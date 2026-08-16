@@ -100,6 +100,10 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .fixture-grid { --market-count: 5; display: grid; grid-template-columns: 220px 300px 310px 190px 110px 95px repeat(var(--market-count), minmax(125px, 1fr)); gap: 12px; min-width: calc(1247px + var(--market-count) * 137px); align-items: center; }
 .table-head { position: sticky; top: 0; z-index: 5; margin: 0 -10px; padding: 12px 10px 10px; border-bottom: 1px solid var(--line); background: #151426; }
 .table-head button { padding: 4px 0; border: 0; background: transparent; color: #87879e; font-size: 10px; font-weight: 700; letter-spacing: .08em; text-align: left; text-transform: uppercase; white-space: nowrap; }
+.sort-mode-badge { display: inline-grid; place-items: center; width: 18px; height: 18px; margin-left: 4px; border-radius: 50%; color: #11111a; font-size: 8px; font-weight: 900; letter-spacing: 0; vertical-align: middle; }
+.sort-mode-badge.win { background: var(--home); }
+.sort-mode-badge.draw { background: #696979; }
+.sort-mode-badge.loss { background: var(--away); }
 .fixture-wrap { border-bottom: 1px solid var(--line-soft); background: rgba(16,16,25,.56); }
 .fixture-wrap:nth-child(odd) { background: rgba(18,18,29,.75); }
 .fixture-wrap.open { background: #11111c; }

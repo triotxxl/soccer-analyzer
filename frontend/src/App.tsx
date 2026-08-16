@@ -21,6 +21,18 @@ type H2hView = "outcome" | "btts" | "over";
 type SortKey = "kickoff" | "team" | "form" | "h2h" | "expected" | "score" | "market";
 
 const levelRank: Record<RecommendationLevel, number> = { none: 0, recommended: 1, strong: 2 };
+const formSortModes = ["draw", "home", "away"] as const;
+const h2hSortTargets = ["draw", "loss", "win"] as const;
+const formSortLabels: Record<(typeof formSortModes)[number], { badge: string; className: FormResult; label: string }> = {
+  home: { badge: "H", className: "win", label: "Heimsiege" },
+  away: { badge: "A", className: "loss", label: "Auswärtssiege" },
+  draw: { badge: "U", className: "draw", label: "Unentschieden beider Teams" }
+};
+const h2hSortLabels: Record<FormResult, { badge: string; label: string }> = {
+  win: { badge: "H", label: "Heimsiege" },
+  draw: { badge: "U", label: "Unentschieden" },
+  loss: { badge: "A", label: "Auswärtssiege" }
+};
 const resultLabels: Record<FormResult, { text: string; title: string }> = {
   win: { text: "S", title: "Sieg" },
   draw: { text: "U", title: "Unentschieden" },
@@ -203,15 +215,17 @@ function Dashboard({ document }: { document: DashboardDocument }) {
     else if (sortKey === "score") comparison = (marketFilter === "draw" ? left.scores.draw ?? -1 : left.scores.favorite ?? -1) - (marketFilter === "draw" ? right.scores.draw ?? -1 : right.scores.favorite ?? -1);
     else if (sortKey === "market") comparison = marketFor(left, selectedMarket).probability - marketFor(right, selectedMarket).probability;
     else if (sortKey === "form") {
-      const target: FormResult = (["win", "loss", "draw"] as const)[formSortMode]!;
-      comparison = countResults([...left.form.home, ...left.form.away], target) - countResults([...right.form.home, ...right.form.away], target);
+      const mode = formSortModes[formSortMode]!;
+      if (mode === "home") comparison = countResults(left.form.home, "win") - countResults(right.form.home, "win");
+      else if (mode === "away") comparison = countResults(left.form.away, "win") - countResults(right.form.away, "win");
+      else comparison = countResults([...left.form.home, ...left.form.away], "draw") - countResults([...right.form.home, ...right.form.away], "draw");
     } else if (sortKey === "h2h") {
       if (h2hView === "btts") comparison = consecutive(left.h2h.btts) - consecutive(right.h2h.btts);
       else if (h2hView === "over") {
         const streak = (fixture: DashboardFixture) => consecutive(fixture.h2h.matches.map((match) => match.homeGoals + match.awayGoals > overLine));
         comparison = streak(left) - streak(right);
       } else {
-        const target: FormResult = (["draw", "loss", "win"] as const)[h2hSortMode]!;
+        const target = h2hSortTargets[h2hSortMode]!;
         comparison = compareOutcomeSequences(left.h2h.outcomes, right.h2h.outcomes, target);
       }
     }
@@ -238,6 +252,10 @@ function Dashboard({ document }: { document: DashboardDocument }) {
     }
   };
   const arrow = (key: SortKey) => sortKey === key ? (sortDirection === 1 ? "↑" : "↓") : "↕";
+  const formSortModeKey = formSortModes[formSortMode]!;
+  const formSortLabel = formSortLabels[formSortModeKey];
+  const h2hSortTarget = h2hSortTargets[h2hSortMode]!;
+  const h2hSortLabel = h2hSortLabels[h2hSortTarget];
   const shownMarkets = marketFilter === "all" ? MARKET_OPTIONS.slice(1) : MARKET_OPTIONS.filter((option) => option.key === marketFilter);
   const showScore = marketFilter === "all" || marketFilter === "1x2" || marketFilter === "draw";
   const gridStyle = { "--market-count": shownMarkets.length } as CSSProperties;
@@ -296,8 +314,16 @@ function Dashboard({ document }: { document: DashboardDocument }) {
         <div className="table-head fixture-grid" style={gridStyle}>
           <button onClick={() => sort("kickoff")}>Anstoß & Liga {arrow("kickoff")}</button>
           <button onClick={() => sort("team")}>Partie {arrow("team")}</button>
-          <button onClick={() => sort("form")}>Letzte 5 Form {arrow("form")}</button>
-          <button onClick={() => sort("h2h")}>Letzte 5 H2H {arrow("h2h")}</button>
+          <button onClick={() => sort("form")}>
+            Letzte 5 Form {sortKey === "form"
+              ? <span className={`sort-mode-badge ${formSortLabel.className}`} aria-label={`Sortierung: ${formSortLabel.label}`} title={formSortLabel.label}>{formSortLabel.badge}</span>
+              : arrow("form")}
+          </button>
+          <button onClick={() => sort("h2h")}>
+            Letzte 5 H2H {h2hView === "outcome" && sortKey === "h2h"
+              ? <span className={`sort-mode-badge ${h2hSortTarget}`} aria-label={`Sortierung: ${h2hSortLabel.label}`} title={h2hSortLabel.label}>{h2hSortLabel.badge}</span>
+              : arrow("h2h")}
+          </button>
           <button onClick={() => sort("expected")}>Erw. Tore {arrow("expected")}</button>
           {showScore && <button onClick={() => sort("score")}>Score {arrow("score")}</button>}
           {shownMarkets.map((option) => <button key={option.key} onClick={() => sort("market")}>{option.label} {arrow("market")}</button>)}

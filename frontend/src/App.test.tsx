@@ -102,6 +102,7 @@ describe("React-Dashboard", () => {
     expect(await screen.findByText("Unterbrochen")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /Letzte 5 H2H/i }));
+    expect(screen.getByLabelText("Sortierung: Auswärtssiege")).toHaveTextContent("A");
     const rows = Array.from(globalThis.document.querySelectorAll(".fixture-row"));
     expect(rows.map((row) => row.textContent)).toEqual([
       expect.stringContaining("Vier A plus U"),
@@ -113,10 +114,42 @@ describe("React-Dashboard", () => {
     ]);
 
     await user.click(screen.getByRole("button", { name: /Letzte 5 H2H/i }));
+    expect(screen.getByLabelText("Sortierung: Heimsiege")).toHaveTextContent("H");
     expect(globalThis.document.querySelector(".fixture-row")?.textContent).toContain("Vier H plus U");
 
     await user.click(screen.getByRole("button", { name: /Letzte 5 H2H/i }));
+    expect(screen.getByLabelText("Sortierung: Unentschieden")).toHaveTextContent("U");
     expect(globalThis.document.querySelector(".fixture-row")?.textContent).toContain("Vier U plus H");
+  });
+
+  it("sortiert die Form nacheinander nach Heim-, Auswärtssiegen und gemeinsamen Remis", async () => {
+    const current = document();
+    const forms = [
+      ["Heimstark", ["win", "win", "win", "win", "loss"], ["loss", "loss", "draw", "loss", "loss"]],
+      ["Auswärtsstark", ["loss", "draw", "loss", "loss", "loss"], ["win", "win", "win", "win", "loss"]],
+      ["Remisstark", ["draw", "draw", "loss", "draw", "loss"], ["draw", "win", "draw", "draw", "loss"]]
+    ] as const;
+    current.fixtures = forms.map(([name, home, away], index) => ({
+      ...fixture(index + 1, name, "none", `2026-08-17T${String(12 + index).padStart(2, "0")}:00:00.000Z`),
+      form: { scope: "venue", home: [...home], away: [...away] }
+    }));
+    current.meta.fixtureCount = current.fixtures.length;
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(current), { status: 200 })));
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(<App />);
+    expect(await screen.findByText("Heimstark")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /Letzte 5 Form/i }));
+    expect(screen.getByLabelText("Sortierung: Heimsiege")).toHaveTextContent("H");
+    expect(globalThis.document.querySelector(".fixture-row")?.textContent).toContain("Heimstark");
+
+    await user.click(screen.getByRole("button", { name: /Letzte 5 Form/i }));
+    expect(screen.getByLabelText("Sortierung: Auswärtssiege")).toHaveTextContent("A");
+    expect(globalThis.document.querySelector(".fixture-row")?.textContent).toContain("Auswärtsstark");
+
+    await user.click(screen.getByRole("button", { name: /Letzte 5 Form/i }));
+    expect(screen.getByLabelText("Sortierung: Unentschieden beider Teams")).toHaveTextContent("U");
+    expect(globalThis.document.querySelector(".fixture-row")?.textContent).toContain("Remisstark");
   });
 
   it("lädt bei erneutem Fensterfokus einen neuen Lauf", async () => {
