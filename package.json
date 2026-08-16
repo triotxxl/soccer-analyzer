@@ -1,0 +1,50 @@
+{
+  "name": "api-football-analyzer",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Chatgesteuerter, deterministischer Fußball-Analyzer für API-Football",
+  "scripts": {
+    "analyze": "node --env-file-if-exists=.env src/cli.ts analyze",
+    "dashboard": "node --env-file-if-exists=.env src/cli.ts dashboard",
+    "draw": "node --env-file-if-exists=.env src/cli.ts analyze --markets draw",
+    "favorites": "node --env-file-if-exists=.env src/cli.ts analyze --markets 1x2",
+    "goals": "node --env-file-if-exists=.env src/cli.ts goals",
+    "venue-form": "node --env-file-if-exists=.env src/cli.ts venue-form",
+    "live": "node --env-file-if-exists=.env src/cli.ts live",
+    "settle": "node --env-file-if-exists=.env src/cli.ts settle",
+    "report": "node --env-file-if-exists=.env src/cli.ts report",
+    "strength": "node --env-file-if-exists=.env src/cli.ts strength",
+    "aliases": "node --env-file-if-exists=.env src/cli.ts aliases",
+    "team-aliases": "node --env-file-if-exists=.env src/cli.ts team-aliases",
+    "app": "vite --config frontend/vite.config.ts",
+    "app:build": "vite build --config frontend/vite.config.ts",
+    "app:preview": "vite preview --config frontend/vite.config.ts",
+    "app:test": "vitest run --config frontend/vite.config.ts",
+    "test": "node --test --test-concurrency=1 && npm run app:test",
+    "typecheck": "tsc --noEmit && tsc --project frontend/tsconfig.json --noEmit",
+    "smoke": "node --env-file-if-exists=.env src/cli.ts smoke"
+  },
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.4",
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
+    "@vitejs/plugin-react": "^6.0.5",
+    "jsdom": "^30.0.1",
+    "typescript": "^5.9.0",
+    "vite": "^8.2.1",
+    "vitest": "^4.1.10"
+  },
+  "dependencies": {
+    "@fontsource/jetbrains-mono": "^5.3.0",
+    "@phosphor-icons/react": "^2.1.10",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
+  }
+}

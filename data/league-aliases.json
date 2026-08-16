@@ -1,0 +1,817 @@
+{
+  "argentinien|copa argentina": {
+    "leagueId": 130,
+    "country": "Argentina",
+    "league": "Copa Argentina"
+  },
+  "argentinien|liga profesional de futbol clausura": {
+    "leagueId": 128,
+    "country": "Argentina",
+    "league": "Liga Profesional Argentina"
+  },
+  "argentinien|primera b metropolitana": {
+    "leagueId": 131,
+    "country": "Argentina",
+    "league": "Primera B Metropolitana"
+  },
+  "argentinien|primera b nacional": {
+    "leagueId": 129,
+    "country": "Argentina",
+    "league": "Primera Nacional"
+  },
+  "argentinien|torneo federal a abstiegsrunde gr a": {
+    "leagueId": 134,
+    "country": "Argentina",
+    "league": "Torneo Federal A"
+  },
+  "argentinien|torneo federal a abstiegsrunde gr b": {
+    "leagueId": 134,
+    "country": "Argentina",
+    "league": "Torneo Federal A"
+  },
+  "argentinien|torneo federal a hauptrunde gr a": {
+    "leagueId": 134,
+    "country": "Argentina",
+    "league": "Torneo Federal A"
+  },
+  "argentinien|torneo federal a hauptrunde gr b": {
+    "leagueId": 134,
+    "country": "Argentina",
+    "league": "Torneo Federal A"
+  },
+  "armenien|premier league": {
+    "leagueId": 342,
+    "country": "Armenia",
+    "league": "Premier League"
+  },
+  "aserbaidschan|premier league": {
+    "leagueId": 419,
+    "country": "Azerbaijan",
+    "league": "Premyer Liqa"
+  },
+  "australien|australien pokal endrunde": {
+    "leagueId": 874,
+    "country": "Australia",
+    "league": "Australia Cup"
+  },
+  "australien|npl capital": {
+    "leagueId": 189,
+    "country": "Australia",
+    "league": "Capital Territory NPL"
+  },
+  "australien|npl new south wales": {
+    "leagueId": 192,
+    "country": "Australia",
+    "league": "New South Wales NPL"
+  },
+  "australien|npl northern nsw": {
+    "leagueId": 481,
+    "country": "Australia",
+    "league": "Northern NSW NPL"
+  },
+  "australien|npl south australia": {
+    "leagueId": 194,
+    "country": "Australia",
+    "league": "South Australia NPL"
+  },
+  "australien|npl tasmania playoffs": {
+    "leagueId": 648,
+    "country": "Australia",
+    "league": "Tasmania NPL"
+  },
+  "australien|npl victoria": {
+    "leagueId": 195,
+    "country": "Australia",
+    "league": "Victoria NPL"
+  },
+  "australien|npl western australia": {
+    "leagueId": 196,
+    "country": "Australia",
+    "league": "Western Australia NPL"
+  },
+  "belarus|pervaya liga": {
+    "leagueId": 117,
+    "country": "Belarus",
+    "league": "1. Division"
+  },
+  "belarus|vysshaya league": {
+    "leagueId": 116,
+    "country": "Belarus",
+    "league": "Premier League"
+  },
+  "belgien|pro league": {
+    "leagueId": 144,
+    "country": "Belgium",
+    "league": "Jupiler Pro League"
+  },
+  "belgien|supercup": {
+    "leagueId": 519,
+    "country": "Belgium",
+    "league": "Super Cup"
+  },
+  "bolivien|primera division": {
+    "leagueId": 344,
+    "country": "Bolivia",
+    "league": "Primera División"
+  },
+  "bosnien and herzegowina|premijer liga": {
+    "leagueId": 315,
+    "country": "Bosnia",
+    "league": "Premijer Liga"
+  },
+  "brasilien|brasileiro serie a": {
+    "leagueId": 71,
+    "country": "Brazil",
+    "league": "Serie A"
+  },
+  "brasilien|brasileiro serie b": {
+    "leagueId": 72,
+    "country": "Brazil",
+    "league": "Serie B"
+  },
+  "brasilien|brasileiro serie c": {
+    "leagueId": 75,
+    "country": "Brazil",
+    "league": "Serie C"
+  },
+  "brasilien|copa do brasil": {
+    "leagueId": 73,
+    "country": "Brazil",
+    "league": "Copa Do Brasil"
+  },
+  "bulgarien|1 professional league": {
+    "leagueId": 172,
+    "country": "Bulgaria",
+    "league": "First League"
+  },
+  "bulgarien|2 professional league": {
+    "leagueId": 173,
+    "country": "Bulgaria",
+    "league": "Second League"
+  },
+  "champions league|qualifikationsrunde": {
+    "leagueId": 2,
+    "country": "World",
+    "league": "UEFA Champions League"
+  },
+  "chile|primera b": {
+    "leagueId": 266,
+    "country": "Chile",
+    "league": "Primera B"
+  },
+  "chile|primera division": {
+    "leagueId": 265,
+    "country": "Chile",
+    "league": "Primera División"
+  },
+  "chile|segunda division abstiegsrunde": {
+    "leagueId": 711,
+    "country": "Chile",
+    "league": "Segunda División"
+  },
+  "china|china league 1": {
+    "leagueId": 170,
+    "country": "China",
+    "league": "League One"
+  },
+  "china|china league 2 nord": {
+    "leagueId": 929,
+    "country": "China",
+    "league": "League Two"
+  },
+  "china|china super league": {
+    "leagueId": 169,
+    "country": "China",
+    "league": "Super League"
+  },
+  "concacaf leagues cup|ligaphase": {
+    "leagueId": 772,
+    "country": "World",
+    "league": "Leagues Cup"
+  },
+  "conference league|qualifikationsrunde": {
+    "leagueId": 848,
+    "country": "World",
+    "league": "UEFA Europa Conference League"
+  },
+  "copa libertadores|finalrunde": {
+    "leagueId": 13,
+    "country": "World",
+    "league": "CONMEBOL Libertadores"
+  },
+  "copa sudamericana|finalrunde": {
+    "leagueId": 11,
+    "country": "World",
+    "league": "CONMEBOL Sudamericana"
+  },
+  "costa rica|liga de ascenso apertura gruppe 2": {
+    "leagueId": 163,
+    "country": "Costa-Rica",
+    "league": "Liga de Ascenso"
+  },
+  "costa rica|primera division apertura": {
+    "leagueId": 162,
+    "country": "Costa-Rica",
+    "league": "Primera División"
+  },
+  "danemark|1st division": {
+    "leagueId": 120,
+    "country": "Denmark",
+    "league": "1. Division"
+  },
+  "danemark|2nd division": {
+    "leagueId": 122,
+    "country": "Denmark",
+    "league": "2. Division"
+  },
+  "danemark|superliga": {
+    "leagueId": 119,
+    "country": "Denmark",
+    "league": "Superliga"
+  },
+  "danemark|superligaen": {
+    "leagueId": 119,
+    "country": "Denmark",
+    "league": "Superliga"
+  },
+  "deutschland|1 bundesliga": {
+    "leagueId": 78,
+    "country": "Germany",
+    "league": "Bundesliga"
+  },
+  "deutschland|2 bundesliga": {
+    "leagueId": 79,
+    "country": "Germany",
+    "league": "2. Bundesliga"
+  },
+  "deutschland|franz beckenbauer super cup": {
+    "leagueId": 529,
+    "country": "Germany",
+    "league": "Super Cup"
+  },
+  "deutschland|supercup frauen": {
+    "leagueId": 1137,
+    "country": "Germany",
+    "league": "Supercup der Frauen"
+  },
+  "ecuador|ligapro primera a primera etapa": {
+    "leagueId": 242,
+    "country": "Ecuador",
+    "league": "Liga Pro"
+  },
+  "ecuador|ligapro primera b": {
+    "leagueId": 243,
+    "country": "Ecuador",
+    "league": "Liga Pro Serie B"
+  },
+  "el salvador|primera division apertura": {
+    "leagueId": 370,
+    "country": "El-Salvador",
+    "league": "Primera Division"
+  },
+  "england|efl pokal": {
+    "leagueId": 48,
+    "country": "England",
+    "league": "League Cup"
+  },
+  "england|national league nord": {
+    "leagueId": 43,
+    "country": "England",
+    "league": "National League"
+  },
+  "england|national league sud": {
+    "leagueId": 43,
+    "country": "England",
+    "league": "National League"
+  },
+  "england|premier league": {
+    "leagueId": 39,
+    "country": "England",
+    "league": "Premier League"
+  },
+  "estland|premium liiga": {
+    "leagueId": 329,
+    "country": "Estonia",
+    "league": "Meistriliiga"
+  },
+  "europa league|qualifikationsrunde": {
+    "leagueId": 3,
+    "country": "World",
+    "league": "UEFA Europa League"
+  },
+  "faroer|premier league": {
+    "leagueId": 367,
+    "country": "Faroe-Islands",
+    "league": "Meistaradeildin"
+  },
+  "finnland|veikkausliiga": {
+    "leagueId": 244,
+    "country": "Finland",
+    "league": "Veikkausliiga"
+  },
+  "finnland|ykkosliiga": {
+    "leagueId": 1087,
+    "country": "Finland",
+    "league": "Ykkösliiga"
+  },
+  "georgien|erovnuli liga": {
+    "leagueId": 327,
+    "country": "Georgia",
+    "league": "Erovnuli Liga"
+  },
+  "guatemala|liga nacional apertura": {
+    "leagueId": 339,
+    "country": "Guatemala",
+    "league": "Liga Nacional"
+  },
+  "honduras|liga nacional apertura": {
+    "leagueId": 234,
+    "country": "Honduras",
+    "league": "Liga Nacional"
+  },
+  "international clubs|uefa super cup": {
+    "leagueId": 531,
+    "country": "World",
+    "league": "UEFA Super Cup"
+  },
+  "international|africa cup of nations finalrunde frauen": {
+    "leagueId": 922,
+    "country": "World",
+    "league": "Africa Cup of Nations - Women"
+  },
+  "international|africa cup of nations frauen gruppe a": {
+    "leagueId": 922,
+    "country": "World",
+    "league": "Africa Cup of Nations - Women"
+  },
+  "international|africa cup of nations frauen gruppe b": {
+    "leagueId": 922,
+    "country": "World",
+    "league": "Africa Cup of Nations - Women"
+  },
+  "international|conference league qualifikationsrunde": {
+    "leagueId": 848,
+    "country": "World",
+    "league": "UEFA Europa Conference League"
+  },
+  "international|copa sudamericana finalrunde": {
+    "leagueId": 11,
+    "country": "World",
+    "league": "CONMEBOL Sudamericana"
+  },
+  "international|europa league qualifikationsrunde": {
+    "leagueId": 3,
+    "country": "World",
+    "league": "UEFA Europa League"
+  },
+  "irak|iraqi league": {
+    "leagueId": 542,
+    "country": "Iraq",
+    "league": "Iraqi League"
+  },
+  "iran|pro league": {
+    "leagueId": 290,
+    "country": "Iran",
+    "league": "Persian Gulf Pro League"
+  },
+  "irland|fai pokal": {
+    "leagueId": 359,
+    "country": "Ireland",
+    "league": "FAI Cup"
+  },
+  "irland|first division": {
+    "leagueId": 358,
+    "country": "Ireland",
+    "league": "First Division"
+  },
+  "irland|ireland premier division": {
+    "leagueId": 357,
+    "country": "Ireland",
+    "league": "Premier Division"
+  },
+  "irland|premier division": {
+    "leagueId": 357,
+    "country": "Ireland",
+    "league": "Premier Division"
+  },
+  "island|besta deild": {
+    "leagueId": 164,
+    "country": "Iceland",
+    "league": "Úrvalsdeild"
+  },
+  "italien|serie a": {
+    "leagueId": 135,
+    "country": "Italy",
+    "league": "Serie A"
+  },
+  "japan|j league": {
+    "leagueId": 98,
+    "country": "Japan",
+    "league": "J1 League"
+  },
+  "japan|j league 2": {
+    "leagueId": 99,
+    "country": "Japan",
+    "league": "J2 League"
+  },
+  "japan|j league 3": {
+    "leagueId": 100,
+    "country": "Japan",
+    "league": "J3 League"
+  },
+  "kanada|canadian premier league": {
+    "leagueId": 479,
+    "country": "Canada",
+    "league": "Canadian Premier League"
+  },
+  "kasachstan|1 division": {
+    "leagueId": 388,
+    "country": "Kazakhstan",
+    "league": "1. Division"
+  },
+  "kasachstan|premier league": {
+    "leagueId": 389,
+    "country": "Kazakhstan",
+    "league": "Premier League"
+  },
+  "kolumbien|copa colombia endrunde": {
+    "leagueId": 241,
+    "country": "Colombia",
+    "league": "Copa Colombia"
+  },
+  "kolumbien|primera a clausura": {
+    "leagueId": 239,
+    "country": "Colombia",
+    "league": "Primera A"
+  },
+  "kolumbien|primera b clausura": {
+    "leagueId": 240,
+    "country": "Colombia",
+    "league": "Primera B"
+  },
+  "kroatien|croatia hnl": {
+    "leagueId": 210,
+    "country": "Croatia",
+    "league": "HNL"
+  },
+  "kroatien|hnl": {
+    "leagueId": 210,
+    "country": "Croatia",
+    "league": "HNL"
+  },
+  "lettland|virsliga": {
+    "leagueId": 365,
+    "country": "Latvia",
+    "league": "Virsliga"
+  },
+  "litauen|1 lyga": {
+    "leagueId": 361,
+    "country": "Lithuania",
+    "league": "1 Lyga"
+  },
+  "litauen|a lyga": {
+    "leagueId": 362,
+    "country": "Lithuania",
+    "league": "A Lyga"
+  },
+  "mexiko|liga de expansion mx apertura": {
+    "leagueId": 263,
+    "country": "Mexico",
+    "league": "Liga de Expansión MX"
+  },
+  "mexiko|liga mx apertura": {
+    "leagueId": 262,
+    "country": "Mexico",
+    "league": "Liga MX"
+  },
+  "montenegro|1 cfl": {
+    "leagueId": 355,
+    "country": "Montenegro",
+    "league": "First League"
+  },
+  "neuseeland|central league": {
+    "leagueId": 954,
+    "country": "New-Zealand",
+    "league": "National League - Central"
+  },
+  "neuseeland|northern league": {
+    "leagueId": 956,
+    "country": "New-Zealand",
+    "league": "National League - Northern"
+  },
+  "neuseeland|southern league": {
+    "leagueId": 957,
+    "country": "New-Zealand",
+    "league": "National League - Southern"
+  },
+  "nicaragua|primera division apertura": {
+    "leagueId": 396,
+    "country": "Nicaragua",
+    "league": "Primera Division"
+  },
+  "nordirland|premiership": {
+    "leagueId": 408,
+    "country": "Northern-Ireland",
+    "league": "Premiership"
+  },
+  "norwegen|1 division": {
+    "leagueId": 104,
+    "country": "Norway",
+    "league": "1. Division"
+  },
+  "norwegen|2 division gruppe 1": {
+    "leagueId": 473,
+    "country": "Norway",
+    "league": "2. Division - Group 1"
+  },
+  "norwegen|eliteserien": {
+    "leagueId": 103,
+    "country": "Norway",
+    "league": "Eliteserien"
+  },
+  "norwegen|toppserien frauen": {
+    "leagueId": 725,
+    "country": "Norway",
+    "league": "Toppserien"
+  },
+  "osterreich|2 liga": {
+    "leagueId": 219,
+    "country": "Austria",
+    "league": "2. Liga"
+  },
+  "osterreich|bundesliga": {
+    "leagueId": 218,
+    "country": "Austria",
+    "league": "Bundesliga"
+  },
+  "panama|liga prom apertura": {
+    "leagueId": 304,
+    "country": "Panama",
+    "league": "Liga Panameña de Fútbol"
+  },
+  "panama|lpf apertura": {
+    "leagueId": 304,
+    "country": "Panama",
+    "league": "Liga Panameña de Fútbol"
+  },
+  "paraguay|primera division clausura": {
+    "leagueId": 252,
+    "country": "Paraguay",
+    "league": "Division Profesional - Clausura"
+  },
+  "peru|primera division clausura": {
+    "leagueId": 281,
+    "country": "Peru",
+    "league": "Primera División"
+  },
+  "polen|1 liga": {
+    "leagueId": 107,
+    "country": "Poland",
+    "league": "I Liga"
+  },
+  "polen|ekstraklasa": {
+    "leagueId": 106,
+    "country": "Poland",
+    "league": "Ekstraklasa"
+  },
+  "polen|ii liga": {
+    "leagueId": 109,
+    "country": "Poland",
+    "league": "II Liga - East"
+  },
+  "polen|poland ekstraklasa": {
+    "leagueId": 106,
+    "country": "Poland",
+    "league": "Ekstraklasa"
+  },
+  "portugal|liga 3 gruppe b": {
+    "leagueId": 865,
+    "country": "Portugal",
+    "league": "Liga 3"
+  },
+  "portugal|supercup": {
+    "leagueId": 550,
+    "country": "Portugal",
+    "league": "Super Cup"
+  },
+  "rumanien|liga 2": {
+    "leagueId": 284,
+    "country": "Romania",
+    "league": "Liga II"
+  },
+  "rumanien|superliga": {
+    "leagueId": 283,
+    "country": "Romania",
+    "league": "Liga I"
+  },
+  "saudi arabien|saudi professional liga": {
+    "leagueId": 307,
+    "country": "Saudi-Arabia",
+    "league": "Pro League"
+  },
+  "schottland|championship": {
+    "leagueId": 180,
+    "country": "Scotland",
+    "league": "Championship"
+  },
+  "schottland|league one": {
+    "leagueId": 183,
+    "country": "Scotland",
+    "league": "League One"
+  },
+  "schottland|league pokal": {
+    "leagueId": 185,
+    "country": "Scotland",
+    "league": "League Cup"
+  },
+  "schottland|league two": {
+    "leagueId": 184,
+    "country": "Scotland",
+    "league": "League Two"
+  },
+  "schottland|premiership": {
+    "leagueId": 179,
+    "country": "Scotland",
+    "league": "Premiership"
+  },
+  "schottland|scotland premiership": {
+    "leagueId": 179,
+    "country": "Scotland",
+    "league": "Premiership"
+  },
+  "schweden|allsvenskan": {
+    "leagueId": 113,
+    "country": "Sweden",
+    "league": "Allsvenskan"
+  },
+  "schweden|damallsvenskan frauen": {
+    "leagueId": 549,
+    "country": "Sweden",
+    "league": "Damallsvenskan"
+  },
+  "schweden|division 1 norra": {
+    "leagueId": 563,
+    "country": "Sweden",
+    "league": "Ettan - Norra"
+  },
+  "schweden|division 1 sodra": {
+    "leagueId": 564,
+    "country": "Sweden",
+    "league": "Ettan - Södra"
+  },
+  "schweden|superettan": {
+    "leagueId": 114,
+    "country": "Sweden",
+    "league": "Superettan"
+  },
+  "schweiz|challenge league": {
+    "leagueId": 208,
+    "country": "Switzerland",
+    "league": "Challenge League"
+  },
+  "schweiz|super league": {
+    "leagueId": 207,
+    "country": "Switzerland",
+    "league": "Super League"
+  },
+  "serbien|prva liga": {
+    "leagueId": 287,
+    "country": "Serbia",
+    "league": "Prva Liga"
+  },
+  "serbien|superliga": {
+    "leagueId": 286,
+    "country": "Serbia",
+    "league": "Super Liga"
+  },
+  "simbabwe|premier league": {
+    "leagueId": 401,
+    "country": "Zimbabwe",
+    "league": "Premier Soccer League"
+  },
+  "slowakei|2 liga": {
+    "leagueId": 506,
+    "country": "Slovakia",
+    "league": "2. liga"
+  },
+  "slowakei|superliga": {
+    "leagueId": 332,
+    "country": "Slovakia",
+    "league": "Super Liga"
+  },
+  "slowenien|2 snl": {
+    "leagueId": 374,
+    "country": "Slovenia",
+    "league": "2. SNL"
+  },
+  "slowenien|prvaliga": {
+    "leagueId": 373,
+    "country": "Slovenia",
+    "league": "1. SNL"
+  },
+  "spanien|la liga": {
+    "leagueId": 140,
+    "country": "Spain",
+    "league": "La Liga"
+  },
+  "spanien|la liga 2": {
+    "leagueId": 141,
+    "country": "Spain",
+    "league": "Segunda División"
+  },
+  "sudafrika|premier league": {
+    "leagueId": 288,
+    "country": "South-Africa",
+    "league": "Premier Soccer League"
+  },
+  "sudkorea|k league 1": {
+    "leagueId": 292,
+    "country": "South-Korea",
+    "league": "K League 1"
+  },
+  "sudkorea|k league 2": {
+    "leagueId": 293,
+    "country": "South-Korea",
+    "league": "K League 2"
+  },
+  "tansania|premier league": {
+    "leagueId": 567,
+    "country": "Tanzania",
+    "league": "Ligi kuu Bara"
+  },
+  "tschechien|1 liga": {
+    "leagueId": 345,
+    "country": "Czech-Republic",
+    "league": "Czech Liga"
+  },
+  "tschechien|cfl gruppe a": {
+    "leagueId": 348,
+    "country": "Czech-Republic",
+    "league": "3. liga - CFL A"
+  },
+  "tschechien|cfl gruppe b": {
+    "leagueId": 685,
+    "country": "Czech-Republic",
+    "league": "3. liga - CFL B"
+  },
+  "tschechien|msfl": {
+    "leagueId": 349,
+    "country": "Czech-Republic",
+    "league": "3. liga - MSFL"
+  },
+  "turkei|1 lig": {
+    "leagueId": 204,
+    "country": "Turkey",
+    "league": "1. Lig"
+  },
+  "ungarn|nb i": {
+    "leagueId": 271,
+    "country": "Hungary",
+    "league": "NB I"
+  },
+  "ungarn|nb ii": {
+    "leagueId": 272,
+    "country": "Hungary",
+    "league": "NB II"
+  },
+  "uruguay|primera division clausura": {
+    "leagueId": 268,
+    "country": "Uruguay",
+    "league": "Primera División"
+  },
+  "usa|mls": {
+    "leagueId": 253,
+    "country": "USA",
+    "league": "Major League Soccer"
+  },
+  "usa|national league frauen": {
+    "leagueId": 254,
+    "country": "USA",
+    "league": "NWSL Women"
+  },
+  "usbekistan|pfl": {
+    "leagueId": 369,
+    "country": "Uzbekistan",
+    "league": "Super League"
+  },
+  "v a emirate|pro league": {
+    "leagueId": 301,
+    "country": "United-Arab-Emirates",
+    "league": "Pro League"
+  },
+  "venezuela|primera division clausura": {
+    "leagueId": 299,
+    "country": "Venezuela",
+    "league": "Primera División"
+  },
+  "venezuela|segunda division zentral west": {
+    "leagueId": 300,
+    "country": "Venezuela",
+    "league": "Segunda División"
+  },
+  "wales|cymru premier league": {
+    "leagueId": 110,
+    "country": "Wales",
+    "league": "Premier League"
+  }
+}

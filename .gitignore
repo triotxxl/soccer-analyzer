@@ -1,0 +1,14 @@
+node_modules/
+.env
+.env copy.example
+/data.json
+/output/
+/Screenshots/
+/UI improvement request.zip
+data/cache/
+data/analysis-cache/
+data/analyzer.sqlite*
+data/tmp/
+coverage/
+dist/
+*.log
