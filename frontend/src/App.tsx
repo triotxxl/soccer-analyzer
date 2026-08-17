@@ -1,5 +1,5 @@
 import {
-  Binoculars, CalendarBlank, CaretDoubleLeft, CaretDoubleRight, CaretLeft, CaretRight, CheckCircle, ListBullets, RocketLaunch, Shield, ShieldCheck, Star, X
+  Binoculars, CalendarBlank, CaretDoubleLeft, CaretDoubleRight, CaretLeft, CaretRight, CheckCircle, ClockCounterClockwise, Funnel, ListBullets, RocketLaunch, Shield, ShieldCheck, Star, WarningCircle, X
 } from "@phosphor-icons/react";
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { useDashboardData } from "./data";
@@ -148,6 +148,15 @@ function formatPercent(value: number): string {
 
 function formatOdd(value: number | null): string {
   return value === null ? "–" : value.toFixed(2).replace(".", ",");
+}
+
+function formatDataTimestamp(value: string, timezone: string): string {
+  return new Intl.DateTimeFormat("de-DE", { timeZone: timezone, day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }).format(new Date(value));
+}
+
+function sortStateLabel(label: string, active: boolean, direction: 1 | -1): string {
+  if (!active) return `${label}, nicht sortiert`;
+  return `${label}, ${direction === 1 ? "aufsteigend" : "absteigend"} sortiert`;
 }
 
 function marketFor(fixture: DashboardFixture, key: DashboardMarketKey): DashboardMarket | undefined {
@@ -515,7 +524,7 @@ function Dashboard({ document }: { document: DashboardDocument }) {
   const kpis = [
     { key: "all" as const, icon: ListBullets, value: counts.all, label: "Alle Partien", tone: "neutral" },
     { key: "strong" as const, icon: Star, value: counts.strong, label: "Starke Tipps", tone: "gold" },
-    { key: "recommended" as const, icon: CheckCircle, value: counts.recommended, label: "Empfehlungen", tone: "neutral" }
+    { key: "recommended" as const, icon: CheckCircle, value: counts.recommended, label: "Empfehlungen", tone: "green" }
   ];
 
   return <div className={`app-shell density-${density} ${sidebarOpen ? "" : "sidebar-collapsed"}`}>
@@ -527,7 +536,7 @@ function Dashboard({ document }: { document: DashboardDocument }) {
       </div>
       {sidebarOpen && <>
         <section className="sidebar-section">
-          <h2>Zeitraum</h2>
+          <h2><CalendarBlank size={14} weight="bold" aria-hidden /> Zeitraum</h2>
           <div className="date-range-control" ref={dateControlRef}>
             <button className={`date-range-trigger ${rangeMode === "custom" ? "active" : ""}`} disabled={!document.meta.firstAvailableDate || !document.meta.lastAvailableDate} aria-label="Datumsbereich auswählen" aria-haspopup="dialog" aria-expanded={calendarOpen} onClick={() => calendarOpen ? setCalendarOpen(false) : openCalendar()}>
               <CalendarBlank size={16} weight="duotone" /><span><strong>Datumsbereich</strong><small>{customStart && customEnd ? `${formatCalendarDate(customStart, { day: "2-digit", month: "2-digit" })} – ${formatCalendarDate(customEnd, { day: "2-digit", month: "2-digit" })}` : "Keine Tage verfügbar"}</small></span>
@@ -545,35 +554,42 @@ function Dashboard({ document }: { document: DashboardDocument }) {
               onCancel={() => setCalendarOpen(false)}
             />}
           </div>
-          <label><input type="checkbox" checked={showCrossLeague} onChange={(event) => setShowCrossLeague(event.target.checked)} /> Pokal- / Cross-League</label>
-          <label><input type="checkbox" checked={showPast} onChange={(event) => setShowPast(event.target.checked)} /> Laufende / beendete Partien</label>
+          <label className="check-row"><input type="checkbox" checked={showCrossLeague} onChange={(event) => setShowCrossLeague(event.target.checked)} /> Pokal- / Cross-League</label>
+          <label className="check-row"><input type="checkbox" checked={showPast} onChange={(event) => setShowPast(event.target.checked)} /> Laufende / beendete Partien</label>
           <p>{rangeLabel}<br />{filtered.length} von {document.meta.fixtureCount} Partien</p>
         </section>
         <section className="sidebar-section kpi-section">
-          <h2>Filter & Kennzahlen</h2>
-          {kpis.map(({ key, icon: Icon, value, label, tone }) => <button key={key} className={`kpi ${tone} ${levelFilter === key ? "active" : ""}`} onClick={() => setLevelFilter((current) => current === key ? "all" : key)}>
+          <h2><Funnel size={14} weight="bold" aria-hidden /> Filter & Kennzahlen</h2>
+          {kpis.map(({ key, icon: Icon, value, label, tone }) => <button key={key} className={`kpi ${tone} ${levelFilter === key ? "active" : ""}`} aria-pressed={levelFilter === key} onClick={() => setLevelFilter((current) => current === key ? "all" : key)}>
             <span className="kpi-icon"><Icon size={16} weight="duotone" /></span><span className="kpi-label">{label}</span><strong className="kpi-value">{value}</strong>
           </button>)}
         </section>
         <section className="sidebar-section defense-legend" aria-label="Legende Defensivstärke">
-          <h2>Defensivstärke</h2>
+          <h2><ShieldCheck size={14} weight="bold" aria-hidden /> Defensivstärke</h2>
           <span><ShieldCheck size={16} weight="fill" aria-hidden /> Top 20 %, durch xGA verifiziert</span>
           <span><Shield size={16} weight="regular" aria-hidden /> Top 20 %, Torhistorie</span>
         </section>
+        <div className="sidebar-footer">
+          <ClockCounterClockwise size={14} weight="bold" aria-hidden />
+          <span>Datenstand: {formatDataTimestamp(document.meta.createdAt, document.meta.timezone)}</span>
+        </div>
       </>}
-      <div className="mini-kpis" aria-hidden={sidebarOpen || mobileViewport}>{kpis.map(({ key, icon: Icon, value, label }) => <button key={key} tabIndex={sidebarOpen || mobileViewport ? -1 : 0} aria-label={`${label}: ${value} Partien`} title={`${label}: ${value} Partien`} className={levelFilter === key ? "active" : ""} onClick={() => setLevelFilter((current) => current === key ? "all" : key)}><Icon /><small>{value}</small></button>)}</div>
+      <div className="mini-kpis" aria-hidden={sidebarOpen || mobileViewport}>{kpis.map(({ key, icon: Icon, value, label, tone }) => <button key={key} tabIndex={sidebarOpen || mobileViewport ? -1 : 0} aria-label={`${label}: ${value} Partien`} aria-pressed={levelFilter === key} title={`${label}: ${value} Partien`} className={`${tone} ${levelFilter === key ? "active" : ""}`} onClick={() => setLevelFilter((current) => current === key ? "all" : key)}><Icon /><small>{value}</small></button>)}</div>
+      <span className="mini-footer" role="img" aria-hidden={sidebarOpen || mobileViewport} aria-label={`Datenstand: ${formatDataTimestamp(document.meta.createdAt, document.meta.timezone)}`} title={`Datenstand: ${formatDataTimestamp(document.meta.createdAt, document.meta.timezone)}`}>
+        <ClockCounterClockwise size={16} weight="bold" aria-hidden />
+      </span>
     </aside>
 
     <main className="content">
       <button className="mobile-sidebar-toggle" tabIndex={mobileViewport ? 0 : -1} aria-hidden={!mobileViewport} onClick={() => setSidebarOpen(true)} aria-controls="dashboard-sidebar" aria-expanded={sidebarOpen}><ListBullets size={17} weight="duotone" /> Filter & Zeitraum</button>
       {banner && <div className="banner"><span><RocketLaunch size={20} weight="duotone" /></span><p><strong>Grün</strong> markierte Tipps erfüllen alle Modellkriterien, gelbe sind starke Kandidaten. Sortiere über die Spaltenköpfe, filtere Märkte über die Reiter.</p><button onClick={() => setBanner(false)} aria-label="Hinweis schließen"><X /></button></div>}
       <nav className="market-tabs" aria-label="Marktfilter">
-        {availableMarketOptions.map((option) => <button className={marketFilter === option.key ? "active" : ""} key={option.key} onClick={() => selectMarket(option.key)}>{option.label}</button>)}
+        {availableMarketOptions.map((option) => <button className={marketFilter === option.key ? "active" : ""} aria-pressed={marketFilter === option.key} key={option.key} onClick={() => selectMarket(option.key)}>{option.label}</button>)}
       </nav>
       <div className="view-toolbar">
         <span>H2H</span>
         <div className="segmented">
-          {([ ["outcome", "Ergebnis"], ["btts", "BTTS"], ["over", "Über"], ["firstHalfOver", "1. HZ Über"] ] as const).map(([key, label]) => <button className={h2hView === key ? "active" : ""} onClick={() => setH2hView(key)} key={key}>{label}</button>)}
+          {([ ["outcome", "Ergebnis"], ["btts", "BTTS"], ["over", "Über"], ["firstHalfOver", "1. HZ Über"] ] as const).map(([key, label]) => <button className={h2hView === key ? "active" : ""} aria-pressed={h2hView === key} onClick={() => setH2hView(key)} key={key}>{label}</button>)}
         </div>
         <select
           aria-label={h2hView === "firstHalfOver" ? "Über-Linie für H2H 1. Halbzeit" : "Über-Linie für H2H"}
@@ -588,15 +604,15 @@ function Dashboard({ document }: { document: DashboardDocument }) {
             : <><option value={1.5}>Über 1,5</option><option value={2.5}>Über 2,5</option><option value={3.5}>Über 3,5</option></>}
         </select>
         <div className="segmented density-switch">
-          {([ ["micro", "XS"], ["compact", "Kompakt"], ["comfort", "Komfort"] ] as const).map(([key, label]) => <button className={density === key ? "active" : ""} onClick={() => setDensity(key)} key={key}>{label}</button>)}
+          {([ ["micro", "XS"], ["compact", "Kompakt"], ["comfort", "Komfort"] ] as const).map(([key, label]) => <button className={density === key ? "active" : ""} aria-pressed={density === key} onClick={() => setDensity(key)} key={key}>{label}</button>)}
         </div>
       </div>
 
       <div className="table-scroll">
         <div className={`table-head ${fixtureGridClass}`} style={gridStyle}>
           <span className="fixture-summary-head">
-            <button onClick={() => sort("team")}>Partie {arrow("team")}</button>
-            <button onClick={() => sort("kickoff")}>Anstoß & Liga {arrow("kickoff")}</button>
+            <button onClick={() => sort("team")} aria-label={sortStateLabel("Partie", sortKey === "team", sortDirection)}>Partie {arrow("team")}</button>
+            <button onClick={() => sort("kickoff")} aria-label={sortStateLabel("Anstoß & Liga", sortKey === "kickoff", sortDirection)}>Anstoß & Liga {arrow("kickoff")}</button>
           </span>
           <button onClick={() => sort("form")}>
             Letzte 5 Form {sortKey === "form"
@@ -608,15 +624,15 @@ function Dashboard({ document }: { document: DashboardDocument }) {
               ? <span className={`sort-mode-badge ${h2hSortTarget}`} aria-label={`Sortierung: ${h2hSortLabel.label}`} title={h2hSortLabel.label}>{h2hSortLabel.badge}</span>
               : arrow("h2h")}
           </button>
-          <button onClick={() => sort("expected")}>{showFirstHalfExpected ? "Erw. Tore 1. HZ" : "Erw. Tore"} {arrow("expected")}</button>
-          {showScore && <button onClick={() => sort("score")}>Score {arrow("score")}</button>}
-          {shownMarkets.map((option) => <button key={option.key} onClick={() => sort("market")}>{option.label} {arrow("market")}</button>)}
+          <button onClick={() => sort("expected")} aria-label={sortStateLabel(showFirstHalfExpected ? "Erw. Tore 1. HZ" : "Erw. Tore", sortKey === "expected", sortDirection)}>{showFirstHalfExpected ? "Erw. Tore 1. HZ" : "Erw. Tore"} {arrow("expected")}</button>
+          {showScore && <button onClick={() => sort("score")} aria-label={sortStateLabel("Score", sortKey === "score", sortDirection)}>Score {arrow("score")}</button>}
+          {shownMarkets.map((option) => <button key={option.key} onClick={() => sort("market")} aria-label={sortStateLabel(option.label, sortKey === "market", sortDirection)}>{option.label} {arrow("market")}</button>)}
         </div>
         {sortedFixtures.map((fixture) => {
           const time = kickoffParts(fixture.kickoff, document.meta.timezone);
           const isPast = Date.parse(fixture.kickoff) < now;
           const markets = visibleMarkets(fixture, marketFilter);
-          return <article className={`fixture-wrap level-${bestLevel(fixture, marketFilter)} ${openFixture === fixture.fixtureId ? "open" : ""}`} key={fixture.fixtureId}>
+          return <article className={`fixture-wrap level-${bestLevel(fixture, marketFilter)} ${openFixture === fixture.fixtureId ? "open" : ""}`} style={gridStyle} key={fixture.fixtureId}>
             <button className={`${fixtureGridClass} fixture-row`} style={gridStyle} onClick={() => setOpenFixture((value) => value === fixture.fixtureId ? null : fixture.fixtureId)} aria-expanded={openFixture === fixture.fixtureId}>
               <span className="fixture-summary-cell">
                 <span className="teams-cell">
@@ -625,7 +641,12 @@ function Dashboard({ document }: { document: DashboardDocument }) {
                 </span>
                 <span className="fixture-meta"><strong>{time.clock}{isPast && <em> angepfiffen</em>}</strong><small>{time.day} · {fixture.country} · {fixture.league}</small>{(fixture.h2hNotice || fixture.warnings.length > 0) && <i>{fixture.h2hNotice ? "H2H" : "Daten"}</i>}</span>
               </span>
-              <span className="form-cell"><span className="scope">{fixture.form.scope === "overall" ? "Gesamt" : "H/A"}</span><span><FormDots results={fixture.form.home} /><FormDots results={fixture.form.away} /></span></span>
+              <span className="form-cell">
+                <span className="form-labels" aria-label={fixture.form.scope === "overall" ? "Form insgesamt: Home und Away" : "Heim- und Auswärtsform"}>
+                  <small>Home</small><small>Away</small>
+                </span>
+                <span><FormDots results={fixture.form.home} /><FormDots results={fixture.form.away} /></span>
+              </span>
               <span className="h2h-cell"><H2hDots fixture={fixture} view={h2hView} overLine={overLine} firstHalfOverLine={firstHalfOverLine} /></span>
               <span className="expected-cell"><strong>{(showFirstHalfExpected ? fixture.expectedFirstHalfGoals?.home ?? 0 : fixture.expectedGoals.home).toFixed(2).replace(".", ",")}</strong><i>:</i><strong>{(showFirstHalfExpected ? fixture.expectedFirstHalfGoals?.away ?? 0 : fixture.expectedGoals.away).toFixed(2).replace(".", ",")}</strong></span>
               {showScore && <span className="score-cell">{marketFilter !== "draw" && <span><small>1X2</small><strong>{fixture.scores.favorite ?? "–"}</strong></span>}{marketFilter !== "1x2" && <span><small>X</small><strong>{fixture.scores.draw ?? "–"}</strong></span>}</span>}
@@ -647,5 +668,5 @@ export function App() {
   const state = useDashboardData();
   if (state.status === "loading") return <div className="status-screen"><span className="brand-mark">FA</span><strong>Dashboard wird geladen …</strong></div>;
   if (!state.document) return <div className="status-screen"><span className="brand-mark">FA</span><EmptyState title="Noch keine Analyse vorhanden" text={state.message ?? "Starte npm run dashboard -- --dates next48 im Chat."} /></div>;
-  return <><Dashboard document={state.document} />{state.status === "error" && <div className="connection-warning">{state.message} · Letzter erfolgreicher Stand wird weiter angezeigt.</div>}</>;
+  return <><Dashboard document={state.document} />{state.status === "error" && <div className="connection-warning" role="status"><WarningCircle size={16} weight="duotone" aria-hidden /><span>{state.message} · Letzter erfolgreicher Stand wird weiter angezeigt.</span></div>}</>;
 }
