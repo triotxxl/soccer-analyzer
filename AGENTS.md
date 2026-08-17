@@ -123,4 +123,6 @@ Benutzer auf Deutsch und führe Analyseaufträge selbstständig über die vorhan
   Abgeschlossene Saisons werden langfristig gespeichert und nicht bei jedem Lauf neu geladen.
 - Nach beendeten Spielen: `npm run settle`
 - Modellgüte anzeigen: `npm run report`
+- Historische xG-Werte und bestätigte Nichtverfügbarkeit werden in SQLite gehalten; der
+  xG-Erstaufbau darf pro Dashboard-Lauf höchstens 250 zusätzliche API-Anfragen auslösen.
 - Vor Codeänderungen und danach: `npm test` und `npm run typecheck`

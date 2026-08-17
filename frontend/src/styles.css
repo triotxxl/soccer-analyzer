@@ -150,7 +150,13 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .team-name strong { overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
 .team-name:first-child strong { color: var(--home); }
 .team-name:last-child strong { color: var(--away); }
-.defense-shield { display: inline-grid; place-items: center; flex: 0 0 auto; color: #73c991; filter: drop-shadow(0 0 5px rgba(115,201,145,.2)); }
+.defense-shield { display: inline-grid; place-items: center; flex: 0 0 auto; color: #73c991; }
+.defense-shield.verified { filter: drop-shadow(0 0 5px rgba(115,201,145,.28)); }
+.defense-shield.fallback { color: #9aa0a6; }
+.defense-legend { display: grid; gap: 7px; }
+.defense-legend span { display: flex; align-items: center; gap: 7px; color: #b9b9b9; font-size: 9px; }
+.defense-legend span:first-of-type svg { color: #73c991; }
+.defense-legend span:last-of-type svg { color: #9aa0a6; }
 .fixture-meta { display: flex; align-items: center; gap: 7px; min-width: 0; color: #969696; }
 .fixture-meta strong { flex: none; color: #d4d4d4; font-size: 11px; }
 .fixture-meta strong em { color: var(--accent); font-size: 7px; font-style: normal; letter-spacing: .06em; text-transform: uppercase; }

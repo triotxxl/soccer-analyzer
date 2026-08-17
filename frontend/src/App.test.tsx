@@ -162,8 +162,25 @@ describe("React-Dashboard", () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(current), { status: 200 })));
     render(<App />);
     expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
-    expect(screen.getByRole("img", { name: /Alpha FC: besonders defensiv stark/ })).toHaveAttribute("title", expect.stringContaining("46 % unter Wettbewerbsniveau"));
-    expect(screen.queryByRole("img", { name: /Gast FC: besonders defensiv stark/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("img", { name: /Alpha FC: durch Torhistorie belegte Top-20-%-Defensive/ })).toHaveClass("fallback");
+    expect(screen.queryByRole("img", { name: /Gast FC:.*Defensive/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Legende Defensivstärke" })).toHaveTextContent("durch xGA verifiziert");
+  });
+
+  it("zeigt xGA-verifizierte Shields gefüllt mit Coverage im ARIA-Text", async () => {
+    const current = document();
+    current.schemaVersion = 3;
+    current.fixtures[0]!.defense = {
+      home: { concededGoals: 0.62, relativeToLeague: 0.52, matches: 18, venueMatches: 9, strong: true,
+        source: "xg", badge: "verified", percentile: 0.94, expectedGoalsAgainst: 0.71,
+        xgMatches: 17, venueXgMatches: 8, xgCoverage: 0.94, venueXgCoverage: 0.89, confidence: 88 },
+      away: { concededGoals: 1.3, relativeToLeague: 1.02, matches: 18, venueMatches: 9, strong: false }
+    };
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(current), { status: 200 })));
+    render(<App />);
+    const shield = await screen.findByRole("img", { name: /Alpha FC: xG-verifizierte Top-20-%-Defensive/ });
+    expect(shield).toHaveClass("verified");
+    expect(shield).toHaveAttribute("aria-label", expect.stringContaining("xG-Abdeckung 94 % gesamt/89 % Rolle"));
   });
 
   it("zeigt Halbzeitmärkte aus Schema 2 mit dynamischen erwarteten Toren", async () => {

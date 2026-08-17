@@ -220,8 +220,24 @@ export class ApiFootballClient {
     return this.get<ApiFixtureEvent[]>("fixtures/events", { fixture: fixtureId }, 0, true);
   }
 
-  getFixtureStatistics(fixtureId: number): Promise<ApiTeamStatistics[]> {
-    return this.get<ApiTeamStatistics[]>("fixtures/statistics", { fixture: fixtureId }, 0, true);
+  getFixtureStatistics(fixtureId: number, fresh = true): Promise<ApiTeamStatistics[]> {
+    return this.get<ApiTeamStatistics[]>(
+      "fixtures/statistics",
+      { fixture: fixtureId },
+      fresh ? 0 : config.cacheTtlMs.fixtureExpectedGoals,
+      fresh
+    );
+  }
+
+  getFixturesWithStatistics(fixtureIds: number[]): Promise<ApiFixture[]> {
+    if (fixtureIds.length === 0 || fixtureIds.length > 20) {
+      throw new Error("Fixture-Batches müssen zwischen 1 und 20 IDs enthalten.");
+    }
+    return this.get<ApiFixture[]>(
+      "fixtures",
+      { ids: fixtureIds.join("-") },
+      config.cacheTtlMs.settledFixtures
+    );
   }
 
   getSeasonFixtures(

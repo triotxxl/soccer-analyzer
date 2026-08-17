@@ -80,6 +80,7 @@ export interface ApiFixture {
     penalty?: { home: number | null; away: number | null };
   };
   events?: ApiFixtureEvent[];
+  statistics?: ApiTeamStatistics[];
 }
 
 export interface ApiOddsValue {
@@ -209,6 +210,39 @@ export interface DefensiveProfile {
   matches: number;
   venueMatches: number;
   strong: boolean;
+  source?: "xg" | "goals";
+  badge?: "verified" | "fallback" | null;
+  index?: number;
+  percentile?: number | null;
+  expectedGoalsAgainst?: number | null;
+  xgMatches?: number;
+  venueXgMatches?: number;
+  xgCoverage?: number;
+  venueXgCoverage?: number;
+  confidence?: number;
+}
+
+export interface FixtureExpectedGoals {
+  fixtureId: number;
+  kickoff: string;
+  leagueId: number;
+  season: number;
+  homeTeamId: number;
+  awayTeamId: number;
+  homeXg: number | null;
+  awayXg: number | null;
+  status: "available" | "unavailable";
+  fetchedAt: string;
+}
+
+export interface DefenseRanking {
+  percentile: number;
+  strong: boolean;
+}
+
+export interface DefenseRankings {
+  home: Map<string, DefenseRanking>;
+  away: Map<string, DefenseRanking>;
 }
 
 export interface ModelResult {

@@ -12,7 +12,8 @@ import type {
   LeagueStrengthSnapshot,
   LeagueSelection,
   LiveMatchSelection,
-  Market
+  Market,
+  FixtureExpectedGoals
 } from "./types.ts";
 import type { MatchWinnerOdds } from "./draw-criteria.ts";
 
@@ -83,6 +84,13 @@ export interface OutcomeProbabilityPerformanceRow {
   brierScore: number;
   intervalLow: number;
   intervalHigh: number;
+}
+
+export interface DefenseBadgePerformanceRow {
+  cohort: "verified" | "fallback" | "unmarked";
+  teams: number;
+  averageGoalsAgainst: number;
+  cleanSheetRate: number;
 }
 
 interface ProfileSaveScope {
@@ -271,6 +279,20 @@ export class AnalyzerDatabase {
       );
       CREATE INDEX IF NOT EXISTS idx_goal_line_scopes_prediction
         ON goal_line_prediction_scopes(prediction_id);
+      CREATE TABLE IF NOT EXISTS fixture_expected_goals (
+        fixture_id INTEGER PRIMARY KEY,
+        kickoff TEXT NOT NULL,
+        league_id INTEGER NOT NULL,
+        season INTEGER NOT NULL,
+        home_team_id INTEGER NOT NULL,
+        away_team_id INTEGER NOT NULL,
+        home_xg REAL,
+        away_xg REAL,
+        status TEXT NOT NULL CHECK(status IN ('available', 'unavailable')),
+        fetched_at TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_fixture_expected_goals_league
+        ON fixture_expected_goals(league_id, season, kickoff);
       CREATE TABLE IF NOT EXISTS league_strength_snapshots (
         pool TEXT NOT NULL,
         league_id INTEGER NOT NULL,
@@ -391,6 +413,42 @@ export class AnalyzerDatabase {
         this.db.exec(`ALTER TABLE goal_line_predictions ADD COLUMN ${column} ${type}`);
       }
     }
+    for (const [column, type] of [
+      ["home_defense_json", "TEXT"], ["away_defense_json", "TEXT"],
+      ["actual_home_xg", "REAL"], ["actual_away_xg", "REAL"]
+    ] as Array<[string, string]>) {
+      if (!goalColumns.some((item) => item.name === column)) {
+        this.db.exec(`ALTER TABLE goal_line_predictions ADD COLUMN ${column} ${type}`);
+      }
+    }
+  }
+
+  expectedGoalsForFixtures(fixtureIds: number[]): Map<number, FixtureExpectedGoals> {
+    const result = new Map<number, FixtureExpectedGoals>();
+    for (let offset = 0; offset < fixtureIds.length; offset += 500) {
+      const ids = fixtureIds.slice(offset, offset + 500);
+      if (!ids.length) continue;
+      const rows = this.db.prepare(`SELECT * FROM fixture_expected_goals WHERE fixture_id IN (${ids.map(() => "?").join(",")})`).all(...ids) as Array<Record<string, unknown>>;
+      for (const row of rows) result.set(Number(row.fixture_id), {
+        fixtureId: Number(row.fixture_id), kickoff: String(row.kickoff), leagueId: Number(row.league_id),
+        season: Number(row.season), homeTeamId: Number(row.home_team_id), awayTeamId: Number(row.away_team_id),
+        homeXg: row.home_xg === null ? null : Number(row.home_xg), awayXg: row.away_xg === null ? null : Number(row.away_xg),
+        status: row.status as FixtureExpectedGoals["status"], fetchedAt: String(row.fetched_at)
+      });
+    }
+    return result;
+  }
+
+  saveFixtureExpectedGoals(rows: FixtureExpectedGoals[]): void {
+    const statement = this.db.prepare(`INSERT INTO fixture_expected_goals(
+      fixture_id,kickoff,league_id,season,home_team_id,away_team_id,home_xg,away_xg,status,fetched_at
+    ) VALUES(?,?,?,?,?,?,?,?,?,?) ON CONFLICT(fixture_id) DO UPDATE SET
+      home_xg=excluded.home_xg, away_xg=excluded.away_xg, status=excluded.status, fetched_at=excluded.fetched_at`);
+    this.db.exec("BEGIN IMMEDIATE");
+    try {
+      for (const row of rows) statement.run(row.fixtureId,row.kickoff,row.leagueId,row.season,row.homeTeamId,row.awayTeamId,row.homeXg,row.awayXg,row.status,row.fetchedAt);
+      this.db.exec("COMMIT");
+    } catch (error) { this.db.exec("ROLLBACK"); throw error; }
   }
 
   saveProfilePredictions(
@@ -570,10 +628,10 @@ export class AnalyzerDatabase {
         first_half_expected_home_goals, first_half_expected_away_goals,
         first_half_expected_total_goals, first_half_data_confidence,
         first_half_over05, first_half_under05, first_half_over15, first_half_under15,
-        first_half_warnings_json, warnings_json
+        first_half_warnings_json, warnings_json, home_defense_json, away_defense_json
       ) VALUES (
         ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
       )
       ON CONFLICT(fixture_id, model_version) DO UPDATE SET
         snapshot_at = excluded.snapshot_at,
@@ -601,7 +659,9 @@ export class AnalyzerDatabase {
         first_half_over15 = excluded.first_half_over15,
         first_half_under15 = excluded.first_half_under15,
         first_half_warnings_json = excluded.first_half_warnings_json,
-        warnings_json = excluded.warnings_json
+        warnings_json = excluded.warnings_json,
+        home_defense_json = excluded.home_defense_json,
+        away_defense_json = excluded.away_defense_json
       WHERE goal_line_predictions.settled_at IS NULL
         AND excluded.snapshot_at < excluded.kickoff
         AND excluded.snapshot_at > goal_line_predictions.snapshot_at
@@ -663,7 +723,9 @@ export class AnalyzerDatabase {
           row.firstHalf.probabilities.over15,
           row.firstHalf.probabilities.under15,
           JSON.stringify(row.firstHalf.warnings),
-          JSON.stringify(row.warnings)
+          JSON.stringify(row.warnings),
+          JSON.stringify(row.defense?.home ?? null),
+          JSON.stringify(row.defense?.away ?? null)
         );
         saved += Number(result.changes);
         const prediction = findPrediction.get(
@@ -757,7 +819,7 @@ export class AnalyzerDatabase {
     return rows.map((row) => row.fixture_id);
   }
 
-  settleFixture(fixture: ApiFixture): number {
+  settleFixture(fixture: ApiFixture, actualXg?: { home: number | null; away: number | null }): number {
     const status = fixture.fixture.status.short;
     if (!["FT", "AET", "PEN"].includes(status)) return 0;
     const home = fixture.score.fulltime?.home ?? fixture.goals.home;
@@ -828,7 +890,8 @@ export class AnalyzerDatabase {
     const goalLineResult = this.db.prepare(`
       UPDATE goal_line_predictions
       SET settled_at = ?, actual_home_goals = ?, actual_away_goals = ?,
-          actual_halftime_home_goals = ?, actual_halftime_away_goals = ?
+          actual_halftime_home_goals = ?, actual_halftime_away_goals = ?,
+          actual_home_xg = ?, actual_away_xg = ?
       WHERE fixture_id = ? AND settled_at IS NULL
     `).run(
       new Date().toISOString(),
@@ -836,9 +899,36 @@ export class AnalyzerDatabase {
       away,
       fixture.score.halftime?.home ?? null,
       fixture.score.halftime?.away ?? null,
+      actualXg?.home ?? null,
+      actualXg?.away ?? null,
       fixture.fixture.id
     );
     return rows.length + profileRows.length + Number(goalLineResult.changes);
+  }
+
+  defenseBadgeReport(): DefenseBadgePerformanceRow[] {
+    const rows = this.db.prepare(`SELECT home_defense_json, away_defense_json,
+      actual_home_goals, actual_away_goals FROM goal_line_predictions
+      WHERE settled_at IS NOT NULL AND actual_home_goals IS NOT NULL AND actual_away_goals IS NOT NULL`).all() as Array<{
+        home_defense_json: string | null; away_defense_json: string | null;
+        actual_home_goals: number; actual_away_goals: number;
+      }>;
+    const samples = rows.flatMap((row) => [
+      { json: row.home_defense_json, against: row.actual_away_goals },
+      { json: row.away_defense_json, against: row.actual_home_goals }
+    ]).map((sample) => {
+      let profile: { badge?: string; strong?: boolean } | null = null;
+      try { profile = sample.json ? JSON.parse(sample.json) as { badge?: string; strong?: boolean } : null; } catch { profile = null; }
+      const cohort: DefenseBadgePerformanceRow["cohort"] = profile?.badge === "verified"
+        ? "verified" : profile?.badge === "fallback" || (profile?.strong && !profile.badge) ? "fallback" : "unmarked";
+      return { cohort, against: sample.against };
+    });
+    return (["verified", "fallback", "unmarked"] as const).flatMap((cohort) => {
+      const group = samples.filter((sample) => sample.cohort === cohort);
+      return group.length ? [{ cohort, teams: group.length,
+        averageGoalsAgainst: group.reduce((sum, sample) => sum + sample.against, 0) / group.length,
+        cleanSheetRate: group.filter((sample) => sample.against === 0).length / group.length }] : [];
+    });
   }
 
   report(): PerformanceRow[] {

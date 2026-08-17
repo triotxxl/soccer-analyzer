@@ -111,7 +111,7 @@ test("Torlinien-End-to-End analysiert und speichert nur konkret ausgewählte Par
   }, { client: fake, database, now: target });
   assert.equal(result.rows.length, 1);
   assert.equal(result.rows[0]?.fixtureId, 901);
-  assert.equal(result.rows[0]?.modelVersion, "2.0.0");
+  assert.equal(result.rows[0]?.modelVersion, "3.0.0");
   assert.ok(Math.abs(
     result.rows[0]!.probabilities.over25 + result.rows[0]!.probabilities.under25 - 1
   ) < 1e-12);

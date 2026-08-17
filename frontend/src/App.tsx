@@ -1,5 +1,5 @@
 import {
-  Binoculars, CalendarBlank, CaretDoubleLeft, CaretDoubleRight, CaretLeft, CaretRight, CheckCircle, ListBullets, RocketLaunch, ShieldCheck, Star, X
+  Binoculars, CalendarBlank, CaretDoubleLeft, CaretDoubleRight, CaretLeft, CaretRight, CheckCircle, ListBullets, RocketLaunch, Shield, ShieldCheck, Star, X
 } from "@phosphor-icons/react";
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { useDashboardData } from "./data";
@@ -220,9 +220,17 @@ function FormDots({ results, h2h = false }: { results: FormResult[]; h2h?: boole
 
 function DefenseShield({ profile, team }: { profile: NonNullable<DashboardFixture["defense"]>["home"] | undefined; team: string }) {
   if (!profile?.strong) return null;
-  const improvement = Math.max(0, Math.round((1 - profile.relativeToLeague) * 100));
-  const label = `${team}: besonders defensiv stark · ${profile.concededGoals.toFixed(2).replace(".", ",")} Gegentore · ${improvement} % unter Wettbewerbsniveau`;
-  return <span className="defense-shield" role="img" aria-label={label} title={label}><ShieldCheck size={16} weight="fill" aria-hidden /></span>;
+  const verified = profile.badge === "verified";
+  const percentile = profile.percentile == null ? "Top 20 %" : `${Math.round(profile.percentile * 100)}. Perzentil`;
+  const sample = `${profile.matches} Spiele (${profile.venueMatches} Rollen-Spiele)`;
+  const coverage = profile.xgCoverage === undefined ? "" : ` · xG-Abdeckung ${Math.round(profile.xgCoverage * 100)} % gesamt/${Math.round((profile.venueXgCoverage ?? 0) * 100)} % Rolle`;
+  const metric = verified
+    ? `xGA ${profile.expectedGoalsAgainst?.toFixed(2).replace(".", ",") ?? "–"} · Gegentore ${profile.concededGoals.toFixed(2).replace(".", ",")}`
+    : `Gegentore ${profile.concededGoals.toFixed(2).replace(".", ",")}`;
+  const label = `${team}: ${verified ? "xG-verifizierte" : "durch Torhistorie belegte"} Top-20-%-Defensive · ${percentile} · ${metric} · ${sample}${coverage}`;
+  return <span className={`defense-shield ${verified ? "verified" : "fallback"}`} role="img" aria-label={label} title={label}>
+    {verified ? <ShieldCheck size={16} weight="fill" aria-hidden /> : <Shield size={16} weight="regular" aria-hidden />}
+  </span>;
 }
 
 function H2hDots({ fixture, view, overLine, firstHalfOverLine }: {
@@ -546,6 +554,11 @@ function Dashboard({ document }: { document: DashboardDocument }) {
           {kpis.map(({ key, icon: Icon, value, label, tone }) => <button key={key} className={`kpi ${tone} ${levelFilter === key ? "active" : ""}`} onClick={() => setLevelFilter((current) => current === key ? "all" : key)}>
             <span className="kpi-icon"><Icon size={16} weight="duotone" /></span><span className="kpi-label">{label}</span><strong className="kpi-value">{value}</strong>
           </button>)}
+        </section>
+        <section className="sidebar-section defense-legend" aria-label="Legende Defensivstärke">
+          <h2>Defensivstärke</h2>
+          <span><ShieldCheck size={16} weight="fill" aria-hidden /> Top 20 %, durch xGA verifiziert</span>
+          <span><Shield size={16} weight="regular" aria-hidden /> Top 20 %, Torhistorie</span>
         </section>
       </>}
       <div className="mini-kpis" aria-hidden={sidebarOpen || mobileViewport}>{kpis.map(({ key, icon: Icon, value, label }) => <button key={key} tabIndex={sidebarOpen || mobileViewport ? -1 : 0} aria-label={`${label}: ${value} Partien`} title={`${label}: ${value} Partien`} className={levelFilter === key ? "active" : ""} onClick={() => setLevelFilter((current) => current === key ? "all" : key)}><Icon /><small>{value}</small></button>)}</div>

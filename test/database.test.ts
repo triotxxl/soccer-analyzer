@@ -146,6 +146,12 @@ test("speichert, aktualisiert und rechnet Gesamtspiel- und Halbzeit-Torlinien ab
       probabilities: { over05: 0.67, under05: 0.33, over15: 0.3, under15: 0.7 },
       warnings: []
     },
+    defense: {
+      home: { concededGoals: 0.6, relativeToLeague: 0.5, matches: 18, venueMatches: 9,
+        strong: true, source: "xg", badge: "verified", expectedGoalsAgainst: 0.7 },
+      away: { concededGoals: 1.2, relativeToLeague: 1, matches: 18, venueMatches: 9,
+        strong: false, source: "goals", badge: null }
+    },
     warnings: []
   };
   const scope = {
@@ -170,7 +176,7 @@ test("speichert, aktualisiert und rechnet Gesamtspiel- und Halbzeit-Torlinien ab
     awayGoals: 1,
     halfTimeHomeGoals: 1,
     halfTimeAwayGoals: 0
-  })), 1);
+  }), { home: 1.4, away: 0.8 }), 1);
   database.saveGoalLinePredictions(
     "2025-12-31T12:00:00.000Z",
     [{ ...row, expectedTotalGoals: 9 }],
@@ -178,10 +184,12 @@ test("speichert, aktualisiert und rechnet Gesamtspiel- und Halbzeit-Torlinien ab
   );
   const reader = new DatabaseSync(filename);
   const stored = reader.prepare(`
-    SELECT expected_total_goals FROM goal_line_predictions WHERE fixture_id = 701
-  `).get() as { expected_total_goals: number };
+    SELECT expected_total_goals, actual_home_xg, actual_away_xg FROM goal_line_predictions WHERE fixture_id = 701
+  `).get() as { expected_total_goals: number; actual_home_xg: number; actual_away_xg: number };
   reader.close();
   assert.equal(stored.expected_total_goals, 2.6);
+  assert.deepEqual([stored.actual_home_xg, stored.actual_away_xg], [1.4, 0.8]);
+  assert.deepEqual(database.defenseBadgeReport().map((item) => item.cohort), ["verified", "unmarked"]);
   const report = database.goalLineReport();
   assert.equal(report.length, 10);
   assert.deepEqual(report.map((item) => item.hits), [1, 0, 1, 0, 0, 1, 1, 0, 0, 1]);

@@ -153,3 +153,19 @@ test("übersetzt Timeouts in einen verständlichen Fehler", async () => {
   });
   await assert.rejects(() => timedOut.getLeagues(), /antwortete nicht/);
 });
+
+test("lädt Fixture-Statistiken in API-konformen 20er-ID-Batches", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "football-fixture-batch-"));
+  let requested = "";
+  const client = new ApiFootballClient({
+    apiKey: "test",
+    cache: new FileCache(directory),
+    fetchFn: (async (input) => {
+      requested = String(input);
+      return new Response(JSON.stringify({ response: [] }), { status: 200 });
+    }) as typeof fetch
+  });
+  await client.getFixturesWithStatistics(Array.from({ length: 20 }, (_, index) => index + 1));
+  assert.match(requested, /fixtures\?ids=1-2-3-/);
+  assert.throws(() => client.getFixturesWithStatistics(Array.from({ length: 21 }, (_, index) => index + 1)), /1 und 20/);
+});

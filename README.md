@@ -33,10 +33,12 @@ Die H2H-Anzeige kann neben Ergebnis, BTTS und Gesamtspiel-Torlinien auch `1. HZ 
 für die Linien 0,5 und 1,5 in den letzten fünf direkten Duellen darstellen. Ausschließlich
 vorhandene Halbzeitstände zählen; fehlende Werte erscheinen als `–`.
 
-Ein Shield hinter einem Teamnamen kennzeichnet eine besonders starke Defensive. Dafür
-müssen mindestens 12 Pflichtspiele, 6 passende Heim-/Auswärtsspiele und 70 %
-Datenvertrauen vorliegen; die zeitgewichteten Gegentore dürfen höchstens 70 % des
-jeweiligen Wettbewerbsniveaus betragen.
+Ein gefülltes grünes Shield kennzeichnet die besten 20 % der xG-verifizierten Defensiven
+eines Wettbewerbs in ihrer Heim-/Auswärtsrolle. Der Index kombiniert 70 %
+gegnerbereinigtes xGA mit 30 % gegnerbereinigten tatsächlichen Gegentoren. Ein
+umrandetes Shield markiert die besten 20 %, wenn nur die Torhistorie ausreichend belegt
+ist. Ein Vergleich wird erst ab acht qualifizierten Teams gebildet; Tooltip und ARIA-Text
+zeigen Quelle, Perzentil, Stichprobe und xG-Abdeckung.
 
 `next48` ist das Standardfenster des Dashboards und umfasst exakt den Zeitpunkt des
 Starts bis 48 Stunden später. Dafür werden nötigenfalls drei Kalendertage geladen;

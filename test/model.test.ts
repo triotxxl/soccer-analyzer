@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   analyzeFirstHalfGoals,
   analyzeFixture,
+  buildDefenseRankings,
   candidatesForFixture,
   firstHalfGoalLineProbabilities,
   firstHalfPlayedMatches,
@@ -10,6 +11,7 @@ import {
   playedMatches,
   poissonProbabilities
 } from "../src/model.ts";
+import type { FixtureExpectedGoals } from "../src/types.ts";
 import { fixture, history } from "./helpers.ts";
 
 test("Poisson-Wahrscheinlichkeiten sind normiert und deterministisch", () => {
@@ -136,7 +138,8 @@ test("kennzeichnet nur ausreichend belegte, relativ starke Defensiven", () => {
     }))
   ];
   const model = analyzeFixture(upcoming, history(base), teamHistory);
-  assert.equal(model.defense.home.strong, true);
+  assert.equal(model.defense.home.source, "goals");
+  assert.equal(model.defense.home.strong, false);
   assert.equal(model.defense.away.strong, false);
   assert.ok(model.defense.home.relativeToLeague <= 0.70);
   assert.equal(model.defense.home.venueMatches, 12);
@@ -165,4 +168,51 @@ test("bleibt bei einer torlosen Wettbewerbshistorie numerisch stabil", () => {
   assert.ok(Math.abs(
     model.probabilities.home + model.probabilities.draw + model.probabilities.away - 1
   ) < 1e-9);
+});
+
+test("ausreichend abgedecktes xGA verändert alle gemeinsamen Poisson-Märkte", () => {
+  const base = Math.floor(Date.parse("2026-08-17T12:00:00Z") / 1000);
+  const games = history(base);
+  const expectedGoals = new Map<number, FixtureExpectedGoals>(games.map((game) => [game.fixture.id, {
+    fixtureId: game.fixture.id, kickoff: game.fixture.date, leagueId: game.league.id,
+    season: game.league.season, homeTeamId: game.teams.home.id, awayTeamId: game.teams.away.id,
+    homeXg: 0.25, awayXg: 0.25, status: "available", fetchedAt: "2026-08-17T10:00:00Z"
+  }]));
+  const upcoming = fixture({ id: 999, timestamp: base + 3600, homeId: 1, awayId: 2 });
+  const baseline = analyzeFixture(upcoming, games);
+  const verified = analyzeFixture(upcoming, games, games, { expectedGoals });
+  assert.equal(verified.defense.home.source, "xg");
+  assert.equal(verified.defense.away.source, "xg");
+  assert.ok(verified.expectedHomeGoals < baseline.expectedHomeGoals);
+  assert.ok(verified.expectedAwayGoals < baseline.expectedAwayGoals);
+  for (const market of ["home", "draw", "away", "btts", "over25"] as const) {
+    assert.notEqual(verified.probabilities[market], baseline.probabilities[market]);
+  }
+});
+
+test("rollenbezogene Perzentile markieren nur Top 20 Prozent eines Pools ab acht Teams", () => {
+  const target = Math.floor(Date.parse("2026-08-17T12:00:00Z") / 1000);
+  let id = 4000;
+  const games = [];
+  const xg = new Map<number, FixtureExpectedGoals>();
+  for (let home = 1; home <= 8; home += 1) {
+    for (let away = 1; away <= 8; away += 1) {
+      if (home === away) continue;
+      const game = fixture({ id: id++, timestamp: target - id * 1800, homeId: home, awayId: away,
+        homeGoals: away <= 2 ? 0 : 1, awayGoals: home <= 2 ? 0 : 1 });
+      games.push(game);
+      xg.set(game.fixture.id, { fixtureId: game.fixture.id, kickoff: game.fixture.date,
+        leagueId: game.league.id, season: game.league.season, homeTeamId: home, awayTeamId: away,
+        homeXg: away <= 2 ? 0.35 : 1.1, awayXg: home <= 2 ? 0.35 : 1.1,
+        status: "available", fetchedAt: "2026-08-17T10:00:00Z" });
+    }
+  }
+  const rankings = buildDefenseRankings(games, xg, target);
+  assert.equal(rankings.home.get("xg:1")?.strong, true);
+  assert.equal(rankings.away.get("xg:1")?.strong, true);
+  assert.equal(rankings.home.get("xg:8")?.strong, false);
+  const upcoming = fixture({ id: 9999, timestamp: target, homeId: 1, awayId: 8 });
+  const model = analyzeFixture(upcoming, games, games, { expectedGoals: xg, rankings });
+  assert.equal(model.defense.home.badge, "verified");
+  assert.ok((model.defense.home.percentile ?? 0) >= 0.8);
 });

@@ -6,11 +6,15 @@ import type {
   GoalLineProbabilities,
   Market,
   ModelResult,
-  TeamMetrics
+  TeamMetrics,
+  DefensiveProfile,
+  DefenseRankings,
+  FixtureExpectedGoals
 } from "./types.ts";
 import { clamp, percent } from "./util.ts";
 
 interface PlayedMatch {
+  fixtureId: number;
   timestamp: number;
   homeId: number;
   awayId: number;
@@ -58,6 +62,7 @@ function playedMatchesForPeriod(
           })();
       if (!score) return null;
       return {
+        fixtureId: fixture.fixture.id,
         timestamp: fixture.fixture.timestamp,
         homeId: fixture.teams.home.id,
         awayId: fixture.teams.away.id,
@@ -72,6 +77,107 @@ function playedMatchesForPeriod(
 function recencyWeight(matchTimestamp: number, targetTimestamp: number): number {
   const days = Math.max(0, (targetTimestamp - matchTimestamp) / 86_400);
   return 0.5 ** (days / 120);
+}
+
+function adjustedOpponentFactor(
+  match: PlayedMatch,
+  defendingTeamId: number,
+  matches: PlayedMatch[],
+  leagueAverage: number
+): number {
+  const opponentId = match.homeId === defendingTeamId ? match.awayId : match.homeId;
+  const prior = matches
+    .filter((item) => item.timestamp < match.timestamp && (item.homeId === opponentId || item.awayId === opponentId))
+    .slice(0, 12)
+    .map((item) => item.homeId === opponentId ? item.homeGoals : item.awayGoals);
+  if (prior.length < 3) return 1;
+  const leaguePrior = matches.filter((item) => item.timestamp < match.timestamp).slice(0, 80);
+  const contemporaneousLeagueAverage = leaguePrior.length
+    ? leaguePrior.reduce((sum, item) => sum + item.homeGoals + item.awayGoals, 0) / (leaguePrior.length * 2)
+    : leagueAverage;
+  return clamp((prior.reduce((sum, goals) => sum + goals, 0) / prior.length) /
+    Math.max(0.2, contemporaneousLeagueAverage), 0.65, 1.5);
+}
+
+function defensiveProfile(
+  teamId: number,
+  venue: "home" | "away",
+  matches: PlayedMatch[],
+  targetTimestamp: number,
+  leagueHomeGoals: number,
+  leagueAwayGoals: number,
+  quality: number,
+  xg: Map<number, FixtureExpectedGoals> | undefined,
+  rankings: DefenseRankings | undefined
+): DefensiveProfile {
+  const teamMatches = matches.filter((match) => match.homeId === teamId || match.awayId === teamId).slice(0, 24);
+  const venueMatches = teamMatches.filter((match) => venue === "home" ? match.homeId === teamId : match.awayId === teamId).slice(0, 12);
+  const leagueAgainst = venue === "home" ? leagueAwayGoals : leagueHomeGoals;
+  const overallLeague = (leagueHomeGoals + leagueAwayGoals) / 2;
+  const adjusted = (items: PlayedMatch[], kind: "goals" | "xg"): WeightedValue[] => items.flatMap((match) => {
+    const isHome = match.homeId === teamId;
+    const goals = isHome ? match.awayGoals : match.homeGoals;
+    const stored = xg?.get(match.fixtureId);
+    const expected = isHome ? stored?.awayXg : stored?.homeXg;
+    if (kind === "xg" && (stored?.status !== "available" || expected === null || expected === undefined)) return [];
+    const factor = adjustedOpponentFactor(match, teamId, matches, overallLeague);
+    return [{ value: (kind === "goals" ? goals : expected!) / factor, weight: recencyWeight(match.timestamp, targetTimestamp) }];
+  });
+  const rawGoals = (items: PlayedMatch[]): WeightedValue[] => items.map((match) => ({
+    value: match.homeId === teamId ? match.awayGoals : match.homeGoals,
+    weight: recencyWeight(match.timestamp, targetTimestamp)
+  }));
+  const rawConcededGoals = 0.75 * shrunkMean(rawGoals(venueMatches), leagueAgainst) +
+    0.25 * shrunkMean(rawGoals(teamMatches), overallLeague);
+  const adjustedConcededGoals = 0.75 * shrunkMean(adjusted(venueMatches, "goals"), leagueAgainst) +
+    0.25 * shrunkMean(adjusted(teamMatches, "goals"), overallLeague);
+  const xgMatches = adjusted(teamMatches, "xg").length;
+  const venueXgMatches = adjusted(venueMatches, "xg").length;
+  const xgCoverage = teamMatches.length ? xgMatches / teamMatches.length : 0;
+  const venueXgCoverage = venueMatches.length ? venueXgMatches / venueMatches.length : 0;
+  const confidence = Math.round(clamp(quality * Math.min(1, teamMatches.length / 12) * Math.min(1, venueMatches.length / 6), 0, 100));
+  const verified = teamMatches.length >= 12 && venueMatches.length >= 6 && xgMatches >= 10 && venueXgMatches >= 5 && xgCoverage >= 0.7 && venueXgCoverage >= 0.7 && confidence >= 70;
+  const xgOverall = verified ? shrunkMean(adjusted(teamMatches, "xg"), overallLeague) : null;
+  const xgVenue = verified ? shrunkMean(adjusted(venueMatches, "xg"), leagueAgainst) : null;
+  const expectedGoalsAgainst = xgOverall === null || xgVenue === null ? null : 0.75 * xgVenue + 0.25 * xgOverall;
+  const concededGoals = verified ? adjustedConcededGoals : rawConcededGoals;
+  const index = verified && expectedGoalsAgainst !== null
+    ? 0.7 * (expectedGoalsAgainst / leagueAgainst) + 0.3 * (adjustedConcededGoals / leagueAgainst)
+    : rawConcededGoals / leagueAgainst;
+  const source = verified ? "xg" : "goals";
+  const ranking = (venue === "home" ? rankings?.home : rankings?.away)?.get(`${source}:${teamId}`);
+  return {
+    concededGoals, relativeToLeague: concededGoals / leagueAgainst, matches: teamMatches.length,
+    venueMatches: venueMatches.length, strong: ranking?.strong ?? false, source,
+    badge: ranking?.strong ? (verified ? "verified" : "fallback") : null,
+    index, percentile: ranking?.percentile ?? null, expectedGoalsAgainst, xgMatches, venueXgMatches,
+    xgCoverage, venueXgCoverage, confidence
+  };
+}
+
+export function buildDefenseRankings(
+  fixtures: ApiFixture[],
+  xg: Map<number, FixtureExpectedGoals>,
+  targetTimestamp: number
+): DefenseRankings {
+  const matches = playedMatches(fixtures).filter((match) => match.timestamp < targetTimestamp);
+  const leagueHome = Math.max(0.2, weightedMean(matches.map((m) => ({ value: m.homeGoals, weight: recencyWeight(m.timestamp, targetTimestamp) })), 1.45));
+  const leagueAway = Math.max(0.2, weightedMean(matches.map((m) => ({ value: m.awayGoals, weight: recencyWeight(m.timestamp, targetTimestamp) })), 1.15));
+  const ids = [...new Set(matches.flatMap((match) => [match.homeId, match.awayId]))];
+  const result: DefenseRankings = { home: new Map(), away: new Map() };
+  for (const venue of ["home", "away"] as const) {
+    const profiles = ids.map((id) => ({ id, profile: defensiveProfile(id, venue, matches, targetTimestamp, leagueHome, leagueAway, 100, xg, undefined) }))
+      .filter(({ profile }) => profile.matches >= 12 && profile.venueMatches >= 6);
+    for (const source of ["xg", "goals"] as const) {
+      const pool = profiles.filter(({ profile }) => profile.source === source).sort((a, b) => a.profile.index! - b.profile.index!);
+      if (pool.length < 8) continue;
+      pool.forEach(({ id }, index) => (result[venue]).set(`${source}:${id}`, {
+        percentile: pool.length === 1 ? 1 : 1 - index / (pool.length - 1),
+        strong: index < Math.ceil(pool.length * 0.2)
+      }));
+    }
+  }
+  return result;
 }
 
 function weightedMean(values: WeightedValue[], fallback: number): number {
@@ -330,7 +436,8 @@ export function analyzeFirstHalfGoals(
 export function analyzeFixture(
   fixture: ApiFixture,
   history: ApiFixture[],
-  teamHistory: ApiFixture[] = history
+  teamHistory: ApiFixture[] = history,
+  options: { expectedGoals?: Map<number, FixtureExpectedGoals>; rankings?: DefenseRankings } = {}
 ): ModelResult {
   const matches = playedMatches(history).filter(
     (match) => match.timestamp < fixture.fixture.timestamp
@@ -368,41 +475,23 @@ export function analyzeFixture(
     leagueHomeGoals,
     leagueAwayGoals
   );
-
-  const homeAttack = (0.75 * homeMetrics.venueGoalsFor + 0.25 * homeMetrics.weightedGoalsFor) /
-    leagueHomeGoals;
-  const awayDefense = (0.75 * awayMetrics.venueGoalsAgainst + 0.25 * awayMetrics.weightedGoalsAgainst) /
-    leagueHomeGoals;
-  const awayAttack = (0.75 * awayMetrics.venueGoalsFor + 0.25 * awayMetrics.weightedGoalsFor) /
-    leagueAwayGoals;
-  const homeDefense = (0.75 * homeMetrics.venueGoalsAgainst + 0.25 * homeMetrics.weightedGoalsAgainst) /
-    leagueAwayGoals;
-  const expectedHomeGoals = clamp(leagueHomeGoals * homeAttack * awayDefense, 0.2, 4.5);
-  const expectedAwayGoals = clamp(leagueAwayGoals * awayAttack * homeDefense, 0.2, 4.5);
-
   const homeVenueCount = homeMetrics.homeMatches;
   const awayVenueCount = awayMetrics.awayMatches;
   const venueScore = Math.min(homeVenueCount, awayVenueCount) * 6;
   const totalScore = Math.min(homeMetrics.matches, awayMetrics.matches) * 1.5;
   const leagueScore = Math.min(matches.length / 4, 20);
   const quality = Math.round(clamp(10 + venueScore + totalScore + leagueScore, 0, 100));
-  const homeConcededGoals = 0.75 * homeMetrics.venueGoalsAgainst + 0.25 * homeMetrics.weightedGoalsAgainst;
-  const awayConcededGoals = 0.75 * awayMetrics.venueGoalsAgainst + 0.25 * awayMetrics.weightedGoalsAgainst;
-  const defensiveProfile = (
-    concededGoals: number,
-    leagueGoals: number,
-    metrics: TeamMetrics,
-    venueMatches: number
-  ) => {
-    const relativeToLeague = concededGoals / leagueGoals;
-    return {
-      concededGoals,
-      relativeToLeague,
-      matches: metrics.matches,
-      venueMatches,
-      strong: quality >= 70 && metrics.matches >= 12 && venueMatches >= 6 && relativeToLeague <= 0.70
-    };
-  };
+
+  const homeAttack = (0.75 * homeMetrics.venueGoalsFor + 0.25 * homeMetrics.weightedGoalsFor) /
+    leagueHomeGoals;
+  const awayAttack = (0.75 * awayMetrics.venueGoalsFor + 0.25 * awayMetrics.weightedGoalsFor) /
+    leagueAwayGoals;
+  const homeProfile = defensiveProfile(fixture.teams.home.id, "home", teamMatches, fixture.fixture.timestamp, leagueHomeGoals, leagueAwayGoals, quality, options.expectedGoals, options.rankings);
+  const awayProfile = defensiveProfile(fixture.teams.away.id, "away", teamMatches, fixture.fixture.timestamp, leagueHomeGoals, leagueAwayGoals, quality, options.expectedGoals, options.rankings);
+  const awayDefense = awayProfile.index ?? awayProfile.relativeToLeague;
+  const homeDefense = homeProfile.index ?? homeProfile.relativeToLeague;
+  const expectedHomeGoals = clamp(leagueHomeGoals * homeAttack * awayDefense, 0.2, 4.5);
+  const expectedAwayGoals = clamp(leagueAwayGoals * awayAttack * homeDefense, 0.2, 4.5);
 
   return {
     expectedHomeGoals,
@@ -412,8 +501,8 @@ export function analyzeFixture(
     homeMetrics,
     awayMetrics,
     defense: {
-      home: defensiveProfile(homeConcededGoals, leagueAwayGoals, homeMetrics, homeVenueCount),
-      away: defensiveProfile(awayConcededGoals, leagueHomeGoals, awayMetrics, awayVenueCount)
+      home: homeProfile,
+      away: awayProfile
     },
     sample: {
       leagueMatches: matches.length,

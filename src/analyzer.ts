@@ -6,7 +6,7 @@ import { scoreCrossLeagueDrawFixture } from "./cross-league-draw-criteria.ts";
 import { consensusOdds, scoreDrawFixture } from "./draw-criteria.ts";
 import { scoreFavoriteFixture } from "./favorite-criteria.ts";
 import { strengthPool } from "./league-strength.ts";
-import { analyzeFirstHalfGoals, analyzeFixture, candidatesForFixture, goalLineProbabilities } from "./model.ts";
+import { analyzeFirstHalfGoals, analyzeFixture, buildDefenseRankings, candidatesForFixture, goalLineProbabilities } from "./model.ts";
 import { buildLeagueStrength } from "./strength-builder.ts";
 import { resolveLeagues, saveAlias } from "./resolver.ts";
 import {
@@ -30,6 +30,7 @@ import type {
 } from "./types.ts";
 import { datesForRange, normalizeText } from "./util.ts";
 import { venueFormRow } from "./venue-form.ts";
+import { enrichFixtureExpectedGoals } from "./xg.ts";
 
 interface DomesticLeagueReference {
   leagueId: number;
@@ -474,11 +475,51 @@ export async function runGoalLineAnalysis(
     const recentByTeam = new Map(
       recentEntries.map((entry) => [entry.teamId, entry.fixtures])
     );
+    const domesticByTeam = new Map<number, DomesticLeagueReference>();
+    for (const fixture of fixtures.filter((item) => crossLeagueFixtureIds.has(item.fixture.id))) {
+      for (const teamId of [fixture.teams.home.id, fixture.teams.away.id]) {
+        if (domesticByTeam.has(teamId)) continue;
+        const reference = domesticLeagueReference(recentByTeam.get(teamId) ?? [], teamId,
+          fixture.fixture.timestamp, fixture.league.id, competitionsById);
+        if (reference) domesticByTeam.set(teamId, reference);
+      }
+    }
+    const domesticKeys = [...new Map([...domesticByTeam.values()].map((reference) => [`${reference.leagueId}:${reference.season}`, reference])).values()];
+    const domesticEntries = await mapLimit(domesticKeys, 2, async ({ leagueId, season }) => {
+      const prior = season > 1900 ? season - 1 : null;
+      const [current, previous] = await Promise.all([
+        client.getSeasonFixtures(leagueId, season),
+        prior === null ? Promise.resolve([]) : client.getSeasonFixtures(leagueId, prior, true)
+      ]);
+      return { key: `${leagueId}:${season}`, fixtures: [...current, ...previous] };
+    });
+    const domesticHistory = new Map(domesticEntries.map((entry) => [entry.key, entry.fixtures]));
+    const allHistory = [...new Map([
+      ...[...competitionHistory.values()].flat(),
+      ...[...recentByTeam.values()].flat(),
+      ...[...domesticHistory.values()].flat()
+    ].map((item) => [item.fixture.id, item])).values()];
+    const enriched = await enrichFixtureExpectedGoals(allHistory, client, database, {
+      maxRequests: config.xgEnrichmentRequestBudget,
+      now
+    });
+    const rankingsByCompetition = new Map<string, ReturnType<typeof buildDefenseRankings>>();
+    for (const [key, history] of competitionHistory) {
+      const targetTimestamp = Math.min(
+        ...fixtures.filter((fixture) => `${fixture.league.id}:${fixture.league.season}` === key).map((fixture) => fixture.fixture.timestamp)
+      );
+      if (Number.isFinite(targetTimestamp)) {
+        rankingsByCompetition.set(key, buildDefenseRankings(history, enriched.values, targetTimestamp));
+      }
+    }
+    for (const [key, history] of domesticHistory) {
+      rankingsByCompetition.set(key, buildDefenseRankings(history, enriched.values,
+        Math.min(...fixtures.map((fixture) => fixture.fixture.timestamp))));
+    }
 
     const rows = fixtures.map((fixture) => {
-      const history = competitionHistory.get(
-        `${fixture.league.id}:${fixture.league.season}`
-      ) ?? [];
+      const competitionKey = `${fixture.league.id}:${fixture.league.season}`;
+      const history = competitionHistory.get(competitionKey) ?? [];
       const crossLeague = crossLeagueFixtureIds.has(fixture.fixture.id);
       const teamHistory = crossLeague
         ? [...new Map([
@@ -487,7 +528,19 @@ export async function runGoalLineAnalysis(
             ...(recentByTeam.get(fixture.teams.away.id) ?? [])
           ].map((item) => [item.fixture.id, item])).values()]
         : history;
-      const model = analyzeFixture(fixture, history, teamHistory);
+      const rankings = crossLeague ? (() => {
+        const homeRef = domesticByTeam.get(fixture.teams.home.id);
+        const awayRef = domesticByTeam.get(fixture.teams.away.id);
+        if (!homeRef || !awayRef) return undefined;
+        const homeRanks = rankingsByCompetition.get(`${homeRef.leagueId}:${homeRef.season}`);
+        const awayRanks = rankingsByCompetition.get(`${awayRef.leagueId}:${awayRef.season}`);
+        if (!homeRanks || !awayRanks) return undefined;
+        return { home: homeRanks.home, away: awayRanks.away };
+      })() : rankingsByCompetition.get(competitionKey);
+      const model = analyzeFixture(fixture, history, teamHistory, {
+        expectedGoals: enriched.values,
+        rankings
+      });
       const firstHalfModel = analyzeFirstHalfGoals(fixture, history, teamHistory);
       const warnings: string[] = [];
       if (model.quality < 60) {

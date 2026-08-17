@@ -80,6 +80,10 @@ Darunter folgt die separate Analyse der ersten Halbzeit für Über und Unter 0,5
 Datenvertrauen und Warnsignale ausgegeben. Es findet keine
 Schwellenfilterung und keine automatische Auswahl einer Wettseite statt.
 
+Bei ausreichender Abdeckung verwendet das gemeinsame Modell gegnerbereinigtes xGA.
+Ein gefülltes Dashboard-Shield markiert eine xG-verifizierte Top-20-%-Defensive; ein
+umrandetes Shield steht für den ausschließlich durch Torhistorie belegten Fallback.
+
 ## Allgemeine Begriffe
 
 - **Favorit:** Team mit der niedrigeren verfügbaren 1X2-Siegquote.

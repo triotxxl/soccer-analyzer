@@ -1,4 +1,4 @@
-# Torlinien-Modell 2.0.0
+# Torlinien-Modell 3.0.0
 
 ## Erwartete Tore
 
@@ -7,6 +7,20 @@ Poisson-Modell. Jüngere Spiele erhalten ein höheres Gewicht. Teamwerte werden 
 kleinen Stichproben zum Wettbewerbsmittel zurückgeführt. Heimangriff und
 Auswärtsabwehr bestimmen die erwarteten Heimtore; Auswärtsangriff und Heimabwehr die
 erwarteten Auswärtstore.
+
+## xGA-verifizierte Defensive
+
+Für abgeschlossene Pflichtspiele wird `expected_goals` bevorzugt in 20er-Fixture-Batches
+geladen; fehlen eingebettete Statistiken, folgt gezielt `/fixtures/statistics`. Verfügbare
+Werte und bestätigte Nichtverfügbarkeit werden in SQLite gespeichert. Der Erstaufbau ist
+pro Dashboard-Lauf auf 250 zusätzliche Anfragen begrenzt und respektiert die API-Reserve.
+
+xGA wird aus dem xG des jeweiligen Gegners abgeleitet. Maximal 24 Gesamt- und 12
+Heim-/Auswärtsspiele werden mit einer Halbwertszeit von 120 Tagen, Shrinkage und einer
+nur aus früheren Spielen berechneten Gegnerkorrektur ausgewertet. Bei mindestens 12/6
+Spielen, 10/5 xG-Werten, jeweils 70 % Coverage und 70 % Datenvertrauen ersetzt der Index
+aus 70 % xGA und 30 % tatsächlichen Gegentoren die reine Abwehrquote im gemeinsamen
+Poisson-Modell. Dadurch bleiben Torlinien, BTTS, 1X2 und Remis rechnerisch konsistent.
 
 Die erwarteten Gesamttore sind:
 
@@ -58,6 +72,7 @@ wird als Warnsignal gekennzeichnet.
 ## Speicherung und Validierung
 
 Jede Prognose wird vor dem Anstoß zusammen mit Modellversion und Analyseumfang
-gespeichert. Nach `npm run settle` werden sechs Gesamtspiel- und vier Halbzeitereignisse
+gespeichert. Nach `npm run settle` werden außerdem nachträgliche xG-Werte gespeichert und sechs Gesamtspiel- und vier Halbzeitereignisse
 anhand der regulären End- beziehungsweise Halbzeitstände abgerechnet. `npm run report` zeigt Stichprobe, Ereignisquote,
-durchschnittliche Modellwahrscheinlichkeit, Brier Score und Wilson-Intervall.
+durchschnittliche Modellwahrscheinlichkeit, Brier Score, Wilson-Intervall sowie den
+Vergleich verifizierter, umrandeter und unmarkierter Defensiven.

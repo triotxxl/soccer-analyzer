@@ -43,7 +43,8 @@ export const config = {
   apiRateLimitRetryMs: 60_000,
   modelVersion: "1.3.0",
   activeProfileVersion: "1.3.0",
-  goalLineModelVersion: "2.0.0",
+  goalLineModelVersion: "3.0.0",
+  xgEnrichmentRequestBudget: 250,
   strengthOnDemandRequestBudget:
     Number.isInteger(strengthOnDemandRequestBudget) &&
     strengthOnDemandRequestBudget > 0
@@ -64,6 +65,7 @@ export const config = {
     recentTeamFixtures: 24 * 60 * 60 * 1000,
     headToHead: 7 * 24 * 60 * 60 * 1000,
     odds: 6 * 60 * 60 * 1000,
+    fixtureExpectedGoals: 24 * 60 * 60 * 1000,
     settledFixtures: 30 * 24 * 60 * 60 * 1000
   }
 } as const;

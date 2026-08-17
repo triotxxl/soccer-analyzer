@@ -26,6 +26,7 @@ import { applyGoalLineFilters } from "./goal-line-filter.ts";
 import { formatVenueFormResult, runVenueFormFilter } from "./venue-form.ts";
 import { importTipicoData } from "./tipico.ts";
 import { writeDashboard } from "./dashboard.ts";
+import { parseExpectedGoals } from "./xg.ts";
 import type {
   AnalysisInput,
   AnalysisResult,
@@ -244,7 +245,18 @@ async function settle(): Promise<void> {
   let settled = 0;
   for (const fixtureId of fixtureIds) {
     const fixture = (await client.getFixture(fixtureId, true))[0];
-    if (fixture) settled += database.settleFixture(fixture);
+    if (fixture && ["FT", "AET", "PEN"].includes(fixture.fixture.status.short)) {
+      const statistics = await client.getFixtureStatistics(fixtureId, false);
+      const xg = parseExpectedGoals(statistics, fixture.teams.home.id, fixture.teams.away.id);
+      database.saveFixtureExpectedGoals([{
+        fixtureId, kickoff: fixture.fixture.date, leagueId: fixture.league.id, season: fixture.league.season,
+        homeTeamId: fixture.teams.home.id, awayTeamId: fixture.teams.away.id,
+        homeXg: xg.home, awayXg: xg.away,
+        status: xg.home !== null && xg.away !== null ? "available" : "unavailable",
+        fetchedAt: new Date().toISOString()
+      }]);
+      settled += database.settleFixture(fixture, xg);
+    }
   }
   database.close();
   console.log(`${settled} Kandidaten aus ${fixtureIds.length} fälligen Spielen abgerechnet.`);
@@ -278,6 +290,7 @@ function report(): void {
   const topKRows = database.topKReport(1.4);
   const goalLineRows = database.goalLineReport();
   const outcomeRows = database.outcomeProbabilityReport();
+  const defenseRows = database.defenseBadgeReport();
   database.close();
   if (rows.length === 0 && profileRows.length === 0 && goalLineRows.length === 0) {
     console.log("Noch keine abgerechneten Kandidaten vorhanden.");
@@ -293,6 +306,12 @@ function report(): void {
         `| ${row.modelVersion} | ${market} | ${row.total} | ${row.hits} | ${percent(row.hitRate)} | ${percent(row.averageProbability)} | ${row.brierScore.toFixed(3)} | ${percent(row.intervalLow)}–${percent(row.intervalHigh)} |`
       );
     }
+  }
+  if (defenseRows.length > 0) {
+    console.log("\n## Defensiv-Shields\n");
+    console.log("| Gruppe | Team-Spiele | Ø Gegentore | Zu-null-Quote |");
+    console.log("|---|---:|---:|---:|");
+    for (const row of defenseRows) console.log(`| ${row.cohort} | ${row.teams} | ${row.averageGoalsAgainst.toFixed(2)} | ${(row.cleanSheetRate * 100).toFixed(1)} % |`);
   }
   if (outcomeRows.length > 0) {
     console.log("\n## Wahrscheinlichkeitsmodell: 1X2, Remis und BTTS\n");
