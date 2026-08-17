@@ -1,7 +1,7 @@
 import {
-  Binoculars, CaretDoubleLeft, CaretDoubleRight, CheckCircle, ListBullets, RocketLaunch, Star, X
+  Binoculars, CalendarBlank, CaretDoubleLeft, CaretDoubleRight, CaretLeft, CaretRight, CheckCircle, ListBullets, RocketLaunch, Star, X
 } from "@phosphor-icons/react";
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { useDashboardData } from "./data";
 import type { DashboardDocument, DashboardFixture, DashboardMarket, DashboardMarketKey, FormResult, RecommendationLevel } from "./types";
 
@@ -16,7 +16,7 @@ const MARKET_OPTIONS: Array<{ key: "all" | DashboardMarketKey; label: string }> 
 type MarketFilter = (typeof MARKET_OPTIONS)[number]["key"];
 type Density = "micro" | "compact" | "comfort";
 type LevelFilter = "all" | "strong" | "recommended";
-type RangeMode = "days" | "hours";
+type RangeMode = "next48" | "custom";
 type H2hView = "outcome" | "btts" | "over";
 type SortKey = "kickoff" | "team" | "form" | "h2h" | "expected" | "score" | "market";
 
@@ -43,6 +43,91 @@ function berlinDate(value: string, timezone: string): string {
   const parts = new Intl.DateTimeFormat("en-CA", { timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date(value));
   const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((item) => item.type === type)?.value ?? "";
   return `${part("year")}-${part("month")}-${part("day")}`;
+}
+
+function dateOnly(value: string): Date {
+  const [year, month, day] = value.split("-").map(Number);
+  return new Date(Date.UTC(year!, month! - 1, day!));
+}
+
+function isoDate(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
+
+function clampDate(value: string, minimum: string, maximum: string): string {
+  return value < minimum ? minimum : value > maximum ? maximum : value;
+}
+
+function formatCalendarDate(value: string, options: Intl.DateTimeFormatOptions = { day: "2-digit", month: "2-digit", year: "numeric" }): string {
+  return new Intl.DateTimeFormat("de-DE", { ...options, timeZone: "UTC" }).format(dateOnly(value));
+}
+
+function monthStart(value: string): string {
+  const date = dateOnly(value);
+  date.setUTCDate(1);
+  return isoDate(date);
+}
+
+function shiftMonth(value: string, offset: number): string {
+  const date = dateOnly(value);
+  date.setUTCMonth(date.getUTCMonth() + offset, 1);
+  return isoDate(date);
+}
+
+function calendarDays(month: string): Array<string | null> {
+  const first = dateOnly(month);
+  const leading = (first.getUTCDay() + 6) % 7;
+  const next = new Date(first);
+  next.setUTCMonth(next.getUTCMonth() + 1, 1);
+  next.setUTCDate(0);
+  const values: Array<string | null> = Array.from({ length: leading }, () => null);
+  for (let day = 1; day <= next.getUTCDate(); day += 1) {
+    const date = new Date(first);
+    date.setUTCDate(day);
+    values.push(isoDate(date));
+  }
+  while (values.length % 7 !== 0) values.push(null);
+  return values;
+}
+
+function DateRangePopover({
+  minimum, maximum, start, end, visibleMonth, onVisibleMonthChange, onSelect, onApply, onCancel
+}: {
+  minimum: string;
+  maximum: string;
+  start: string;
+  end: string;
+  visibleMonth: string;
+  onVisibleMonthChange(value: string): void;
+  onSelect(value: string): void;
+  onApply(): void;
+  onCancel(): void;
+}) {
+  const days = calendarDays(visibleMonth);
+  const minimumMonth = monthStart(minimum);
+  const maximumMonth = monthStart(maximum);
+  return <div className="date-popover" role="dialog" aria-label="Datumsbereich auswählen">
+    <div className="date-popover-head">
+      <button aria-label="Vorheriger Monat" disabled={visibleMonth <= minimumMonth} onClick={() => onVisibleMonthChange(shiftMonth(visibleMonth, -1))}><CaretLeft /></button>
+      <strong>{formatCalendarDate(visibleMonth, { month: "long", year: "numeric" })}</strong>
+      <button aria-label="Nächster Monat" disabled={visibleMonth >= maximumMonth} onClick={() => onVisibleMonthChange(shiftMonth(visibleMonth, 1))}><CaretRight /></button>
+    </div>
+    <div className="date-weekdays" aria-hidden="true">{["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"].map((day) => <span key={day}>{day}</span>)}</div>
+    <div className="date-calendar">
+      {days.map((date, index) => date === null
+        ? <span key={`blank-${index}`} />
+        : <button
+            key={date}
+            disabled={date < minimum || date > maximum}
+            className={`${date >= start && date <= end ? "in-range" : ""} ${date === start ? "range-start" : ""} ${date === end ? "range-end" : ""}`}
+            aria-label={formatCalendarDate(date, { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
+            aria-pressed={date >= start && date <= end}
+            onClick={() => onSelect(date)}
+          >{Number(date.slice(-2))}</button>)}
+    </div>
+    <div className="date-selection" aria-live="polite"><span>Von <strong>{formatCalendarDate(start)}</strong></span><span>Bis <strong>{formatCalendarDate(end)}</strong></span></div>
+    <div className="date-actions"><button onClick={onCancel}>Abbrechen</button><button className="primary" onClick={onApply}>Übernehmen</button></div>
+  </div>;
 }
 
 function kickoffParts(value: string, timezone: string): { clock: string; day: string } {
@@ -159,14 +244,24 @@ function EmptyState({ title, text }: { title: string; text: string }) {
   </div>;
 }
 
+function defaultSidebarOpen(): boolean {
+  return typeof window.matchMedia !== "function" || window.matchMedia("(min-width: 700px)").matches;
+}
+
 function Dashboard({ document }: { document: DashboardDocument }) {
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(defaultSidebarOpen);
+  const [mobileViewport, setMobileViewport] = useState(() => !defaultSidebarOpen());
   const [banner, setBanner] = useState(true);
   const [marketFilter, setMarketFilter] = useState<MarketFilter>("all");
   const [levelFilter, setLevelFilter] = useState<LevelFilter>("all");
-  const [rangeMode, setRangeMode] = useState<RangeMode>("days");
-  const [days, setDays] = useState(Math.min(2, document.meta.maximumDays));
-  const [hours, setHours] = useState(Math.min(48, document.meta.maximumHours));
+  const [rangeMode, setRangeMode] = useState<RangeMode>("next48");
+  const [customStart, setCustomStart] = useState(document.meta.firstAvailableDate ?? "");
+  const [customEnd, setCustomEnd] = useState(document.meta.lastAvailableDate ?? "");
+  const [draftStart, setDraftStart] = useState(customStart);
+  const [draftEnd, setDraftEnd] = useState(customEnd);
+  const [selectingRangeEnd, setSelectingRangeEnd] = useState(false);
+  const [calendarOpen, setCalendarOpen] = useState(false);
+  const [visibleMonth, setVisibleMonth] = useState(monthStart(customStart || "1970-01-01"));
   const [showCrossLeague, setShowCrossLeague] = useState(true);
   const [showPast, setShowPast] = useState(false);
   const [h2hView, setH2hView] = useState<H2hView>("outcome");
@@ -177,22 +272,92 @@ function Dashboard({ document }: { document: DashboardDocument }) {
   const [formSortMode, setFormSortMode] = useState(0);
   const [h2hSortMode, setH2hSortMode] = useState(0);
   const [openFixture, setOpenFixture] = useState<number | null>(null);
+  const dateControlRef = useRef<HTMLDivElement>(null);
   const now = Date.now();
 
   useEffect(() => {
-    setDays((value) => Math.min(Math.max(1, value), document.meta.maximumDays));
-    setHours((value) => Math.min(Math.max(1, value), document.meta.maximumHours));
+    const minimum = document.meta.firstAvailableDate;
+    const maximum = document.meta.lastAvailableDate;
+    if (minimum && maximum) {
+      setCustomStart((value) => clampDate(value || minimum, minimum, maximum));
+      setCustomEnd((value) => clampDate(value || maximum, minimum, maximum));
+      setVisibleMonth((value) => clampDate(monthStart(value), monthStart(minimum), monthStart(maximum)));
+    } else {
+      setCustomStart("");
+      setCustomEnd("");
+      setCalendarOpen(false);
+      setRangeMode("next48");
+    }
     setOpenFixture((value) => value !== null && document.fixtures.some((fixture) => fixture.fixtureId === value) ? value : null);
   }, [document]);
 
+  useEffect(() => {
+    if (!calendarOpen) return;
+    const closeOutside = (event: PointerEvent) => {
+      if (!dateControlRef.current?.contains(event.target as Node)) setCalendarOpen(false);
+    };
+    window.addEventListener("pointerdown", closeOutside);
+    return () => window.removeEventListener("pointerdown", closeOutside);
+  }, [calendarOpen]);
+
+  useEffect(() => {
+    if (typeof window.matchMedia !== "function") return;
+    const media = window.matchMedia("(min-width: 700px)");
+    const syncSidebar = (event: MediaQueryListEvent) => {
+      setMobileViewport(!event.matches);
+      setSidebarOpen(event.matches);
+    };
+    media.addEventListener("change", syncSidebar);
+    return () => media.removeEventListener("change", syncSidebar);
+  }, []);
+
+  useEffect(() => {
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      if (calendarOpen) setCalendarOpen(false);
+      else setSidebarOpen(false);
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [calendarOpen]);
+
+  const openCalendar = () => {
+    if (!document.meta.firstAvailableDate || !document.meta.lastAvailableDate) return;
+    const start = clampDate(customStart || document.meta.firstAvailableDate, document.meta.firstAvailableDate, document.meta.lastAvailableDate);
+    const end = clampDate(customEnd || document.meta.lastAvailableDate, start, document.meta.lastAvailableDate);
+    setDraftStart(start);
+    setDraftEnd(end);
+    setSelectingRangeEnd(false);
+    setVisibleMonth(monthStart(start));
+    setCalendarOpen(true);
+  };
+
+  const selectCalendarDate = (date: string) => {
+    if (!selectingRangeEnd) {
+      setDraftStart(date);
+      setDraftEnd(date);
+      setSelectingRangeEnd(true);
+      return;
+    }
+    setDraftStart(date < draftStart ? date : draftStart);
+    setDraftEnd(date < draftStart ? draftStart : date);
+    setSelectingRangeEnd(false);
+  };
+
+  const applyCalendarRange = () => {
+    setCustomStart(draftStart);
+    setCustomEnd(draftEnd);
+    setRangeMode("custom");
+    setCalendarOpen(false);
+  };
+
   const inSelectedRange = (fixture: DashboardFixture): boolean => {
     const kickoff = Date.parse(fixture.kickoff);
+    if (rangeMode === "next48") return kickoff >= now && kickoff <= now + 48 * 3_600_000;
     if (!showPast && kickoff < now) return false;
-    if (rangeMode === "hours") return (showPast || kickoff >= now) && kickoff <= now + hours * 3_600_000;
-    if (!document.meta.firstAvailableDate) return true;
-    const cutoff = new Date(`${document.meta.firstAvailableDate}T00:00:00Z`);
-    cutoff.setUTCDate(cutoff.getUTCDate() + days - 1);
-    return berlinDate(fixture.kickoff, document.meta.timezone) <= cutoff.toISOString().slice(0, 10);
+    if (!customStart || !customEnd) return false;
+    const localDate = berlinDate(fixture.kickoff, document.meta.timezone);
+    return localDate >= customStart && localDate <= customEnd;
   };
 
   const scopedFixtures = document.fixtures.filter((fixture) => inSelectedRange(fixture) && (showCrossLeague || !fixture.crossLeague));
@@ -258,27 +423,51 @@ function Dashboard({ document }: { document: DashboardDocument }) {
   const h2hSortLabel = h2hSortLabels[h2hSortTarget];
   const shownMarkets = marketFilter === "all" ? MARKET_OPTIONS.slice(1) : MARKET_OPTIONS.filter((option) => option.key === marketFilter);
   const showScore = marketFilter === "all" || marketFilter === "1x2" || marketFilter === "draw";
-  const gridStyle = { "--market-count": shownMarkets.length } as CSSProperties;
-  const rangeLabel = rangeMode === "days" ? `${days} Tag(e) ab ${document.meta.firstAvailableDate ? document.meta.firstAvailableDate.split("-").reverse().join(".") : "–"}` : `${hours} Stunde(n) ab jetzt`;
+  const columnCount = 5 + (showScore ? 1 : 0) + shownMarkets.length;
+  const minimumWidth = density === "micro"
+    ? 723 + (showScore ? 68 : 0) + shownMarkets.length * 108 + (columnCount - 1) * 12
+    : 860 + (showScore ? 82 : 0) + shownMarkets.length * 122 + (columnCount - 1) * 12;
+  const gridStyle = {
+    "--market-count": shownMarkets.length,
+    "--table-min-width": `${minimumWidth}px`
+  } as CSSProperties;
+  const fixtureGridClass = `fixture-grid${showScore ? " has-score" : ""}`;
+  const rangeLabel = rangeMode === "next48"
+    ? "Nächste 48 Stunden ab jetzt"
+    : `${customStart ? formatCalendarDate(customStart) : "–"} – ${customEnd ? formatCalendarDate(customEnd) : "–"}`;
 
   const kpis = [
-    { key: "all" as const, icon: ListBullets, value: counts.all, label: "Alle Partien", tone: "violet" },
+    { key: "all" as const, icon: ListBullets, value: counts.all, label: "Alle Partien", tone: "neutral" },
     { key: "strong" as const, icon: Star, value: counts.strong, label: "Starke Tipps", tone: "gold" },
-    { key: "recommended" as const, icon: CheckCircle, value: counts.recommended, label: "Empfehlungen", tone: "violet" }
+    { key: "recommended" as const, icon: CheckCircle, value: counts.recommended, label: "Empfehlungen", tone: "neutral" }
   ];
 
   return <div className={`app-shell density-${density} ${sidebarOpen ? "" : "sidebar-collapsed"}`}>
-    <aside className="sidebar">
-      <div className="brand"><span className="brand-mark">FA</span>{sidebarOpen && <span><strong>Fußball-Analyzer</strong><small>Modell v3.2</small></span>}</div>
-      <button className="sidebar-toggle" onClick={() => setSidebarOpen((value) => !value)} aria-label="Sidebar umschalten">{sidebarOpen ? <CaretDoubleLeft /> : <CaretDoubleRight />}</button>
+    {sidebarOpen && mobileViewport && <button className="sidebar-backdrop" aria-label="Sidebar schließen" onClick={() => setSidebarOpen(false)} />}
+    <aside className="sidebar" id="dashboard-sidebar" aria-label="Dashboard-Filter" aria-hidden={mobileViewport && !sidebarOpen}>
+      <div className="sidebar-head">
+        <div className="brand"><span className="brand-mark">FA</span>{sidebarOpen && <span><strong>Fußball-Analyzer</strong><small>Modell v3.2</small></span>}</div>
+        <button className="sidebar-toggle" onClick={() => setSidebarOpen((value) => !value)} aria-controls="dashboard-sidebar" aria-expanded={sidebarOpen} aria-label={sidebarOpen ? "Sidebar einklappen" : "Sidebar ausklappen"} title={sidebarOpen ? "Sidebar einklappen" : "Sidebar ausklappen"}>{sidebarOpen ? <CaretDoubleLeft /> : <CaretDoubleRight />}</button>
+      </div>
       {sidebarOpen && <>
         <section className="sidebar-section">
           <h2>Zeitraum</h2>
-          <div className="range-grid">
-            <button className={rangeMode === "days" ? "active" : ""} onClick={() => setRangeMode("days")}>Tage</button>
-            <input aria-label="Anzahl Tage" type="number" min={1} max={document.meta.maximumDays} value={days} disabled={rangeMode !== "days"} onChange={(event) => setDays(Math.max(1, Math.min(document.meta.maximumDays, Number(event.target.value))))} />
-            <button className={rangeMode === "hours" ? "active" : ""} onClick={() => setRangeMode("hours")}>Stunden</button>
-            <input aria-label="Anzahl Stunden" type="number" min={1} max={document.meta.maximumHours} value={hours} disabled={rangeMode !== "hours"} onChange={(event) => setHours(Math.max(1, Math.min(document.meta.maximumHours, Number(event.target.value))))} />
+          <div className="date-range-control" ref={dateControlRef}>
+            <button className={`date-range-trigger ${rangeMode === "custom" ? "active" : ""}`} disabled={!document.meta.firstAvailableDate || !document.meta.lastAvailableDate} aria-label="Datumsbereich auswählen" aria-haspopup="dialog" aria-expanded={calendarOpen} onClick={() => calendarOpen ? setCalendarOpen(false) : openCalendar()}>
+              <CalendarBlank size={16} weight="duotone" /><span><strong>Datumsbereich</strong><small>{customStart && customEnd ? `${formatCalendarDate(customStart, { day: "2-digit", month: "2-digit" })} – ${formatCalendarDate(customEnd, { day: "2-digit", month: "2-digit" })}` : "Keine Tage verfügbar"}</small></span>
+            </button>
+            <button className={`quick-range ${rangeMode === "next48" ? "active" : ""}`} aria-pressed={rangeMode === "next48"} onClick={() => { setRangeMode("next48"); setCalendarOpen(false); }}>48h</button>
+            {calendarOpen && document.meta.firstAvailableDate && document.meta.lastAvailableDate && <DateRangePopover
+              minimum={document.meta.firstAvailableDate}
+              maximum={document.meta.lastAvailableDate}
+              start={draftStart}
+              end={draftEnd}
+              visibleMonth={visibleMonth}
+              onVisibleMonthChange={setVisibleMonth}
+              onSelect={selectCalendarDate}
+              onApply={applyCalendarRange}
+              onCancel={() => setCalendarOpen(false)}
+            />}
           </div>
           <label><input type="checkbox" checked={showCrossLeague} onChange={(event) => setShowCrossLeague(event.target.checked)} /> Pokal- / Cross-League</label>
           <label><input type="checkbox" checked={showPast} onChange={(event) => setShowPast(event.target.checked)} /> Laufende / beendete Partien</label>
@@ -287,14 +476,15 @@ function Dashboard({ document }: { document: DashboardDocument }) {
         <section className="sidebar-section kpi-section">
           <h2>Filter & Kennzahlen</h2>
           {kpis.map(({ key, icon: Icon, value, label, tone }) => <button key={key} className={`kpi ${tone} ${levelFilter === key ? "active" : ""}`} onClick={() => setLevelFilter((current) => current === key ? "all" : key)}>
-            <span className="kpi-icon"><Icon size={18} weight="duotone" /></span><span><strong>{value}</strong><small>Partien</small><b>{label}</b></span><em>Filter</em>
+            <span className="kpi-icon"><Icon size={16} weight="duotone" /></span><span className="kpi-label">{label}</span><strong className="kpi-value">{value}</strong>
           </button>)}
         </section>
       </>}
-      <div className="mini-kpis">{kpis.map(({ key, icon: Icon, value }) => <button key={key} title={`${value} Partien`} onClick={() => setLevelFilter(key)}><Icon /><small>{value}</small></button>)}</div>
+      <div className="mini-kpis" aria-hidden={sidebarOpen || mobileViewport}>{kpis.map(({ key, icon: Icon, value, label }) => <button key={key} tabIndex={sidebarOpen || mobileViewport ? -1 : 0} aria-label={`${label}: ${value} Partien`} title={`${label}: ${value} Partien`} className={levelFilter === key ? "active" : ""} onClick={() => setLevelFilter((current) => current === key ? "all" : key)}><Icon /><small>{value}</small></button>)}</div>
     </aside>
 
     <main className="content">
+      <button className="mobile-sidebar-toggle" tabIndex={mobileViewport ? 0 : -1} aria-hidden={!mobileViewport} onClick={() => setSidebarOpen(true)} aria-controls="dashboard-sidebar" aria-expanded={sidebarOpen}><ListBullets size={17} weight="duotone" /> Filter & Zeitraum</button>
       {banner && <div className="banner"><span><RocketLaunch size={20} weight="duotone" /></span><p><strong>Grün</strong> markierte Tipps erfüllen alle Modellkriterien, gelbe sind starke Kandidaten. Sortiere über die Spaltenköpfe, filtere Märkte über die Reiter.</p><button onClick={() => setBanner(false)} aria-label="Hinweis schließen"><X /></button></div>}
       <nav className="market-tabs" aria-label="Marktfilter">
         {MARKET_OPTIONS.map((option) => <button className={marketFilter === option.key ? "active" : ""} key={option.key} onClick={() => { setMarketFilter(option.key); setOpenFixture(null); }}>{option.label}</button>)}
@@ -311,7 +501,7 @@ function Dashboard({ document }: { document: DashboardDocument }) {
       </div>
 
       <div className="table-scroll">
-        <div className="table-head fixture-grid" style={gridStyle}>
+        <div className={`table-head ${fixtureGridClass}`} style={gridStyle}>
           <button onClick={() => sort("kickoff")}>Anstoß & Liga {arrow("kickoff")}</button>
           <button onClick={() => sort("team")}>Partie {arrow("team")}</button>
           <button onClick={() => sort("form")}>
@@ -333,7 +523,7 @@ function Dashboard({ document }: { document: DashboardDocument }) {
           const isPast = Date.parse(fixture.kickoff) < now;
           const markets = visibleMarkets(fixture, marketFilter);
           return <article className={`fixture-wrap level-${bestLevel(fixture, marketFilter)} ${openFixture === fixture.fixtureId ? "open" : ""}`} key={fixture.fixtureId}>
-            <button className="fixture-grid fixture-row" style={gridStyle} onClick={() => setOpenFixture((value) => value === fixture.fixtureId ? null : fixture.fixtureId)} aria-expanded={openFixture === fixture.fixtureId}>
+            <button className={`${fixtureGridClass} fixture-row`} style={gridStyle} onClick={() => setOpenFixture((value) => value === fixture.fixtureId ? null : fixture.fixtureId)} aria-expanded={openFixture === fixture.fixtureId}>
               <span className="time-cell"><strong>{time.clock}{isPast && <em> angepfiffen</em>}</strong><small>{time.day} · {fixture.country} · {fixture.league}</small>{(fixture.h2hNotice || fixture.warnings.length > 0) && <i>{fixture.h2hNotice ? "H2H" : "Daten"}</i>}</span>
               <span className="teams-cell"><strong>{fixture.homeTeam}</strong><strong>{fixture.awayTeam}</strong></span>
               <span className="form-cell"><span className="scope">{fixture.form.scope === "overall" ? "Gesamt" : "H/A"}</span><span><FormDots results={fixture.form.home} /><FormDots results={fixture.form.away} /></span></span>

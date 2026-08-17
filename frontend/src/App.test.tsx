@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
@@ -45,6 +45,22 @@ function document(createdAt = "2026-08-16T10:00:00.000Z", name = "Alpha FC"): Da
   };
 }
 
+function rangeDocument(): DashboardDocument {
+  const current = document();
+  current.meta.firstAvailableDate = "2026-08-16";
+  current.meta.lastAvailableDate = "2026-08-18";
+  current.meta.maximumDays = 3;
+  current.meta.maximumHours = 49;
+  current.meta.fixtureCount = 4;
+  current.fixtures = [
+    fixture(1, "Vor Start", "none", "2026-08-16T11:59:59.000Z"),
+    fixture(2, "Exakter Start", "strong", "2026-08-16T12:00:00.000Z"),
+    fixture(3, "Exaktes Ende", "strong", "2026-08-18T12:00:00.000Z"),
+    fixture(4, "Nach Ende", "none", "2026-08-18T12:00:01.000Z")
+  ];
+  return current;
+}
+
 describe("React-Dashboard", () => {
   beforeEach(() => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
@@ -54,6 +70,7 @@ describe("React-Dashboard", () => {
   afterEach(() => {
     cleanup();
     vi.restoreAllMocks();
+    vi.unstubAllGlobals();
     vi.useRealTimers();
   });
 
@@ -75,6 +92,13 @@ describe("React-Dashboard", () => {
     expect(screen.queryByText("Zulu FC")).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: /^Remis$/i }));
     expect(globalThis.document.querySelector(".table-head")?.textContent).toContain("Remis");
+    expect(globalThis.document.querySelector(".table-head")).toHaveClass("has-score");
+
+    await user.click(within(screen.getByRole("navigation", { name: "Marktfilter" })).getByRole("button", { name: /^BTTS$/i }));
+    const bttsHeader = globalThis.document.querySelector<HTMLElement>(".table-head");
+    expect(bttsHeader).not.toHaveClass("has-score");
+    expect(bttsHeader?.style.getPropertyValue("--market-count")).toBe("1");
+    expect(globalThis.document.querySelector(".fixture-row")).not.toHaveClass("has-score");
 
     await user.click(screen.getByRole("button", { name: /Alpha FCGast FC/i }));
     expect(screen.getByText("Direkte Begegnungen")).toBeInTheDocument();
@@ -150,6 +174,136 @@ describe("React-Dashboard", () => {
     await user.click(screen.getByRole("button", { name: /Letzte 5 Form/i }));
     expect(screen.getByLabelText("Sortierung: Unentschieden beider Teams")).toHaveTextContent("U");
     expect(globalThis.document.querySelector(".fixture-row")?.textContent).toContain("Remisstark");
+  });
+
+  it("filtert beim Start strikt vom aktuellen Zeitpunkt bis exakt 48 Stunden", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(rangeDocument()), { status: 200 })));
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(<App />);
+
+    expect(await screen.findByText("Exakter Start")).toBeInTheDocument();
+    expect(screen.getByText("Exaktes Ende")).toBeInTheDocument();
+    expect(screen.queryByText("Vor Start")).not.toBeInTheDocument();
+    expect(screen.queryByText("Nach Ende")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "48h" })).toHaveAttribute("aria-pressed", "true");
+
+    await user.click(screen.getByRole("checkbox", { name: /Laufende \/ beendete Partien/i }));
+    expect(screen.queryByText("Vor Start")).not.toBeInTheDocument();
+  });
+
+  it("wählt inklusive Datumsbereiche, normalisiert die Reihenfolge und erlaubt spielfreie Tage", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(rangeDocument()), { status: 200 })));
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(<App />);
+    expect(await screen.findByText("Exakter Start")).toBeInTheDocument();
+    await user.click(screen.getByRole("checkbox", { name: /Laufende \/ beendete Partien/i }));
+
+    await user.click(screen.getByRole("button", { name: "Datumsbereich auswählen" }));
+    let dialog = screen.getByRole("dialog", { name: "Datumsbereich auswählen" });
+    expect(within(dialog).getByRole("button", { name: /15. August 2026/i })).toBeDisabled();
+    expect(within(dialog).getByRole("button", { name: /17. August 2026/i })).toBeEnabled();
+    await user.click(within(dialog).getByRole("button", { name: /18. August 2026/i }));
+    await user.click(within(dialog).getByRole("button", { name: /16. August 2026/i }));
+    expect(within(dialog).getByText("16.08.2026")).toBeInTheDocument();
+    expect(within(dialog).getByText("18.08.2026")).toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: "Übernehmen" }));
+    expect(screen.getByText("Exakter Start")).toBeInTheDocument();
+    expect(screen.getByText("Exaktes Ende")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Datumsbereich auswählen" }));
+    dialog = screen.getByRole("dialog", { name: "Datumsbereich auswählen" });
+    await user.click(within(dialog).getByRole("button", { name: /17. August 2026/i }));
+    await user.click(within(dialog).getByRole("button", { name: "Übernehmen" }));
+    expect(screen.getByText("Keine Partien für diese Auswahl")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "48h" }));
+    expect(screen.getByText("Exaktes Ende")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "48h" })).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("verwirft Kalenderentwürfe beim Abbrechen und mit Escape", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(rangeDocument()), { status: 200 })));
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(<App />);
+    expect(await screen.findByText("Exakter Start")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Datumsbereich auswählen" }));
+    let dialog = screen.getByRole("dialog", { name: "Datumsbereich auswählen" });
+    await user.click(within(dialog).getByRole("button", { name: /18. August 2026/i }));
+    await user.click(within(dialog).getByRole("button", { name: "Abbrechen" }));
+    expect(screen.getByRole("button", { name: "48h" })).toHaveAttribute("aria-pressed", "true");
+
+    await user.click(screen.getByRole("button", { name: "Datumsbereich auswählen" }));
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(screen.queryByRole("dialog", { name: "Datumsbereich auswählen" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Sidebar einklappen" })).toHaveAttribute("aria-expanded", "true");
+  });
+
+  it("begrenzt einen benutzerdefinierten Bereich nach einem Snapshot-Refresh", async () => {
+    let current = rangeDocument();
+    const fetchMock = vi.fn().mockImplementation(() => Promise.resolve(new Response(JSON.stringify(current), { status: 200 })));
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(<App />);
+    expect(await screen.findByText("Exakter Start")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Datumsbereich auswählen" }));
+    const dialog = screen.getByRole("dialog", { name: "Datumsbereich auswählen" });
+    await user.click(within(dialog).getByRole("button", { name: /16. August 2026/i }));
+    await user.click(within(dialog).getByRole("button", { name: /18. August 2026/i }));
+    await user.click(within(dialog).getByRole("button", { name: "Übernehmen" }));
+
+    current = document("2026-08-17T10:00:00.000Z", "Nur neuer Tag");
+    current.meta.firstAvailableDate = "2026-08-17";
+    current.meta.lastAvailableDate = "2026-08-17";
+    current.meta.maximumDays = 1;
+    current.meta.fixtureCount = 1;
+    current.fixtures = [fixture(10, "Nur neuer Tag", "strong", "2026-08-17T18:00:00.000Z")];
+    fireEvent.focus(window);
+    expect(await screen.findByText("Nur neuer Tag")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole("button", { name: "Datumsbereich auswählen" })).toHaveTextContent("17.08. – 17.08."));
+  });
+
+  it("klappt die Desktop-Sidebar ein und filtert über die kompakte Iconleiste", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(document()), { status: 200 })));
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(<App />);
+    expect(await screen.findByText("Fußball-Analyzer")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Sidebar einklappen" }));
+    expect(globalThis.document.querySelector(".app-shell")).toHaveClass("sidebar-collapsed");
+    expect(screen.queryByText("Fußball-Analyzer")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /Starke Tipps: 1 Partien/i }));
+    expect(screen.queryByText("Zulu FC")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Sidebar ausklappen" }));
+    expect(screen.getByText("Fußball-Analyzer")).toBeInTheDocument();
+  });
+
+  it("öffnet und schließt die mobile Sidebar als Drawer und reagiert auf den Breakpoint", async () => {
+    let breakpointListener: ((event: MediaQueryListEvent) => void) | undefined;
+    vi.stubGlobal("matchMedia", vi.fn().mockReturnValue({
+      matches: false, media: "(min-width: 700px)", onchange: null,
+      addEventListener: (_type: string, listener: (event: MediaQueryListEvent) => void) => { breakpointListener = listener; },
+      removeEventListener: vi.fn(), addListener: vi.fn(), removeListener: vi.fn(), dispatchEvent: vi.fn()
+    }));
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(document()), { status: 200 })));
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(<App />);
+    expect(await screen.findByRole("button", { name: "Filter & Zeitraum" })).toHaveAttribute("aria-expanded", "false");
+
+    await user.click(screen.getByRole("button", { name: "Filter & Zeitraum" }));
+    expect(screen.getByRole("button", { name: "Filter & Zeitraum" })).toHaveAttribute("aria-expanded", "true");
+    await user.click(screen.getByRole("button", { name: "Sidebar schließen" }));
+    expect(screen.getByRole("button", { name: "Filter & Zeitraum" })).toHaveAttribute("aria-expanded", "false");
+
+    await user.click(screen.getByRole("button", { name: "Filter & Zeitraum" }));
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(screen.getByRole("button", { name: "Filter & Zeitraum" })).toHaveAttribute("aria-expanded", "false");
+
+    act(() => breakpointListener?.({ matches: true } as MediaQueryListEvent));
+    expect(screen.getByRole("button", { name: "Sidebar einklappen" })).toHaveAttribute("aria-expanded", "true");
+    expect(globalThis.document.querySelector(".app-shell")).not.toHaveClass("sidebar-collapsed");
   });
 
   it("lädt bei erneutem Fensterfokus einen neuen Lauf", async () => {
