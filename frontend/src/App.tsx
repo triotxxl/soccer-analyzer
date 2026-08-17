@@ -156,6 +156,26 @@ function formatDataTimestamp(value: string, timezone: string): string {
   return new Intl.DateTimeFormat("de-DE", { timeZone: timezone, day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }).format(new Date(value));
 }
 
+const BANNER_STORAGE_KEY = "football-analyzer:banner-dismissed";
+
+function loadBannerDismissed(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.localStorage.getItem(BANNER_STORAGE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function saveBannerDismissed(): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(BANNER_STORAGE_KEY, "1");
+  } catch {
+    // Storage unavailable - dismissal just doesn't persist for this session.
+  }
+}
+
 function sortStateLabel(label: string, active: boolean, direction: 1 | -1): string {
   if (!active) return `${label}, nicht sortiert`;
   return `${label}, ${direction === 1 ? "aufsteigend" : "absteigend"} sortiert`;
@@ -305,7 +325,7 @@ function defaultSidebarOpen(): boolean {
 function Dashboard({ document }: { document: DashboardDocument }) {
   const [sidebarOpen, setSidebarOpen] = useState(defaultSidebarOpen);
   const [mobileViewport, setMobileViewport] = useState(() => !defaultSidebarOpen());
-  const [banner, setBanner] = useState(true);
+  const [banner, setBanner] = useState(() => !loadBannerDismissed());
   const [marketFilter, setMarketFilter] = useState<MarketFilter>("all");
   const [levelFilter, setLevelFilter] = useState<LevelFilter>("all");
   const [rangeMode, setRangeMode] = useState<RangeMode>("next48");
@@ -592,7 +612,7 @@ function Dashboard({ document }: { document: DashboardDocument }) {
 
     <main className="content">
       <button className="mobile-sidebar-toggle" tabIndex={mobileViewport ? 0 : -1} aria-hidden={!mobileViewport} onClick={() => setSidebarOpen(true)} aria-controls="dashboard-sidebar" aria-expanded={sidebarOpen}><ListBullets size={17} weight="duotone" /> Filter & Zeitraum</button>
-      {banner && <div className="banner"><span><RocketLaunch size={20} weight="duotone" /></span><p><strong>Grün</strong> markierte Tipps erfüllen alle Modellkriterien, gelbe sind starke Kandidaten. Sortiere über die Spaltenköpfe, filtere Märkte über die Reiter.</p><button onClick={() => setBanner(false)} aria-label="Hinweis schließen"><X /></button></div>}
+      {banner && <div className="banner"><span><RocketLaunch size={20} weight="duotone" /></span><p><strong>Grün</strong> markierte Tipps erfüllen alle Modellkriterien, gelbe sind starke Kandidaten. Sortiere über die Spaltenköpfe, filtere Märkte über die Reiter.</p><button onClick={() => { setBanner(false); saveBannerDismissed(); }} aria-label="Hinweis schließen"><X /></button></div>}
       <nav className="market-tabs" aria-label="Marktfilter">
         {availableMarketOptions.map((option) => <button className={marketFilter === option.key ? "active" : ""} aria-pressed={marketFilter === option.key} key={option.key} onClick={() => selectMarket(option.key)}>{option.label}</button>)}
       </nav>
@@ -643,6 +663,7 @@ function Dashboard({ document }: { document: DashboardDocument }) {
           const isPast = Date.parse(fixture.kickoff) < now;
           const markets = visibleMarkets(fixture, marketFilter);
           return <article className={`fixture-wrap level-${bestLevel(fixture, marketFilter)} ${openFixture === fixture.fixtureId ? "open" : ""}`} style={gridStyle} key={fixture.fixtureId}>
+            <div className="fixture-row-wrap">
             <CartAddButton fixture={fixture} onOpen={() => setPickerFixtureId(fixture.fixtureId)} />
             <button className={`${fixtureGridClass} fixture-row`} style={gridStyle} onClick={() => setOpenFixture((value) => value === fixture.fixtureId ? null : fixture.fixtureId)} aria-expanded={openFixture === fixture.fixtureId}>
               <span className="fixture-summary-cell">
@@ -663,8 +684,33 @@ function Dashboard({ document }: { document: DashboardDocument }) {
               {showScore && <span className="score-cell">{marketFilter !== "draw" && <span><small>1X2</small><strong>{fixture.scores.favorite ?? "–"}</strong></span>}{marketFilter !== "1x2" && <span><small>X</small><strong>{fixture.scores.draw ?? "–"}</strong></span>}</span>}
               {markets.map((item) => <MarketCard market={item} key={item.key} />)}
             </button>
+            </div>
             {openFixture === fixture.fixtureId && <div className="fixture-details">
-              <section><h3>Direkte Begegnungen</h3>{fixture.h2h.matches.length ? fixture.h2h.matches.map((match) => <p key={`${match.date}-${match.homeTeam}`}>{new Intl.DateTimeFormat("de-DE", { timeZone: document.meta.timezone }).format(new Date(match.date))} · {match.homeTeam} {match.homeGoals}:{match.awayGoals} {match.awayTeam}{typeof match.halfTimeHomeGoals === "number" && typeof match.halfTimeAwayGoals === "number" ? ` (HZ ${match.halfTimeHomeGoals}:${match.halfTimeAwayGoals})` : ""}</p>) : <p>Keine H2H-Ergebnisse verfügbar.</p>}</section>
+              <section><h3>Direkte Begegnungen</h3>{fixture.h2h.matches.length
+                ? <ul className="h2h-match-list">{fixture.h2h.matches.map((match, index) => {
+                    const outcome = fixture.h2h.outcomes[index];
+                    const hasHalfTime = typeof match.halfTimeHomeGoals === "number" && typeof match.halfTimeAwayGoals === "number";
+                    const homeTeamWasHome = match.homeTeam === fixture.homeTeam;
+                    const currentHomeGoals = homeTeamWasHome ? match.homeGoals : match.awayGoals;
+                    const currentAwayGoals = homeTeamWasHome ? match.awayGoals : match.homeGoals;
+                    const currentHalfHomeGoals = homeTeamWasHome ? match.halfTimeHomeGoals : match.halfTimeAwayGoals;
+                    const currentHalfAwayGoals = homeTeamWasHome ? match.halfTimeAwayGoals : match.halfTimeHomeGoals;
+                    return <li className={`h2h-match-row ${outcome ?? ""}`} key={`${match.date}-${match.homeTeam}`}>
+                      <span className="h2h-match-date">{new Intl.DateTimeFormat("de-DE", { timeZone: document.meta.timezone, day: "2-digit", month: "2-digit", year: "numeric" }).format(new Date(match.date))}</span>
+                      <span className="h2h-match-teams">
+                        <span className="home">{fixture.homeTeam}</span>
+                        <span className="h2h-match-score">
+                          <strong className={outcome === "win" ? "home" : outcome === "loss" ? "lose" : ""}>{currentHomeGoals}</strong>
+                          <i>:</i>
+                          <strong className={outcome === "loss" ? "away" : outcome === "win" ? "lose" : ""}>{currentAwayGoals}</strong>
+                        </span>
+                        <span className="away">{fixture.awayTeam}</span>
+                      </span>
+                      <span className="h2h-match-venue" title={homeTeamWasHome ? `${fixture.homeTeam} spielte zu Hause` : `${fixture.homeTeam} spielte auswärts`}>{homeTeamWasHome ? "H" : "A"}</span>
+                      {hasHalfTime && <span className="h2h-match-half">HZ {currentHalfHomeGoals}:{currentHalfAwayGoals}</span>}
+                    </li>;
+                  })}</ul>
+                : <p>Keine H2H-Ergebnisse verfügbar.</p>}</section>
               <section><h3>Bewertung je Markt</h3><div className="market-details">{fixture.markets.map((item) => <div key={item.key} className={item.recommendation.level}><i /><span><strong>{item.label} · {item.recommendation.label}</strong>{item.details.join(" · ")}</span></div>)}</div></section>
             </div>}
           </article>;

@@ -488,4 +488,20 @@ describe("React-Dashboard", () => {
 
     expect(within(builder).getByText("Kombi 1 · 2er")).toBeInTheDocument();
   });
+
+  it("merkt sich das Schließen des Hinweisbanners über einen Reload hinweg", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockImplementation(() => Promise.resolve(new Response(JSON.stringify(document()), { status: 200 }))));
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const { unmount } = render(<App />);
+    expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Hinweis schließen" })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Hinweis schließen" }));
+    expect(screen.queryByRole("button", { name: "Hinweis schließen" })).not.toBeInTheDocument();
+
+    unmount();
+    render(<App />);
+    expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Hinweis schließen" })).not.toBeInTheDocument();
+  });
 });
