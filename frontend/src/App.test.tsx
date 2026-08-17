@@ -72,6 +72,7 @@ describe("React-Dashboard", () => {
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
     vi.useRealTimers();
+    window.localStorage.clear();
   });
 
   it("zeigt einen verständlichen Zustand ohne Dashboard-Datei", async () => {
@@ -458,5 +459,33 @@ describe("React-Dashboard", () => {
     fireEvent.focus(window);
     await waitFor(() => expect(screen.getByText("Neu FC")).toBeInTheDocument());
     expect(fetchMock.mock.calls.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("sammelt Wetten über den Bet-Picker im Warenkorb und mischt eine Kombi", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(document()), { status: 200 })));
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(<App />);
+    expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Zum Wett-Baukasten hinzufügen: Alpha FC – Gast FC" }));
+    let picker = screen.getByRole("dialog", { name: "Markt wählen: Alpha FC – Gast FC" });
+    await user.click(within(picker).getByRole("button", { name: /1X2/ }));
+    expect(screen.getByRole("button", { name: /Wett-Baukasten öffnen \(1 Wette\)/ })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Zum Wett-Baukasten hinzufügen: Zulu FC – Gast FC" }));
+    picker = screen.getByRole("dialog", { name: "Markt wählen: Zulu FC – Gast FC" });
+    await user.click(within(picker).getByRole("button", { name: /1X2/ }));
+    const cartButton = screen.getByRole("button", { name: /Wett-Baukasten öffnen \(2 Wetten\)/ });
+
+    await user.click(cartButton);
+    const builder = screen.getByRole("dialog", { name: "Wett-Baukasten" });
+    expect(within(builder).getByText("Ausgewählte Wetten (2)")).toBeInTheDocument();
+
+    const countInput = within(builder).getByRole("spinbutton", { name: "Anzahl 2er-Kombis" });
+    await user.clear(countInput);
+    await user.type(countInput, "1");
+    await user.click(within(builder).getByRole("button", { name: /Kombis mischen/ }));
+
+    expect(within(builder).getByText("Kombi 1 · 2er")).toBeInTheDocument();
   });
 });

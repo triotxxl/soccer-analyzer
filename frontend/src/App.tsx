@@ -2,6 +2,8 @@ import {
   Binoculars, CalendarBlank, CaretDoubleLeft, CaretDoubleRight, CaretLeft, CaretRight, CheckCircle, ClockCounterClockwise, Funnel, ListBullets, RocketLaunch, Shield, ShieldCheck, Star, WarningCircle, X
 } from "@phosphor-icons/react";
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { BetBuilderDrawer, CartAddButton, CartBadge, MarketPickerModal } from "./BetCartUI";
+import { toCartEntry, useBetCart } from "./betCart";
 import { useDashboardData } from "./data";
 import type { DashboardDocument, DashboardFixture, DashboardMarket, DashboardMarketKey, FormResult, RecommendationLevel } from "./types";
 
@@ -142,11 +144,11 @@ function kickoffParts(value: string, timezone: string): { clock: string; day: st
   };
 }
 
-function formatPercent(value: number): string {
+export function formatPercent(value: number): string {
   return `${(value * 100).toFixed(1).replace(".", ",")} %`;
 }
 
-function formatOdd(value: number | null): string {
+export function formatOdd(value: number | null): string {
   return value === null ? "–" : value.toFixed(2).replace(".", ",");
 }
 
@@ -325,8 +327,12 @@ function Dashboard({ document }: { document: DashboardDocument }) {
   const [formSortMode, setFormSortMode] = useState(0);
   const [h2hSortMode, setH2hSortMode] = useState(0);
   const [openFixture, setOpenFixture] = useState<number | null>(null);
+  const [pickerFixtureId, setPickerFixtureId] = useState<number | null>(null);
+  const [builderOpen, setBuilderOpen] = useState(false);
+  const { cart, addEntry, removeEntry, clear: clearCart } = useBetCart();
   const dateControlRef = useRef<HTMLDivElement>(null);
   const now = Date.now();
+  const pickerFixture = pickerFixtureId === null ? null : document.fixtures.find((item) => item.fixtureId === pickerFixtureId) ?? null;
 
   const selectMarket = (market: MarketFilter) => {
     setMarketFilter(market);
@@ -364,6 +370,7 @@ function Dashboard({ document }: { document: DashboardDocument }) {
       setRangeMode("next48");
     }
     setOpenFixture((value) => value !== null && document.fixtures.some((fixture) => fixture.fixtureId === value) ? value : null);
+    setPickerFixtureId((value) => value !== null && document.fixtures.some((fixture) => fixture.fixtureId === value) ? value : null);
     setMarketFilter((value) => value === "all" || document.fixtures.some((fixture) => fixture.markets.some((market) => market.key === value)) ? value : "all");
   }, [document]);
 
@@ -390,12 +397,14 @@ function Dashboard({ document }: { document: DashboardDocument }) {
   useEffect(() => {
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
-      if (calendarOpen) setCalendarOpen(false);
+      if (pickerFixtureId !== null) setPickerFixtureId(null);
+      else if (builderOpen) setBuilderOpen(false);
+      else if (calendarOpen) setCalendarOpen(false);
       else setSidebarOpen(false);
     };
     window.addEventListener("keydown", closeOnEscape);
     return () => window.removeEventListener("keydown", closeOnEscape);
-  }, [calendarOpen]);
+  }, [builderOpen, calendarOpen, pickerFixtureId]);
 
   const openCalendar = () => {
     if (!document.meta.firstAvailableDate || !document.meta.lastAvailableDate) return;
@@ -527,7 +536,8 @@ function Dashboard({ document }: { document: DashboardDocument }) {
     { key: "recommended" as const, icon: CheckCircle, value: counts.recommended, label: "Empfehlungen", tone: "green" }
   ];
 
-  return <div className={`app-shell density-${density} ${sidebarOpen ? "" : "sidebar-collapsed"}`}>
+  return <>
+  <div className={`app-shell density-${density} ${sidebarOpen ? "" : "sidebar-collapsed"}`}>
     {sidebarOpen && mobileViewport && <button className="sidebar-backdrop" aria-label="Sidebar schließen" onClick={() => setSidebarOpen(false)} />}
     <aside className="sidebar" id="dashboard-sidebar" aria-label="Dashboard-Filter" aria-hidden={mobileViewport && !sidebarOpen}>
       <div className="sidebar-head">
@@ -633,6 +643,7 @@ function Dashboard({ document }: { document: DashboardDocument }) {
           const isPast = Date.parse(fixture.kickoff) < now;
           const markets = visibleMarkets(fixture, marketFilter);
           return <article className={`fixture-wrap level-${bestLevel(fixture, marketFilter)} ${openFixture === fixture.fixtureId ? "open" : ""}`} style={gridStyle} key={fixture.fixtureId}>
+            <CartAddButton fixture={fixture} onOpen={() => setPickerFixtureId(fixture.fixtureId)} />
             <button className={`${fixtureGridClass} fixture-row`} style={gridStyle} onClick={() => setOpenFixture((value) => value === fixture.fixtureId ? null : fixture.fixtureId)} aria-expanded={openFixture === fixture.fixtureId}>
               <span className="fixture-summary-cell">
                 <span className="teams-cell">
@@ -661,7 +672,16 @@ function Dashboard({ document }: { document: DashboardDocument }) {
         {sortedFixtures.length === 0 && <EmptyState title="Keine Partien für diese Auswahl" text="Wähle einen anderen Zeitraum oder setze den Bewertungsfilter zurück." />}
       </div>
     </main>
-  </div>;
+  </div>
+  {pickerFixture && <MarketPickerModal
+    fixture={pickerFixture}
+    cart={cart}
+    onSelect={(market) => { addEntry(toCartEntry(pickerFixture, market)); setPickerFixtureId(null); }}
+    onClose={() => setPickerFixtureId(null)}
+  />}
+  <CartBadge count={cart.length} onClick={() => setBuilderOpen(true)} />
+  {builderOpen && <BetBuilderDrawer cart={cart} onRemove={removeEntry} onClear={clearCart} onClose={() => setBuilderOpen(false)} />}
+  </>;
 }
 
 export function App() {
