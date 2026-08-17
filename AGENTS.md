@@ -39,7 +39,9 @@ Benutzer auf Deutsch und führe Analyseaufträge selbstständig über die vorhan
    niemals zusätzliche API-Fixtures derselben Liga, die nicht in dieser `data.json` stehen.
    API-Football bleibt die Quelle für Zuordnung, Historie, Statistiken und Modellberechnung.
 3. Leite aus der Nachricht die Märkte ab:
-   `draw` für Remis, `btts`, `over25` und `1x2`. Ohne Einschränkung nutze alle Märkte.
+   `draw` für Remis, `btts`, `over25` und `1x2`. Anfragen zu Toren in der ersten
+   Halbzeit gehören zur Torlinienanalyse und umfassen Über/Unter 0,5 und 1,5.
+   Ohne Einschränkung nutze alle Märkte.
 4. Nutze ohne andere Zeitangabe `--dates both` für heute und morgen in `Europe/Berlin`.
 5. Verwende für eine reine Remis-Analyse den deterministischen 100-Punkte-Analyzer:
 
@@ -60,14 +62,15 @@ Benutzer auf Deutsch und führe Analyseaufträge selbstständig über die vorhan
    Favoriten und anschließend die Ergänzung aus dem 70/50-Heim-/Auswärtsformfilter
    mit Mindestquote 1,30 aus. Übernimm Tipp `1` oder `2`, Quote und Punktwert unverändert.
 
-7. Verwende für Torlinien-Wahrscheinlichkeiten:
+7. Verwende für Torlinien-Wahrscheinlichkeiten einschließlich erster Halbzeit:
 
    ```powershell
    npm run goals -- --select "Deutschland|Bundesliga" --dates both
    ```
 
-   Gib die vollständige Tabelle mit Über/Unter 1,5, 2,5 und 3,5, erwarteten Toren,
-   Datenvertrauen und Warnsignalen inhaltlich unverändert aus.
+   Gib die vollständige Gesamtspieltabelle mit Über/Unter 1,5, 2,5 und 3,5 sowie
+   darunter die Halbzeittabelle mit Über/Unter 0,5 und 1,5, erwarteten Toren,
+   jeweiligem Datenvertrauen und Warnsignalen inhaltlich unverändert aus.
 
 8. Bei Exitcode 2 zeigt die CLI mögliche API-Ligen. Frage den Benutzer nur dann nach der
    gemeinten Liga, wenn der Screenshot die Mehrdeutigkeit nicht auflöst. Speichere die

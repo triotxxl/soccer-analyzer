@@ -1,5 +1,5 @@
 import {
-  Binoculars, CalendarBlank, CaretDoubleLeft, CaretDoubleRight, CaretLeft, CaretRight, CheckCircle, ListBullets, RocketLaunch, Star, X
+  Binoculars, CalendarBlank, CaretDoubleLeft, CaretDoubleRight, CaretLeft, CaretRight, CheckCircle, ListBullets, RocketLaunch, ShieldCheck, Star, X
 } from "@phosphor-icons/react";
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { useDashboardData } from "./data";
@@ -11,13 +11,17 @@ const MARKET_OPTIONS: Array<{ key: "all" | DashboardMarketKey; label: string }> 
   { key: "draw", label: "Remis" },
   { key: "btts", label: "BTTS" },
   { key: "over15", label: "Über 1,5" },
-  { key: "over25", label: "Über 2,5" }
+  { key: "over25", label: "Über 2,5" },
+  { key: "firstHalfOver05", label: "1. HZ Ü0,5" },
+  { key: "firstHalfOver15", label: "1. HZ Ü1,5" }
 ];
 type MarketFilter = (typeof MARKET_OPTIONS)[number]["key"];
 type Density = "micro" | "compact" | "comfort";
 type LevelFilter = "all" | "strong" | "recommended";
 type RangeMode = "next48" | "custom";
-type H2hView = "outcome" | "btts" | "over";
+type H2hView = "outcome" | "btts" | "over" | "firstHalfOver";
+type FullTimeOverLine = 1.5 | 2.5 | 3.5;
+type FirstHalfOverLine = 0.5 | 1.5;
 type SortKey = "kickoff" | "team" | "form" | "h2h" | "expected" | "score" | "market";
 
 const levelRank: Record<RecommendationLevel, number> = { none: 0, recommended: 1, strong: 2 };
@@ -146,8 +150,8 @@ function formatOdd(value: number | null): string {
   return value === null ? "–" : value.toFixed(2).replace(".", ",");
 }
 
-function marketFor(fixture: DashboardFixture, key: DashboardMarketKey): DashboardMarket {
-  return fixture.markets.find((item) => item.key === key)!;
+function marketFor(fixture: DashboardFixture, key: DashboardMarketKey): DashboardMarket | undefined {
+  return fixture.markets.find((item) => item.key === key);
 }
 
 function visibleMarkets(fixture: DashboardFixture, filter: MarketFilter): DashboardMarket[] {
@@ -192,9 +196,16 @@ function compareOutcomeSequences(left: FormResult[], right: FormResult[], target
   return left.length - right.length;
 }
 
-function consecutive(values: boolean[]): number {
-  const index = values.findIndex((value) => !value);
+function consecutive(values: Array<boolean | null | undefined>): number {
+  const index = values.findIndex((value) => value !== true);
   return index === -1 ? values.length : index;
+}
+
+function firstHalfOverResults(fixture: DashboardFixture, line: FirstHalfOverLine): Array<boolean | null> {
+  return fixture.h2h.matches.map((match) => {
+    if (typeof match.halfTimeHomeGoals !== "number" || typeof match.halfTimeAwayGoals !== "number") return null;
+    return match.halfTimeHomeGoals + match.halfTimeAwayGoals > line;
+  });
 }
 
 function FormDots({ results, h2h = false }: { results: FormResult[]; h2h?: boolean }) {
@@ -207,17 +218,41 @@ function FormDots({ results, h2h = false }: { results: FormResult[]; h2h?: boole
   </div>;
 }
 
-function H2hDots({ fixture, view, overLine }: { fixture: DashboardFixture; view: H2hView; overLine: 1.5 | 2.5 | 3.5 }) {
+function DefenseShield({ profile, team }: { profile: NonNullable<DashboardFixture["defense"]>["home"] | undefined; team: string }) {
+  if (!profile?.strong) return null;
+  const improvement = Math.max(0, Math.round((1 - profile.relativeToLeague) * 100));
+  const label = `${team}: besonders defensiv stark · ${profile.concededGoals.toFixed(2).replace(".", ",")} Gegentore · ${improvement} % unter Wettbewerbsniveau`;
+  return <span className="defense-shield" role="img" aria-label={label} title={label}><ShieldCheck size={16} weight="fill" aria-hidden /></span>;
+}
+
+function H2hDots({ fixture, view, overLine, firstHalfOverLine }: {
+  fixture: DashboardFixture;
+  view: H2hView;
+  overLine: FullTimeOverLine;
+  firstHalfOverLine: FirstHalfOverLine;
+}) {
   if (view === "outcome") return <FormDots results={fixture.h2h.outcomes} h2h />;
   const values = view === "btts"
-    ? fixture.h2h.btts.map((value) => ({ value, text: value ? "✓" : "×" }))
-    : fixture.h2h.matches.map((match) => {
+    ? fixture.h2h.btts.map((value) => ({ value, text: value ? "✓" : "×", title: value ? "BTTS" : "Kein BTTS" }))
+    : view === "firstHalfOver"
+      ? fixture.h2h.matches.map((match) => {
+        if (typeof match.halfTimeHomeGoals !== "number" || typeof match.halfTimeAwayGoals !== "number") {
+          return { value: null, text: "–", title: "Kein Halbzeitstand verfügbar" };
+        }
+        const value = match.halfTimeHomeGoals + match.halfTimeAwayGoals > firstHalfOverLine;
+        return {
+          value,
+          text: value ? "Ü" : "U",
+          title: `1. Halbzeit ${match.halfTimeHomeGoals}:${match.halfTimeAwayGoals} · ${value ? "Über" : "Unter"} ${firstHalfOverLine.toLocaleString("de-DE")}`
+        };
+      })
+      : fixture.h2h.matches.map((match) => {
         const value = match.homeGoals + match.awayGoals > overLine;
-        return { value, text: value ? "Ü" : "U" };
+        return { value, text: value ? "Ü" : "U", title: `Endstand ${match.homeGoals}:${match.awayGoals}` };
       });
-  while (values.length < 5) values.push({ value: false, text: "–" });
+  while (values.length < 5) values.push({ value: null, text: "–", title: "Keine Daten" });
   return <div className="dot-row">
-    {values.slice(0, 5).map((item, index) => <span className={`result-dot ${item.text === "–" ? "missing" : item.value ? "hit" : "miss"} ${index === 0 ? "latest" : ""}`} key={index}>{item.text}</span>)}
+    {values.slice(0, 5).map((item, index) => <span className={`result-dot ${item.value === null ? "missing" : item.value ? "hit" : "miss"} ${index === 0 ? "latest" : ""}`} title={item.title} key={index}>{item.text}</span>)}
   </div>;
 }
 
@@ -265,7 +300,8 @@ function Dashboard({ document }: { document: DashboardDocument }) {
   const [showCrossLeague, setShowCrossLeague] = useState(true);
   const [showPast, setShowPast] = useState(false);
   const [h2hView, setH2hView] = useState<H2hView>("outcome");
-  const [overLine, setOverLine] = useState<1.5 | 2.5 | 3.5>(2.5);
+  const [overLine, setOverLine] = useState<FullTimeOverLine>(2.5);
+  const [firstHalfOverLine, setFirstHalfOverLine] = useState<FirstHalfOverLine>(0.5);
   const [density, setDensity] = useState<Density>("comfort");
   const [sortKey, setSortKey] = useState<SortKey>("kickoff");
   const [sortDirection, setSortDirection] = useState<1 | -1>(1);
@@ -274,6 +310,28 @@ function Dashboard({ document }: { document: DashboardDocument }) {
   const [openFixture, setOpenFixture] = useState<number | null>(null);
   const dateControlRef = useRef<HTMLDivElement>(null);
   const now = Date.now();
+
+  const selectMarket = (market: MarketFilter) => {
+    setMarketFilter(market);
+    setOpenFixture(null);
+    if (market === "btts") {
+      setH2hView("btts");
+    } else if (market === "over15") {
+      setH2hView("over");
+      setOverLine(1.5);
+    } else if (market === "over25") {
+      setH2hView("over");
+      setOverLine(2.5);
+    } else if (market === "firstHalfOver05") {
+      setH2hView("firstHalfOver");
+      setFirstHalfOverLine(0.5);
+    } else if (market === "firstHalfOver15") {
+      setH2hView("firstHalfOver");
+      setFirstHalfOverLine(1.5);
+    } else {
+      setH2hView("outcome");
+    }
+  };
 
   useEffect(() => {
     const minimum = document.meta.firstAvailableDate;
@@ -289,6 +347,7 @@ function Dashboard({ document }: { document: DashboardDocument }) {
       setRangeMode("next48");
     }
     setOpenFixture((value) => value !== null && document.fixtures.some((fixture) => fixture.fixtureId === value) ? value : null);
+    setMarketFilter((value) => value === "all" || document.fixtures.some((fixture) => fixture.markets.some((market) => market.key === value)) ? value : "all");
   }, [document]);
 
   useEffect(() => {
@@ -376,9 +435,13 @@ function Dashboard({ document }: { document: DashboardDocument }) {
     let comparison = 0;
     if (sortKey === "kickoff") comparison = Date.parse(left.kickoff) - Date.parse(right.kickoff);
     else if (sortKey === "team") comparison = `${left.homeTeam} ${left.awayTeam}`.localeCompare(`${right.homeTeam} ${right.awayTeam}`, "de");
-    else if (sortKey === "expected") comparison = left.expectedGoals.total - right.expectedGoals.total;
+    else if (sortKey === "expected") {
+      const firstHalf = marketFilter === "firstHalfOver05" || marketFilter === "firstHalfOver15";
+      comparison = (firstHalf ? left.expectedFirstHalfGoals?.total ?? -1 : left.expectedGoals.total) -
+        (firstHalf ? right.expectedFirstHalfGoals?.total ?? -1 : right.expectedGoals.total);
+    }
     else if (sortKey === "score") comparison = (marketFilter === "draw" ? left.scores.draw ?? -1 : left.scores.favorite ?? -1) - (marketFilter === "draw" ? right.scores.draw ?? -1 : right.scores.favorite ?? -1);
-    else if (sortKey === "market") comparison = marketFor(left, selectedMarket).probability - marketFor(right, selectedMarket).probability;
+    else if (sortKey === "market") comparison = (marketFor(left, selectedMarket)?.probability ?? -1) - (marketFor(right, selectedMarket)?.probability ?? -1);
     else if (sortKey === "form") {
       const mode = formSortModes[formSortMode]!;
       if (mode === "home") comparison = countResults(left.form.home, "win") - countResults(right.form.home, "win");
@@ -389,13 +452,16 @@ function Dashboard({ document }: { document: DashboardDocument }) {
       else if (h2hView === "over") {
         const streak = (fixture: DashboardFixture) => consecutive(fixture.h2h.matches.map((match) => match.homeGoals + match.awayGoals > overLine));
         comparison = streak(left) - streak(right);
+      } else if (h2hView === "firstHalfOver") {
+        const streak = (fixture: DashboardFixture) => consecutive(firstHalfOverResults(fixture, firstHalfOverLine));
+        comparison = streak(left) - streak(right);
       } else {
         const target = h2hSortTargets[h2hSortMode]!;
         comparison = compareOutcomeSequences(left.h2h.outcomes, right.h2h.outcomes, target);
       }
     }
     return comparison * sortDirection || Date.parse(left.kickoff) - Date.parse(right.kickoff);
-  }), [filtered, formSortMode, h2hSortMode, h2hView, marketFilter, overLine, sortDirection, sortKey]);
+  }), [filtered, firstHalfOverLine, formSortMode, h2hSortMode, h2hView, marketFilter, overLine, sortDirection, sortKey]);
 
   const sort = (key: SortKey) => {
     if (key === "form") {
@@ -421,7 +487,9 @@ function Dashboard({ document }: { document: DashboardDocument }) {
   const formSortLabel = formSortLabels[formSortModeKey];
   const h2hSortTarget = h2hSortTargets[h2hSortMode]!;
   const h2hSortLabel = h2hSortLabels[h2hSortTarget];
-  const shownMarkets = marketFilter === "all" ? MARKET_OPTIONS.slice(1) : MARKET_OPTIONS.filter((option) => option.key === marketFilter);
+  const availableMarketOptions = MARKET_OPTIONS.filter((option) => option.key === "all" || document.fixtures.some((fixture) => fixture.markets.some((market) => market.key === option.key)));
+  const shownMarkets = marketFilter === "all" ? availableMarketOptions.slice(1) : availableMarketOptions.filter((option) => option.key === marketFilter);
+  const showFirstHalfExpected = marketFilter === "firstHalfOver05" || marketFilter === "firstHalfOver15";
   const showScore = marketFilter === "all" || marketFilter === "1x2" || marketFilter === "draw";
   const columnCount = 5 + (showScore ? 1 : 0) + shownMarkets.length;
   const minimumWidth = density === "micro"
@@ -487,14 +555,25 @@ function Dashboard({ document }: { document: DashboardDocument }) {
       <button className="mobile-sidebar-toggle" tabIndex={mobileViewport ? 0 : -1} aria-hidden={!mobileViewport} onClick={() => setSidebarOpen(true)} aria-controls="dashboard-sidebar" aria-expanded={sidebarOpen}><ListBullets size={17} weight="duotone" /> Filter & Zeitraum</button>
       {banner && <div className="banner"><span><RocketLaunch size={20} weight="duotone" /></span><p><strong>Grün</strong> markierte Tipps erfüllen alle Modellkriterien, gelbe sind starke Kandidaten. Sortiere über die Spaltenköpfe, filtere Märkte über die Reiter.</p><button onClick={() => setBanner(false)} aria-label="Hinweis schließen"><X /></button></div>}
       <nav className="market-tabs" aria-label="Marktfilter">
-        {MARKET_OPTIONS.map((option) => <button className={marketFilter === option.key ? "active" : ""} key={option.key} onClick={() => { setMarketFilter(option.key); setOpenFixture(null); }}>{option.label}</button>)}
+        {availableMarketOptions.map((option) => <button className={marketFilter === option.key ? "active" : ""} key={option.key} onClick={() => selectMarket(option.key)}>{option.label}</button>)}
       </nav>
       <div className="view-toolbar">
         <span>H2H</span>
         <div className="segmented">
-          {([ ["outcome", "Ergebnis"], ["btts", "BTTS"], ["over", "Über"] ] as const).map(([key, label]) => <button className={h2hView === key ? "active" : ""} onClick={() => setH2hView(key)} key={key}>{label}</button>)}
+          {([ ["outcome", "Ergebnis"], ["btts", "BTTS"], ["over", "Über"], ["firstHalfOver", "1. HZ Über"] ] as const).map(([key, label]) => <button className={h2hView === key ? "active" : ""} onClick={() => setH2hView(key)} key={key}>{label}</button>)}
         </div>
-        <select aria-label="Über-Linie für H2H" value={overLine} disabled={h2hView !== "over"} onChange={(event) => setOverLine(Number(event.target.value) as 1.5 | 2.5 | 3.5)}><option value={1.5}>Über 1,5</option><option value={2.5}>Über 2,5</option><option value={3.5}>Über 3,5</option></select>
+        <select
+          aria-label={h2hView === "firstHalfOver" ? "Über-Linie für H2H 1. Halbzeit" : "Über-Linie für H2H"}
+          value={h2hView === "firstHalfOver" ? firstHalfOverLine : overLine}
+          disabled={h2hView !== "over" && h2hView !== "firstHalfOver"}
+          onChange={(event) => h2hView === "firstHalfOver"
+            ? setFirstHalfOverLine(Number(event.target.value) as FirstHalfOverLine)
+            : setOverLine(Number(event.target.value) as FullTimeOverLine)}
+        >
+          {h2hView === "firstHalfOver"
+            ? <><option value={0.5}>Über 0,5</option><option value={1.5}>Über 1,5</option></>
+            : <><option value={1.5}>Über 1,5</option><option value={2.5}>Über 2,5</option><option value={3.5}>Über 3,5</option></>}
+        </select>
         <div className="segmented density-switch">
           {([ ["micro", "XS"], ["compact", "Kompakt"], ["comfort", "Komfort"] ] as const).map(([key, label]) => <button className={density === key ? "active" : ""} onClick={() => setDensity(key)} key={key}>{label}</button>)}
         </div>
@@ -502,8 +581,10 @@ function Dashboard({ document }: { document: DashboardDocument }) {
 
       <div className="table-scroll">
         <div className={`table-head ${fixtureGridClass}`} style={gridStyle}>
-          <button onClick={() => sort("kickoff")}>Anstoß & Liga {arrow("kickoff")}</button>
-          <button onClick={() => sort("team")}>Partie {arrow("team")}</button>
+          <span className="fixture-summary-head">
+            <button onClick={() => sort("team")}>Partie {arrow("team")}</button>
+            <button onClick={() => sort("kickoff")}>Anstoß & Liga {arrow("kickoff")}</button>
+          </span>
           <button onClick={() => sort("form")}>
             Letzte 5 Form {sortKey === "form"
               ? <span className={`sort-mode-badge ${formSortLabel.className}`} aria-label={`Sortierung: ${formSortLabel.label}`} title={formSortLabel.label}>{formSortLabel.badge}</span>
@@ -514,7 +595,7 @@ function Dashboard({ document }: { document: DashboardDocument }) {
               ? <span className={`sort-mode-badge ${h2hSortTarget}`} aria-label={`Sortierung: ${h2hSortLabel.label}`} title={h2hSortLabel.label}>{h2hSortLabel.badge}</span>
               : arrow("h2h")}
           </button>
-          <button onClick={() => sort("expected")}>Erw. Tore {arrow("expected")}</button>
+          <button onClick={() => sort("expected")}>{showFirstHalfExpected ? "Erw. Tore 1. HZ" : "Erw. Tore"} {arrow("expected")}</button>
           {showScore && <button onClick={() => sort("score")}>Score {arrow("score")}</button>}
           {shownMarkets.map((option) => <button key={option.key} onClick={() => sort("market")}>{option.label} {arrow("market")}</button>)}
         </div>
@@ -524,16 +605,21 @@ function Dashboard({ document }: { document: DashboardDocument }) {
           const markets = visibleMarkets(fixture, marketFilter);
           return <article className={`fixture-wrap level-${bestLevel(fixture, marketFilter)} ${openFixture === fixture.fixtureId ? "open" : ""}`} key={fixture.fixtureId}>
             <button className={`${fixtureGridClass} fixture-row`} style={gridStyle} onClick={() => setOpenFixture((value) => value === fixture.fixtureId ? null : fixture.fixtureId)} aria-expanded={openFixture === fixture.fixtureId}>
-              <span className="time-cell"><strong>{time.clock}{isPast && <em> angepfiffen</em>}</strong><small>{time.day} · {fixture.country} · {fixture.league}</small>{(fixture.h2hNotice || fixture.warnings.length > 0) && <i>{fixture.h2hNotice ? "H2H" : "Daten"}</i>}</span>
-              <span className="teams-cell"><strong>{fixture.homeTeam}</strong><strong>{fixture.awayTeam}</strong></span>
+              <span className="fixture-summary-cell">
+                <span className="teams-cell">
+                  <span className="team-name"><strong>{fixture.homeTeam}</strong><DefenseShield profile={fixture.defense?.home} team={fixture.homeTeam} /></span>
+                  <span className="team-name"><strong>{fixture.awayTeam}</strong><DefenseShield profile={fixture.defense?.away} team={fixture.awayTeam} /></span>
+                </span>
+                <span className="fixture-meta"><strong>{time.clock}{isPast && <em> angepfiffen</em>}</strong><small>{time.day} · {fixture.country} · {fixture.league}</small>{(fixture.h2hNotice || fixture.warnings.length > 0) && <i>{fixture.h2hNotice ? "H2H" : "Daten"}</i>}</span>
+              </span>
               <span className="form-cell"><span className="scope">{fixture.form.scope === "overall" ? "Gesamt" : "H/A"}</span><span><FormDots results={fixture.form.home} /><FormDots results={fixture.form.away} /></span></span>
-              <span className="h2h-cell"><H2hDots fixture={fixture} view={h2hView} overLine={overLine} /></span>
-              <span className="expected-cell"><strong>{fixture.expectedGoals.home.toFixed(2).replace(".", ",")}</strong><i>:</i><strong>{fixture.expectedGoals.away.toFixed(2).replace(".", ",")}</strong></span>
+              <span className="h2h-cell"><H2hDots fixture={fixture} view={h2hView} overLine={overLine} firstHalfOverLine={firstHalfOverLine} /></span>
+              <span className="expected-cell"><strong>{(showFirstHalfExpected ? fixture.expectedFirstHalfGoals?.home ?? 0 : fixture.expectedGoals.home).toFixed(2).replace(".", ",")}</strong><i>:</i><strong>{(showFirstHalfExpected ? fixture.expectedFirstHalfGoals?.away ?? 0 : fixture.expectedGoals.away).toFixed(2).replace(".", ",")}</strong></span>
               {showScore && <span className="score-cell">{marketFilter !== "draw" && <span><small>1X2</small><strong>{fixture.scores.favorite ?? "–"}</strong></span>}{marketFilter !== "1x2" && <span><small>X</small><strong>{fixture.scores.draw ?? "–"}</strong></span>}</span>}
               {markets.map((item) => <MarketCard market={item} key={item.key} />)}
             </button>
             {openFixture === fixture.fixtureId && <div className="fixture-details">
-              <section><h3>Direkte Begegnungen</h3>{fixture.h2h.matches.length ? fixture.h2h.matches.map((match) => <p key={`${match.date}-${match.homeTeam}`}>{new Intl.DateTimeFormat("de-DE", { timeZone: document.meta.timezone }).format(new Date(match.date))} · {match.homeTeam} {match.homeGoals}:{match.awayGoals} {match.awayTeam}</p>) : <p>Keine H2H-Ergebnisse verfügbar.</p>}</section>
+              <section><h3>Direkte Begegnungen</h3>{fixture.h2h.matches.length ? fixture.h2h.matches.map((match) => <p key={`${match.date}-${match.homeTeam}`}>{new Intl.DateTimeFormat("de-DE", { timeZone: document.meta.timezone }).format(new Date(match.date))} · {match.homeTeam} {match.homeGoals}:{match.awayGoals} {match.awayTeam}{typeof match.halfTimeHomeGoals === "number" && typeof match.halfTimeAwayGoals === "number" ? ` (HZ ${match.halfTimeHomeGoals}:${match.halfTimeAwayGoals})` : ""}</p>) : <p>Keine H2H-Ergebnisse verfügbar.</p>}</section>
               <section><h3>Bewertung je Markt</h3><div className="market-details">{fixture.markets.map((item) => <div key={item.key} className={item.recommendation.level}><i /><span><strong>{item.label} · {item.recommendation.label}</strong>{item.details.join(" · ")}</span></div>)}</div></section>
             </div>}
           </article>;

@@ -364,6 +364,11 @@
     "apiTeamId": 11238,
     "apiTeamName": "Araz"
   },
+  "arbroath fc": {
+    "tipicoName": "Arbroath FC",
+    "apiTeamId": 4249,
+    "apiTeamName": "Arbroath"
+  },
   "arg de merlo": {
     "tipicoName": "Arg. de Merlo",
     "apiTeamId": 2430,
@@ -3918,6 +3923,11 @@
     "tipicoName": "Liverpool MTV",
     "apiTeamId": 2358,
     "apiTeamName": "Liverpool Montevideo"
+  },
+  "livingston fc": {
+    "tipicoName": "Livingston FC",
+    "apiTeamId": 255,
+    "apiTeamName": "Livingston"
   },
   "lks lodz": {
     "tipicoName": "LKS Lodz",

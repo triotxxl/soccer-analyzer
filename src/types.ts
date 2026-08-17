@@ -24,6 +24,10 @@ export interface TipicoOdds {
   bttsYes?: number;
   over15?: number;
   over25?: number;
+  firstHalfOver05?: number;
+  firstHalfUnder05?: number;
+  firstHalfOver15?: number;
+  firstHalfUnder15?: number;
 }
 
 export interface ApiEnvelope<T> {
@@ -199,6 +203,14 @@ export interface TeamMetrics {
   drawRate: number;
 }
 
+export interface DefensiveProfile {
+  concededGoals: number;
+  relativeToLeague: number;
+  matches: number;
+  venueMatches: number;
+  strong: boolean;
+}
+
 export interface ModelResult {
   expectedHomeGoals: number;
   expectedAwayGoals: number;
@@ -212,6 +224,7 @@ export interface ModelResult {
   quality: number;
   homeMetrics: TeamMetrics;
   awayMetrics: TeamMetrics;
+  defense: { home: DefensiveProfile; away: DefensiveProfile };
   sample: { leagueMatches: number; homeTeamMatches: number; awayTeamMatches: number };
 }
 
@@ -222,6 +235,13 @@ export interface GoalLineProbabilities {
   under25: number;
   over35: number;
   under35: number;
+}
+
+export interface FirstHalfGoalLineProbabilities {
+  over05: number;
+  under05: number;
+  over15: number;
+  under15: number;
 }
 
 export interface GoalLineRow {
@@ -243,6 +263,15 @@ export interface GoalLineRow {
     btts: number;
   };
   probabilities: GoalLineProbabilities;
+  defense?: { home: DefensiveProfile; away: DefensiveProfile };
+  firstHalf: {
+    expectedHomeGoals: number;
+    expectedAwayGoals: number;
+    expectedTotalGoals: number;
+    dataConfidence: number;
+    probabilities: FirstHalfGoalLineProbabilities;
+    warnings: string[];
+  };
   warnings: string[];
 }
 
@@ -341,6 +370,8 @@ export interface DrawScoreRow {
       awayTeam: string;
       homeGoals: number;
       awayGoals: number;
+      halfTimeHomeGoals?: number | null;
+      halfTimeAwayGoals?: number | null;
     }>;
   };
   rating:

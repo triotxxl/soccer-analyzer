@@ -7,6 +7,8 @@ export function fixture(options: {
   awayId: number;
   homeGoals?: number | null;
   awayGoals?: number | null;
+  halfTimeHomeGoals?: number | null;
+  halfTimeAwayGoals?: number | null;
   status?: string;
   leagueId?: number;
   leagueName?: string;
@@ -17,6 +19,12 @@ export function fixture(options: {
   const date = new Date(options.timestamp * 1000).toISOString();
   const homeGoals = options.homeGoals ?? null;
   const awayGoals = options.awayGoals ?? null;
+  const halfTimeHomeGoals = options.halfTimeHomeGoals === undefined
+    ? homeGoals === null ? null : Math.min(homeGoals, 1)
+    : options.halfTimeHomeGoals;
+  const halfTimeAwayGoals = options.halfTimeAwayGoals === undefined
+    ? awayGoals === null ? null : Math.min(awayGoals, 1)
+    : options.halfTimeAwayGoals;
   return {
     fixture: {
       id: options.id,
@@ -37,6 +45,7 @@ export function fixture(options: {
     },
     goals: { home: homeGoals, away: awayGoals },
     score: {
+      halftime: { home: halfTimeHomeGoals, away: halfTimeAwayGoals },
       fulltime: { home: homeGoals, away: awayGoals }
     }
   };

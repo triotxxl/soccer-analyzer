@@ -111,13 +111,17 @@ test("Torlinien-End-to-End analysiert und speichert nur konkret ausgewählte Par
   }, { client: fake, database, now: target });
   assert.equal(result.rows.length, 1);
   assert.equal(result.rows[0]?.fixtureId, 901);
-  assert.equal(result.rows[0]?.modelVersion, "1.0.0");
+  assert.equal(result.rows[0]?.modelVersion, "2.0.0");
   assert.ok(Math.abs(
     result.rows[0]!.probabilities.over25 + result.rows[0]!.probabilities.under25 - 1
+  ) < 1e-12);
+  assert.ok(Math.abs(
+    result.rows[0]!.firstHalf.probabilities.over05 + result.rows[0]!.firstHalf.probabilities.under05 - 1
   ) < 1e-12);
   assert.equal(database.goalLinePredictionCount(), 1);
   const output = formatGoalLineAnalysis(result);
   assert.match(output, /Ü 1,5.*U 1,5.*Ü 2,5.*U 2,5.*Ü 3,5.*U 3,5/);
+  assert.match(output, /1\. Halbzeit[\s\S]*Ü 0,5.*U 0,5.*Ü 1,5.*U 1,5/);
   assert.match(output, /Datenvertrauen/);
   assert.doesNotMatch(output, /Gewinnwahrscheinlichkeit[^.]*Datenvertrauen/);
   database.close();

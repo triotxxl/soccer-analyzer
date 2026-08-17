@@ -75,7 +75,9 @@ verfügbaren API-Quoten verwendet.
 
 Vollständige Tabelle aller ausgewählten Spiele mit erwarteten Heim-, Auswärts- und
 Gesamttoren sowie den Wahrscheinlichkeiten für Über und Unter 1,5, 2,5 und 3,5 Tore.
-Zusätzlich werden Datenvertrauen und Warnsignale ausgegeben. Es findet keine
+Darunter folgt die separate Analyse der ersten Halbzeit für Über und Unter 0,5 und
+1,5 mit eigenen erwarteten Toren und eigenem Datenvertrauen. Zusätzlich werden
+Datenvertrauen und Warnsignale ausgegeben. Es findet keine
 Schwellenfilterung und keine automatische Auswahl einer Wettseite statt.
 
 ## Allgemeine Begriffe

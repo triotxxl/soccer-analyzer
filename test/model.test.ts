@@ -1,8 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  analyzeFirstHalfGoals,
   analyzeFixture,
   candidatesForFixture,
+  firstHalfGoalLineProbabilities,
+  firstHalfPlayedMatches,
   goalLineProbabilities,
   playedMatches,
   poissonProbabilities
@@ -45,6 +48,57 @@ test("Torlinien verwenden die exakte Poisson-CDF und komplementäre Wahrscheinli
   });
 });
 
+test("Halbzeit-Torlinien verwenden die exakte Poisson-CDF für 0,5 und 1,5", () => {
+  const probabilities = firstHalfGoalLineProbabilities(0.7, 0.4);
+  const lambda = 1.1;
+  const p0 = Math.exp(-lambda);
+  const p1 = p0 * lambda;
+  assert.ok(Math.abs(probabilities.under05 - p0) < 1e-12);
+  assert.ok(Math.abs(probabilities.under15 - (p0 + p1)) < 1e-12);
+  assert.ok(Math.abs(probabilities.over05 + probabilities.under05 - 1) < 1e-12);
+  assert.ok(Math.abs(probabilities.over15 + probabilities.under15 - 1) < 1e-12);
+  assert.deepEqual(firstHalfGoalLineProbabilities(0, 0), {
+    over05: 0, under05: 1, over15: 0, under15: 1
+  });
+});
+
+test("Halbzeitmodell verwendet nur vollständige Halbzeitstände und nicht den Endstand", () => {
+  const base = 1_800_000_000;
+  const upcoming = fixture({ id: 999, timestamp: base, homeId: 1, awayId: 2 });
+  const histories = (largeScores: boolean) => Array.from({ length: 16 }, (_, index) => fixture({
+    id: index + 1,
+    timestamp: base - (index + 1) * 86_400,
+    homeId: index % 2 === 0 ? 1 : 10 + index,
+    awayId: index % 2 === 0 ? 20 + index : 2,
+    homeGoals: largeScores ? 5 : 1,
+    awayGoals: largeScores ? 4 : 1,
+    halfTimeHomeGoals: index % 3 === 0 ? 1 : 0,
+    halfTimeAwayGoals: index % 4 === 0 ? 1 : 0
+  }));
+  const low = analyzeFirstHalfGoals(upcoming, histories(false));
+  const high = analyzeFirstHalfGoals(upcoming, histories(true));
+  assert.ok(Math.abs(low.expectedHomeGoals - high.expectedHomeGoals) < 1e-12);
+  assert.ok(Math.abs(low.expectedAwayGoals - high.expectedAwayGoals) < 1e-12);
+  const missing = fixture({
+    id: 1000, timestamp: base - 20 * 86_400, homeId: 1, awayId: 2,
+    homeGoals: 4, awayGoals: 4, halfTimeHomeGoals: null, halfTimeAwayGoals: null
+  });
+  assert.equal(firstHalfPlayedMatches([...histories(false), missing]).length, histories(false).length);
+});
+
+test("Halbzeitmodell kennzeichnet den 45-Prozent-Prior bei fehlenden Halbzeitständen", () => {
+  const base = 1_800_000_000;
+  const upcoming = fixture({ id: 999, timestamp: base, homeId: 1, awayId: 2 });
+  const withoutHalftime = history(base).map((match) => ({
+    ...match,
+    score: { ...match.score, halftime: { home: null, away: null } }
+  }));
+  const model = analyzeFirstHalfGoals(upcoming, withoutHalftime);
+  assert.equal(model.usedFallback, true);
+  assert.equal(model.quality, 0);
+  assert.ok(Number.isFinite(model.probabilities.over05));
+});
+
 test("ignoriert abgesagte, kommende und Freundschaftsspiele", () => {
   const base = 1_800_000_000;
   const fixtures = [
@@ -66,6 +120,26 @@ test("liefert bei ausreichender Historie Qualität und nachvollziehbare Kandidat
     assert.ok(candidate.quality >= 60);
     assert.ok(candidate.reasons.length >= 2);
   }
+});
+
+test("kennzeichnet nur ausreichend belegte, relativ starke Defensiven", () => {
+  const base = 1_800_000_000;
+  const upcoming = fixture({ id: 999, timestamp: base, homeId: 1, awayId: 2 });
+  const teamHistory = [
+    ...Array.from({ length: 12 }, (_, index) => fixture({
+      id: 1_000 + index, timestamp: base - (index + 1) * 7 * 86_400,
+      homeId: 1, awayId: 100 + index, homeGoals: 1, awayGoals: 0
+    })),
+    ...Array.from({ length: 12 }, (_, index) => fixture({
+      id: 2_000 + index, timestamp: base - (index + 1) * 7 * 86_400,
+      homeId: 200 + index, awayId: 2, homeGoals: 2, awayGoals: 1
+    }))
+  ];
+  const model = analyzeFixture(upcoming, history(base), teamHistory);
+  assert.equal(model.defense.home.strong, true);
+  assert.equal(model.defense.away.strong, false);
+  assert.ok(model.defense.home.relativeToLeague <= 0.70);
+  assert.equal(model.defense.home.venueMatches, 12);
 });
 
 test("filtert dünne Datenlagen unabhängig von hoher Wahrscheinlichkeit", () => {

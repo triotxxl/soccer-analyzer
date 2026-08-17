@@ -190,12 +190,16 @@ function h2hSummary(
   });
   const recentMatches = completed.slice(0, 5).map((match) => {
     const score = completedScore(match)!;
+    const halfTimeHomeGoals = match.score.halftime?.home;
+    const halfTimeAwayGoals = match.score.halftime?.away;
     return {
       date: match.fixture.date,
       homeTeam: match.teams.home.name,
       awayTeam: match.teams.away.name,
       homeGoals: score[0],
-      awayGoals: score[1]
+      awayGoals: score[1],
+      halfTimeHomeGoals: typeof halfTimeHomeGoals === "number" ? halfTimeHomeGoals : null,
+      halfTimeAwayGoals: typeof halfTimeAwayGoals === "number" ? halfTimeAwayGoals : null
     };
   });
   return {

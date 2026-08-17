@@ -37,6 +37,7 @@ interface TipicoOddResult {
 
 interface TipicoMarket {
   fixedParamText?: string | null;
+  section?: number | null;
   results?: TipicoOddResult[];
 }
 
@@ -99,6 +100,14 @@ function oddsForEvent(
   const totals = markets["points-more-less-than"] ?? [];
   const over15 = totals.find((market) => market.fixedParamText === "1.5");
   const over25 = totals.find((market) => market.fixedParamText === "2.5");
+  const firstHalfTotals = (markets["section-points-more-less"] ?? [])
+    .filter((market) => market.section === 1);
+  const firstHalf05 = firstHalfTotals.find((market) => market.fixedParamText === "0.5");
+  const firstHalf15 = firstHalfTotals.find((market) => market.fixedParamText === "1.5");
+  const firstHalfOver05 = quotedResult(firstHalf05, ["+", "over"]);
+  const firstHalfUnder05 = quotedResult(firstHalf05, ["-", "under"]);
+  const firstHalfOver15 = quotedResult(firstHalf15, ["+", "over"]);
+  const firstHalfUnder15 = quotedResult(firstHalf15, ["-", "under"]);
   return {
     homeTeam: event.team1,
     awayTeam: event.team2,
@@ -107,7 +116,11 @@ function oddsForEvent(
     away: quotedResult(standard, ["2"]),
     bttsYes: quotedResult(btts, ["j", "ja", "yes"]),
     over15: quotedResult(over15, ["+", "over"]),
-    over25: quotedResult(over25, ["+", "over"])
+    over25: quotedResult(over25, ["+", "over"]),
+    ...(firstHalfOver05 === undefined ? {} : { firstHalfOver05 }),
+    ...(firstHalfUnder05 === undefined ? {} : { firstHalfUnder05 }),
+    ...(firstHalfOver15 === undefined ? {} : { firstHalfOver15 }),
+    ...(firstHalfUnder15 === undefined ? {} : { firstHalfUnder15 })
   };
 }
 

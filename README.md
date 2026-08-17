@@ -29,6 +29,15 @@ Das Dashboard zeigt 1X2, Remis, BTTS, Über 1,5 und Über 2,5 mit eindeutigen Sy
 Cross-League-Spiele werden mit einem getrennten Modell gekennzeichnet. Remis-Serien aus
 direkten Duellen erscheinen als eigener Auffälligkeitshinweis.
 
+Die H2H-Anzeige kann neben Ergebnis, BTTS und Gesamtspiel-Torlinien auch `1. HZ Über`
+für die Linien 0,5 und 1,5 in den letzten fünf direkten Duellen darstellen. Ausschließlich
+vorhandene Halbzeitstände zählen; fehlende Werte erscheinen als `–`.
+
+Ein Shield hinter einem Teamnamen kennzeichnet eine besonders starke Defensive. Dafür
+müssen mindestens 12 Pflichtspiele, 6 passende Heim-/Auswärtsspiele und 70 %
+Datenvertrauen vorliegen; die zeitgewichteten Gegentore dürfen höchstens 70 % des
+jeweiligen Wettbewerbsniveaus betragen.
+
 `next48` ist das Standardfenster des Dashboards und umfasst exakt den Zeitpunkt des
 Starts bis 48 Stunden später. Dafür werden nötigenfalls drei Kalendertage geladen;
 Spiele außerhalb der exakten Zeitgrenzen werden verworfen.
@@ -96,8 +105,9 @@ Für die vollständige Torlinienverteilung:
 npm run goals -- --select "Deutschland|Bundesliga" --dates both
 ```
 
-Der Bericht zeigt für jedes Spiel Über und Unter 1,5, 2,5 und 3,5 sowie erwartete Tore,
-Datenvertrauen und Warnsignale. Das System ist in `docs/TORLINIEN-KRITERIEN.md` und
+Der Bericht zeigt für jedes Spiel Über und Unter 1,5, 2,5 und 3,5 sowie in einer
+separaten Halbzeittabelle Über und Unter 0,5 und 1,5 für die erste Halbzeit. Beide
+Tabellen enthalten erwartete Tore, eigenes Datenvertrauen und Warnsignale. Das System ist in `docs/TORLINIEN-KRITERIEN.md` und
 `docs/TORLINIEN-MODELL.md` dokumentiert.
 
 Die konkreten Partien werden aus `SELECTION.events` der zum Auftrag gehörenden
@@ -137,7 +147,8 @@ Optionen:
 - Lokale Nachfilter für Remis und 1X2: `--min-odds`, `--min-score` und
   `--min-confidence`.
 - Lokale Nachfilter für Torlinien: `--min-confidence`, `--min-over15`,
-  `--min-over25` und `--min-over35`. Wahrscheinlichkeiten akzeptieren `0.70` oder `70`.
+  `--min-over25`, `--min-over35`, `--min-fh-over05` und `--min-fh-over15`.
+  Wahrscheinlichkeiten akzeptieren `0.70` oder `70`.
 - Lokale Nachfilter für die allgemeine Analyse: `--min-probability` und
   `--min-quality`.
 

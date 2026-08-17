@@ -2,7 +2,7 @@ import { mkdir, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { config, ROOT_DIR } from "./config.ts";
 import { teamNameSimilarity } from "./team-resolver.ts";
-import type { DrawAnalysisResult, FavoriteAnalysisResult, GoalLineAnalysisResult, GoalLineRow, TipicoOdds } from "./types.ts";
+import type { DefensiveProfile, DrawAnalysisResult, FavoriteAnalysisResult, GoalLineAnalysisResult, GoalLineRow, TipicoOdds } from "./types.ts";
 
 export interface DashboardInput {
   createdAt: string;
@@ -17,7 +17,7 @@ export interface DashboardInput {
 }
 
 export type RecommendationLevel = "none" | "recommended" | "strong";
-export type DashboardMarketKey = "1x2" | "draw" | "btts" | "over15" | "over25";
+export type DashboardMarketKey = "1x2" | "draw" | "btts" | "over15" | "over25" | "firstHalfOver05" | "firstHalfOver15";
 export type FormResult = "win" | "draw" | "loss";
 
 export interface DashboardMarket {
@@ -52,15 +52,25 @@ export interface DashboardFixture {
     btts: boolean[];
     draws: number;
     consecutiveDraws: number;
-    matches: Array<{ date: string; homeTeam: string; awayTeam: string; homeGoals: number; awayGoals: number }>;
+    matches: Array<{
+      date: string;
+      homeTeam: string;
+      awayTeam: string;
+      homeGoals: number;
+      awayGoals: number;
+      halfTimeHomeGoals?: number | null;
+      halfTimeAwayGoals?: number | null;
+    }>;
   };
+  defense?: { home: DefensiveProfile; away: DefensiveProfile };
   expectedGoals: { home: number; away: number; total: number };
+  expectedFirstHalfGoals?: { home: number; away: number; total: number };
   scores: { favorite: number | null; draw: number | null };
   markets: DashboardMarket[];
 }
 
 export interface DashboardDocument {
-  schemaVersion: 1;
+  schemaVersion: 1 | 2;
   meta: {
     createdAt: string;
     timezone: string;
@@ -82,7 +92,9 @@ const thresholds: Record<DashboardMarketKey, { recommended: number; strong: numb
   draw: { recommended: 0.28, strong: 0.34 },
   btts: { recommended: 0.62, strong: 0.70 },
   over15: { recommended: 0.75, strong: 0.85 },
-  over25: { recommended: 0.60, strong: 0.70 }
+  over25: { recommended: 0.60, strong: 0.70 },
+  firstHalfOver05: { recommended: 0.70, strong: 0.80 },
+  firstHalfOver15: { recommended: 0.35, strong: 0.45 }
 };
 
 function recommendation(
@@ -148,6 +160,9 @@ export function buildDashboardDocument(input: DashboardInput): DashboardDocument
       ? `Remis auffällig: ${h2h.consecutiveDraws} direkte Duelle in Folge remis${h2h.allDraws ? `; alle ${h2h.matches} verfügbaren H2H endeten remis` : ""}`
       : null;
     const sharedDetails = warnings.length ? warnings : ["Keine zusätzlichen Warnsignale"];
+    const firstHalfDetails = row.firstHalf.warnings.length
+      ? row.firstHalf.warnings
+      : ["Keine zusätzlichen Halbzeit-Warnsignale"];
     const markets: DashboardMarket[] = [
       createMarket({
         key: "1x2", label: "1X2",
@@ -179,6 +194,16 @@ export function buildDashboardDocument(input: DashboardInput): DashboardDocument
         key: "over25", label: "Über 2,5", selection: "Mindestens 3 Tore", pick: null, selectionTone: "neutral",
         probability: row.probabilities.over25, odds: tipico?.over25 ?? null, confidence: row.dataConfidence,
         score: null, crossLeague, details: [`Erwartete Tore gesamt: ${row.expectedTotalGoals.toFixed(2)}`, ...sharedDetails]
+      }),
+      createMarket({
+        key: "firstHalfOver05", label: "1. HZ Ü0,5", selection: "1. Halbzeit: mindestens 1 Tor", pick: null, selectionTone: "neutral",
+        probability: row.firstHalf.probabilities.over05, odds: tipico?.firstHalfOver05 ?? null, confidence: row.firstHalf.dataConfidence,
+        score: null, crossLeague, details: [`Erwartete Tore 1. Halbzeit: ${row.firstHalf.expectedTotalGoals.toFixed(2)}`, ...firstHalfDetails]
+      }),
+      createMarket({
+        key: "firstHalfOver15", label: "1. HZ Ü1,5", selection: "1. Halbzeit: mindestens 2 Tore", pick: null, selectionTone: "neutral",
+        probability: row.firstHalf.probabilities.over15, odds: tipico?.firstHalfOver15 ?? null, confidence: row.firstHalf.dataConfidence,
+        score: null, crossLeague, details: [`Erwartete Tore 1. Halbzeit: ${row.firstHalf.expectedTotalGoals.toFixed(2)}`, ...firstHalfDetails]
       })
     ];
     return {
@@ -190,7 +215,13 @@ export function buildDashboardDocument(input: DashboardInput): DashboardDocument
         outcomes: h2h?.recentHomeTeamResults ?? [], btts: h2h?.recentBttsResults ?? [], draws: h2h?.draws ?? 0,
         consecutiveDraws: h2h?.consecutiveDraws ?? 0, matches: h2h?.recentMatches ?? []
       },
+      ...(row.defense ? { defense: row.defense } : {}),
       expectedGoals: { home: row.expectedHomeGoals, away: row.expectedAwayGoals, total: row.expectedTotalGoals },
+      expectedFirstHalfGoals: {
+        home: row.firstHalf.expectedHomeGoals,
+        away: row.firstHalf.expectedAwayGoals,
+        total: row.firstHalf.expectedTotalGoals
+      },
       scores: { favorite: favorite?.score ?? null, draw: draw?.score ?? null }, markets
     };
   });
@@ -204,7 +235,7 @@ export function buildDashboardDocument(input: DashboardInput): DashboardDocument
   const createdAt = Date.parse(input.createdAt);
   const latestKickoff = fixtures.reduce((latest, fixture) => Math.max(latest, Date.parse(fixture.kickoff)), createdAt);
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     meta: {
       createdAt: input.createdAt, timezone: config.timezone, sourceFile: input.sourceFile,
       totalTipicoEvents: input.totalTipicoEvents, selectedTipicoEvents: input.selectedTipicoEvents,

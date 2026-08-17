@@ -67,7 +67,9 @@ test("100-Punkte-System ist deterministisch und summiert alle Blöcke", () => {
     homeTeam: "Team 1",
     awayTeam: "Team 2",
     homeGoals: 1,
-    awayGoals: 1
+    awayGoals: 1,
+    halfTimeHomeGoals: 1,
+    halfTimeAwayGoals: 1
   });
   const sum = Object.values(first.breakdown).reduce((total, value) => total + value, 0);
   assert.equal(first.score, Math.max(0, Math.min(100, sum)));

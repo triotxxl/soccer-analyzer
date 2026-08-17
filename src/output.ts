@@ -139,6 +139,27 @@ export function formatGoalLineAnalysis(result: GoalLineAnalysisResult): string {
   }
   lines.push(
     "",
+    "## Torlinien-Wahrscheinlichkeiten 1. Halbzeit",
+    "",
+    "| Spiel | Erw. Tore 1. HZ H/A/G | Datenvertrauen | Ü 0,5 | U 0,5 | Ü 1,5 | U 1,5 | Anstoß | Warnsignale |",
+    "|---|---:|---:|---:|---:|---:|---:|---|---|"
+  );
+  if (result.rows.length === 0) {
+    lines.push("| Keine ausgewählte Partie gefunden | – | – | – | – | – | – | – | – |");
+  } else {
+    for (const row of result.rows) {
+      const game = `${row.homeTeam.replaceAll("|", "\\|")} – ${row.awayTeam.replaceAll("|", "\\|")}`;
+      const expected = `${row.firstHalf.expectedHomeGoals.toFixed(2)}/${row.firstHalf.expectedAwayGoals.toFixed(2)}/${row.firstHalf.expectedTotalGoals.toFixed(2)}`;
+      const warnings = row.firstHalf.warnings.length
+        ? row.firstHalf.warnings.join("; ").replaceAll("|", "\\|")
+        : "–";
+      lines.push(
+        `| ${game} | ${expected} | ${row.firstHalf.dataConfidence} | ${percent(row.firstHalf.probabilities.over05)} | ${percent(row.firstHalf.probabilities.under05)} | ${percent(row.firstHalf.probabilities.over15)} | ${percent(row.firstHalf.probabilities.under15)} | ${tableKickoff(row.kickoff)} | ${warnings} |`
+      );
+    }
+  }
+  lines.push(
+    "",
     `Modell ${config.goalLineModelVersion} · API-Aufrufe in diesem Lauf: ${result.apiRequests}${result.apiRequestsRemaining === null ? "" : ` · verbleibend: ${result.apiRequestsRemaining}`}`,
     "",
     "_Datenvertrauen beschreibt die Datenvollständigkeit, nicht die Gewinnwahrscheinlichkeit. Statistische Einordnung, keine Gewinnzusage._"

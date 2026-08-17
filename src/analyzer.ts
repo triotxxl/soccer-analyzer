@@ -6,7 +6,7 @@ import { scoreCrossLeagueDrawFixture } from "./cross-league-draw-criteria.ts";
 import { consensusOdds, scoreDrawFixture } from "./draw-criteria.ts";
 import { scoreFavoriteFixture } from "./favorite-criteria.ts";
 import { strengthPool } from "./league-strength.ts";
-import { analyzeFixture, candidatesForFixture, goalLineProbabilities } from "./model.ts";
+import { analyzeFirstHalfGoals, analyzeFixture, candidatesForFixture, goalLineProbabilities } from "./model.ts";
 import { buildLeagueStrength } from "./strength-builder.ts";
 import { resolveLeagues, saveAlias } from "./resolver.ts";
 import {
@@ -488,6 +488,7 @@ export async function runGoalLineAnalysis(
           ].map((item) => [item.fixture.id, item])).values()]
         : history;
       const model = analyzeFixture(fixture, history, teamHistory);
+      const firstHalfModel = analyzeFirstHalfGoals(fixture, history, teamHistory);
       const warnings: string[] = [];
       if (model.quality < 60) {
         warnings.push("Schwache Datenlage; Wahrscheinlichkeiten nicht als Empfehlung verwenden");
@@ -503,6 +504,27 @@ export async function runGoalLineAnalysis(
       if (crossLeague) {
         warnings.push("Cross-League: Teamform aus Pflichtspielen verschiedener Wettbewerbe");
       }
+      const firstHalfWarnings: string[] = [];
+      if (firstHalfModel.quality < 60) {
+        firstHalfWarnings.push("Schwache Halbzeit-Datenlage; Wahrscheinlichkeiten vorsichtig einordnen");
+      } else if (firstHalfModel.quality < 75) {
+        firstHalfWarnings.push("Nur mittleres Halbzeit-Datenvertrauen");
+      }
+      if (Math.min(firstHalfModel.homeMetrics.homeMatches, firstHalfModel.awayMetrics.awayMatches) < 6) {
+        firstHalfWarnings.push("Kleine Heim-/Auswärtsstichprobe für Halbzeitstände");
+      }
+      if (firstHalfModel.sample.leagueMatches < 10) {
+        firstHalfWarnings.push("Dünne Wettbewerbshistorie mit vollständigen Halbzeitständen");
+      }
+      if (firstHalfModel.sample.coverage < 0.8) {
+        firstHalfWarnings.push(`Nur ${Math.round(firstHalfModel.sample.coverage * 100)} % der historischen Spiele enthalten vollständige Halbzeitstände`);
+      }
+      if (firstHalfModel.usedFallback) {
+        firstHalfWarnings.push("Keine Wettbewerbshistorie mit Halbzeitständen; 45-%-Prior aus Gesamtspieltoren verwendet");
+      }
+      if (crossLeague) {
+        firstHalfWarnings.push("Cross-League: Halbzeit-Teamform aus Pflichtspielen verschiedener Wettbewerbe");
+      }
       return {
         fixtureId: fixture.fixture.id,
         kickoff: fixture.fixture.date,
@@ -516,10 +538,19 @@ export async function runGoalLineAnalysis(
         expectedTotalGoals: model.expectedHomeGoals + model.expectedAwayGoals,
         dataConfidence: model.quality,
         outcomeProbabilities: model.probabilities,
+        defense: model.defense,
         probabilities: goalLineProbabilities(
           model.expectedHomeGoals,
           model.expectedAwayGoals
         ),
+        firstHalf: {
+          expectedHomeGoals: firstHalfModel.expectedHomeGoals,
+          expectedAwayGoals: firstHalfModel.expectedAwayGoals,
+          expectedTotalGoals: firstHalfModel.expectedHomeGoals + firstHalfModel.expectedAwayGoals,
+          dataConfidence: firstHalfModel.quality,
+          probabilities: firstHalfModel.probabilities,
+          warnings: firstHalfWarnings
+        },
         warnings
       };
     });

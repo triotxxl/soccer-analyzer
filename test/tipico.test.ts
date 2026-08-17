@@ -38,6 +38,17 @@ test("liest Tipico-Events, IDs und gewünschte Quoten aus data.json", async () =
           "points-more-less-than": [
             { fixedParamText: "1.5", results: [{ caption: "+", quoteFloatValue: 1.25 }] },
             { fixedParamText: "2.5", results: [{ caption: "+", quoteFloatValue: 1.9 }] }
+          ],
+          "section-points-more-less": [
+            { section: 1, fixedParamText: "0.5", results: [
+              { caption: "+", quoteFloatValue: 1.35 },
+              { caption: "-", quoteFloatValue: 2.8 }
+            ] },
+            { section: 1, fixedParamText: "1.5", results: [
+              { caption: "+", quoteFloatValue: 2.4 },
+              { caption: "-", quoteFloatValue: 1.5 }
+            ] },
+            { section: 2, fixedParamText: "0.5", results: [{ caption: "+", quoteFloatValue: 9.9 }] }
           ]
         }
       }
@@ -65,7 +76,11 @@ test("liest Tipico-Events, IDs und gewünschte Quoten aus data.json", async () =
       away: 3.4,
       bttsYes: 1.8,
       over15: 1.25,
-      over25: 1.9
+      over25: 1.9,
+      firstHalfOver05: 1.35,
+      firstHalfUnder05: 2.8,
+      firstHalfOver15: 2.4,
+      firstHalfUnder15: 1.5
     });
   } finally {
     await rm(directory, { recursive: true, force: true });

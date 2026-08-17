@@ -62,7 +62,8 @@ export interface TopKPerformanceRow {
 
 export interface GoalLinePerformanceRow {
   modelVersion: string;
-  line: "1.5" | "2.5" | "3.5";
+  period: "fulltime" | "first-half";
+  line: "0.5" | "1.5" | "2.5" | "3.5";
   direction: "over" | "under";
   total: number;
   hits: number;
@@ -244,10 +245,21 @@ export class AnalyzerDatabase {
         under25 REAL NOT NULL,
         over35 REAL NOT NULL,
         under35 REAL NOT NULL,
+        first_half_expected_home_goals REAL,
+        first_half_expected_away_goals REAL,
+        first_half_expected_total_goals REAL,
+        first_half_data_confidence INTEGER,
+        first_half_over05 REAL,
+        first_half_under05 REAL,
+        first_half_over15 REAL,
+        first_half_under15 REAL,
+        first_half_warnings_json TEXT,
         warnings_json TEXT NOT NULL,
         settled_at TEXT,
         actual_home_goals INTEGER,
         actual_away_goals INTEGER,
+        actual_halftime_home_goals INTEGER,
+        actual_halftime_away_goals INTEGER,
         UNIQUE(fixture_id, model_version)
       );
       CREATE INDEX IF NOT EXISTS idx_goal_line_predictions_unsettled
@@ -359,6 +371,24 @@ export class AnalyzerDatabase {
     ]) {
       if (!goalColumns.some((item) => item.name === column)) {
         this.db.exec(`ALTER TABLE goal_line_predictions ADD COLUMN ${column} REAL`);
+      }
+    }
+    const halfTimeColumns: Array<[string, string]> = [
+      ["first_half_expected_home_goals", "REAL"],
+      ["first_half_expected_away_goals", "REAL"],
+      ["first_half_expected_total_goals", "REAL"],
+      ["first_half_data_confidence", "INTEGER"],
+      ["first_half_over05", "REAL"],
+      ["first_half_under05", "REAL"],
+      ["first_half_over15", "REAL"],
+      ["first_half_under15", "REAL"],
+      ["first_half_warnings_json", "TEXT"],
+      ["actual_halftime_home_goals", "INTEGER"],
+      ["actual_halftime_away_goals", "INTEGER"]
+    ];
+    for (const [column, type] of halfTimeColumns) {
+      if (!goalColumns.some((item) => item.name === column)) {
+        this.db.exec(`ALTER TABLE goal_line_predictions ADD COLUMN ${column} ${type}`);
       }
     }
   }
@@ -536,8 +566,15 @@ export class AnalyzerDatabase {
         model_version, expected_home_goals, expected_away_goals,
         expected_total_goals, data_confidence, home_probability,
         draw_probability, away_probability, btts_probability,
-        over15, under15, over25, under25, over35, under35, warnings_json
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        over15, under15, over25, under25, over35, under35,
+        first_half_expected_home_goals, first_half_expected_away_goals,
+        first_half_expected_total_goals, first_half_data_confidence,
+        first_half_over05, first_half_under05, first_half_over15, first_half_under15,
+        first_half_warnings_json, warnings_json
+      ) VALUES (
+        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+      )
       ON CONFLICT(fixture_id, model_version) DO UPDATE SET
         snapshot_at = excluded.snapshot_at,
         kickoff = excluded.kickoff,
@@ -555,6 +592,15 @@ export class AnalyzerDatabase {
         under25 = excluded.under25,
         over35 = excluded.over35,
         under35 = excluded.under35,
+        first_half_expected_home_goals = excluded.first_half_expected_home_goals,
+        first_half_expected_away_goals = excluded.first_half_expected_away_goals,
+        first_half_expected_total_goals = excluded.first_half_expected_total_goals,
+        first_half_data_confidence = excluded.first_half_data_confidence,
+        first_half_over05 = excluded.first_half_over05,
+        first_half_under05 = excluded.first_half_under05,
+        first_half_over15 = excluded.first_half_over15,
+        first_half_under15 = excluded.first_half_under15,
+        first_half_warnings_json = excluded.first_half_warnings_json,
         warnings_json = excluded.warnings_json
       WHERE goal_line_predictions.settled_at IS NULL
         AND excluded.snapshot_at < excluded.kickoff
@@ -608,6 +654,15 @@ export class AnalyzerDatabase {
           row.probabilities.under25,
           row.probabilities.over35,
           row.probabilities.under35,
+          row.firstHalf.expectedHomeGoals,
+          row.firstHalf.expectedAwayGoals,
+          row.firstHalf.expectedTotalGoals,
+          row.firstHalf.dataConfidence,
+          row.firstHalf.probabilities.over05,
+          row.firstHalf.probabilities.under05,
+          row.firstHalf.probabilities.over15,
+          row.firstHalf.probabilities.under15,
+          JSON.stringify(row.firstHalf.warnings),
           JSON.stringify(row.warnings)
         );
         saved += Number(result.changes);
@@ -772,12 +827,15 @@ export class AnalyzerDatabase {
     }
     const goalLineResult = this.db.prepare(`
       UPDATE goal_line_predictions
-      SET settled_at = ?, actual_home_goals = ?, actual_away_goals = ?
+      SET settled_at = ?, actual_home_goals = ?, actual_away_goals = ?,
+          actual_halftime_home_goals = ?, actual_halftime_away_goals = ?
       WHERE fixture_id = ? AND settled_at IS NULL
     `).run(
       new Date().toISOString(),
       home,
       away,
+      fixture.score.halftime?.home ?? null,
+      fixture.score.halftime?.away ?? null,
       fixture.fixture.id
     );
     return rows.length + profileRows.length + Number(goalLineResult.changes);
@@ -890,7 +948,9 @@ export class AnalyzerDatabase {
   goalLineReport(): GoalLinePerformanceRow[] {
     const rows = this.db.prepare(`
       SELECT model_version, over15, under15, over25, under25, over35, under35,
-             actual_home_goals, actual_away_goals
+             first_half_over05, first_half_under05, first_half_over15, first_half_under15,
+             actual_home_goals, actual_away_goals,
+             actual_halftime_home_goals, actual_halftime_away_goals
       FROM goal_line_predictions
       WHERE settled_at IS NOT NULL
         AND EXISTS (
@@ -899,56 +959,84 @@ export class AnalyzerDatabase {
         )
     `).all() as Array<{
       model_version: string;
-      over15: number;
-      under15: number;
-      over25: number;
-      under25: number;
-      over35: number;
-      under35: number;
-      actual_home_goals: number;
-      actual_away_goals: number;
+      over15: number | null;
+      under15: number | null;
+      over25: number | null;
+      under25: number | null;
+      over35: number | null;
+      under35: number | null;
+      first_half_over05: number | null;
+      first_half_under05: number | null;
+      first_half_over15: number | null;
+      first_half_under15: number | null;
+      actual_home_goals: number | null;
+      actual_away_goals: number | null;
+      actual_halftime_home_goals: number | null;
+      actual_halftime_away_goals: number | null;
     }>;
     if (rows.length === 0) return [];
-    const definitions = [
-      { line: "1.5" as const, direction: "over" as const, probability: "over15" as const, threshold: 2 },
-      { line: "1.5" as const, direction: "under" as const, probability: "under15" as const, threshold: 2 },
-      { line: "2.5" as const, direction: "over" as const, probability: "over25" as const, threshold: 3 },
-      { line: "2.5" as const, direction: "under" as const, probability: "under25" as const, threshold: 3 },
-      { line: "3.5" as const, direction: "over" as const, probability: "over35" as const, threshold: 4 },
-      { line: "3.5" as const, direction: "under" as const, probability: "under35" as const, threshold: 4 }
+    type ProbabilityKey = "over15" | "under15" | "over25" | "under25" | "over35" | "under35" |
+      "first_half_over05" | "first_half_under05" | "first_half_over15" | "first_half_under15";
+    const definitions: Array<{
+      period: GoalLinePerformanceRow["period"];
+      line: GoalLinePerformanceRow["line"];
+      direction: GoalLinePerformanceRow["direction"];
+      probability: ProbabilityKey;
+      threshold: number;
+    }> = [
+      { period: "fulltime", line: "1.5", direction: "over", probability: "over15", threshold: 2 },
+      { period: "fulltime", line: "1.5", direction: "under", probability: "under15", threshold: 2 },
+      { period: "fulltime", line: "2.5", direction: "over", probability: "over25", threshold: 3 },
+      { period: "fulltime", line: "2.5", direction: "under", probability: "under25", threshold: 3 },
+      { period: "fulltime", line: "3.5", direction: "over", probability: "over35", threshold: 4 },
+      { period: "fulltime", line: "3.5", direction: "under", probability: "under35", threshold: 4 },
+      { period: "first-half", line: "0.5", direction: "over", probability: "first_half_over05", threshold: 1 },
+      { period: "first-half", line: "0.5", direction: "under", probability: "first_half_under05", threshold: 1 },
+      { period: "first-half", line: "1.5", direction: "over", probability: "first_half_over15", threshold: 2 },
+      { period: "first-half", line: "1.5", direction: "under", probability: "first_half_under15", threshold: 2 }
     ];
     const versions = [...new Set(rows.map((row) => row.model_version))].sort();
     return versions.flatMap((modelVersion) => {
       const versionRows = rows.filter((row) => row.model_version === modelVersion);
-      return definitions.map((definition) => {
+      return definitions.flatMap((definition) => {
+        const usableRows = versionRows.filter((row) => {
+          if (row[definition.probability] === null) return false;
+          return definition.period === "fulltime"
+            ? row.actual_home_goals !== null && row.actual_away_goals !== null
+            : row.actual_halftime_home_goals !== null && row.actual_halftime_away_goals !== null;
+        });
+        if (usableRows.length === 0) return [];
         let hits = 0;
         let probabilityTotal = 0;
         let brierTotal = 0;
-        for (const row of versionRows) {
-          const totalGoals = row.actual_home_goals + row.actual_away_goals;
+        for (const row of usableRows) {
+          const totalGoals = definition.period === "fulltime"
+            ? row.actual_home_goals! + row.actual_away_goals!
+            : row.actual_halftime_home_goals! + row.actual_halftime_away_goals!;
           const over = totalGoals >= definition.threshold;
           const hit = definition.direction === "over" ? over : !over;
-          const probability = row[definition.probability];
+          const probability = row[definition.probability]!;
           const outcome = hit ? 1 : 0;
           hits += outcome;
           probabilityTotal += probability;
           brierTotal += (probability - outcome) ** 2;
         }
-        const [intervalLow, intervalHigh] = wilsonInterval(hits, versionRows.length);
-        return {
+        const [intervalLow, intervalHigh] = wilsonInterval(hits, usableRows.length);
+        return [{
           modelVersion,
+          period: definition.period,
           line: definition.line,
           direction: definition.direction,
-          total: versionRows.length,
+          total: usableRows.length,
           hits,
-          hitRate: versionRows.length ? hits / versionRows.length : 0,
-          averageProbability: versionRows.length
-            ? probabilityTotal / versionRows.length
+          hitRate: hits / usableRows.length,
+          averageProbability: usableRows.length
+            ? probabilityTotal / usableRows.length
             : 0,
-          brierScore: versionRows.length ? brierTotal / versionRows.length : 0,
+          brierScore: usableRows.length ? brierTotal / usableRows.length : 0,
           intervalLow,
           intervalHigh
-        };
+        }];
       });
     });
   }

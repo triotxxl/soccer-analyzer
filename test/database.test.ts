@@ -83,7 +83,37 @@ test("migriert eine bestehende 1.3-Datenbank auf die versionierten Profile", asy
   assert.equal(goalLineTable?.name, "goal_line_predictions");
 });
 
-test("speichert, aktualisiert und rechnet alle sechs Torlinien-Ausgänge ab", async () => {
+test("migriert eine bestehende Torlinien-Tabelle um Halbzeitfelder", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "football-halftime-migration-"));
+  const filename = path.join(directory, "test.sqlite");
+  const legacy = new DatabaseSync(filename);
+  legacy.exec(`
+    CREATE TABLE goal_line_predictions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      kickoff TEXT NOT NULL,
+      settled_at TEXT,
+      home_probability REAL,
+      draw_probability REAL,
+      away_probability REAL,
+      btts_probability REAL
+    );
+  `);
+  legacy.close();
+  const database = new AnalyzerDatabase(filename);
+  database.close();
+  const migrated = new DatabaseSync(filename);
+  const columns = migrated.prepare("PRAGMA table_info(goal_line_predictions)").all() as Array<{ name: string }>;
+  migrated.close();
+  for (const name of [
+    "first_half_expected_home_goals", "first_half_data_confidence",
+    "first_half_over05", "first_half_under15",
+    "actual_halftime_home_goals", "actual_halftime_away_goals"
+  ]) {
+    assert.ok(columns.some((column) => column.name === name), `Fehlende migrierte Spalte ${name}`);
+  }
+});
+
+test("speichert, aktualisiert und rechnet Gesamtspiel- und Halbzeit-Torlinien ab", async () => {
   const directory = await mkdtemp(path.join(os.tmpdir(), "football-goal-lines-db-"));
   const filename = path.join(directory, "test.sqlite");
   const database = new AnalyzerDatabase(filename);
@@ -94,7 +124,7 @@ test("speichert, aktualisiert und rechnet alle sechs Torlinien-Ausgänge ab", as
     league: "Bundesliga",
     homeTeam: "A",
     awayTeam: "B",
-    modelVersion: "1.0.0",
+    modelVersion: "2.0.0",
     expectedHomeGoals: 1.5,
     expectedAwayGoals: 1.0,
     expectedTotalGoals: 2.5,
@@ -109,6 +139,12 @@ test("speichert, aktualisiert und rechnet alle sechs Torlinien-Ausgänge ab", as
       over15: 0.7, under15: 0.3,
       over25: 0.5, under25: 0.5,
       over35: 0.3, under35: 0.7
+    },
+    firstHalf: {
+      expectedHomeGoals: 0.7, expectedAwayGoals: 0.4, expectedTotalGoals: 1.1,
+      dataConfidence: 78,
+      probabilities: { over05: 0.67, under05: 0.33, over15: 0.3, under15: 0.7 },
+      warnings: []
     },
     warnings: []
   };
@@ -131,7 +167,9 @@ test("speichert, aktualisiert und rechnet alle sechs Torlinien-Ausgänge ab", as
     homeId: 1,
     awayId: 2,
     homeGoals: 2,
-    awayGoals: 1
+    awayGoals: 1,
+    halfTimeHomeGoals: 1,
+    halfTimeAwayGoals: 0
   })), 1);
   database.saveGoalLinePredictions(
     "2025-12-31T12:00:00.000Z",
@@ -145,8 +183,9 @@ test("speichert, aktualisiert und rechnet alle sechs Torlinien-Ausgänge ab", as
   reader.close();
   assert.equal(stored.expected_total_goals, 2.6);
   const report = database.goalLineReport();
-  assert.equal(report.length, 6);
-  assert.deepEqual(report.map((item) => item.hits), [1, 0, 1, 0, 0, 1]);
+  assert.equal(report.length, 10);
+  assert.deepEqual(report.map((item) => item.hits), [1, 0, 1, 0, 0, 1, 1, 0, 0, 1]);
+  assert.deepEqual(report.slice(6).map((item) => item.period), ["first-half", "first-half", "first-half", "first-half"]);
   assert.ok(report.every((item) => item.total === 1));
   assert.ok(report.every((item) => item.intervalHigh <= 1));
   database.close();
@@ -408,4 +447,3 @@ test("speichert und berichtet aktive Profilprognosen ohne Duplikate", async () =
   );
   database.close();
 });
-

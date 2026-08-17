@@ -2,6 +2,7 @@ import { config } from "./config.ts";
 import type {
   ApiFixture,
   Candidate,
+  FirstHalfGoalLineProbabilities,
   GoalLineProbabilities,
   Market,
   ModelResult,
@@ -32,10 +33,29 @@ function regulationScore(fixture: ApiFixture): { home: number; away: number } | 
 }
 
 export function playedMatches(fixtures: ApiFixture[]): PlayedMatch[] {
+  return playedMatchesForPeriod(fixtures, "fulltime");
+}
+
+export function firstHalfPlayedMatches(fixtures: ApiFixture[]): PlayedMatch[] {
+  return playedMatchesForPeriod(fixtures, "halftime");
+}
+
+function playedMatchesForPeriod(
+  fixtures: ApiFixture[],
+  period: "fulltime" | "halftime"
+): PlayedMatch[] {
   return fixtures
     .filter((fixture) => !/\b(friendl|freundschaft)/i.test(fixture.league.name))
     .map((fixture) => {
-      const score = regulationScore(fixture);
+      const score = period === "fulltime"
+        ? regulationScore(fixture)
+        : (() => {
+            if (!new Set(["FT", "AET", "PEN"]).has(fixture.fixture.status.short)) return null;
+            const home = fixture.score.halftime?.home;
+            const away = fixture.score.halftime?.away;
+            if (home === null || home === undefined || away === null || away === undefined || home < 0 || away < 0) return null;
+            return { home, away };
+          })();
       if (!score) return null;
       return {
         timestamp: fixture.fixture.timestamp,
@@ -187,6 +207,126 @@ export function goalLineProbabilities(
   };
 }
 
+export function firstHalfGoalLineProbabilities(
+  homeLambda: number,
+  awayLambda: number
+): FirstHalfGoalLineProbabilities {
+  const totalLambda = Math.max(0, homeLambda + awayLambda);
+  const p0 = poisson(0, totalLambda);
+  const p1 = poisson(1, totalLambda);
+  const under05 = p0;
+  const under15 = p0 + p1;
+  return {
+    over05: 1 - under05,
+    under05,
+    over15: 1 - under15,
+    under15
+  };
+}
+
+export function analyzeFirstHalfGoals(
+  fixture: ApiFixture,
+  history: ApiFixture[],
+  teamHistory: ApiFixture[] = history
+): {
+  expectedHomeGoals: number;
+  expectedAwayGoals: number;
+  probabilities: FirstHalfGoalLineProbabilities;
+  quality: number;
+  usedFallback: boolean;
+  homeMetrics: TeamMetrics;
+  awayMetrics: TeamMetrics;
+  sample: { leagueMatches: number; homeTeamMatches: number; awayTeamMatches: number; coverage: number };
+} {
+  const fullMatches = playedMatches(history).filter(
+    (match) => match.timestamp < fixture.fixture.timestamp
+  );
+  const matches = firstHalfPlayedMatches(history).filter(
+    (match) => match.timestamp < fixture.fixture.timestamp
+  );
+  const fullTeamMatches = playedMatches(teamHistory).filter(
+    (match) => match.timestamp < fixture.fixture.timestamp
+  );
+  const teamMatches = firstHalfPlayedMatches(teamHistory).filter(
+    (match) => match.timestamp < fixture.fixture.timestamp
+  );
+  const fullHomeGoals = weightedMean(
+    fullMatches.map((match) => ({
+      value: match.homeGoals,
+      weight: recencyWeight(match.timestamp, fixture.fixture.timestamp)
+    })),
+    1.45
+  );
+  const fullAwayGoals = weightedMean(
+    fullMatches.map((match) => ({
+      value: match.awayGoals,
+      weight: recencyWeight(match.timestamp, fixture.fixture.timestamp)
+    })),
+    1.15
+  );
+  const fallbackHomeGoals = Math.max(0.05, fullHomeGoals * 0.45);
+  const fallbackAwayGoals = Math.max(0.05, fullAwayGoals * 0.45);
+  const leagueHomeGoals = Math.max(0.05, weightedMean(
+    matches.map((match) => ({
+      value: match.homeGoals,
+      weight: recencyWeight(match.timestamp, fixture.fixture.timestamp)
+    })),
+    fallbackHomeGoals
+  ));
+  const leagueAwayGoals = Math.max(0.05, weightedMean(
+    matches.map((match) => ({
+      value: match.awayGoals,
+      weight: recencyWeight(match.timestamp, fixture.fixture.timestamp)
+    })),
+    fallbackAwayGoals
+  ));
+  const homeMetrics = buildTeamMetrics(
+    fixture.teams.home.id,
+    "home",
+    teamMatches,
+    fixture.fixture.timestamp,
+    leagueHomeGoals,
+    leagueAwayGoals
+  );
+  const awayMetrics = buildTeamMetrics(
+    fixture.teams.away.id,
+    "away",
+    teamMatches,
+    fixture.fixture.timestamp,
+    leagueHomeGoals,
+    leagueAwayGoals
+  );
+  const homeAttack = (0.75 * homeMetrics.venueGoalsFor + 0.25 * homeMetrics.weightedGoalsFor) / leagueHomeGoals;
+  const awayDefense = (0.75 * awayMetrics.venueGoalsAgainst + 0.25 * awayMetrics.weightedGoalsAgainst) / leagueHomeGoals;
+  const awayAttack = (0.75 * awayMetrics.venueGoalsFor + 0.25 * awayMetrics.weightedGoalsFor) / leagueAwayGoals;
+  const homeDefense = (0.75 * homeMetrics.venueGoalsAgainst + 0.25 * homeMetrics.weightedGoalsAgainst) / leagueAwayGoals;
+  const expectedHomeGoals = clamp(leagueHomeGoals * homeAttack * awayDefense, 0.05, 2.5);
+  const expectedAwayGoals = clamp(leagueAwayGoals * awayAttack * homeDefense, 0.05, 2.5);
+  const coverage = fullTeamMatches.length === 0
+    ? 0
+    : clamp(teamMatches.length / fullTeamMatches.length, 0, 1);
+  const venueScore = Math.min(homeMetrics.homeMatches, awayMetrics.awayMatches) * 6;
+  const totalScore = Math.min(homeMetrics.matches, awayMetrics.matches) * 1.5;
+  const leagueScore = Math.min(matches.length / 4, 20);
+  const baseQuality = clamp(10 + venueScore + totalScore + leagueScore, 0, 100);
+  const quality = Math.round(baseQuality * Math.min(1, coverage / 0.8));
+  return {
+    expectedHomeGoals,
+    expectedAwayGoals,
+    probabilities: firstHalfGoalLineProbabilities(expectedHomeGoals, expectedAwayGoals),
+    quality,
+    usedFallback: matches.length === 0,
+    homeMetrics,
+    awayMetrics,
+    sample: {
+      leagueMatches: matches.length,
+      homeTeamMatches: homeMetrics.matches,
+      awayTeamMatches: awayMetrics.matches,
+      coverage
+    }
+  };
+}
+
 export function analyzeFixture(
   fixture: ApiFixture,
   history: ApiFixture[],
@@ -246,6 +386,23 @@ export function analyzeFixture(
   const totalScore = Math.min(homeMetrics.matches, awayMetrics.matches) * 1.5;
   const leagueScore = Math.min(matches.length / 4, 20);
   const quality = Math.round(clamp(10 + venueScore + totalScore + leagueScore, 0, 100));
+  const homeConcededGoals = 0.75 * homeMetrics.venueGoalsAgainst + 0.25 * homeMetrics.weightedGoalsAgainst;
+  const awayConcededGoals = 0.75 * awayMetrics.venueGoalsAgainst + 0.25 * awayMetrics.weightedGoalsAgainst;
+  const defensiveProfile = (
+    concededGoals: number,
+    leagueGoals: number,
+    metrics: TeamMetrics,
+    venueMatches: number
+  ) => {
+    const relativeToLeague = concededGoals / leagueGoals;
+    return {
+      concededGoals,
+      relativeToLeague,
+      matches: metrics.matches,
+      venueMatches,
+      strong: quality >= 70 && metrics.matches >= 12 && venueMatches >= 6 && relativeToLeague <= 0.70
+    };
+  };
 
   return {
     expectedHomeGoals,
@@ -254,6 +411,10 @@ export function analyzeFixture(
     quality,
     homeMetrics,
     awayMetrics,
+    defense: {
+      home: defensiveProfile(homeConcededGoals, leagueAwayGoals, homeMetrics, homeVenueCount),
+      away: defensiveProfile(awayConcededGoals, leagueHomeGoals, awayMetrics, awayVenueCount)
+    },
     sample: {
       leagueMatches: matches.length,
       homeTeamMatches: homeMetrics.matches,

@@ -43,7 +43,7 @@ export const config = {
   apiRateLimitRetryMs: 60_000,
   modelVersion: "1.3.0",
   activeProfileVersion: "1.3.0",
-  goalLineModelVersion: "1.0.0",
+  goalLineModelVersion: "2.0.0",
   strengthOnDemandRequestBudget:
     Number.isInteger(strengthOnDemandRequestBudget) &&
     strengthOnDemandRequestBudget > 0

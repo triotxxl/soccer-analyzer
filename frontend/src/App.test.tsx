@@ -87,6 +87,13 @@ describe("React-Dashboard", () => {
     render(<App />);
     expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
     expect(screen.getByText("Zulu FC")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "1. HZ Ü0,5" })).not.toBeInTheDocument();
+    const summary = globalThis.document.querySelector(".fixture-summary-cell");
+    expect(summary).toHaveTextContent("Alpha FC");
+    expect(summary).toHaveTextContent("20:00");
+    expect(summary).toHaveTextContent("Deutschland · Bundesliga");
+    expect(globalThis.document.querySelector(".fixture-row > .time-cell")).not.toBeInTheDocument();
+    expect(globalThis.document.querySelector(".fixture-row > .teams-cell")).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /Starke Tipps/i }));
     expect(screen.queryByText("Zulu FC")).not.toBeInTheDocument();
@@ -103,6 +110,121 @@ describe("React-Dashboard", () => {
     await user.click(screen.getByRole("button", { name: /Alpha FCGast FC/i }));
     expect(screen.getByText("Direkte Begegnungen")).toBeInTheDocument();
     expect(screen.getAllByText(/Testbegründung/)).toHaveLength(5);
+  });
+
+  it("synchronisiert die H2H-Ansicht mit dem ausgewählten Markt", async () => {
+    const current = document();
+    current.schemaVersion = 2;
+    current.fixtures = current.fixtures.map((item) => ({
+      ...item,
+      markets: [
+        ...item.markets,
+        { ...item.markets[3]!, key: "firstHalfOver05", label: "1. HZ Ü0,5", selection: "1. Halbzeit: mindestens 1 Tor" },
+        { ...item.markets[3]!, key: "firstHalfOver15", label: "1. HZ Ü1,5", selection: "1. Halbzeit: mindestens 2 Tore" }
+      ]
+    }));
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(current), { status: 200 })));
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(<App />);
+    expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
+    const markets = within(screen.getByRole("navigation", { name: "Marktfilter" }));
+    const h2h = within(globalThis.document.querySelector<HTMLElement>(".view-toolbar")!);
+
+    await user.click(markets.getByRole("button", { name: "BTTS" }));
+    expect(h2h.getByRole("button", { name: "BTTS" })).toHaveClass("active");
+
+    await user.click(markets.getByRole("button", { name: "Über 1,5" }));
+    expect(h2h.getByRole("button", { name: "Über" })).toHaveClass("active");
+    expect(h2h.getByRole("combobox", { name: "Über-Linie für H2H" })).toHaveValue("1.5");
+
+    await user.click(markets.getByRole("button", { name: "Über 2,5" }));
+    expect(h2h.getByRole("combobox", { name: "Über-Linie für H2H" })).toHaveValue("2.5");
+
+    await user.click(markets.getByRole("button", { name: "1. HZ Ü0,5" }));
+    expect(h2h.getByRole("button", { name: "1. HZ Über" })).toHaveClass("active");
+    expect(h2h.getByRole("combobox", { name: "Über-Linie für H2H 1. Halbzeit" })).toHaveValue("0.5");
+
+    await user.click(markets.getByRole("button", { name: "1. HZ Ü1,5" }));
+    expect(h2h.getByRole("combobox", { name: "Über-Linie für H2H 1. Halbzeit" })).toHaveValue("1.5");
+
+    await user.click(markets.getByRole("button", { name: "1X2" }));
+    expect(h2h.getByRole("button", { name: "Ergebnis" })).toHaveClass("active");
+    await user.click(markets.getByRole("button", { name: "Remis" }));
+    expect(h2h.getByRole("button", { name: "Ergebnis" })).toHaveClass("active");
+  });
+
+  it("kennzeichnet besonders defensiv starke Teams mit einem Shield", async () => {
+    const current = document();
+    current.fixtures[0]!.defense = {
+      home: { concededGoals: 0.64, relativeToLeague: 0.54, matches: 18, venueMatches: 9, strong: true },
+      away: { concededGoals: 1.3, relativeToLeague: 1.02, matches: 18, venueMatches: 9, strong: false }
+    };
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(current), { status: 200 })));
+    render(<App />);
+    expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: /Alpha FC: besonders defensiv stark/ })).toHaveAttribute("title", expect.stringContaining("46 % unter Wettbewerbsniveau"));
+    expect(screen.queryByRole("img", { name: /Gast FC: besonders defensiv stark/ })).not.toBeInTheDocument();
+  });
+
+  it("zeigt Halbzeitmärkte aus Schema 2 mit dynamischen erwarteten Toren", async () => {
+    const current = document();
+    current.schemaVersion = 2;
+    current.fixtures = current.fixtures.map((item, index) => ({
+      ...item,
+      expectedFirstHalfGoals: index === 0
+        ? { home: 0.7, away: 0.4, total: 1.1 }
+        : { home: 0.3, away: 0.2, total: 0.5 },
+      markets: [
+        ...item.markets,
+        {
+          key: "firstHalfOver05", label: "1. HZ Ü0,5", selection: "1. Halbzeit: mindestens 1 Tor",
+          pick: null, selectionTone: "neutral", probability: index === 0 ? 0.78 : 0.55, odds: null,
+          confidence: 85, score: null, recommendation: { level: index === 0 ? "recommended" : "none", label: index === 0 ? "Empfehlenswert" : "Nicht empfehlenswert" },
+          details: ["Erwartete Tore 1. Halbzeit"]
+        },
+        {
+          key: "firstHalfOver15", label: "1. HZ Ü1,5", selection: "1. Halbzeit: mindestens 2 Tore",
+          pick: null, selectionTone: "neutral", probability: 0.4, odds: 2.4, confidence: 85, score: null,
+          recommendation: { level: "recommended", label: "Empfehlenswert" }, details: ["Halbzeit-Test"]
+        }
+      ]
+    }));
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(current), { status: 200 })));
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(<App />);
+    expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
+
+    await user.click(within(screen.getByRole("navigation", { name: "Marktfilter" })).getByRole("button", { name: "1. HZ Ü0,5" }));
+    expect(globalThis.document.querySelector(".table-head")?.textContent).toContain("Erw. Tore 1. HZ");
+    const firstRow = globalThis.document.querySelector(".fixture-row");
+    expect(firstRow?.textContent).toContain("0,70:0,40");
+    expect(firstRow?.textContent).toContain("78,0 %");
+    expect(firstRow?.textContent).toContain("–");
+  });
+
+  it("zeigt die letzten fünf H2H nach Halbzeit-Über 0,5 und 1,5", async () => {
+    const current = document();
+    current.schemaVersion = 2;
+    current.fixtures[0]!.h2h.matches = [
+      { date: "2026-05-05T18:00:00.000Z", homeTeam: "Alpha FC", awayTeam: "Gast FC", homeGoals: 2, awayGoals: 1, halfTimeHomeGoals: 1, halfTimeAwayGoals: 0 },
+      { date: "2026-04-05T18:00:00.000Z", homeTeam: "Gast FC", awayTeam: "Alpha FC", homeGoals: 1, awayGoals: 0, halfTimeHomeGoals: 0, halfTimeAwayGoals: 0 },
+      { date: "2026-03-05T18:00:00.000Z", homeTeam: "Alpha FC", awayTeam: "Gast FC", homeGoals: 3, awayGoals: 1, halfTimeHomeGoals: 1, halfTimeAwayGoals: 1 },
+      { date: "2026-02-05T18:00:00.000Z", homeTeam: "Gast FC", awayTeam: "Alpha FC", homeGoals: 1, awayGoals: 2, halfTimeHomeGoals: 0, halfTimeAwayGoals: 1 },
+      { date: "2026-01-05T18:00:00.000Z", homeTeam: "Alpha FC", awayTeam: "Gast FC", homeGoals: 2, awayGoals: 0, halfTimeHomeGoals: null, halfTimeAwayGoals: null }
+    ];
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(current), { status: 200 })));
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(<App />);
+    expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "1. HZ Über" }));
+    const line = screen.getByRole("combobox", { name: "Über-Linie für H2H 1. Halbzeit" });
+    expect(within(line).getAllByRole("option").map((option) => option.textContent)).toEqual(["Über 0,5", "Über 1,5"]);
+    const firstH2h = globalThis.document.querySelector(".fixture-row")!;
+    expect(Array.from(firstH2h.querySelectorAll(".h2h-cell .result-dot")).map((dot) => dot.textContent)).toEqual(["Ü", "U", "Ü", "Ü", "–"]);
+
+    await user.selectOptions(line, "1.5");
+    expect(Array.from(firstH2h.querySelectorAll(".h2h-cell .result-dot")).map((dot) => dot.textContent)).toEqual(["U", "U", "Ü", "U", "–"]);
   });
 
   it("sortiert H2H zuerst nach aktueller Serie und danach nach Ergebnispriorität", async () => {

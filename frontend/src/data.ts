@@ -9,7 +9,7 @@ export type DashboardLoadState =
 function isDashboardDocument(value: unknown): value is DashboardDocument {
   if (!value || typeof value !== "object") return false;
   const candidate = value as Partial<DashboardDocument>;
-  return candidate.schemaVersion === 1
+  return (candidate.schemaVersion === 1 || candidate.schemaVersion === 2)
     && !!candidate.meta
     && typeof candidate.meta.createdAt === "string"
     && typeof candidate.meta.timezone === "string"

@@ -22,6 +22,7 @@ import { runLiveAnalysis } from "./live.ts";
 import { saveAlias } from "./resolver.ts";
 import { saveTeamAlias } from "./team-resolver.ts";
 import { buildLeagueStrength } from "./strength-builder.ts";
+import { applyGoalLineFilters } from "./goal-line-filter.ts";
 import { formatVenueFormResult, runVenueFormFilter } from "./venue-form.ts";
 import { importTipicoData } from "./tipico.ts";
 import { writeDashboard } from "./dashboard.ts";
@@ -107,15 +108,16 @@ function filterGoalLineResult(
   const minimumOver15 = probabilityOption(args, "min-over15");
   const minimumOver25 = probabilityOption(args, "min-over25");
   const minimumOver35 = probabilityOption(args, "min-over35");
-  return {
-    ...result,
-    rows: result.rows.filter((row) =>
-      (minimumConfidence === null || row.dataConfidence >= minimumConfidence) &&
-      (minimumOver15 === null || row.probabilities.over15 >= minimumOver15) &&
-      (minimumOver25 === null || row.probabilities.over25 >= minimumOver25) &&
-      (minimumOver35 === null || row.probabilities.over35 >= minimumOver35)
-    )
-  };
+  const minimumFirstHalfOver05 = probabilityOption(args, "min-fh-over05");
+  const minimumFirstHalfOver15 = probabilityOption(args, "min-fh-over15");
+  return applyGoalLineFilters(result, {
+    minimumConfidence,
+    minimumOver15,
+    minimumOver25,
+    minimumOver35,
+    minimumFirstHalfOver05,
+    minimumFirstHalfOver15
+  });
 }
 
 function filterAnalysisResult(result: AnalysisResult, args: ParsedArgs): AnalysisResult {
@@ -286,7 +288,7 @@ function report(): void {
     console.log("| Modell | Markt | Stichprobe | Treffer | Trefferquote | Ø Wahrscheinlichkeit | Brier Score | 95-%-Intervall |");
     console.log("|---|---|---:|---:|---:|---:|---:|---:|");
     for (const row of goalLineRows) {
-      const market = `${row.direction === "over" ? "Über" : "Unter"} ${row.line}`;
+      const market = `${row.period === "first-half" ? "1. HZ " : ""}${row.direction === "over" ? "Über" : "Unter"} ${row.line}`;
       console.log(
         `| ${row.modelVersion} | ${market} | ${row.total} | ${row.hits} | ${percent(row.hitRate)} | ${percent(row.averageProbability)} | ${row.brierScore.toFixed(3)} | ${percent(row.intervalLow)}–${percent(row.intervalHigh)} |`
       );
