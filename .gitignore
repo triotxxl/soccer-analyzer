@@ -12,3 +12,5 @@ data/tmp/
 coverage/
 dist/
 *.log
+__pycache__/
+*.pyc
