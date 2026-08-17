@@ -576,8 +576,8 @@ function Dashboard({ document }: { document: DashboardDocument }) {
         </section>
         <section className="sidebar-section defense-legend" aria-label="Legende Defensivstärke">
           <h2><ShieldCheck size={14} weight="bold" aria-hidden /> Defensivstärke</h2>
-          <span><ShieldCheck size={16} weight="fill" aria-hidden /> Top 20 %, durch xGA verifiziert</span>
-          <span><Shield size={16} weight="regular" aria-hidden /> Top 20 %, Torhistorie</span>
+          <span title="Zählt laut Expected Goals Against (xGA) zu den 20 % defensivstärksten Teams der Liga. xGA bewertet die Qualität der gegnerischen Torchancen, nicht nur die tatsächlich kassierten Tore."><ShieldCheck size={16} weight="fill" aria-hidden /> Top 20 %, durch xGA verifiziert</span>
+          <span title="Zählt zu den 20 % defensivstärksten Teams der Liga, gemessen an tatsächlich kassierten Toren. xGA-Daten waren für eine genauere Einordnung nicht verfügbar."><Shield size={16} weight="regular" aria-hidden /> Top 20 %, Torhistorie</span>
         </section>
         <div className="sidebar-footer">
           <ClockCounterClockwise size={14} weight="bold" aria-hidden />

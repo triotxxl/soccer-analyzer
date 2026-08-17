@@ -154,7 +154,7 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .fixture-wrap:nth-child(odd) { background: rgba(37,37,38,.78); }
 .fixture-wrap.open { background: #252526; }
 .fixture-row { width: 100%; min-height: 92px; padding: 12px 8px 12px 40px; border: 0; background: transparent; text-align: left; }
-.cart-add { position: absolute; left: 7px; top: 50%; transform: translateY(-50%); display: grid; place-items: center; width: 26px; height: 26px; border: 1px solid var(--line); border-radius: 50%; background: #202020; color: #9d9d9d; z-index: 1; }
+.cart-add { position: absolute; left: 7px; top: 50%; transform: translateY(-50%); display: grid; place-items: center; width: 26px; height: 26px; padding: 0; border: 1px solid var(--line); border-radius: 50%; background: #202020; color: #9d9d9d; z-index: 1; line-height: 0; }
 .cart-add:hover { border-color: var(--accent); color: var(--accent); background: rgba(0,122,204,.16); }
 .fixture-row:hover { background: rgba(255,255,255,.035); }
 .fixture-row > span { min-width: 0; }
