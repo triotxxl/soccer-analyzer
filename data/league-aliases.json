@@ -1,4 +1,9 @@
 {
+  "agypten|premier league": {
+    "leagueId": 233,
+    "country": "Egypt",
+    "league": "Premier League"
+  },
   "argentinien|copa argentina": {
     "leagueId": 130,
     "country": "Argentina",
@@ -224,6 +229,11 @@
     "country": "Denmark",
     "league": "2. Division"
   },
+  "danemark|dbu pokalen": {
+    "leagueId": 121,
+    "country": "Denmark",
+    "league": "DBU Pokalen"
+  },
   "danemark|superliga": {
     "leagueId": 119,
     "country": "Denmark",
@@ -273,6 +283,36 @@
     "leagueId": 48,
     "country": "England",
     "league": "League Cup"
+  },
+  "england|league trophy northern gruppe b": {
+    "leagueId": 46,
+    "country": "England",
+    "league": "EFL Trophy"
+  },
+  "england|league trophy northern gruppe d": {
+    "leagueId": 46,
+    "country": "England",
+    "league": "EFL Trophy"
+  },
+  "england|league trophy northern gruppe e": {
+    "leagueId": 46,
+    "country": "England",
+    "league": "EFL Trophy"
+  },
+  "england|league trophy southern gruppe c": {
+    "leagueId": 46,
+    "country": "England",
+    "league": "EFL Trophy"
+  },
+  "england|league trophy southern gruppe f": {
+    "leagueId": 46,
+    "country": "England",
+    "league": "EFL Trophy"
+  },
+  "england|league trophy southern gruppe g": {
+    "leagueId": 46,
+    "country": "England",
+    "league": "EFL Trophy"
   },
   "england|national league nord": {
     "leagueId": 43,
@@ -394,10 +434,20 @@
     "country": "Ireland",
     "league": "Premier Division"
   },
+  "island|1 deild": {
+    "leagueId": 165,
+    "country": "Iceland",
+    "league": "1. Deild"
+  },
   "island|besta deild": {
     "leagueId": 164,
     "country": "Iceland",
     "league": "Úrvalsdeild"
+  },
+  "israel|national league": {
+    "leagueId": 382,
+    "country": "Israel",
+    "league": "Liga Leumit"
   },
   "italien|serie a": {
     "leagueId": 135,
@@ -433,6 +483,11 @@
     "leagueId": 389,
     "country": "Kazakhstan",
     "league": "Premier League"
+  },
+  "katar|stars league": {
+    "leagueId": 305,
+    "country": "Qatar",
+    "league": "Stars League"
   },
   "kolumbien|copa colombia endrunde": {
     "leagueId": 241,
@@ -563,6 +618,11 @@
     "leagueId": 281,
     "country": "Peru",
     "league": "Primera División"
+  },
+  "peru|segunda division gruppe b": {
+    "leagueId": 282,
+    "country": "Peru",
+    "league": "Segunda División"
   },
   "polen|1 liga": {
     "leagueId": 107,
@@ -733,6 +793,11 @@
     "leagueId": 293,
     "country": "South-Korea",
     "league": "K League 2"
+  },
+  "sudkorea|korea pokal": {
+    "leagueId": 294,
+    "country": "South-Korea",
+    "league": "FA Cup"
   },
   "tansania|premier league": {
     "leagueId": 567,

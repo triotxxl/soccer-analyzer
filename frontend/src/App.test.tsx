@@ -94,6 +94,9 @@ describe("React-Dashboard", () => {
     expect(summary).toHaveTextContent("Deutschland · Bundesliga");
     expect(globalThis.document.querySelector(".fixture-row > .time-cell")).not.toBeInTheDocument();
     expect(globalThis.document.querySelector(".fixture-row > .teams-cell")).not.toBeInTheDocument();
+    const formLabels = globalThis.document.querySelector(".form-labels");
+    expect(formLabels).toHaveTextContent("HomeAway");
+    expect(formLabels).not.toHaveTextContent("H/A");
 
     await user.click(screen.getByRole("button", { name: /Starke Tipps/i }));
     expect(screen.queryByText("Zulu FC")).not.toBeInTheDocument();
