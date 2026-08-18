@@ -84,6 +84,11 @@
     "apiTeamId": 502,
     "apiTeamName": "Fiorentina"
   },
+  "ac lumezzane": {
+    "tipicoName": "AC Lumezzane",
+    "apiTeamId": 1689,
+    "apiTeamName": "Lumezzane"
+  },
   "ac mailand": {
     "tipicoName": "AC Mailand",
     "apiTeamId": 489,
@@ -133,6 +138,11 @@
     "tipicoName": "Accrington Stanley",
     "apiTeamId": 1360,
     "apiTeamName": "Accrington ST"
+  },
+  "acd ospitaletto": {
+    "tipicoName": "Acd Ospitaletto",
+    "apiTeamId": 24696,
+    "apiTeamName": "Ospitaletto"
   },
   "acs fc bacau 2023": {
     "tipicoName": "Acs FC Bacau 2023",
@@ -258,6 +268,11 @@
     "tipicoName": "AL Julan",
     "apiTeamId": 28222,
     "apiTeamName": "Al-Jolan SC"
+  },
+  "al masry club": {
+    "tipicoName": "Al Masry Club",
+    "apiTeamId": 1031,
+    "apiTeamName": "AL Masry"
   },
   "al nafit maysan": {
     "tipicoName": "AL Nafit Maysan",
@@ -439,6 +454,16 @@
     "apiTeamId": 528,
     "apiTeamName": "Avellino"
   },
+  "as giana erminio": {
+    "tipicoName": "AS Giana Erminio",
+    "apiTeamId": 865,
+    "apiTeamName": "Giana Erminio"
+  },
+  "as gubbio 1910": {
+    "tipicoName": "AS Gubbio 1910",
+    "apiTeamId": 866,
+    "apiTeamName": "Gubbio"
+  },
   "as monaco": {
     "tipicoName": "AS Monaco",
     "apiTeamId": 91,
@@ -529,6 +554,11 @@
     "apiTeamId": 2283,
     "apiTeamName": "Atlas"
   },
+  "atletico bucaramanga": {
+    "tipicoName": "Atletico Bucaramanga",
+    "apiTeamId": 1131,
+    "apiTeamName": "Bucaramanga"
+  },
   "atletico camioneros": {
     "tipicoName": "Atletico Camioneros",
     "apiTeamId": 3943,
@@ -608,6 +638,11 @@
     "tipicoName": "Bangor FC",
     "apiTeamId": 11112,
     "apiTeamName": "Bangor"
+  },
+  "barletta calcio": {
+    "tipicoName": "Barletta Calcio",
+    "apiTeamId": 19968,
+    "apiTeamName": "Barletta"
   },
   "barra fc": {
     "tipicoName": "Barra FC",
@@ -1008,6 +1043,11 @@
     "tipicoName": "Cagliari Calcio",
     "apiTeamId": 490,
     "apiTeamName": "Cagliari"
+  },
+  "calcio lecco": {
+    "tipicoName": "Calcio Lecco",
+    "apiTeamId": 6379,
+    "apiTeamName": "Lecco"
   },
   "calcio padova": {
     "tipicoName": "Calcio Padova",
@@ -1474,6 +1514,11 @@
     "apiTeamId": 569,
     "apiTeamName": "Club Brugge KV"
   },
+  "club brugge nxt": {
+    "tipicoName": "Club Brügge NXT",
+    "apiTeamId": 14130,
+    "apiTeamName": "Club Brugge II"
+  },
   "club jaiba brava": {
     "tipicoName": "Club Jaiba Brava",
     "apiTeamId": 19905,
@@ -1548,6 +1593,11 @@
     "tipicoName": "Cork City FC",
     "apiTeamId": 653,
     "apiTeamName": "Cork City"
+  },
+  "cosenza calcio": {
+    "tipicoName": "Cosenza Calcio",
+    "apiTeamId": 10137,
+    "apiTeamName": "Cosenza"
   },
   "cove rangers fc": {
     "tipicoName": "Cove Rangers FC",
@@ -1669,6 +1719,11 @@
     "apiTeamId": 1151,
     "apiTeamName": "Tecnico Universitario"
   },
+  "cucuta deportivo": {
+    "tipicoName": "Cucuta Deportivo",
+    "apiTeamId": 1470,
+    "apiTeamName": "Cucuta"
+  },
   "cuiaba esporte clube": {
     "tipicoName": "Cuiabá Esporte Clube",
     "apiTeamId": 1193,
@@ -1718,6 +1773,11 @@
     "tipicoName": "Def. Belgrano",
     "apiTeamId": 1067,
     "apiTeamName": "Defensores De Belgrano"
+  },
+  "delfino pescara 1936": {
+    "tipicoName": "Delfino Pescara 1936",
+    "apiTeamId": 525,
+    "apiTeamName": "Pescara"
   },
   "denver sum fc f": {
     "tipicoName": "Denver Sum. FC (F)",
@@ -2954,6 +3014,11 @@
     "apiTeamId": 12797,
     "apiTeamName": "Jablonec II"
   },
+  "fk jelgava": {
+    "tipicoName": "FK Jelgava",
+    "apiTeamId": 18834,
+    "apiTeamName": "FS Jelgava"
+  },
   "fk jezero": {
     "tipicoName": "FK Jezero",
     "apiTeamId": 3748,
@@ -3274,6 +3339,11 @@
     "apiTeamId": 495,
     "apiTeamName": "Genoa"
   },
+  "ghazl el mahallah": {
+    "tipicoName": "Ghazl El Mahallah",
+    "apiTeamId": 13819,
+    "apiTeamName": "Ghazl El Mehalla"
+  },
   "gil vicente fc": {
     "tipicoName": "Gil Vicente FC",
     "apiTeamId": 762,
@@ -3413,6 +3483,11 @@
     "tipicoName": "Guayaquil City F.C.",
     "apiTeamId": 1159,
     "apiTeamName": "Guayaquil City FC"
+  },
+  "guidonia montecelio": {
+    "tipicoName": "Guidonia Montecelio",
+    "apiTeamId": 882,
+    "apiTeamName": "Guidonia Montecelio 1937"
   },
   "gyirmot fc": {
     "tipicoName": "Gyirmot FC",
@@ -4153,6 +4228,11 @@
     "tipicoName": "Londrina EC",
     "apiTeamId": 148,
     "apiTeamName": "Londrina"
+  },
+  "longford town fc": {
+    "tipicoName": "Longford Town FC",
+    "apiTeamId": 3853,
+    "apiTeamName": "Longford Town"
   },
   "loudoun united fc": {
     "tipicoName": "Loudoun United FC",
@@ -5649,6 +5729,11 @@
     "apiTeamId": 637,
     "apiTeamName": "Sturm Graz"
   },
+  "sk super nova": {
+    "tipicoName": "SK Super Nova",
+    "apiTeamId": 4143,
+    "apiTeamName": "Super Nova"
+  },
   "skala if": {
     "tipicoName": "Skala IF",
     "apiTeamId": 4191,
@@ -5808,6 +5893,11 @@
     "tipicoName": "SSC Neapel",
     "apiTeamId": 492,
     "apiTeamName": "Napoli"
+  },
+  "ssd vis pesaro 1898": {
+    "tipicoName": "SSD Vis Pesaro 1898",
+    "apiTeamId": 1708,
+    "apiTeamName": "Vis Pesaro"
   },
   "st johnstone fc": {
     "tipicoName": "St Johnstone FC",
@@ -6119,6 +6209,11 @@
     "apiTeamId": 2888,
     "apiTeamName": "Deportivo Universitario"
   },
+  "uc albinoleffe": {
+    "tipicoName": "UC Albinoleffe",
+    "apiTeamId": 879,
+    "apiTeamName": "Albinoleffe"
+  },
   "uc dublin": {
     "tipicoName": "UC Dublin",
     "apiTeamId": 3844,
@@ -6229,6 +6324,11 @@
     "apiTeamId": 1299,
     "apiTeamName": "Boulogne"
   },
+  "us casertana 1908": {
+    "tipicoName": "US Casertana 1908",
+    "apiTeamId": 885,
+    "apiTeamName": "Casertana"
+  },
   "us catanzaro": {
     "tipicoName": "US Catanzaro",
     "apiTeamId": 1687,
@@ -6258,6 +6358,11 @@
     "tipicoName": "US Palermo",
     "apiTeamId": 522,
     "apiTeamName": "Palermo"
+  },
+  "us pergolettese 1932": {
+    "tipicoName": "US Pergolettese 1932",
+    "apiTeamId": 6380,
+    "apiTeamName": "Pergolettese"
   },
   "us quevilly rouen": {
     "tipicoName": "US Quevilly Rouen",

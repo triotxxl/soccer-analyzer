@@ -376,6 +376,16 @@ export interface CrossLeagueDrawBreakdown {
   warnings: string[];
 }
 
+export interface RecentMatchSummary {
+  date: string;
+  homeTeam: string;
+  awayTeam: string;
+  homeGoals: number;
+  awayGoals: number;
+  halfTimeHomeGoals?: number | null;
+  halfTimeAwayGoals?: number | null;
+}
+
 export interface DrawScoreRow {
   fixtureId: number;
   kickoff: string;
@@ -394,6 +404,8 @@ export interface DrawScoreRow {
   model: "league" | "cross-league";
   recentHomeResults?: Array<"win" | "draw" | "loss">;
   recentAwayResults?: Array<"win" | "draw" | "loss">;
+  recentHomeMatches?: RecentMatchSummary[];
+  recentAwayMatches?: RecentMatchSummary[];
   h2hSummary?: {
     matches: number;
     draws: number;
@@ -401,15 +413,7 @@ export interface DrawScoreRow {
     allDraws: boolean;
     recentHomeTeamResults: Array<"win" | "draw" | "loss">;
     recentBttsResults: boolean[];
-    recentMatches?: Array<{
-      date: string;
-      homeTeam: string;
-      awayTeam: string;
-      homeGoals: number;
-      awayGoals: number;
-      halfTimeHomeGoals?: number | null;
-      halfTimeAwayGoals?: number | null;
-    }>;
+    recentMatches?: RecentMatchSummary[];
   };
   rating:
     | "sehr stark"

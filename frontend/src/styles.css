@@ -130,7 +130,7 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .market-tabs button { position: relative; padding: 0 18px 14px; border: 0; background: transparent; color: #969696; font-size: 13px; font-weight: 600; white-space: nowrap; }
 .market-tabs button.active { color: #f0f0f0; }
 .market-tabs button.active::after { position: absolute; right: 8px; bottom: -1px; left: 8px; height: 3px; background: var(--accent); content: ""; }
-.view-toolbar { display: flex; align-items: center; gap: 14px; padding: 15px 0; border-bottom: 1px solid var(--line-soft); color: #858585; font-size: 12px; }
+.view-toolbar { display: flex; align-items: center; gap: 14px; padding: 15px 0; border-bottom: 1px solid var(--line-soft); color: #858585; font-size: 12px; flex-wrap: wrap; }
 .segmented { display: flex; padding: 3px; border: 1px solid var(--line); border-radius: 10px; background: #1e1e1e; }
 .segmented button { padding: 8px 12px; border: 0; border-radius: 7px; background: transparent; color: #a0a0a0; font-size: 11px; }
 .segmented button.active { background: #37373d; color: #ffffff; font-weight: 700; }
@@ -150,6 +150,7 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .sort-mode-badge.win { background: var(--home); }
 .sort-mode-badge.draw { background: #858585; }
 .sort-mode-badge.loss { background: var(--away); }
+.sort-mode-badge.secondary { background: transparent; border: 1px solid #6a6a6a; color: #a0a0a0; }
 .fixture-wrap { min-width: max(100%,var(--table-min-width, 1490px)); border-bottom: 1px solid var(--line-soft); background: rgba(30,30,30,.72); }
 .fixture-row-wrap { position: relative; }
 .fixture-wrap:nth-child(odd) { background: rgba(37,37,38,.78); }
@@ -281,8 +282,15 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .market-picker-stats strong { color: var(--text); font-size: 12px; }
 .market-picker-added { flex: 0 0 auto; padding: 3px 7px; border-radius: 6px; background: var(--accent-soft); color: #9cdcfe; font-size: 8px; }
 
-.bet-builder-drawer { position: fixed; top: 0; right: 0; bottom: 0; z-index: 61; display: flex; flex-direction: column; width: min(440px, 100vw); border-left: 1px solid #4a4a4a; background: #1e1e1e; box-shadow: -20px 0 50px rgba(0,0,0,.5); overflow-y: auto; }
+.bet-builder-drawer { position: fixed; top: 0; right: 0; bottom: 0; z-index: 61; display: flex; flex-direction: column; width: min(460px, 100vw); border-left: 1px solid #4a4a4a; background: #1e1e1e; box-shadow: -20px 0 50px rgba(0,0,0,.5); overflow: hidden; }
+.bet-builder-drawer.has-combos { width: min(880px, 100vw); }
 .bet-builder-empty { padding: 24px 16px; color: #969696; font-size: 11px; line-height: 1.6; }
+.bet-builder-body { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow-y: auto; }
+.bet-builder-drawer.has-combos .bet-builder-body { flex-direction: row; overflow-y: hidden; }
+.bet-builder-results { flex: 1; min-width: 0; padding: 16px; overflow-y: auto; }
+.bet-builder-results h3 { margin: 0 0 12px; color: #9d9d9d; font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.bet-builder-controls { flex: 0 0 auto; overflow-y: auto; }
+.bet-builder-drawer.has-combos .bet-builder-controls { flex: 0 0 320px; border-left: 1px solid var(--line-soft); }
 .bet-builder-section { padding: 14px 16px; border-bottom: 1px solid var(--line-soft); }
 .bet-builder-section h3 { margin: 0 0 10px; color: #9d9d9d; font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
 .cart-entry-list { display: grid; gap: 7px; margin: 0 0 10px; padding: 0; list-style: none; }
@@ -301,14 +309,14 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .ghost-button:hover { border-color: var(--red); color: var(--red); }
 .primary-button { display: flex; align-items: center; justify-content: center; gap: 7px; width: 100%; height: 38px; margin-top: 10px; border: 1px solid #007acc; border-radius: 9px; background: #0e639c; color: #ffffff; font-size: 11px; font-weight: 800; }
 .primary-button:disabled { cursor: not-allowed; opacity: .4; }
-.combo-list { display: grid; gap: 10px; }
-.combo-card { padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: #252526; }
-.combo-card-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
-.combo-card-head strong { flex: 1; font-size: 11px; }
-.combo-card-head span { color: var(--green); font-size: 12px; font-weight: 800; }
-.combo-card-head button { display: grid; place-items: center; width: 20px; height: 20px; border: 0; border-radius: 50%; background: transparent; color: #808080; }
+.combo-list { display: grid; gap: 12px; }
+.combo-card { padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; background: #252526; }
+.combo-card-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.combo-card-head strong { flex: 1; font-size: 13px; }
+.combo-card-head span { color: var(--green); font-size: 14px; font-weight: 800; }
+.combo-card-head button { display: grid; place-items: center; width: 22px; height: 22px; border: 0; border-radius: 50%; background: transparent; color: #808080; }
 .combo-card-head button:hover { color: var(--red); }
-.combo-card ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 3px; color: #b3b3b3; font-size: 9px; line-height: 1.5; }
+.combo-card ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 5px; color: #c2c2c2; font-size: 12px; line-height: 1.6; }
 
 .density-compact .fixture-row { min-height: 72px; padding-block: 8px; }
 .density-compact .market-card { padding: 6px 8px; }
@@ -343,6 +351,8 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
   .view-toolbar > span { display: none; }
   .density-switch { margin-left: 4px; }
   .bet-builder-drawer { width: 100vw; }
+  .bet-builder-drawer.has-combos .bet-builder-body { flex-direction: column; overflow-y: auto; }
+  .bet-builder-drawer.has-combos .bet-builder-controls { flex: 0 0 auto; border-left: 0; border-top: 1px solid var(--line-soft); }
   .market-picker-modal { width: calc(100vw - 32px); }
   .bet-cart-badge { right: 14px; bottom: 14px; }
 }

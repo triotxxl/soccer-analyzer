@@ -21,7 +21,11 @@ function fixture(id: number, homeTeam: string, level: "none" | "recommended" | "
   return {
     fixtureId: id, kickoff, country: "Deutschland", league: "Bundesliga", homeTeam, awayTeam: "Gast FC",
     modelVersion: "test", crossLeague: false, dataConfidence: 85, warnings: [], h2hNotice: null,
-    form: { scope: "venue", home: ["win", "draw", "loss"], away: ["loss", "draw", "win"] },
+    form: {
+      scope: "venue", home: ["win", "draw", "loss"], away: ["loss", "draw", "win"],
+      homeMatches: [{ date: "2026-04-24T18:00:00.000Z", homeTeam, awayTeam: "Vorheim FC", homeGoals: 2, awayGoals: 1 }],
+      awayMatches: [{ date: "2026-04-24T18:00:00.000Z", homeTeam: "Vorauswärts FC", awayTeam: "Gast FC", homeGoals: 0, awayGoals: 0 }]
+    },
     h2h: {
       outcomes: ["win", "draw", "loss"], btts: [true, false, true], draws: 1, consecutiveDraws: 0,
       matches: [{ date: "2026-05-01T18:00:00.000Z", homeTeam, awayTeam: "Gast FC", homeGoals: 2, awayGoals: 1 }]
@@ -132,27 +136,32 @@ describe("React-Dashboard", () => {
     render(<App />);
     expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
     const markets = within(screen.getByRole("navigation", { name: "Marktfilter" }));
-    const h2h = within(globalThis.document.querySelector<HTMLElement>(".view-toolbar")!);
+    const h2h = within(screen.getByRole("group", { name: "H2H-Ansicht" }));
+    const form = within(screen.getByRole("group", { name: "Form-Ansicht" }));
 
     await user.click(markets.getByRole("button", { name: "BTTS" }));
     expect(h2h.getByRole("button", { name: "BTTS" })).toHaveClass("active");
+    expect(form.getByRole("button", { name: "BTTS" })).toHaveClass("active");
 
     await user.click(markets.getByRole("button", { name: "Über 1,5" }));
     expect(h2h.getByRole("button", { name: "Über" })).toHaveClass("active");
-    expect(h2h.getByRole("combobox", { name: "Über-Linie für H2H" })).toHaveValue("1.5");
+    expect(form.getByRole("button", { name: "Über" })).toHaveClass("active");
+    expect(screen.getByRole("combobox", { name: "Über-Linie für H2H & Form" })).toHaveValue("1.5");
 
     await user.click(markets.getByRole("button", { name: "Über 2,5" }));
-    expect(h2h.getByRole("combobox", { name: "Über-Linie für H2H" })).toHaveValue("2.5");
+    expect(screen.getByRole("combobox", { name: "Über-Linie für H2H & Form" })).toHaveValue("2.5");
 
     await user.click(markets.getByRole("button", { name: "1. HZ Ü0,5" }));
     expect(h2h.getByRole("button", { name: "1. HZ Über" })).toHaveClass("active");
-    expect(h2h.getByRole("combobox", { name: "Über-Linie für H2H 1. Halbzeit" })).toHaveValue("0.5");
+    expect(form.getByRole("button", { name: "1. HZ Über" })).toHaveClass("active");
+    expect(screen.getByRole("combobox", { name: "Über-Linie für H2H & Form, 1. Halbzeit" })).toHaveValue("0.5");
 
     await user.click(markets.getByRole("button", { name: "1. HZ Ü1,5" }));
-    expect(h2h.getByRole("combobox", { name: "Über-Linie für H2H 1. Halbzeit" })).toHaveValue("1.5");
+    expect(screen.getByRole("combobox", { name: "Über-Linie für H2H & Form, 1. Halbzeit" })).toHaveValue("1.5");
 
     await user.click(markets.getByRole("button", { name: "1X2" }));
     expect(h2h.getByRole("button", { name: "Ergebnis" })).toHaveClass("active");
+    expect(form.getByRole("button", { name: "Ergebnis" })).toHaveClass("active");
     await user.click(markets.getByRole("button", { name: "Remis" }));
     expect(h2h.getByRole("button", { name: "Ergebnis" })).toHaveClass("active");
   });
@@ -238,8 +247,8 @@ describe("React-Dashboard", () => {
     render(<App />);
     expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "1. HZ Über" }));
-    const line = screen.getByRole("combobox", { name: "Über-Linie für H2H 1. Halbzeit" });
+    await user.click(within(screen.getByRole("group", { name: "H2H-Ansicht" })).getByRole("button", { name: "1. HZ Über" }));
+    const line = screen.getByRole("combobox", { name: "Über-Linie für H2H & Form, 1. Halbzeit" });
     expect(within(line).getAllByRole("option").map((option) => option.textContent)).toEqual(["Über 0,5", "Über 1,5"]);
     const firstH2h = globalThis.document.querySelector(".fixture-row")!;
     expect(Array.from(firstH2h.querySelectorAll(".h2h-cell .result-dot")).map((dot) => dot.textContent)).toEqual(["Ü", "U", "Ü", "Ü", "–"]);
@@ -296,10 +305,10 @@ describe("React-Dashboard", () => {
       ["Auswärtsstark", ["loss", "draw", "loss", "loss", "loss"], ["win", "win", "win", "win", "loss"]],
       ["Remisstark", ["draw", "draw", "loss", "draw", "loss"], ["draw", "win", "draw", "draw", "loss"]]
     ] as const;
-    current.fixtures = forms.map(([name, home, away], index) => ({
-      ...fixture(index + 1, name, "none", `2026-08-17T${String(12 + index).padStart(2, "0")}:00:00.000Z`),
-      form: { scope: "venue", home: [...home], away: [...away] }
-    }));
+    current.fixtures = forms.map(([name, home, away], index) => {
+      const base = fixture(index + 1, name, "none", `2026-08-17T${String(12 + index).padStart(2, "0")}:00:00.000Z`);
+      return { ...base, form: { ...base.form, home: [...home], away: [...away] } };
+    });
     current.meta.fixtureCount = current.fixtures.length;
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(current), { status: 200 })));
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });

@@ -82,7 +82,7 @@ export function BetBuilderDrawer({ cart, onRemove, onClear, onClose }: {
   const discardCombo = (id: string) => setCombos((current) => current.filter((combo) => combo.id !== id));
 
   return <div className="overlay-backdrop" onClick={onClose}>
-    <div className="bet-builder-drawer" role="dialog" aria-label="Wett-Baukasten" onClick={(event) => event.stopPropagation()}>
+    <div className={`bet-builder-drawer ${combos.length > 0 ? "has-combos" : ""}`} role="dialog" aria-label="Wett-Baukasten" onClick={(event) => event.stopPropagation()}>
       <div className="overlay-head">
         <strong>Wett-Baukasten</strong>
         <button aria-label="Schließen" onClick={onClose}><X /></button>
@@ -90,36 +90,8 @@ export function BetBuilderDrawer({ cart, onRemove, onClear, onClose }: {
 
       {cart.length === 0
         ? <p className="bet-builder-empty">Noch keine Wetten im Warenkorb. Füge über das "+" an einer Partie einen Markt hinzu.</p>
-        : <>
-          <section className="bet-builder-section">
-            <h3>Ausgewählte Wetten ({cart.length})</h3>
-            <ul className="cart-entry-list">
-              {cart.map((entry) => <li key={entry.id}>
-                <span><strong>{entry.homeTeam} – {entry.awayTeam}</strong><small>{entry.marketLabel} · {entry.selection}</small></span>
-                <span className="cart-entry-odd">{formatOdd(entry.odds)}</span>
-                <button aria-label={`Entfernen: ${entry.homeTeam} – ${entry.awayTeam}, ${entry.marketLabel}`} onClick={() => onRemove(entry.id)}><X size={14} /></button>
-              </li>)}
-            </ul>
-            <button className="ghost-button" onClick={onClear}><Trash size={14} /> Warenkorb leeren</button>
-          </section>
-
-          <section className="bet-builder-section">
-            <h3>Kombi-Konfiguration</h3>
-            <div className="combo-size-list">
-              {sizes.map((size) => <label key={size} className="combo-size-row">
-                <span>{size}er</span>
-                <input type="number" min={0} value={counts[size] ?? 0} aria-label={`Anzahl ${size}er-Kombis`} onChange={(event) => setCount(size, Number(event.target.value))} />
-              </label>)}
-            </div>
-            <div className="segmented">
-              <button className={!withRepetition ? "active" : ""} aria-pressed={!withRepetition} onClick={() => setWithRepetition(false)}>Ohne Wiederholung</button>
-              <button className={withRepetition ? "active" : ""} aria-pressed={withRepetition} onClick={() => setWithRepetition(true)}>Mit Wiederholung</button>
-            </div>
-            {message && <p className="bet-builder-warning">{message}</p>}
-            <button className="primary-button" disabled={!canShuffle} onClick={shuffleCombos}><Shuffle size={15} weight="bold" /> Kombis mischen</button>
-          </section>
-
-          {combos.length > 0 && <section className="bet-builder-section">
+        : <div className="bet-builder-body">
+          {combos.length > 0 && <div className="bet-builder-results">
             <h3>Kombis ({combos.length})</h3>
             <div className="combo-list">
               {combos.map((combo, index) => <div className="combo-card" key={combo.id}>
@@ -131,8 +103,38 @@ export function BetBuilderDrawer({ cart, onRemove, onClear, onClose }: {
                 <ul>{combo.entries.map((entry) => <li key={entry.id}>{entry.homeTeam} – {entry.awayTeam} · {entry.marketLabel} · {formatOdd(entry.odds)}</li>)}</ul>
               </div>)}
             </div>
-          </section>}
-        </>}
+          </div>}
+
+          <div className="bet-builder-controls">
+            <section className="bet-builder-section">
+              <h3>Ausgewählte Wetten ({cart.length})</h3>
+              <ul className="cart-entry-list">
+                {cart.map((entry) => <li key={entry.id}>
+                  <span><strong>{entry.homeTeam} – {entry.awayTeam}</strong><small>{entry.marketLabel} · {entry.selection}</small></span>
+                  <span className="cart-entry-odd">{formatOdd(entry.odds)}</span>
+                  <button aria-label={`Entfernen: ${entry.homeTeam} – ${entry.awayTeam}, ${entry.marketLabel}`} onClick={() => onRemove(entry.id)}><X size={14} /></button>
+                </li>)}
+              </ul>
+              <button className="ghost-button" onClick={onClear}><Trash size={14} /> Warenkorb leeren</button>
+            </section>
+
+            <section className="bet-builder-section">
+              <h3>Kombi-Konfiguration</h3>
+              <div className="combo-size-list">
+                {sizes.map((size) => <label key={size} className="combo-size-row">
+                  <span>{size}er</span>
+                  <input type="number" min={0} value={counts[size] ?? 0} aria-label={`Anzahl ${size}er-Kombis`} onChange={(event) => setCount(size, Number(event.target.value))} />
+                </label>)}
+              </div>
+              <div className="segmented">
+                <button className={!withRepetition ? "active" : ""} aria-pressed={!withRepetition} onClick={() => setWithRepetition(false)}>Ohne Wiederholung</button>
+                <button className={withRepetition ? "active" : ""} aria-pressed={withRepetition} onClick={() => setWithRepetition(true)}>Mit Wiederholung</button>
+              </div>
+              {message && <p className="bet-builder-warning">{message}</p>}
+              <button className="primary-button" disabled={!canShuffle} onClick={shuffleCombos}><Shuffle size={15} weight="bold" /> Kombis mischen</button>
+            </section>
+          </div>
+        </div>}
     </div>
   </div>;
 }

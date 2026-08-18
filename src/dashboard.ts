@@ -2,7 +2,7 @@ import { mkdir, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { config, ROOT_DIR } from "./config.ts";
 import { teamNameSimilarity } from "./team-resolver.ts";
-import type { DefensiveProfile, DrawAnalysisResult, FavoriteAnalysisResult, GoalLineAnalysisResult, GoalLineRow, TipicoOdds } from "./types.ts";
+import type { DefensiveProfile, DrawAnalysisResult, FavoriteAnalysisResult, GoalLineAnalysisResult, GoalLineRow, RecentMatchSummary, TipicoOdds } from "./types.ts";
 
 export interface DashboardInput {
   createdAt: string;
@@ -46,21 +46,13 @@ export interface DashboardFixture {
   dataConfidence: number;
   warnings: string[];
   h2hNotice: string | null;
-  form: { scope: "venue" | "overall"; home: FormResult[]; away: FormResult[] };
+  form: { scope: "venue" | "overall"; home: FormResult[]; away: FormResult[]; homeMatches: RecentMatchSummary[]; awayMatches: RecentMatchSummary[] };
   h2h: {
     outcomes: FormResult[];
     btts: boolean[];
     draws: number;
     consecutiveDraws: number;
-    matches: Array<{
-      date: string;
-      homeTeam: string;
-      awayTeam: string;
-      homeGoals: number;
-      awayGoals: number;
-      halfTimeHomeGoals?: number | null;
-      halfTimeAwayGoals?: number | null;
-    }>;
+    matches: RecentMatchSummary[];
   };
   defense?: { home: DefensiveProfile; away: DefensiveProfile };
   table?: Array<{
@@ -221,7 +213,13 @@ export function buildDashboardDocument(input: DashboardInput): DashboardDocument
       fixtureId: row.fixtureId, kickoff: row.kickoff, country: row.country, league: row.league,
       homeTeam: row.homeTeam, awayTeam: row.awayTeam, modelVersion: row.modelVersion, crossLeague,
       dataConfidence: row.dataConfidence, warnings, h2hNotice,
-      form: { scope: crossLeague ? "overall" : "venue", home: draw?.recentHomeResults ?? [], away: draw?.recentAwayResults ?? [] },
+      form: {
+        scope: crossLeague ? "overall" : "venue",
+        home: draw?.recentHomeResults ?? [],
+        away: draw?.recentAwayResults ?? [],
+        homeMatches: draw?.recentHomeMatches ?? [],
+        awayMatches: draw?.recentAwayMatches ?? []
+      },
       h2h: {
         outcomes: h2h?.recentHomeTeamResults ?? [], btts: h2h?.recentBttsResults ?? [], draws: h2h?.draws ?? 0,
         consecutiveDraws: h2h?.consecutiveDraws ?? 0, matches: h2h?.recentMatches ?? []

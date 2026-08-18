@@ -3,6 +3,7 @@ import type {
   ApiFixtureOdds,
   DrawScoreBreakdown,
   DrawScoreRow,
+  RecentMatchSummary,
   TipicoOdds
 } from "./types.ts";
 import { config } from "./config.ts";
@@ -59,12 +60,12 @@ export function completedScore(fixture: ApiFixture): [number, number] | null {
   return home === null || away === null ? null : [home, away];
 }
 
-export function recentTeamResults(
+function recentCompletedMatches(
   fixtures: ApiFixture[],
   teamId: number,
   cutoff: number,
   venue?: "home" | "away"
-): Array<"win" | "draw" | "loss"> {
+): ApiFixture[] {
   return [...new Map(fixtures.map((match) => [match.fixture.id, match])).values()]
     .filter((match) => match.fixture.timestamp < cutoff)
     .filter((match) => venue === "home"
@@ -75,14 +76,44 @@ export function recentTeamResults(
     .filter((match) => !/friendl/i.test(match.league.name))
     .filter((match) => completedScore(match))
     .sort((left, right) => right.fixture.timestamp - left.fixture.timestamp)
-    .slice(0, 5)
-    .map((match) => {
-      const score = completedScore(match)!;
-      const teamWasHome = match.teams.home.id === teamId;
-      const ownGoals = teamWasHome ? score[0] : score[1];
-      const opponentGoals = teamWasHome ? score[1] : score[0];
-      return ownGoals > opponentGoals ? "win" : ownGoals === opponentGoals ? "draw" : "loss";
-    });
+    .slice(0, 5);
+}
+
+export function recentTeamResults(
+  fixtures: ApiFixture[],
+  teamId: number,
+  cutoff: number,
+  venue?: "home" | "away"
+): Array<"win" | "draw" | "loss"> {
+  return recentCompletedMatches(fixtures, teamId, cutoff, venue).map((match) => {
+    const score = completedScore(match)!;
+    const teamWasHome = match.teams.home.id === teamId;
+    const ownGoals = teamWasHome ? score[0] : score[1];
+    const opponentGoals = teamWasHome ? score[1] : score[0];
+    return ownGoals > opponentGoals ? "win" : ownGoals === opponentGoals ? "draw" : "loss";
+  });
+}
+
+export function recentTeamMatches(
+  fixtures: ApiFixture[],
+  teamId: number,
+  cutoff: number,
+  venue?: "home" | "away"
+): RecentMatchSummary[] {
+  return recentCompletedMatches(fixtures, teamId, cutoff, venue).map((match) => {
+    const score = completedScore(match)!;
+    const halfTimeHomeGoals = match.score.halftime?.home;
+    const halfTimeAwayGoals = match.score.halftime?.away;
+    return {
+      date: match.fixture.date,
+      homeTeam: match.teams.home.name,
+      awayTeam: match.teams.away.name,
+      homeGoals: score[0],
+      awayGoals: score[1],
+      halfTimeHomeGoals: typeof halfTimeHomeGoals === "number" ? halfTimeHomeGoals : null,
+      halfTimeAwayGoals: typeof halfTimeAwayGoals === "number" ? halfTimeAwayGoals : null
+    };
+  });
 }
 
 function pointsBand(value: number, bands: Array<[number, number]>): number {
@@ -543,6 +574,18 @@ export function scoreDrawFixture(context: DrawCriteriaContext): DrawScoreRow {
       "home"
     ),
     recentAwayResults: recentTeamResults(
+      context.awayRecent,
+      fixture.teams.away.id,
+      fixture.fixture.timestamp,
+      "away"
+    ),
+    recentHomeMatches: recentTeamMatches(
+      context.homeRecent,
+      fixture.teams.home.id,
+      fixture.fixture.timestamp,
+      "home"
+    ),
+    recentAwayMatches: recentTeamMatches(
       context.awayRecent,
       fixture.teams.away.id,
       fixture.fixture.timestamp,

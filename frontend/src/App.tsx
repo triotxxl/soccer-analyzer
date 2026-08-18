@@ -22,6 +22,7 @@ type Density = "micro" | "compact" | "comfort";
 type LevelFilter = "all" | "strong" | "recommended";
 type RangeMode = "next48" | "custom";
 type H2hView = "outcome" | "btts" | "over" | "firstHalfOver";
+type FormView = H2hView;
 type FullTimeOverLine = 1.5 | 2.5 | 3.5;
 type FirstHalfOverLine = 0.5 | 1.5;
 type SortKey = "kickoff" | "team" | "form" | "h2h" | "expected" | "score" | "market";
@@ -264,17 +265,21 @@ function DefenseShield({ profile, team }: { profile: NonNullable<DashboardFixtur
   </span>;
 }
 
-function H2hDots({ fixture, view, overLine, firstHalfOverLine }: {
-  fixture: DashboardFixture;
-  view: H2hView;
-  overLine: FullTimeOverLine;
-  firstHalfOverLine: FirstHalfOverLine;
-}) {
-  if (view === "outcome") return <FormDots results={fixture.h2h.outcomes} h2h />;
+type MatchSummary = DashboardFixture["h2h"]["matches"][number];
+
+function matchViewDots(
+  matches: MatchSummary[],
+  view: Exclude<H2hView, "outcome">,
+  overLine: FullTimeOverLine,
+  firstHalfOverLine: FirstHalfOverLine
+): Array<{ value: boolean | null; text: string; title: string }> {
   const values = view === "btts"
-    ? fixture.h2h.btts.map((value) => ({ value, text: value ? "✓" : "×", title: value ? "BTTS" : "Kein BTTS" }))
+    ? matches.map((match) => {
+      const value = match.homeGoals > 0 && match.awayGoals > 0;
+      return { value, text: value ? "✓" : "×", title: value ? "BTTS" : "Kein BTTS" };
+    })
     : view === "firstHalfOver"
-      ? fixture.h2h.matches.map((match) => {
+      ? matches.map((match) => {
         if (typeof match.halfTimeHomeGoals !== "number" || typeof match.halfTimeAwayGoals !== "number") {
           return { value: null, text: "–", title: "Kein Halbzeitstand verfügbar" };
         }
@@ -285,14 +290,86 @@ function H2hDots({ fixture, view, overLine, firstHalfOverLine }: {
           title: `1. Halbzeit ${match.halfTimeHomeGoals}:${match.halfTimeAwayGoals} · ${value ? "Über" : "Unter"} ${firstHalfOverLine.toLocaleString("de-DE")}`
         };
       })
-      : fixture.h2h.matches.map((match) => {
+      : matches.map((match) => {
         const value = match.homeGoals + match.awayGoals > overLine;
         return { value, text: value ? "Ü" : "U", title: `Endstand ${match.homeGoals}:${match.awayGoals}` };
       });
   while (values.length < 5) values.push({ value: null, text: "–", title: "Keine Daten" });
+  return values.slice(0, 5);
+}
+
+function formMatchesStreak(
+  matches: MatchSummary[] | undefined,
+  view: Exclude<FormView, "outcome">,
+  overLine: FullTimeOverLine,
+  firstHalfOverLine: FirstHalfOverLine
+): number {
+  return consecutive(matchViewDots(matches ?? [], view, overLine, firstHalfOverLine).map((item) => item.value));
+}
+
+function columnComparison(
+  key: "form" | "h2h",
+  left: DashboardFixture,
+  right: DashboardFixture,
+  formView: FormView,
+  h2hView: H2hView,
+  formSortMode: number,
+  h2hSortMode: number,
+  overLine: FullTimeOverLine,
+  firstHalfOverLine: FirstHalfOverLine
+): number {
+  if (key === "form") {
+    if (formView === "outcome") {
+      const mode = formSortModes[formSortMode]!;
+      if (mode === "home") return countResults(left.form.home, "win") - countResults(right.form.home, "win");
+      if (mode === "away") return countResults(left.form.away, "win") - countResults(right.form.away, "win");
+      return countResults([...left.form.home, ...left.form.away], "draw") - countResults([...right.form.home, ...right.form.away], "draw");
+    }
+    const pairScore = (fixture: DashboardFixture) => {
+      const homeStreak = formMatchesStreak(fixture.form.homeMatches, formView, overLine, firstHalfOverLine);
+      const awayStreak = formMatchesStreak(fixture.form.awayMatches, formView, overLine, firstHalfOverLine);
+      return { min: Math.min(homeStreak, awayStreak), sum: homeStreak + awayStreak };
+    };
+    const l = pairScore(left);
+    const r = pairScore(right);
+    return (l.min - r.min) || (l.sum - r.sum);
+  }
+  if (h2hView === "btts") return consecutive(left.h2h.btts) - consecutive(right.h2h.btts);
+  if (h2hView === "over") {
+    const streak = (fixture: DashboardFixture) => consecutive(fixture.h2h.matches.map((match) => match.homeGoals + match.awayGoals > overLine));
+    return streak(left) - streak(right);
+  }
+  if (h2hView === "firstHalfOver") {
+    const streak = (fixture: DashboardFixture) => consecutive(firstHalfOverResults(fixture, firstHalfOverLine));
+    return streak(left) - streak(right);
+  }
+  const target = h2hSortTargets[h2hSortMode]!;
+  return compareOutcomeSequences(left.h2h.outcomes, right.h2h.outcomes, target);
+}
+
+function ViewDots({ values }: { values: Array<{ value: boolean | null; text: string; title: string }> }) {
   return <div className="dot-row">
-    {values.slice(0, 5).map((item, index) => <span className={`result-dot ${item.value === null ? "missing" : item.value ? "hit" : "miss"} ${index === 0 ? "latest" : ""}`} title={item.title} key={index}>{item.text}</span>)}
+    {values.map((item, index) => <span className={`result-dot ${item.value === null ? "missing" : item.value ? "hit" : "miss"} ${index === 0 ? "latest" : ""}`} title={item.title} key={index}>{item.text}</span>)}
   </div>;
+}
+
+function H2hDots({ fixture, view, overLine, firstHalfOverLine }: {
+  fixture: DashboardFixture;
+  view: H2hView;
+  overLine: FullTimeOverLine;
+  firstHalfOverLine: FirstHalfOverLine;
+}) {
+  if (view === "outcome") return <FormDots results={fixture.h2h.outcomes} h2h />;
+  return <ViewDots values={matchViewDots(fixture.h2h.matches, view, overLine, firstHalfOverLine)} />;
+}
+
+function FormMatchDots({ matches, view, overLine, firstHalfOverLine }: {
+  matches: MatchSummary[] | undefined;
+  view: Exclude<FormView, "outcome">;
+  overLine: FullTimeOverLine;
+  firstHalfOverLine: FirstHalfOverLine;
+}) {
+  return <ViewDots values={matchViewDots(matches ?? [], view, overLine, firstHalfOverLine)} />;
 }
 
 function MarketCard({ market }: { market: DashboardMarket }) {
@@ -364,6 +441,7 @@ function Dashboard({ document }: { document: DashboardDocument }) {
   const [showCrossLeague, setShowCrossLeague] = useState(true);
   const [showPast, setShowPast] = useState(false);
   const [h2hView, setH2hView] = useState<H2hView>("outcome");
+  const [formView, setFormView] = useState<FormView>("outcome");
   const [overLine, setOverLine] = useState<FullTimeOverLine>(2.5);
   const [firstHalfOverLine, setFirstHalfOverLine] = useState<FirstHalfOverLine>(0.5);
   const [density, setDensity] = useState<Density>("comfort");
@@ -371,6 +449,7 @@ function Dashboard({ document }: { document: DashboardDocument }) {
   const [sortDirection, setSortDirection] = useState<1 | -1>(1);
   const [formSortMode, setFormSortMode] = useState(0);
   const [h2hSortMode, setH2hSortMode] = useState(0);
+  const [secondarySortKey, setSecondarySortKey] = useState<"form" | "h2h" | null>(null);
   const [openFixture, setOpenFixture] = useState<number | null>(null);
   const [pickerFixtureId, setPickerFixtureId] = useState<number | null>(null);
   const [builderOpen, setBuilderOpen] = useState(false);
@@ -384,20 +463,26 @@ function Dashboard({ document }: { document: DashboardDocument }) {
     setOpenFixture(null);
     if (market === "btts") {
       setH2hView("btts");
+      setFormView("btts");
     } else if (market === "over15") {
       setH2hView("over");
+      setFormView("over");
       setOverLine(1.5);
     } else if (market === "over25") {
       setH2hView("over");
+      setFormView("over");
       setOverLine(2.5);
     } else if (market === "firstHalfOver05") {
       setH2hView("firstHalfOver");
+      setFormView("firstHalfOver");
       setFirstHalfOverLine(0.5);
     } else if (market === "firstHalfOver15") {
       setH2hView("firstHalfOver");
+      setFormView("firstHalfOver");
       setFirstHalfOverLine(1.5);
     } else {
       setH2hView("outcome");
+      setFormView("outcome");
     }
   };
 
@@ -513,40 +598,51 @@ function Dashboard({ document }: { document: DashboardDocument }) {
     }
     else if (sortKey === "score") comparison = (marketFilter === "draw" ? left.scores.draw ?? -1 : left.scores.favorite ?? -1) - (marketFilter === "draw" ? right.scores.draw ?? -1 : right.scores.favorite ?? -1);
     else if (sortKey === "market") comparison = (marketFor(left, selectedMarket)?.probability ?? -1) - (marketFor(right, selectedMarket)?.probability ?? -1);
-    else if (sortKey === "form") {
-      const mode = formSortModes[formSortMode]!;
-      if (mode === "home") comparison = countResults(left.form.home, "win") - countResults(right.form.home, "win");
-      else if (mode === "away") comparison = countResults(left.form.away, "win") - countResults(right.form.away, "win");
-      else comparison = countResults([...left.form.home, ...left.form.away], "draw") - countResults([...right.form.home, ...right.form.away], "draw");
-    } else if (sortKey === "h2h") {
-      if (h2hView === "btts") comparison = consecutive(left.h2h.btts) - consecutive(right.h2h.btts);
-      else if (h2hView === "over") {
-        const streak = (fixture: DashboardFixture) => consecutive(fixture.h2h.matches.map((match) => match.homeGoals + match.awayGoals > overLine));
-        comparison = streak(left) - streak(right);
-      } else if (h2hView === "firstHalfOver") {
-        const streak = (fixture: DashboardFixture) => consecutive(firstHalfOverResults(fixture, firstHalfOverLine));
-        comparison = streak(left) - streak(right);
-      } else {
-        const target = h2hSortTargets[h2hSortMode]!;
-        comparison = compareOutcomeSequences(left.h2h.outcomes, right.h2h.outcomes, target);
+    else if (sortKey === "form" || sortKey === "h2h") {
+      comparison = columnComparison(sortKey, left, right, formView, h2hView, formSortMode, h2hSortMode, overLine, firstHalfOverLine);
+      if (comparison === 0 && secondarySortKey) {
+        comparison = columnComparison(secondarySortKey, left, right, formView, h2hView, formSortMode, h2hSortMode, overLine, firstHalfOverLine);
       }
     }
     return comparison * sortDirection || Date.parse(left.kickoff) - Date.parse(right.kickoff);
-  }), [filtered, firstHalfOverLine, formSortMode, h2hSortMode, h2hView, marketFilter, overLine, sortDirection, sortKey]);
+  }), [filtered, firstHalfOverLine, formSortMode, formView, h2hSortMode, h2hView, marketFilter, overLine, secondarySortKey, sortDirection, sortKey]);
+
+  const cyclePairMode = (key: "form" | "h2h") => {
+    if (key === "form") setFormSortMode((value) => (value + 1) % 3);
+    else setH2hSortMode((value) => (value + 1) % 3);
+  };
 
   const sort = (key: SortKey) => {
-    if (key === "form") {
-      setFormSortMode((value) => (value + 1) % 3);
+    if (key === "form" || key === "h2h") {
+      const other: "form" | "h2h" = key === "form" ? "h2h" : "form";
+      const isOutcome = key === "form" ? formView === "outcome" : h2hView === "outcome";
+
+      if (sortKey === key) {
+        if (isOutcome) {
+          cyclePairMode(key);
+          setSortDirection(-1);
+          return;
+        }
+        setSortDirection((value) => value === 1 ? -1 : 1);
+        return;
+      }
+      if (secondarySortKey === key) {
+        setSecondarySortKey(other);
+        setSortKey(key);
+        return;
+      }
+      if (sortKey === other) {
+        if (isOutcome) cyclePairMode(key);
+        setSecondarySortKey(key);
+        return;
+      }
+      setSecondarySortKey(null);
+      if (isOutcome) cyclePairMode(key);
       setSortKey(key);
       setSortDirection(-1);
       return;
     }
-    if (key === "h2h" && h2hView === "outcome") {
-      setH2hSortMode((value) => (value + 1) % 3);
-      setSortKey(key);
-      setSortDirection(-1);
-      return;
-    }
+    setSecondarySortKey(null);
     if (sortKey === key) setSortDirection((value) => value === 1 ? -1 : 1);
     else {
       setSortKey(key);
@@ -558,6 +654,9 @@ function Dashboard({ document }: { document: DashboardDocument }) {
   const formSortLabel = formSortLabels[formSortModeKey];
   const h2hSortTarget = h2hSortTargets[h2hSortMode]!;
   const h2hSortLabel = h2hSortLabels[h2hSortTarget];
+  const activeLineView = h2hView === "over" || h2hView === "firstHalfOver"
+    ? h2hView
+    : formView === "over" || formView === "firstHalfOver" ? formView : null;
   const availableMarketOptions = MARKET_OPTIONS.filter((option) => option.key === "all" || document.fixtures.some((fixture) => fixture.markets.some((market) => market.key === option.key)));
   const shownMarkets = marketFilter === "all" ? availableMarketOptions.slice(1) : availableMarketOptions.filter((option) => option.key === marketFilter);
   const showFirstHalfExpected = marketFilter === "firstHalfOver05" || marketFilter === "firstHalfOver15";
@@ -643,18 +742,22 @@ function Dashboard({ document }: { document: DashboardDocument }) {
       </nav>
       <div className="view-toolbar">
         <span>H2H</span>
-        <div className="segmented">
+        <div className="segmented" role="group" aria-label="H2H-Ansicht">
           {([ ["outcome", "Ergebnis"], ["btts", "BTTS"], ["over", "Über"], ["firstHalfOver", "1. HZ Über"] ] as const).map(([key, label]) => <button className={h2hView === key ? "active" : ""} aria-pressed={h2hView === key} onClick={() => setH2hView(key)} key={key}>{label}</button>)}
         </div>
+        <span>Form</span>
+        <div className="segmented" role="group" aria-label="Form-Ansicht">
+          {([ ["outcome", "Ergebnis"], ["btts", "BTTS"], ["over", "Über"], ["firstHalfOver", "1. HZ Über"] ] as const).map(([key, label]) => <button className={formView === key ? "active" : ""} aria-pressed={formView === key} onClick={() => setFormView(key)} key={key}>{label}</button>)}
+        </div>
         <select
-          aria-label={h2hView === "firstHalfOver" ? "Über-Linie für H2H 1. Halbzeit" : "Über-Linie für H2H"}
-          value={h2hView === "firstHalfOver" ? firstHalfOverLine : overLine}
-          disabled={h2hView !== "over" && h2hView !== "firstHalfOver"}
-          onChange={(event) => h2hView === "firstHalfOver"
+          aria-label={activeLineView === "firstHalfOver" ? "Über-Linie für H2H & Form, 1. Halbzeit" : "Über-Linie für H2H & Form"}
+          value={activeLineView === "firstHalfOver" ? firstHalfOverLine : overLine}
+          disabled={activeLineView === null}
+          onChange={(event) => activeLineView === "firstHalfOver"
             ? setFirstHalfOverLine(Number(event.target.value) as FirstHalfOverLine)
             : setOverLine(Number(event.target.value) as FullTimeOverLine)}
         >
-          {h2hView === "firstHalfOver"
+          {activeLineView === "firstHalfOver"
             ? <><option value={0.5}>Über 0,5</option><option value={1.5}>Über 1,5</option></>
             : <><option value={1.5}>Über 1,5</option><option value={2.5}>Über 2,5</option><option value={3.5}>Über 3,5</option></>}
         </select>
@@ -670,14 +773,18 @@ function Dashboard({ document }: { document: DashboardDocument }) {
             <button onClick={() => sort("kickoff")} aria-label={sortStateLabel("Anstoß & Liga", sortKey === "kickoff", sortDirection)}>Anstoß & Liga {arrow("kickoff")}</button>
           </span>
           <button onClick={() => sort("form")}>
-            Letzte 5 Form {sortKey === "form"
+            Letzte 5 Form {formView === "outcome" && sortKey === "form"
               ? <span className={`sort-mode-badge ${formSortLabel.className}`} aria-label={`Sortierung: ${formSortLabel.label}`} title={formSortLabel.label}>{formSortLabel.badge}</span>
-              : arrow("form")}
+              : secondarySortKey === "form"
+                ? <span className="sort-mode-badge secondary" aria-label="Sekundäre Sortierung" title="Sekundäre Sortierung">2</span>
+                : arrow("form")}
           </button>
           <button onClick={() => sort("h2h")}>
             Letzte 5 H2H {h2hView === "outcome" && sortKey === "h2h"
               ? <span className={`sort-mode-badge ${h2hSortTarget}`} aria-label={`Sortierung: ${h2hSortLabel.label}`} title={h2hSortLabel.label}>{h2hSortLabel.badge}</span>
-              : arrow("h2h")}
+              : secondarySortKey === "h2h"
+                ? <span className="sort-mode-badge secondary" aria-label="Sekundäre Sortierung" title="Sekundäre Sortierung">2</span>
+                : arrow("h2h")}
           </button>
           <button onClick={() => sort("expected")} aria-label={sortStateLabel(showFirstHalfExpected ? "Erw. Tore 1. HZ" : "Erw. Tore", sortKey === "expected", sortDirection)}>{showFirstHalfExpected ? "Erw. Tore 1. HZ" : "Erw. Tore"} {arrow("expected")}</button>
           {showScore && <button onClick={() => sort("score")} aria-label={sortStateLabel("Score", sortKey === "score", sortDirection)}>Score {arrow("score")}</button>}
@@ -702,7 +809,12 @@ function Dashboard({ document }: { document: DashboardDocument }) {
                 <span className="form-labels" aria-label={fixture.form.scope === "overall" ? "Form insgesamt: Home und Away" : "Heim- und Auswärtsform"}>
                   <small>Home</small><small>Away</small>
                 </span>
-                <span><FormDots results={fixture.form.home} /><FormDots results={fixture.form.away} /></span>
+                <span>{formView === "outcome"
+                  ? <><FormDots results={fixture.form.home} /><FormDots results={fixture.form.away} /></>
+                  : <>
+                    <FormMatchDots matches={fixture.form.homeMatches} view={formView} overLine={overLine} firstHalfOverLine={firstHalfOverLine} />
+                    <FormMatchDots matches={fixture.form.awayMatches} view={formView} overLine={overLine} firstHalfOverLine={firstHalfOverLine} />
+                  </>}</span>
               </span>
               <span className="h2h-cell"><H2hDots fixture={fixture} view={h2hView} overLine={overLine} firstHalfOverLine={firstHalfOverLine} /></span>
               <span className="expected-cell"><strong>{(showFirstHalfExpected ? fixture.expectedFirstHalfGoals?.home ?? 0 : fixture.expectedGoals.home).toFixed(2).replace(".", ",")}</strong><i>:</i><strong>{(showFirstHalfExpected ? fixture.expectedFirstHalfGoals?.away ?? 0 : fixture.expectedGoals.away).toFixed(2).replace(".", ",")}</strong></span>

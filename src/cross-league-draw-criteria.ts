@@ -3,6 +3,7 @@ import {
   completedScore,
   consensusOdds,
   formStats,
+  recentTeamMatches,
   recentTeamResults,
   tablePpg
 } from "./draw-criteria.ts";
@@ -455,6 +456,16 @@ export function scoreCrossLeagueDrawFixture(
       fixture.fixture.timestamp
     ),
     recentAwayResults: recentTeamResults(
+      context.awayRecent,
+      fixture.teams.away.id,
+      fixture.fixture.timestamp
+    ),
+    recentHomeMatches: recentTeamMatches(
+      context.homeRecent,
+      fixture.teams.home.id,
+      fixture.fixture.timestamp
+    ),
+    recentAwayMatches: recentTeamMatches(
       context.awayRecent,
       fixture.teams.away.id,
       fixture.fixture.timestamp
