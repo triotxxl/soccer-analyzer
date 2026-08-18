@@ -2,7 +2,7 @@ import { mkdir, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { config, ROOT_DIR } from "./config.ts";
 import { teamNameSimilarity } from "./team-resolver.ts";
-import type { DefensiveProfile, DrawAnalysisResult, FavoriteAnalysisResult, GoalLineAnalysisResult, GoalLineRow, RecentMatchSummary, TipicoOdds } from "./types.ts";
+import type { DefensiveProfile, DrawAnalysisResult, FavoriteAnalysisResult, GoalLineAnalysisResult, GoalLineRow, LeagueStats, RecentMatchSummary, TipicoOdds } from "./types.ts";
 
 export interface DashboardInput {
   createdAt: string;
@@ -88,6 +88,7 @@ export interface DashboardDocument {
     maximumHours: number;
   };
   fixtures: DashboardFixture[];
+  leagues: LeagueStats[];
 }
 
 const thresholds: Record<DashboardMarketKey, { recommended: number; strong: number }> = {
@@ -257,7 +258,8 @@ export function buildDashboardDocument(input: DashboardInput): DashboardDocument
       firstAvailableDate, lastAvailableDate, maximumDays,
       maximumHours: Math.max(1, Math.ceil((latestKickoff - createdAt) / 3_600_000))
     },
-    fixtures
+    fixtures,
+    leagues: input.draw.leagues ?? []
   };
 }
 

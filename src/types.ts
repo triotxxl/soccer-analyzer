@@ -425,12 +425,23 @@ export interface DrawScoreRow {
   breakdown: DrawScoreBreakdown | CrossLeagueDrawBreakdown;
 }
 
+export interface LeagueStats {
+  country: string;
+  league: string;
+  matches: number;
+  avgGoalsTotal: number;
+  bttsRate: number;
+  over15Rate: number;
+  over25Rate: number;
+}
+
 export interface DrawAnalysisResult {
   createdAt: string;
   dates: string[];
   rows: DrawScoreRow[];
   apiRequests: number;
   apiRequestsRemaining: number | null;
+  leagues: LeagueStats[];
   validation?: {
     settledRecommendations: number;
     minimum: number;

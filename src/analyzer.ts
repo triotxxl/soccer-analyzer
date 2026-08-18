@@ -3,7 +3,7 @@ import { config, TEAM_ALIASES_FILE } from "./config.ts";
 import { AnalyzerDatabase } from "./database.ts";
 import { scoreCrossLeagueFixture } from "./cross-league-criteria.ts";
 import { scoreCrossLeagueDrawFixture } from "./cross-league-draw-criteria.ts";
-import { buildTable, consensusOdds, scoreDrawFixture } from "./draw-criteria.ts";
+import { buildTable, consensusOdds, leagueAverages, scoreDrawFixture } from "./draw-criteria.ts";
 import { scoreFavoriteFixture } from "./favorite-criteria.ts";
 import { strengthPool } from "./league-strength.ts";
 import { analyzeFirstHalfGoals, analyzeFixture, buildDefenseRankings, candidatesForFixture, goalLineProbabilities } from "./model.ts";
@@ -25,6 +25,7 @@ import type {
   DrawAnalysisResult,
   FavoriteAnalysisResult,
   GoalLineAnalysisResult,
+  LeagueStats,
   ResolutionFailure,
   ResolvedLeague
 } from "./types.ts";
@@ -714,6 +715,13 @@ export async function runDrawCriteriaAnalysis(
   const seasonFixtures = new Map(
     seasonEntries.map((entry) => [entry.key, entry.fixtures])
   );
+  const leagueStatsList: LeagueStats[] = [];
+  for (const [, seasonList] of seasonFixtures) {
+    const sample = seasonList[0];
+    if (!sample) continue;
+    const stats = leagueAverages(seasonList, now.getTime());
+    if (stats) leagueStatsList.push({ country: sample.league.country, league: sample.league.name, ...stats });
+  }
 
   const teamIds = [...new Set(fixtures.flatMap((fixture) => [
     fixture.teams.home.id,
@@ -844,6 +852,7 @@ export async function runDrawCriteriaAnalysis(
     rows,
     apiRequests: client.requestCount,
     apiRequestsRemaining: client.requestsRemaining,
+    leagues: leagueStatsList,
     ...(validation ? { validation } : {})
   };
 }

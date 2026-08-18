@@ -16,6 +16,7 @@ function dashboardInput(odds = 1.75): DashboardInput {
     tipicoOdds: [{ homeTeam: "Heim FC", awayTeam: "Gast FC", home: odds, draw: 3.5, away: 4.2, bttsYes: 1.8, over15: 1.25, over25: 1.9, firstHalfOver05: 1.35, firstHalfOver15: 2.4 }],
     draw: {
       ...base,
+      leagues: [],
       rows: [{
         fixtureId: 1, kickoff: "2026-08-11T19:00:00.000Z", country: "Deutschland", league: "Bundesliga",
         homeTeam: "Heim FC", awayTeam: "Gast FC", odds: 3.5, score: 65, confidence: 80,

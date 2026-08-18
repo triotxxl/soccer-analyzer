@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { scoreDrawFixture } from "../src/draw-criteria.ts";
+import { leagueAverages, scoreDrawFixture } from "../src/draw-criteria.ts";
 import { formatDrawAnalysis } from "../src/output.ts";
 import type { ApiFixtureOdds, DrawScoreRow } from "../src/types.ts";
 import { fixture, history } from "./helpers.ts";
@@ -73,6 +73,32 @@ test("100-Punkte-System ist deterministisch und summiert alle Blöcke", () => {
   });
   const sum = Object.values(first.breakdown).reduce((total, value) => total + value, 0);
   assert.equal(first.score, Math.max(0, Math.min(100, sum)));
+});
+
+test("leagueAverages berechnet Torschnitt, BTTS- und Über-Quoten aus abgeschlossenen Spielen", () => {
+  const timestamp = 1_800_000_000;
+  const matches = [
+    fixture({ id: 1, timestamp: timestamp - 86_400, homeId: 1, awayId: 2, homeGoals: 2, awayGoals: 1 }),
+    fixture({ id: 2, timestamp: timestamp - 2 * 86_400, homeId: 3, awayId: 4, homeGoals: 1, awayGoals: 0 }),
+    fixture({ id: 3, timestamp: timestamp - 3 * 86_400, homeId: 5, awayId: 6, homeGoals: 0, awayGoals: 0 }),
+    fixture({ id: 4, timestamp: timestamp - 4 * 86_400, homeId: 7, awayId: 8 }),
+    fixture({ id: 5, timestamp: timestamp + 86_400, homeId: 9, awayId: 10, homeGoals: 3, awayGoals: 3 })
+  ];
+  const stats = leagueAverages(matches, timestamp);
+  assert.deepEqual(stats, {
+    matches: 3,
+    avgGoalsTotal: (3 + 1 + 0) / 3,
+    bttsRate: 1 / 3,
+    over15Rate: 1 / 3,
+    over25Rate: 1 / 3
+  });
+});
+
+test("leagueAverages liefert null ohne abgeschlossene Spiele", () => {
+  const timestamp = 1_800_000_000;
+  const matches = [fixture({ id: 1, timestamp: timestamp - 86_400, homeId: 1, awayId: 2 })];
+  assert.equal(leagueAverages(matches, timestamp), null);
+  assert.equal(leagueAverages([], timestamp), null);
 });
 
 test("Wettbewerb ohne Tabelle erhält keine künstlichen Tabellenpunkte", () => {
@@ -156,7 +182,8 @@ test("Ausgabe enthält nur Gesamttabelle und Top-12-Tabelle", () => {
     dates: ["2026-07-29", "2026-07-30"],
     rows,
     apiRequests: 0,
-    apiRequestsRemaining: null
+    apiRequestsRemaining: null,
+    leagues: []
   });
   assert.match(output, /Remis-Ranking noch nicht validiert/);
   assert.match(output, /Datenvertrauen/);

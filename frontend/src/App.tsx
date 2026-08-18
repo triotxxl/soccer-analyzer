@@ -1,11 +1,11 @@
 import {
-  Binoculars, CalendarBlank, CaretDoubleLeft, CaretDoubleRight, CaretLeft, CaretRight, CheckCircle, ClockCounterClockwise, Funnel, ListBullets, RocketLaunch, Shield, ShieldCheck, Star, WarningCircle, X
+  Binoculars, CalendarBlank, CaretDoubleLeft, CaretDoubleRight, CaretLeft, CaretRight, CheckCircle, ClockCounterClockwise, Funnel, Info, ListBullets, RocketLaunch, Shield, ShieldCheck, Star, WarningCircle, X
 } from "@phosphor-icons/react";
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { BetBuilderDrawer, CartAddButton, CartBadge, MarketPickerModal } from "./BetCartUI";
 import { toCartEntry, useBetCart } from "./betCart";
 import { useDashboardData } from "./data";
-import type { DashboardDocument, DashboardFixture, DashboardMarket, DashboardMarketKey, FormResult, RecommendationLevel } from "./types";
+import type { DashboardDocument, DashboardFixture, DashboardMarket, DashboardMarketKey, FormResult, LeagueStats, RecommendationLevel } from "./types";
 
 const MARKET_OPTIONS: Array<{ key: "all" | DashboardMarketKey; label: string }> = [
   { key: "all", label: "Alle Märkte" },
@@ -134,6 +134,88 @@ function DateRangePopover({
     </div>
     <div className="date-selection" aria-live="polite"><span>Von <strong>{formatCalendarDate(start)}</strong></span><span>Bis <strong>{formatCalendarDate(end)}</strong></span></div>
     <div className="date-actions"><button onClick={onCancel}>Abbrechen</button><button className="primary" onClick={onApply}>Übernehmen</button></div>
+  </div>;
+}
+
+function leagueKey(country: string, league: string): string {
+  return `${country}::${league}`;
+}
+
+function LeagueFilterModal({ leagues, statsByKey, deselected, search, onSearchChange, onToggle, onSelectAll, onSelectNone, onClose }: {
+  leagues: Array<{ key: string; country: string; league: string; count: number }>;
+  statsByKey: Map<string, LeagueStats>;
+  deselected: Set<string>;
+  search: string;
+  onSearchChange(value: string): void;
+  onToggle(key: string): void;
+  onSelectAll(): void;
+  onSelectNone(): void;
+  onClose(): void;
+}) {
+  const [hoverKey, setHoverKey] = useState<string | null>(null);
+  const [hoverPosition, setHoverPosition] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
+  const query = search.trim().toLowerCase();
+  const visible = query
+    ? leagues.filter((item) => `${item.country} ${item.league}`.toLowerCase().includes(query))
+    : leagues;
+  const hoverItem = hoverKey === null ? null : visible.find((item) => item.key === hoverKey) ?? null;
+  const hoverStats = hoverKey === null ? undefined : statsByKey.get(hoverKey);
+
+  const showCard = (key: string, target: HTMLElement) => {
+    const rect = target.getBoundingClientRect();
+    setHoverPosition({ top: rect.top, left: rect.right + 8 });
+    setHoverKey(key);
+  };
+
+  return <div className="overlay-backdrop" onClick={onClose}>
+    <div className="league-filter-modal" role="dialog" aria-label="Wettbewerbe auswählen" onClick={(event) => event.stopPropagation()}>
+      <div className="overlay-head">
+        <strong>Wettbewerbe</strong>
+        <button aria-label="Schließen" onClick={onClose}><X /></button>
+      </div>
+      <div className="league-modal-toolbar">
+        <input className="league-search" type="text" placeholder="Wettbewerb suchen…" value={search}
+          onChange={(event) => onSearchChange(event.target.value)} aria-label="Wettbewerb suchen" />
+        <div className="league-actions">
+          <button onClick={onSelectAll}>Alle auswählen</button>
+          <button onClick={onSelectNone}>Keine auswählen</button>
+        </div>
+      </div>
+      <ul className="league-list">
+        {visible.map((item) => {
+          const stats = statsByKey.get(item.key);
+          return <li className="league-row" key={item.key}>
+            <label>
+              <input type="checkbox" checked={!deselected.has(item.key)} onChange={() => onToggle(item.key)} />
+              <span title={`${item.country} · ${item.league}`}>{item.country} · {item.league}</span>
+              <small>{item.count}</small>
+            </label>
+            <span className="league-info" tabIndex={0}
+              aria-label={stats ? `Liga-Durchschnitt ${item.league}` : "Keine Liga-Daten verfügbar"}
+              onMouseEnter={(event) => showCard(item.key, event.currentTarget)}
+              onMouseLeave={() => setHoverKey((current) => current === item.key ? null : current)}
+              onFocus={(event) => showCard(item.key, event.currentTarget)}
+              onBlur={() => setHoverKey((current) => current === item.key ? null : current)}
+            >
+              <Info size={14} weight="bold" aria-hidden />
+            </span>
+          </li>;
+        })}
+        {visible.length === 0 && <li className="league-empty">Keine Treffer</li>}
+      </ul>
+    </div>
+    {hoverItem && <div className="league-stat-card" role="tooltip" style={{ top: hoverPosition.top, left: hoverPosition.left }}>
+      {hoverStats ? <>
+        <strong>{hoverItem.league}</strong>
+        <dl>
+          <div><dt>Ø Tore/Spiel</dt><dd>{hoverStats.avgGoalsTotal.toFixed(2).replace(".", ",")}</dd></div>
+          <div><dt>BTTS-Quote</dt><dd>{formatPercent(hoverStats.bttsRate)}</dd></div>
+          <div><dt>Über 1,5</dt><dd>{formatPercent(hoverStats.over15Rate)}</dd></div>
+          <div><dt>Über 2,5</dt><dd>{formatPercent(hoverStats.over25Rate)}</dd></div>
+        </dl>
+        <small>{hoverStats.matches} Spiele Basis</small>
+      </> : <span>Keine Liga-Daten verfügbar</span>}
+    </div>}
   </div>;
 }
 
@@ -440,6 +522,9 @@ function Dashboard({ document }: { document: DashboardDocument }) {
   const [visibleMonth, setVisibleMonth] = useState(monthStart(customStart || "1970-01-01"));
   const [showCrossLeague, setShowCrossLeague] = useState(true);
   const [showPast, setShowPast] = useState(false);
+  const [deselectedLeagues, setDeselectedLeagues] = useState<Set<string>>(new Set());
+  const [leagueFilterOpen, setLeagueFilterOpen] = useState(false);
+  const [leagueSearch, setLeagueSearch] = useState("");
   const [h2hView, setH2hView] = useState<H2hView>("outcome");
   const [formView, setFormView] = useState<FormView>("outcome");
   const [overLine, setOverLine] = useState<FullTimeOverLine>(2.5);
@@ -457,6 +542,30 @@ function Dashboard({ document }: { document: DashboardDocument }) {
   const dateControlRef = useRef<HTMLDivElement>(null);
   const now = Date.now();
   const pickerFixture = pickerFixtureId === null ? null : document.fixtures.find((item) => item.fixtureId === pickerFixtureId) ?? null;
+
+  const availableLeagues = useMemo(() => {
+    const map = new Map<string, { key: string; country: string; league: string; count: number }>();
+    for (const fixture of document.fixtures) {
+      const key = leagueKey(fixture.country, fixture.league);
+      const existing = map.get(key);
+      if (existing) existing.count += 1;
+      else map.set(key, { key, country: fixture.country, league: fixture.league, count: 1 });
+    }
+    return [...map.values()].sort((left, right) =>
+      left.country.localeCompare(right.country, "de") || left.league.localeCompare(right.league, "de"));
+  }, [document]);
+
+  const leagueStatsByKey = useMemo(() =>
+    new Map((document.leagues ?? []).map((entry) => [leagueKey(entry.country, entry.league), entry])),
+    [document]);
+
+  const toggleLeague = (key: string) => setDeselectedLeagues((prev) => {
+    const next = new Set(prev);
+    if (next.has(key)) next.delete(key); else next.add(key);
+    return next;
+  });
+  const selectAllLeagues = () => setDeselectedLeagues(new Set());
+  const selectNoneLeagues = () => setDeselectedLeagues(new Set(availableLeagues.map((item) => item.key)));
 
   const selectMarket = (market: MarketFilter) => {
     setMarketFilter(market);
@@ -502,7 +611,8 @@ function Dashboard({ document }: { document: DashboardDocument }) {
     setOpenFixture((value) => value !== null && document.fixtures.some((fixture) => fixture.fixtureId === value) ? value : null);
     setPickerFixtureId((value) => value !== null && document.fixtures.some((fixture) => fixture.fixtureId === value) ? value : null);
     setMarketFilter((value) => value === "all" || document.fixtures.some((fixture) => fixture.markets.some((market) => market.key === value)) ? value : "all");
-  }, [document]);
+    setDeselectedLeagues((prev) => new Set([...prev].filter((key) => availableLeagues.some((item) => item.key === key))));
+  }, [availableLeagues, document]);
 
   useEffect(() => {
     if (!calendarOpen) return;
@@ -530,11 +640,12 @@ function Dashboard({ document }: { document: DashboardDocument }) {
       if (pickerFixtureId !== null) setPickerFixtureId(null);
       else if (builderOpen) setBuilderOpen(false);
       else if (calendarOpen) setCalendarOpen(false);
+      else if (leagueFilterOpen) setLeagueFilterOpen(false);
       else setSidebarOpen(false);
     };
     window.addEventListener("keydown", closeOnEscape);
     return () => window.removeEventListener("keydown", closeOnEscape);
-  }, [builderOpen, calendarOpen, pickerFixtureId]);
+  }, [builderOpen, calendarOpen, leagueFilterOpen, pickerFixtureId]);
 
   const openCalendar = () => {
     if (!document.meta.firstAvailableDate || !document.meta.lastAvailableDate) return;
@@ -575,7 +686,10 @@ function Dashboard({ document }: { document: DashboardDocument }) {
     return localDate >= customStart && localDate <= customEnd;
   };
 
-  const scopedFixtures = document.fixtures.filter((fixture) => inSelectedRange(fixture) && (showCrossLeague || !fixture.crossLeague));
+  const scopedFixtures = document.fixtures.filter((fixture) =>
+    inSelectedRange(fixture) &&
+    (showCrossLeague || !fixture.crossLeague) &&
+    !deselectedLeagues.has(leagueKey(fixture.country, fixture.league)));
   const counts = {
     all: scopedFixtures.length,
     strong: scopedFixtures.filter((fixture) => bestLevel(fixture, marketFilter) === "strong").length,
@@ -711,6 +825,14 @@ function Dashboard({ document }: { document: DashboardDocument }) {
           <label className="check-row"><input type="checkbox" checked={showCrossLeague} onChange={(event) => setShowCrossLeague(event.target.checked)} /> Pokal- / Cross-League</label>
           <label className="check-row"><input type="checkbox" checked={showPast} onChange={(event) => setShowPast(event.target.checked)} /> Laufende / beendete Partien</label>
           <p>{rangeLabel}<br />{filtered.length} von {document.meta.fixtureCount} Partien</p>
+        </section>
+        <section className="sidebar-section">
+          <h2><ListBullets size={14} weight="bold" aria-hidden /> Wettbewerbe</h2>
+          <button className={`league-filter-trigger ${deselectedLeagues.size > 0 ? "active" : ""}`}
+            aria-label="Wettbewerbe auswählen" aria-haspopup="dialog" aria-expanded={leagueFilterOpen}
+            onClick={() => setLeagueFilterOpen(true)}>
+            <span><strong>Wettbewerbe</strong><small>{availableLeagues.length - deselectedLeagues.size} von {availableLeagues.length} ausgewählt</small></span>
+          </button>
         </section>
         <section className="sidebar-section kpi-section">
           <h2><Funnel size={14} weight="bold" aria-hidden /> Filter & Kennzahlen</h2>
@@ -878,6 +1000,17 @@ function Dashboard({ document }: { document: DashboardDocument }) {
     cart={cart}
     onSelect={(market) => { addEntry(toCartEntry(pickerFixture, market)); setPickerFixtureId(null); }}
     onClose={() => setPickerFixtureId(null)}
+  />}
+  {leagueFilterOpen && <LeagueFilterModal
+    leagues={availableLeagues}
+    statsByKey={leagueStatsByKey}
+    deselected={deselectedLeagues}
+    search={leagueSearch}
+    onSearchChange={setLeagueSearch}
+    onToggle={toggleLeague}
+    onSelectAll={selectAllLeagues}
+    onSelectNone={selectNoneLeagues}
+    onClose={() => setLeagueFilterOpen(false)}
   />}
   <CartBadge count={cart.length} onClick={() => setBuilderOpen(true)} />
   {builderOpen && <BetBuilderDrawer cart={cart} onRemove={removeEntry} onClear={clearCart} onClose={() => setBuilderOpen(false)} />}

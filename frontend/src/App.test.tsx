@@ -45,7 +45,8 @@ function document(createdAt = "2026-08-16T10:00:00.000Z", name = "Alpha FC"): Da
     fixtures: [
       fixture(1, name, "strong", "2026-08-16T18:00:00.000Z"),
       fixture(2, "Zulu FC", "none", "2026-08-17T18:00:00.000Z")
-    ]
+    ],
+    leagues: []
   };
 }
 

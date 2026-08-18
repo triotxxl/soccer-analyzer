@@ -460,7 +460,8 @@ async function dashboard(args: ParsedArgs): Promise<void> {
       dates: [],
       rows: [],
       apiRequests: 0,
-      apiRequestsRemaining: null
+      apiRequestsRemaining: null,
+      leagues: []
     };
     const goalsResult = client
       ? await runGoalLineAnalysis(imported.input, { client, database })

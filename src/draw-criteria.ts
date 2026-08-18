@@ -3,6 +3,7 @@ import type {
   ApiFixtureOdds,
   DrawScoreBreakdown,
   DrawScoreRow,
+  LeagueStats,
   RecentMatchSummary,
   TipicoOdds
 } from "./types.ts";
@@ -189,6 +190,30 @@ export function buildTable(fixtures: ApiFixture[], cutoff: number): TableRow[] {
 
 export function tablePpg(row: TableRow): number {
   return row.played === 0 ? 0 : row.points / row.played;
+}
+
+export function leagueAverages(fixtures: ApiFixture[], cutoff: number): Omit<LeagueStats, "country" | "league"> | null {
+  const completed = fixtures.filter((match) => match.fixture.timestamp < cutoff && completedScore(match));
+  if (completed.length === 0) return null;
+  let goalSum = 0;
+  let btts = 0;
+  let over15 = 0;
+  let over25 = 0;
+  for (const match of completed) {
+    const score = completedScore(match)!;
+    const total = score[0] + score[1];
+    goalSum += total;
+    if (score[0] > 0 && score[1] > 0) btts += 1;
+    if (total > 1.5) over15 += 1;
+    if (total > 2.5) over25 += 1;
+  }
+  return {
+    matches: completed.length,
+    avgGoalsTotal: goalSum / completed.length,
+    bttsRate: btts / completed.length,
+    over15Rate: over15 / completed.length,
+    over25Rate: over25 / completed.length
+  };
 }
 
 export function formStats(fixtures: ApiFixture[], teamId: number, table: TableRow[]): FormStats {
