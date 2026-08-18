@@ -3,7 +3,7 @@ import { config, TEAM_ALIASES_FILE } from "./config.ts";
 import { AnalyzerDatabase } from "./database.ts";
 import { scoreCrossLeagueFixture } from "./cross-league-criteria.ts";
 import { scoreCrossLeagueDrawFixture } from "./cross-league-draw-criteria.ts";
-import { consensusOdds, scoreDrawFixture } from "./draw-criteria.ts";
+import { buildTable, consensusOdds, scoreDrawFixture } from "./draw-criteria.ts";
 import { scoreFavoriteFixture } from "./favorite-criteria.ts";
 import { strengthPool } from "./league-strength.ts";
 import { analyzeFirstHalfGoals, analyzeFixture, buildDefenseRankings, candidatesForFixture, goalLineProbabilities } from "./model.ts";
@@ -28,6 +28,7 @@ import type {
   ResolutionFailure,
   ResolvedLeague
 } from "./types.ts";
+import type { TableRow } from "./draw-criteria.ts";
 import { datesForRange, normalizeText } from "./util.ts";
 import { venueFormRow } from "./venue-form.ts";
 import { enrichFixtureExpectedGoals } from "./xg.ts";
@@ -516,6 +517,19 @@ export async function runGoalLineAnalysis(
       rankingsByCompetition.set(key, buildDefenseRankings(history, enriched.values,
         Math.min(...fixtures.map((fixture) => fixture.fixture.timestamp))));
     }
+    const standingsByCompetition = new Map<string, { table: TableRow[]; teamNames: Map<number, string> }>();
+    for (const [key, history] of competitionHistory) {
+      const targetTimestamp = Math.min(
+        ...fixtures.filter((fixture) => `${fixture.league.id}:${fixture.league.season}` === key).map((fixture) => fixture.fixture.timestamp)
+      );
+      if (!Number.isFinite(targetTimestamp)) continue;
+      const teamNames = new Map<number, string>();
+      for (const match of history) {
+        teamNames.set(match.teams.home.id, match.teams.home.name);
+        teamNames.set(match.teams.away.id, match.teams.away.name);
+      }
+      standingsByCompetition.set(key, { table: buildTable(history, targetTimestamp), teamNames });
+    }
 
     const rows = fixtures.map((fixture) => {
       const competitionKey = `${fixture.league.id}:${fixture.league.season}`;
@@ -592,6 +606,10 @@ export async function runGoalLineAnalysis(
         dataConfidence: model.quality,
         outcomeProbabilities: model.probabilities,
         defense: model.defense,
+        standings: crossLeague ? undefined : (() => {
+          const entry = standingsByCompetition.get(competitionKey);
+          return entry?.table.map((row) => ({ ...row, teamName: entry.teamNames.get(row.id) ?? "?" }));
+        })(),
         probabilities: goalLineProbabilities(
           model.expectedHomeGoals,
           model.expectedAwayGoals

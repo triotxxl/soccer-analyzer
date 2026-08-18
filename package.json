@@ -21,7 +21,7 @@
     "app:build": "vite build --config frontend/vite.config.ts",
     "app:preview": "vite preview --config frontend/vite.config.ts",
     "app:test": "vitest run --config frontend/vite.config.ts",
-    "test": "node --test --test-concurrency=1 && npm run app:test",
+    "test": "node --test --test-concurrency=1 \"test/**/*.test.ts\" && npm run app:test",
     "typecheck": "tsc --noEmit && tsc --project frontend/tsconfig.json --noEmit",
     "smoke": "node --env-file-if-exists=.env src/cli.ts smoke"
   },

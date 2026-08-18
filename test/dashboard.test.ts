@@ -67,7 +67,7 @@ function dashboardInput(odds = 1.75): DashboardInput {
 
 test("Dashboard-Dokument führt alle Analysen über fixtureId zusammen", () => {
   const document = buildDashboardDocument(dashboardInput());
-  assert.equal(document.schemaVersion, 3);
+  assert.equal(document.schemaVersion, 4);
   assert.equal(document.meta.timezone, "Europe/Berlin");
   assert.equal(document.meta.fixtureCount, 1);
   const fixture = document.fixtures[0]!;
@@ -124,7 +124,7 @@ test("Dashboard-Ausgabe schreibt latest und datierten Snapshot als JSON", async 
     assert.equal(path.basename(files.latest), "dashboard-latest.json");
     assert.match(path.basename(files.snapshot), /^dashboard-2026-08-11T16-00-00-000Z\.json$/);
     const latest = JSON.parse(await readFile(files.latest, "utf8")) as { schemaVersion: number };
-    assert.equal(latest.schemaVersion, 3);
+    assert.equal(latest.schemaVersion, 4);
   } finally {
     await rm(directory, { recursive: true, force: true });
   }

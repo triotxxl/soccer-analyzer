@@ -504,4 +504,57 @@ describe("React-Dashboard", () => {
     expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Hinweis schließen" })).not.toBeInTheDocument();
   });
+
+  it("zeigt einen kompakten Ligatabellen-Ausschnitt bei Ligaspielen", async () => {
+    const current = document();
+    current.fixtures[0]!.table = [
+      { position: 1, teamName: "Spitzenreiter FC", played: 10, wins: 9, draws: 1, losses: 0, points: 28, goalsFor: 30, goalsAgainst: 5 },
+      { position: 2, teamName: "Alpha FC", played: 10, wins: 8, draws: 1, losses: 1, points: 25, goalsFor: 24, goalsAgainst: 10 },
+      { position: 3, teamName: "Team C", played: 10, wins: 6, draws: 2, losses: 2, points: 20, goalsFor: 18, goalsAgainst: 12 },
+      { position: 4, teamName: "Team D", played: 10, wins: 5, draws: 3, losses: 2, points: 18, goalsFor: 16, goalsAgainst: 13 },
+      { position: 5, teamName: "Team E", played: 10, wins: 4, draws: 3, losses: 3, points: 15, goalsFor: 14, goalsAgainst: 14 },
+      { position: 6, teamName: "Team F", played: 10, wins: 3, draws: 4, losses: 3, points: 13, goalsFor: 12, goalsAgainst: 13 },
+      { position: 7, teamName: "Team G", played: 10, wins: 3, draws: 3, losses: 4, points: 12, goalsFor: 11, goalsAgainst: 14 },
+      { position: 8, teamName: "Team H", played: 10, wins: 3, draws: 2, losses: 5, points: 11, goalsFor: 10, goalsAgainst: 15 },
+      { position: 9, teamName: "Gast FC", played: 10, wins: 2, draws: 3, losses: 5, points: 9, goalsFor: 9, goalsAgainst: 16 },
+      { position: 10, teamName: "Team J", played: 10, wins: 2, draws: 2, losses: 6, points: 8, goalsFor: 8, goalsAgainst: 17 },
+      { position: 11, teamName: "Team K", played: 10, wins: 1, draws: 3, losses: 6, points: 6, goalsFor: 7, goalsAgainst: 18 },
+      { position: 12, teamName: "Schlusslicht FC", played: 10, wins: 0, draws: 2, losses: 8, points: 2, goalsFor: 4, goalsAgainst: 22 }
+    ];
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(current), { status: 200 })));
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(<App />);
+    expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /Alpha FCGast FC/i }));
+    expect(screen.getByText("Ligatabelle")).toBeInTheDocument();
+    const standings = screen.getByRole("table");
+    expect(within(standings).getByText("Spitzenreiter FC")).toBeInTheDocument();
+    expect(within(standings).getByText("Alpha FC")).toBeInTheDocument();
+    expect(within(standings).getByText("Gast FC")).toBeInTheDocument();
+    expect(within(standings).queryByText("Team E")).not.toBeInTheDocument();
+    expect(within(standings).queryByText("Schlusslicht FC")).not.toBeInTheDocument();
+  });
+
+  it("zeigt keine Ligatabelle bei Cross-League-Partien oder ohne Tabellendaten", async () => {
+    const current = document();
+    current.fixtures[0]!.crossLeague = true;
+    current.fixtures[0]!.table = [
+      { position: 1, teamName: "Alpha FC", played: 10, wins: 8, draws: 1, losses: 1, points: 25, goalsFor: 24, goalsAgainst: 10 },
+      { position: 2, teamName: "Gast FC", played: 10, wins: 2, draws: 3, losses: 5, points: 9, goalsFor: 9, goalsAgainst: 16 }
+    ];
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(current), { status: 200 })));
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(<App />);
+    expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /Alpha FCGast FC/i }));
+    expect(screen.getByText("Direkte Begegnungen")).toBeInTheDocument();
+    expect(screen.queryByText("Ligatabelle")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /Alpha FCGast FC/i }));
+    await user.click(screen.getByRole("button", { name: /Zulu FCGast FC/i }));
+    expect(screen.getByText("Direkte Begegnungen")).toBeInTheDocument();
+    expect(screen.queryByText("Ligatabelle")).not.toBeInTheDocument();
+  });
 });

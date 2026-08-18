@@ -322,6 +322,31 @@ function defaultSidebarOpen(): boolean {
   return typeof window.matchMedia !== "function" || window.matchMedia("(min-width: 700px)").matches;
 }
 
+type StandingsRow = NonNullable<DashboardFixture["table"]>[number];
+
+function standingsWindow(table: StandingsRow[], homeTeam: string, awayTeam: string, padding = 2): Array<StandingsRow | null> {
+  const homeIndex = table.findIndex((row) => row.teamName === homeTeam);
+  const awayIndex = table.findIndex((row) => row.teamName === awayTeam);
+  if (homeIndex === -1 || awayIndex === -1) return table;
+  const ranges = [
+    [Math.max(0, homeIndex - padding), Math.min(table.length - 1, homeIndex + padding)],
+    [Math.max(0, awayIndex - padding), Math.min(table.length - 1, awayIndex + padding)]
+  ].sort((left, right) => left[0]! - right[0]!);
+  const merged: Array<[number, number]> = [];
+  for (const [start, end] of ranges) {
+    const last = merged[merged.length - 1];
+    if (last && start! <= last[1] + 1) last[1] = Math.max(last[1], end!);
+    else merged.push([start!, end!]);
+  }
+  if (merged[0]![0] > 0) merged.unshift([0, 0]);
+  const rows: Array<StandingsRow | null> = [];
+  merged.forEach(([start, end], index) => {
+    if (index > 0 && start > merged[index - 1]![1] + 1) rows.push(null);
+    for (let position = start; position <= end; position += 1) rows.push(table[position]!);
+  });
+  return rows;
+}
+
 function Dashboard({ document }: { document: DashboardDocument }) {
   const [sidebarOpen, setSidebarOpen] = useState(defaultSidebarOpen);
   const [mobileViewport, setMobileViewport] = useState(() => !defaultSidebarOpen());
@@ -685,7 +710,9 @@ function Dashboard({ document }: { document: DashboardDocument }) {
               {markets.map((item) => <MarketCard market={item} key={item.key} />)}
             </button>
             </div>
-            {openFixture === fixture.fixtureId && <div className="fixture-details">
+            {openFixture === fixture.fixtureId && (() => {
+              const showTable = !fixture.crossLeague && !!fixture.table?.length;
+              return <div className={`fixture-details ${showTable ? "has-table" : ""}`}>
               <section><h3>Direkte Begegnungen</h3>{fixture.h2h.matches.length
                 ? <ul className="h2h-match-list">{fixture.h2h.matches.map((match, index) => {
                     const outcome = fixture.h2h.outcomes[index];
@@ -711,8 +738,23 @@ function Dashboard({ document }: { document: DashboardDocument }) {
                     </li>;
                   })}</ul>
                 : <p>Keine H2H-Ergebnisse verfügbar.</p>}</section>
+              {showTable && <section><h3>Ligatabelle</h3>
+                <table className="standings-table">
+                  <thead><tr><th>Pl.</th><th>Team</th><th>Sp</th><th>+/-</th><th>Pkt</th></tr></thead>
+                  <tbody>{standingsWindow(fixture.table!, fixture.homeTeam, fixture.awayTeam).map((row, index) => row === null
+                    ? <tr className="standings-gap" key={`gap-${index}`}><td colSpan={5}>⋯</td></tr>
+                    : <tr className={row.teamName === fixture.homeTeam ? "home" : row.teamName === fixture.awayTeam ? "away" : ""} key={row.teamName}>
+                        <td>{row.position}</td>
+                        <td>{row.teamName}</td>
+                        <td>{row.played}</td>
+                        <td>{row.goalsFor - row.goalsAgainst > 0 ? "+" : ""}{row.goalsFor - row.goalsAgainst}</td>
+                        <td>{row.points}</td>
+                      </tr>)}</tbody>
+                </table>
+              </section>}
               <section><h3>Bewertung je Markt</h3><div className="market-details">{fixture.markets.map((item) => <div key={item.key} className={item.recommendation.level}><i /><span><strong>{item.label} · {item.recommendation.label}</strong>{item.details.join(" · ")}</span></div>)}</div></section>
-            </div>}
+            </div>;
+            })()}
           </article>;
         })}
         {sortedFixtures.length === 0 && <EmptyState title="Keine Partien für diese Auswahl" text="Wähle einen anderen Zeitraum oder setze den Bewertungsfilter zurück." />}

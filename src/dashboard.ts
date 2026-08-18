@@ -63,6 +63,17 @@ export interface DashboardFixture {
     }>;
   };
   defense?: { home: DefensiveProfile; away: DefensiveProfile };
+  table?: Array<{
+    position: number;
+    teamName: string;
+    played: number;
+    wins: number;
+    draws: number;
+    losses: number;
+    points: number;
+    goalsFor: number;
+    goalsAgainst: number;
+  }>;
   expectedGoals: { home: number; away: number; total: number };
   expectedFirstHalfGoals?: { home: number; away: number; total: number };
   scores: { favorite: number | null; draw: number | null };
@@ -70,7 +81,7 @@ export interface DashboardFixture {
 }
 
 export interface DashboardDocument {
-  schemaVersion: 1 | 2 | 3;
+  schemaVersion: 1 | 2 | 3 | 4;
   meta: {
     createdAt: string;
     timezone: string;
@@ -216,6 +227,11 @@ export function buildDashboardDocument(input: DashboardInput): DashboardDocument
         consecutiveDraws: h2h?.consecutiveDraws ?? 0, matches: h2h?.recentMatches ?? []
       },
       ...(row.defense ? { defense: row.defense } : {}),
+      ...(row.standings ? { table: row.standings.map((standing) => ({
+        position: standing.position, teamName: standing.teamName, played: standing.played,
+        wins: standing.wins, draws: standing.draws, losses: standing.played - standing.wins - standing.draws,
+        points: standing.points, goalsFor: standing.goalsFor, goalsAgainst: standing.goalsAgainst
+      })) } : {}),
       expectedGoals: { home: row.expectedHomeGoals, away: row.expectedAwayGoals, total: row.expectedTotalGoals },
       expectedFirstHalfGoals: {
         home: row.firstHalf.expectedHomeGoals,
@@ -235,7 +251,7 @@ export function buildDashboardDocument(input: DashboardInput): DashboardDocument
   const createdAt = Date.parse(input.createdAt);
   const latestKickoff = fixtures.reduce((latest, fixture) => Math.max(latest, Date.parse(fixture.kickoff)), createdAt);
   return {
-    schemaVersion: 3,
+    schemaVersion: 4,
     meta: {
       createdAt: input.createdAt, timezone: config.timezone, sourceFile: input.sourceFile,
       totalTipicoEvents: input.totalTipicoEvents, selectedTipicoEvents: input.selectedTipicoEvents,
