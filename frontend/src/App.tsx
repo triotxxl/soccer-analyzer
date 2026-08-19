@@ -1,9 +1,10 @@
 import {
-  Binoculars, CalendarBlank, CaretDoubleLeft, CaretDoubleRight, CaretLeft, CaretRight, CheckCircle, ClockCounterClockwise, Funnel, Info, ListBullets, RocketLaunch, Shield, ShieldCheck, Star, WarningCircle, X
+  Binoculars, CalendarBlank, CaretDoubleLeft, CaretDoubleRight, CaretLeft, CaretRight, CheckCircle, ClockCounterClockwise, Funnel, ListBullets, RocketLaunch, Shield, ShieldCheck, Star, WarningCircle, X
 } from "@phosphor-icons/react";
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { BetBuilderDrawer, CartAddButton, CartBadge, MarketPickerModal } from "./BetCartUI";
 import { toCartEntry, useBetCart } from "./betCart";
+import { countryFlagCode } from "./countryFlags";
 import { useDashboardData } from "./data";
 import type { DashboardDocument, DashboardFixture, DashboardMarket, DashboardMarketKey, FormResult, LeagueStats, RecommendationLevel } from "./types";
 
@@ -141,6 +142,29 @@ function leagueKey(country: string, league: string): string {
   return `${country}::${league}`;
 }
 
+function CountryFlag({ country }: { country: string }) {
+  const code = countryFlagCode(country);
+  if (!code) return null;
+  return <span className={`fi fi-${code} country-flag`} aria-hidden />;
+}
+
+type LeagueSortKey = "country" | "league" | "avgGoals" | "btts" | "over15" | "over25" | "matches";
+
+function leagueSortValue(
+  item: { country: string; league: string },
+  stats: LeagueStats | undefined,
+  key: LeagueSortKey
+): number | string | null {
+  if (key === "country") return item.country;
+  if (key === "league") return item.league;
+  if (!stats) return null;
+  if (key === "avgGoals") return stats.avgGoalsTotal;
+  if (key === "btts") return stats.bttsRate;
+  if (key === "over15") return stats.over15Rate;
+  if (key === "over25") return stats.over25Rate;
+  return stats.matches;
+}
+
 function LeagueFilterModal({ leagues, statsByKey, deselected, search, onSearchChange, onToggle, onSelectAll, onSelectNone, onClose }: {
   leagues: Array<{ key: string; country: string; league: string; count: number }>;
   statsByKey: Map<string, LeagueStats>;
@@ -152,20 +176,31 @@ function LeagueFilterModal({ leagues, statsByKey, deselected, search, onSearchCh
   onSelectNone(): void;
   onClose(): void;
 }) {
-  const [hoverKey, setHoverKey] = useState<string | null>(null);
-  const [hoverPosition, setHoverPosition] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
+  const [sortKey, setSortKey] = useState<LeagueSortKey>("country");
+  const [sortDirection, setSortDirection] = useState<1 | -1>(1);
+
   const query = search.trim().toLowerCase();
   const visible = query
     ? leagues.filter((item) => `${item.country} ${item.league}`.toLowerCase().includes(query))
     : leagues;
-  const hoverItem = hoverKey === null ? null : visible.find((item) => item.key === hoverKey) ?? null;
-  const hoverStats = hoverKey === null ? undefined : statsByKey.get(hoverKey);
+  const sorted = [...visible].sort((left, right) => {
+    const leftValue = leagueSortValue(left, statsByKey.get(left.key), sortKey);
+    const rightValue = leagueSortValue(right, statsByKey.get(right.key), sortKey);
+    if (leftValue === null && rightValue === null) return 0;
+    if (leftValue === null) return 1;
+    if (rightValue === null) return -1;
+    const comparison = typeof leftValue === "string" && typeof rightValue === "string"
+      ? leftValue.localeCompare(rightValue, "de")
+      : (leftValue as number) - (rightValue as number);
+    return comparison * sortDirection;
+  });
 
-  const showCard = (key: string, target: HTMLElement) => {
-    const rect = target.getBoundingClientRect();
-    setHoverPosition({ top: rect.top, left: rect.right + 8 });
-    setHoverKey(key);
+  const sort = (key: LeagueSortKey) => {
+    if (sortKey === key) { setSortDirection((value) => value === 1 ? -1 : 1); return; }
+    setSortKey(key);
+    setSortDirection(key === "country" || key === "league" ? 1 : -1);
   };
+  const arrow = (key: LeagueSortKey) => sortKey === key ? (sortDirection === 1 ? "↑" : "↓") : "↕";
 
   return <div className="overlay-backdrop" onClick={onClose}>
     <div className="league-filter-modal" role="dialog" aria-label="Wettbewerbe auswählen" onClick={(event) => event.stopPropagation()}>
@@ -181,41 +216,39 @@ function LeagueFilterModal({ leagues, statsByKey, deselected, search, onSearchCh
           <button onClick={onSelectNone}>Keine auswählen</button>
         </div>
       </div>
-      <ul className="league-list">
-        {visible.map((item) => {
-          const stats = statsByKey.get(item.key);
-          return <li className="league-row" key={item.key}>
-            <label>
-              <input type="checkbox" checked={!deselected.has(item.key)} onChange={() => onToggle(item.key)} />
-              <span title={`${item.country} · ${item.league}`}>{item.country} · {item.league}</span>
-              <small>{item.count}</small>
-            </label>
-            <span className="league-info" tabIndex={0}
-              aria-label={stats ? `Liga-Durchschnitt ${item.league}` : "Keine Liga-Daten verfügbar"}
-              onMouseEnter={(event) => showCard(item.key, event.currentTarget)}
-              onMouseLeave={() => setHoverKey((current) => current === item.key ? null : current)}
-              onFocus={(event) => showCard(item.key, event.currentTarget)}
-              onBlur={() => setHoverKey((current) => current === item.key ? null : current)}
-            >
-              <Info size={14} weight="bold" aria-hidden />
-            </span>
-          </li>;
-        })}
-        {visible.length === 0 && <li className="league-empty">Keine Treffer</li>}
-      </ul>
+      <div className="league-table-scroll">
+        <table className="league-table">
+          <thead>
+            <tr>
+              <th></th>
+              <th><button onClick={() => sort("country")} aria-label={sortStateLabel("Land", sortKey === "country", sortDirection)}>Land {arrow("country")}</button></th>
+              <th><button onClick={() => sort("league")} aria-label={sortStateLabel("Wettbewerb", sortKey === "league", sortDirection)}>Wettbewerb {arrow("league")}</button></th>
+              <th><button onClick={() => sort("avgGoals")} aria-label={sortStateLabel("Ø Tore", sortKey === "avgGoals", sortDirection)}>Ø Tore {arrow("avgGoals")}</button></th>
+              <th><button onClick={() => sort("btts")} aria-label={sortStateLabel("BTTS", sortKey === "btts", sortDirection)}>BTTS {arrow("btts")}</button></th>
+              <th><button onClick={() => sort("over15")} aria-label={sortStateLabel("Über 1,5", sortKey === "over15", sortDirection)}>Ü 1,5 {arrow("over15")}</button></th>
+              <th><button onClick={() => sort("over25")} aria-label={sortStateLabel("Über 2,5", sortKey === "over25", sortDirection)}>Ü 2,5 {arrow("over25")}</button></th>
+              <th><button onClick={() => sort("matches")} aria-label={sortStateLabel("Spiele", sortKey === "matches", sortDirection)}>Spiele {arrow("matches")}</button></th>
+            </tr>
+          </thead>
+          <tbody>
+            {sorted.map((item) => {
+              const stats = statsByKey.get(item.key);
+              return <tr className={deselected.has(item.key) ? "off" : ""} key={item.key}>
+                <td><input type="checkbox" checked={!deselected.has(item.key)} onChange={() => onToggle(item.key)} aria-label={`${item.country} · ${item.league}`} /></td>
+                <td onClick={() => onToggle(item.key)}><CountryFlag country={item.country} /> {item.country}</td>
+                <td onClick={() => onToggle(item.key)}>{item.league}</td>
+                <td>{stats ? stats.avgGoalsTotal.toFixed(2).replace(".", ",") : "–"}</td>
+                <td>{stats ? formatPercent(stats.bttsRate) : "–"}</td>
+                <td>{stats ? formatPercent(stats.over15Rate) : "–"}</td>
+                <td>{stats ? formatPercent(stats.over25Rate) : "–"}</td>
+                <td>{stats ? stats.matches : "–"}</td>
+              </tr>;
+            })}
+            {sorted.length === 0 && <tr><td className="league-empty" colSpan={8}>Keine Treffer</td></tr>}
+          </tbody>
+        </table>
+      </div>
     </div>
-    {hoverItem && <div className="league-stat-card" role="tooltip" style={{ top: hoverPosition.top, left: hoverPosition.left }}>
-      {hoverStats ? <>
-        <strong>{hoverItem.league}</strong>
-        <dl>
-          <div><dt>Ø Tore/Spiel</dt><dd>{hoverStats.avgGoalsTotal.toFixed(2).replace(".", ",")}</dd></div>
-          <div><dt>BTTS-Quote</dt><dd>{formatPercent(hoverStats.bttsRate)}</dd></div>
-          <div><dt>Über 1,5</dt><dd>{formatPercent(hoverStats.over15Rate)}</dd></div>
-          <div><dt>Über 2,5</dt><dd>{formatPercent(hoverStats.over25Rate)}</dd></div>
-        </dl>
-        <small>{hoverStats.matches} Spiele Basis</small>
-      </> : <span>Keine Liga-Daten verfügbar</span>}
-    </div>}
   </div>;
 }
 
@@ -925,7 +958,7 @@ function Dashboard({ document }: { document: DashboardDocument }) {
                   <span className="team-name"><strong>{fixture.homeTeam}</strong><DefenseShield profile={fixture.defense?.home} team={fixture.homeTeam} /></span>
                   <span className="team-name"><strong>{fixture.awayTeam}</strong><DefenseShield profile={fixture.defense?.away} team={fixture.awayTeam} /></span>
                 </span>
-                <span className="fixture-meta"><strong>{time.clock}{isPast && <em> angepfiffen</em>}</strong><small>{time.day} · {fixture.country} · {fixture.league}</small>{(fixture.h2hNotice || fixture.warnings.length > 0) && <i>{fixture.h2hNotice ? "H2H" : "Daten"}</i>}</span>
+                <span className="fixture-meta"><strong>{time.clock}{isPast && <em> angepfiffen</em>}</strong><small>{time.day} · <CountryFlag country={fixture.country} /> {fixture.country} · {fixture.league}</small>{(fixture.h2hNotice || fixture.warnings.length > 0) && <i>{fixture.h2hNotice ? "H2H" : "Daten"}</i>}</span>
               </span>
               <span className="form-cell">
                 <span className="form-labels" aria-label={fixture.form.scope === "overall" ? "Form insgesamt: Home und Away" : "Heim- und Auswärtsform"}>
