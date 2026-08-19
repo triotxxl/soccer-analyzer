@@ -148,7 +148,7 @@ function CountryFlag({ country }: { country: string }) {
   return <span className={`fi fi-${code} country-flag`} aria-hidden />;
 }
 
-type LeagueSortKey = "country" | "league" | "avgGoals" | "btts" | "over15" | "over25" | "matches";
+type LeagueSortKey = "country" | "league" | "avgGoals" | "btts" | "over15" | "over25" | "homeWin" | "draw" | "awayWin" | "matches";
 
 function leagueSortValue(
   item: { country: string; league: string },
@@ -162,6 +162,9 @@ function leagueSortValue(
   if (key === "btts") return stats.bttsRate;
   if (key === "over15") return stats.over15Rate;
   if (key === "over25") return stats.over25Rate;
+  if (key === "homeWin") return typeof stats.homeWinRate === "number" ? stats.homeWinRate : null;
+  if (key === "draw") return typeof stats.drawRate === "number" ? stats.drawRate : null;
+  if (key === "awayWin") return typeof stats.awayWinRate === "number" ? stats.awayWinRate : null;
   return stats.matches;
 }
 
@@ -202,6 +205,13 @@ function LeagueFilterModal({ leagues, statsByKey, deselected, search, onSearchCh
   };
   const arrow = (key: LeagueSortKey) => sortKey === key ? (sortDirection === 1 ? "↑" : "↓") : "↕";
 
+  const allSelected = deselected.size === 0;
+  const noneSelected = leagues.length > 0 && deselected.size === leagues.length;
+  const selectAllRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (selectAllRef.current) selectAllRef.current.indeterminate = !allSelected && !noneSelected;
+  }, [allSelected, noneSelected]);
+
   return <div className="overlay-backdrop" onClick={onClose}>
     <div className="league-filter-modal" role="dialog" aria-label="Wettbewerbe auswählen" onClick={(event) => event.stopPropagation()}>
       <div className="overlay-head">
@@ -211,22 +221,23 @@ function LeagueFilterModal({ leagues, statsByKey, deselected, search, onSearchCh
       <div className="league-modal-toolbar">
         <input className="league-search" type="text" placeholder="Wettbewerb suchen…" value={search}
           onChange={(event) => onSearchChange(event.target.value)} aria-label="Wettbewerb suchen" />
-        <div className="league-actions">
-          <button onClick={onSelectAll}>Alle auswählen</button>
-          <button onClick={onSelectNone}>Keine auswählen</button>
-        </div>
       </div>
       <div className="league-table-scroll">
         <table className="league-table">
           <thead>
             <tr>
-              <th></th>
+              <th><input type="checkbox" ref={selectAllRef} checked={allSelected}
+                onChange={() => allSelected ? onSelectNone() : onSelectAll()}
+                aria-label={allSelected ? "Alle Wettbewerbe abwählen" : "Alle Wettbewerbe auswählen"} /></th>
               <th><button onClick={() => sort("country")} aria-label={sortStateLabel("Land", sortKey === "country", sortDirection)}>Land {arrow("country")}</button></th>
               <th><button onClick={() => sort("league")} aria-label={sortStateLabel("Wettbewerb", sortKey === "league", sortDirection)}>Wettbewerb {arrow("league")}</button></th>
               <th><button onClick={() => sort("avgGoals")} aria-label={sortStateLabel("Ø Tore", sortKey === "avgGoals", sortDirection)}>Ø Tore {arrow("avgGoals")}</button></th>
               <th><button onClick={() => sort("btts")} aria-label={sortStateLabel("BTTS", sortKey === "btts", sortDirection)}>BTTS {arrow("btts")}</button></th>
               <th><button onClick={() => sort("over15")} aria-label={sortStateLabel("Über 1,5", sortKey === "over15", sortDirection)}>Ü 1,5 {arrow("over15")}</button></th>
               <th><button onClick={() => sort("over25")} aria-label={sortStateLabel("Über 2,5", sortKey === "over25", sortDirection)}>Ü 2,5 {arrow("over25")}</button></th>
+              <th><button onClick={() => sort("homeWin")} aria-label={sortStateLabel("Heimsieg-Quote", sortKey === "homeWin", sortDirection)}>1 {arrow("homeWin")}</button></th>
+              <th><button onClick={() => sort("draw")} aria-label={sortStateLabel("Remis-Quote", sortKey === "draw", sortDirection)}>X {arrow("draw")}</button></th>
+              <th><button onClick={() => sort("awayWin")} aria-label={sortStateLabel("Auswärtssieg-Quote", sortKey === "awayWin", sortDirection)}>2 {arrow("awayWin")}</button></th>
               <th><button onClick={() => sort("matches")} aria-label={sortStateLabel("Spiele", sortKey === "matches", sortDirection)}>Spiele {arrow("matches")}</button></th>
             </tr>
           </thead>
@@ -241,10 +252,13 @@ function LeagueFilterModal({ leagues, statsByKey, deselected, search, onSearchCh
                 <td>{stats ? formatPercent(stats.bttsRate) : "–"}</td>
                 <td>{stats ? formatPercent(stats.over15Rate) : "–"}</td>
                 <td>{stats ? formatPercent(stats.over25Rate) : "–"}</td>
+                <td>{typeof stats?.homeWinRate === "number" ? formatPercent(stats.homeWinRate) : "–"}</td>
+                <td>{typeof stats?.drawRate === "number" ? formatPercent(stats.drawRate) : "–"}</td>
+                <td>{typeof stats?.awayWinRate === "number" ? formatPercent(stats.awayWinRate) : "–"}</td>
                 <td>{stats ? stats.matches : "–"}</td>
               </tr>;
             })}
-            {sorted.length === 0 && <tr><td className="league-empty" colSpan={8}>Keine Treffer</td></tr>}
+            {sorted.length === 0 && <tr><td className="league-empty" colSpan={11}>Keine Treffer</td></tr>}
           </tbody>
         </table>
       </div>

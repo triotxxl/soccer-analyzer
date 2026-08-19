@@ -433,6 +433,9 @@ export interface LeagueStats {
   bttsRate: number;
   over15Rate: number;
   over25Rate: number;
+  homeWinRate: number;
+  drawRate: number;
+  awayWinRate: number;
 }
 
 export interface DrawAnalysisResult {

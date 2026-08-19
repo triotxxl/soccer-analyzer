@@ -90,7 +90,10 @@ test("leagueAverages berechnet Torschnitt, BTTS- und Über-Quoten aus abgeschlos
     avgGoalsTotal: (3 + 1 + 0) / 3,
     bttsRate: 1 / 3,
     over15Rate: 1 / 3,
-    over25Rate: 1 / 3
+    over25Rate: 1 / 3,
+    homeWinRate: 2 / 3,
+    drawRate: 1 / 3,
+    awayWinRate: 0
   });
 });
 

@@ -199,6 +199,9 @@ export function leagueAverages(fixtures: ApiFixture[], cutoff: number): Omit<Lea
   let btts = 0;
   let over15 = 0;
   let over25 = 0;
+  let homeWins = 0;
+  let draws = 0;
+  let awayWins = 0;
   for (const match of completed) {
     const score = completedScore(match)!;
     const total = score[0] + score[1];
@@ -206,13 +209,19 @@ export function leagueAverages(fixtures: ApiFixture[], cutoff: number): Omit<Lea
     if (score[0] > 0 && score[1] > 0) btts += 1;
     if (total > 1.5) over15 += 1;
     if (total > 2.5) over25 += 1;
+    if (score[0] > score[1]) homeWins += 1;
+    else if (score[0] === score[1]) draws += 1;
+    else awayWins += 1;
   }
   return {
     matches: completed.length,
     avgGoalsTotal: goalSum / completed.length,
     bttsRate: btts / completed.length,
     over15Rate: over15 / completed.length,
-    over25Rate: over25 / completed.length
+    over25Rate: over25 / completed.length,
+    homeWinRate: homeWins / completed.length,
+    drawRate: draws / completed.length,
+    awayWinRate: awayWins / completed.length
   };
 }
 

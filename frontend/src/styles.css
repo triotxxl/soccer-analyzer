@@ -104,12 +104,9 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .league-filter-trigger strong { font-size: 9px; }
 .league-filter-trigger small { margin-top: 3px; color: #858585; font-size: 8px; }
 .league-filter-trigger:hover, .league-filter-trigger.active { background: rgba(0,122,204,.22); color: #d7ecff; }
-.league-filter-modal { position: fixed; top: 50%; left: 50%; z-index: 61; width: min(760px, calc(100vw - 32px)); max-height: min(680px, calc(100vh - 48px)); display: flex; flex-direction: column; overflow: hidden; border: 1px solid #4a4a4a; border-radius: 14px; background: #1e1e1e; box-shadow: 0 24px 60px rgba(0,0,0,.55); transform: translate(-50%,-50%); }
+.league-filter-modal { position: fixed; top: 50%; left: 50%; z-index: 61; width: min(940px, calc(100vw - 32px)); max-height: min(680px, calc(100vh - 48px)); display: flex; flex-direction: column; overflow: hidden; border: 1px solid #4a4a4a; border-radius: 14px; background: #1e1e1e; box-shadow: 0 24px 60px rgba(0,0,0,.55); transform: translate(-50%,-50%); }
 .league-modal-toolbar { flex: 0 0 auto; display: flex; gap: 8px; padding: 14px 16px 0; }
 .league-search { flex: 1; min-width: 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: #1a1a1a; color: var(--text); font-size: 12px; }
-.league-actions { display: flex; flex: 0 0 auto; gap: 6px; }
-.league-actions button { min-width: 88px; padding: 0 12px; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: #a0a0a0; font-size: 10px; }
-.league-actions button:hover { border-color: #5a5a5a; color: var(--accent); }
 .league-table-scroll { flex: 1; min-height: 0; margin-top: 10px; padding: 0 16px 14px; overflow: auto; }
 .league-table { width: 100%; border-collapse: collapse; font-size: 11px; }
 .league-table thead { position: sticky; top: 0; z-index: 1; background: #1e1e1e; }
@@ -379,9 +376,6 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
   .density-switch { margin-left: 4px; }
   .bet-builder-drawer { width: 100vw; }
   .league-filter-modal { width: 100vw; height: 100vh; max-height: 100vh; border-radius: 0; }
-  .league-modal-toolbar { flex-direction: column; }
-  .league-actions { justify-content: stretch; }
-  .league-actions button { flex: 1; }
   .bet-builder-drawer.has-combos .bet-builder-body { flex-direction: column; overflow-y: auto; }
   .bet-builder-drawer.has-combos .bet-builder-controls { flex: 0 0 auto; border-left: 0; border-top: 1px solid var(--line-soft); }
   .market-picker-modal { width: calc(100vw - 32px); }
