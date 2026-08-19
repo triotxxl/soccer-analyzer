@@ -1,4 +1,9 @@
 {
+  "agypten|2nd division a": {
+    "leagueId": 887,
+    "country": "Egypt",
+    "league": "Second League"
+  },
   "agypten|premier league": {
     "leagueId": 233,
     "country": "Egypt",
@@ -364,6 +369,16 @@
     "country": "Guatemala",
     "league": "Liga Nacional"
   },
+  "guatemala|primera division apertura gruppe a": {
+    "leagueId": 338,
+    "country": "Guatemala",
+    "league": "Primera Division"
+  },
+  "guatemala|primera division apertura gruppe b": {
+    "leagueId": 338,
+    "country": "Guatemala",
+    "league": "Primera Division"
+  },
   "honduras|liga nacional apertura": {
     "leagueId": 234,
     "country": "Honduras",
@@ -608,6 +623,11 @@
     "leagueId": 304,
     "country": "Panama",
     "league": "Liga Panameña de Fútbol"
+  },
+  "paraguay|pokal paraguay": {
+    "leagueId": 501,
+    "country": "Paraguay",
+    "league": "Copa Paraguay"
   },
   "paraguay|primera division clausura": {
     "leagueId": 252,

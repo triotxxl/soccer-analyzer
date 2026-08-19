@@ -1,11 +1,13 @@
 import {
-  Binoculars, CalendarBlank, CaretDoubleLeft, CaretDoubleRight, CaretLeft, CaretRight, CheckCircle, ClockCounterClockwise, Funnel, ListBullets, RocketLaunch, Shield, ShieldCheck, Star, WarningCircle, X
+  Binoculars, CalendarBlank, CaretDoubleLeft, CaretDoubleRight, CaretLeft, CaretRight, Calculator, CheckCircle, ClockCounterClockwise, Funnel, ListBullets, RocketLaunch, Shield, ShieldCheck, Star, WarningCircle, X
 } from "@phosphor-icons/react";
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { BetBuilderDrawer, CartAddButton, CartBadge, MarketPickerModal } from "./BetCartUI";
 import { toCartEntry, useBetCart } from "./betCart";
 import { countryFlagCode } from "./countryFlags";
 import { useDashboardData } from "./data";
+import { edgeOf, loadKellySettings, loadKellyVisible, saveKellySettings, saveKellyVisible, type KellySettings } from "./kelly";
+import { KellyButton, KellyDialog } from "./KellyUI";
 import type { DashboardDocument, DashboardFixture, DashboardMarket, DashboardMarketKey, FormResult, LeagueStats, RecommendationLevel } from "./types";
 
 const MARKET_OPTIONS: Array<{ key: "all" | DashboardMarketKey; label: string }> = [
@@ -306,7 +308,7 @@ function saveBannerDismissed(): void {
   }
 }
 
-function sortStateLabel(label: string, active: boolean, direction: 1 | -1): string {
+export function sortStateLabel(label: string, active: boolean, direction: 1 | -1): string {
   if (!active) return `${label}, nicht sortiert`;
   return `${label}, ${direction === 1 ? "aufsteigend" : "absteigend"} sortiert`;
 }
@@ -501,13 +503,15 @@ function FormMatchDots({ matches, view, overLine, firstHalfOverLine }: {
   return <ViewDots values={matchViewDots(matches ?? [], view, overLine, firstHalfOverLine)} />;
 }
 
-function MarketCard({ market }: { market: DashboardMarket }) {
+function MarketCard({ market, showEdge }: { market: DashboardMarket; showEdge: boolean }) {
   const percentage = Math.round(market.probability * 100);
+  const edge = showEdge ? edgeOf(market) : null;
   return <div className={`market-card ${market.recommendation.level}`} title={`${market.selection} · ${market.recommendation.label}`}>
     <div className="market-line">
       <span className="level-glyph">{market.recommendation.level === "strong" ? "★" : market.recommendation.level === "recommended" ? "✓" : "·"}</span>
       {market.pick && <strong className={`pick ${market.selectionTone}`}>{market.pick}</strong>}
       <strong className="odd">{formatOdd(market.odds)}</strong>
+      {edge !== null && <span className={`market-edge ${edge >= 0 ? "pos" : "neg"}`} title="Value = Modellwahrscheinlichkeit − quotenimplizierte Wahrscheinlichkeit">{edge >= 0 ? "+" : ""}{(edge * 100).toFixed(1).replace(".", ",")} PP</span>}
     </div>
     <div className="probability-line">
       <span className="probability-track"><span style={{ width: `${percentage}%` }} /></span>
@@ -585,6 +589,9 @@ function Dashboard({ document }: { document: DashboardDocument }) {
   const [openFixture, setOpenFixture] = useState<number | null>(null);
   const [pickerFixtureId, setPickerFixtureId] = useState<number | null>(null);
   const [builderOpen, setBuilderOpen] = useState(false);
+  const [kellyOpen, setKellyOpen] = useState(false);
+  const [showKelly, setShowKelly] = useState(() => loadKellyVisible());
+  const [kellySettings, setKellySettings] = useState<KellySettings>(() => loadKellySettings());
   const { cart, addEntry, removeEntry, clear: clearCart } = useBetCart();
   const dateControlRef = useRef<HTMLDivElement>(null);
   const now = Date.now();
@@ -686,13 +693,17 @@ function Dashboard({ document }: { document: DashboardDocument }) {
       if (event.key !== "Escape") return;
       if (pickerFixtureId !== null) setPickerFixtureId(null);
       else if (builderOpen) setBuilderOpen(false);
+      else if (kellyOpen) setKellyOpen(false);
       else if (calendarOpen) setCalendarOpen(false);
       else if (leagueFilterOpen) setLeagueFilterOpen(false);
       else setSidebarOpen(false);
     };
     window.addEventListener("keydown", closeOnEscape);
     return () => window.removeEventListener("keydown", closeOnEscape);
-  }, [builderOpen, calendarOpen, leagueFilterOpen, pickerFixtureId]);
+  }, [builderOpen, calendarOpen, kellyOpen, leagueFilterOpen, pickerFixtureId]);
+
+  useEffect(() => { saveKellySettings(kellySettings); }, [kellySettings]);
+  useEffect(() => { saveKellyVisible(showKelly); }, [showKelly]);
 
   const openCalendar = () => {
     if (!document.meta.firstAvailableDate || !document.meta.lastAvailableDate) return;
@@ -881,6 +892,13 @@ function Dashboard({ document }: { document: DashboardDocument }) {
             <span><strong>Wettbewerbe</strong><small>{availableLeagues.length - deselectedLeagues.size} von {availableLeagues.length} ausgewählt</small></span>
           </button>
         </section>
+        <section className="sidebar-section">
+          <h2><Calculator size={14} weight="bold" aria-hidden /> Kelly-Kriterium</h2>
+          <label className="check-row"><input type="checkbox" checked={showKelly} onChange={(event) => {
+            setShowKelly(event.target.checked);
+            if (!event.target.checked) setKellyOpen(false);
+          }} /> Value & Kelly-Ansicht anzeigen</label>
+        </section>
         <section className="sidebar-section kpi-section">
           <h2><Funnel size={14} weight="bold" aria-hidden /> Filter & Kennzahlen</h2>
           {kpis.map(({ key, icon: Icon, value, label, tone }) => <button key={key} className={`kpi ${tone} ${levelFilter === key ? "active" : ""}`} aria-pressed={levelFilter === key} onClick={() => setLevelFilter((current) => current === key ? "all" : key)}>
@@ -930,6 +948,7 @@ function Dashboard({ document }: { document: DashboardDocument }) {
             ? <><option value={0.5}>Über 0,5</option><option value={1.5}>Über 1,5</option></>
             : <><option value={1.5}>Über 1,5</option><option value={2.5}>Über 2,5</option><option value={3.5}>Über 3,5</option></>}
         </select>
+        {showKelly && <KellyButton onOpen={() => setKellyOpen(true)} />}
         <div className="segmented density-switch">
           {([ ["micro", "XS"], ["compact", "Kompakt"], ["comfort", "Komfort"] ] as const).map(([key, label]) => <button className={density === key ? "active" : ""} aria-pressed={density === key} onClick={() => setDensity(key)} key={key}>{label}</button>)}
         </div>
@@ -988,7 +1007,7 @@ function Dashboard({ document }: { document: DashboardDocument }) {
               <span className="h2h-cell"><H2hDots fixture={fixture} view={h2hView} overLine={overLine} firstHalfOverLine={firstHalfOverLine} /></span>
               <span className="expected-cell"><strong>{(showFirstHalfExpected ? fixture.expectedFirstHalfGoals?.home ?? 0 : fixture.expectedGoals.home).toFixed(2).replace(".", ",")}</strong><i>:</i><strong>{(showFirstHalfExpected ? fixture.expectedFirstHalfGoals?.away ?? 0 : fixture.expectedGoals.away).toFixed(2).replace(".", ",")}</strong></span>
               {showScore && <span className="score-cell">{marketFilter !== "draw" && <span><small>1X2</small><strong>{fixture.scores.favorite ?? "–"}</strong></span>}{marketFilter !== "1x2" && <span><small>X</small><strong>{fixture.scores.draw ?? "–"}</strong></span>}</span>}
-              {markets.map((item) => <MarketCard market={item} key={item.key} />)}
+              {markets.map((item) => <MarketCard market={item} showEdge={showKelly} key={item.key} />)}
             </button>
             </div>
             {openFixture === fixture.fixtureId && (() => {
@@ -1061,6 +1080,14 @@ function Dashboard({ document }: { document: DashboardDocument }) {
   />}
   <CartBadge count={cart.length} onClick={() => setBuilderOpen(true)} />
   {builderOpen && <BetBuilderDrawer cart={cart} onRemove={removeEntry} onClear={clearCart} onClose={() => setBuilderOpen(false)} />}
+  {showKelly && kellyOpen && <KellyDialog
+    fixtures={scopedFixtures}
+    marketFilter={marketFilter}
+    marketLabel={MARKET_OPTIONS.find((option) => option.key === marketFilter)?.label ?? "Alle Märkte"}
+    settings={kellySettings}
+    onSettingsChange={setKellySettings}
+    onClose={() => setKellyOpen(false)}
+  />}
   </>;
 }
 
