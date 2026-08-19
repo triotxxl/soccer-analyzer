@@ -114,7 +114,11 @@ export function KellyDialog({ fixtures, marketFilter, marketLabel, settings, onS
               <th><button onClick={() => sort("odds")} aria-label={sortStateLabel("Quote", sortKey === "odds", sortDirection)}>Quote {arrow("odds")}</button></th>
               <th><button onClick={() => sort("probability")} aria-label={sortStateLabel("Modell", sortKey === "probability", sortDirection)}>Modell {arrow("probability")}</button></th>
               <th><button onClick={() => sort("edge")} aria-label={sortStateLabel("Value", sortKey === "edge", sortDirection)}>Value {arrow("edge")}</button></th>
-              <th><button onClick={() => sort("kelly")} aria-label={sortStateLabel("Kelly", sortKey === "kelly", sortDirection)}>Kelly {arrow("kelly")}</button></th>
+              <th><button onClick={() => sort("kelly")}
+                aria-label={sortStateLabel("Einsatzanteil nach Caps", sortKey === "kelly", sortDirection)}
+                title="Fractional Kelly, begrenzt durch Max-Einsatz/Wette und ggf. Gesamtrisiko-Skalierung">
+                Kelly* {arrow("kelly")}
+              </button></th>
               <th><button onClick={() => sort("stake")} aria-label={sortStateLabel("Einsatz", sortKey === "stake", sortDirection)}>Einsatz {arrow("stake")}</button></th>
             </tr>
           </thead>
@@ -125,7 +129,7 @@ export function KellyDialog({ fixtures, marketFilter, marketLabel, settings, onS
               <td>{formatOdd(candidate.odds)}</td>
               <td>{formatPercent(candidate.probability)}</td>
               <td className="kelly-edge">{formatEdge(candidate.edge)}</td>
-              <td>{formatPercent(candidate.stakePercent)}</td>
+              <td><strong>{formatPercent(candidate.stakePercent)}</strong><small>Full: {formatPercent(candidate.fullKelly)}</small></td>
               <td><strong>{formatEuro(candidate.stake)}</strong></td>
             </tr>)}
             {sorted.length === 0 && <tr><td className="kelly-empty" colSpan={7}>Keine Value-Wetten im aktuellen Markt gefunden</td></tr>}
@@ -139,6 +143,7 @@ export function KellyDialog({ fixtures, marketFilter, marketLabel, settings, onS
           {scaleFactor < 1 && <> · Einsätze wegen Gesamtrisiko-Limit auf {(scaleFactor * 100).toFixed(0)} % skaliert</>}
         </p>
         <p className="kelly-hint">Kelly setzt kalibrierte Wahrscheinlichkeiten voraus – die Modellwerte sind Schätzungen, keine Garantien. Fractional Kelly reduziert das Risiko bei Fehleinschätzungen.</p>
+        <p className="kelly-hint">* „Kelly" zeigt den finalen Einsatzanteil nach Fraktion, Pro-Wette- und Gesamtrisiko-Cap; „Full" darunter ist der ungedeckelte volle Kelly-Wert.</p>
       </div>
     </div>
   </div>;

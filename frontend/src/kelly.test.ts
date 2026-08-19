@@ -105,4 +105,51 @@ describe("computeKellyCandidates", () => {
     expect(candidates).toHaveLength(1);
     expect(candidates[0]!.marketKey).toBe("over25");
   });
+
+  it("skaliert nicht, solange die Kelly-Summe unter dem Gesamtrisiko-Limit bleibt", () => {
+    const fixtures = [1, 2, 3, 4, 5].map((id) => fixture(id, `Team${id}`, [market("btts", 0.55, 2.2)]));
+    const config = settings({ kellyFraction: 0.25, maxStakePercent: 1, maxExposurePercent: 1, minEdge: 0 });
+    const { candidates, scaleFactor } = computeKellyCandidates(fixtures, "btts", config);
+    expect(scaleFactor).toBe(1);
+    const totalStake = candidates.reduce((sum, candidate) => sum + candidate.stake, 0);
+    expect(totalStake).toBeLessThan(config.budget * config.maxExposurePercent);
+  });
+
+  it("Full Kelly liefert ohne Caps den vierfachen Einsatz von 1/4 Kelly", () => {
+    const fixtures = [fixture(1, "Alpha", [market("btts", 0.6, 2.2)])];
+    const base = { maxStakePercent: 1, maxExposurePercent: 1, minEdge: 0 };
+    const full = computeKellyCandidates(fixtures, "btts", settings({ ...base, kellyFraction: 1 })).candidates[0]!;
+    const quarter = computeKellyCandidates(fixtures, "btts", settings({ ...base, kellyFraction: 0.25 })).candidates[0]!;
+    expect(full.stake).toBeCloseTo(quarter.stake * 4);
+  });
+
+  it("unterschiedliche Kelly-Fraktionen bleiben bei maxExposure=100% unterschiedlich", () => {
+    const fixtures = [1, 2, 3].map((id) => fixture(id, `Team${id}`, [market("btts", 0.6, 2.2)]));
+    const base = { maxStakePercent: 1, maxExposurePercent: 1, minEdge: 0 };
+    const sums = [1, 0.5, 0.25, 0.125].map((kellyFraction) => {
+      const { candidates, scaleFactor } = computeKellyCandidates(fixtures, "btts", settings({ ...base, kellyFraction }));
+      expect(scaleFactor).toBe(1);
+      return candidates.reduce((sum, candidate) => sum + candidate.stake, 0);
+    });
+    expect(new Set(sums.map((sum) => sum.toFixed(6))).size).toBe(sums.length);
+  });
+
+  it("deckelt den Einsatz pro Wette, ohne die Kelly-Empfehlung zu erhöhen", () => {
+    const fixtures = [fixture(1, "Alpha", [market("btts", 0.65, 2.3)])];
+    const config = settings({ kellyFraction: 1, maxStakePercent: 0.03, maxExposurePercent: 1, minEdge: 0 });
+    const [candidate] = computeKellyCandidates(fixtures, "btts", config).candidates;
+    expect(candidate!.fullKelly).toBeGreaterThan(0.03);
+    expect(candidate!.stakePercent).toBeCloseTo(0.03);
+  });
+
+  it("finalStake übersteigt nie fullKelly * Fraktion * Budget, auch nach Exposure-Scaling", () => {
+    const fixtures = Array.from({ length: 8 }, (_, index) =>
+      fixture(index + 1, `Team${index}`, [market("btts", 0.6 + index * 0.01, 2 + index * 0.05)]));
+    const config = settings({ kellyFraction: 0.25, maxStakePercent: 0.03, maxExposurePercent: 0.1, minEdge: 0 });
+    const { candidates } = computeKellyCandidates(fixtures, "btts", config);
+    for (const candidate of candidates) {
+      const theoretical = candidate.fullKelly * config.kellyFraction * config.budget;
+      expect(candidate.stake).toBeLessThanOrEqual(theoretical + 1e-9);
+    }
+  });
 });
