@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import type { ApiFootballClient } from "../src/api.ts";
+import { config } from "../src/config.ts";
 import {
   runAnalysis,
   runDrawCriteriaAnalysis,
@@ -111,7 +112,7 @@ test("Torlinien-End-to-End analysiert und speichert nur konkret ausgewählte Par
   }, { client: fake, database, now: target });
   assert.equal(result.rows.length, 1);
   assert.equal(result.rows[0]?.fixtureId, 901);
-  assert.equal(result.rows[0]?.modelVersion, "3.0.0");
+  assert.equal(result.rows[0]?.modelVersion, config.goalLineModelVersion);
   assert.ok(Math.abs(
     result.rows[0]!.probabilities.over25 + result.rows[0]!.probabilities.under25 - 1
   ) < 1e-12);
@@ -470,4 +471,113 @@ test("1X2-End-to-End-Analyse schaltet Pokalspiele auf Cross-League um", async ()
   assert.ok(seasonCalls.includes(207));
   assert.ok(!seasonCalls.includes(3));
   assert.equal(headToHeadCalls, 1);
+});
+
+test("Cross-League-Partien messen jede Seite an ihrer eigenen Liga und Ligastärke", async () => {
+  const now = new Date("2026-08-23T06:00:00.000Z");
+  const timestamp = Date.parse("2026-08-23T13:30:00.000Z") / 1000;
+  const cup = { leagueId: 81, leagueName: "DFB Pokal" };
+  const amateur = { leagueId: 747, leagueName: "Oberliga" };
+  const pro = { leagueId: 79, leagueName: "2. Bundesliga" };
+  let id = 1;
+
+  const cupHistory = Array.from({ length: 24 }, (_, index) => fixture({
+    id: id++, timestamp: timestamp - (index + 1) * 86_400,
+    homeId: 300 + index, awayId: 400 + index,
+    homeGoals: index % 4 === 0 ? 2 : 0, awayGoals: index % 3 === 0 ? 3 : 2, ...cup
+  }));
+  const amateurHistory = [
+    ...Array.from({ length: 14 }, (_, index) => fixture({
+      id: id++, timestamp: timestamp - (index + 1) * 86_400,
+      homeId: 100 + index, awayId: 200 + index,
+      homeGoals: index % 2 ? 3 : 2, awayGoals: index % 3 ? 2 : 1, ...amateur
+    })),
+    ...Array.from({ length: 7 }, (_, index) => fixture({
+      id: id++, timestamp: timestamp - (index + 1) * 86_400 - 3600,
+      homeId: 1, awayId: 210 + index, homeGoals: 3, awayGoals: 2, ...amateur
+    })),
+    ...Array.from({ length: 7 }, (_, index) => fixture({
+      id: id++, timestamp: timestamp - (index + 1) * 86_400 - 7200,
+      homeId: 220 + index, awayId: 1, homeGoals: 2, awayGoals: 3, ...amateur
+    }))
+  ];
+  const proHistory = [
+    ...Array.from({ length: 14 }, (_, index) => fixture({
+      id: id++, timestamp: timestamp - (index + 1) * 86_400,
+      homeId: 500 + index, awayId: 600 + index,
+      homeGoals: index % 2 ? 1 : 2, awayGoals: index % 3 ? 1 : 0, ...pro
+    })),
+    ...Array.from({ length: 7 }, (_, index) => fixture({
+      id: id++, timestamp: timestamp - (index + 1) * 86_400 - 3600,
+      homeId: 2, awayId: 610 + index, homeGoals: 2, awayGoals: 0, ...pro
+    })),
+    ...Array.from({ length: 7 }, (_, index) => fixture({
+      id: id++, timestamp: timestamp - (index + 1) * 86_400 - 7200,
+      homeId: 620 + index, awayId: 2, homeGoals: 1, awayGoals: 2, ...pro
+    }))
+  ];
+  const upcoming = fixture({ id: 950, timestamp, homeId: 1, awayId: 2, ...cup });
+
+  const leagues: ApiLeague[] = [
+    {
+      league: { id: 81, name: "DFB Pokal", type: "Cup" },
+      country: { name: "Germany" },
+      seasons: [{ year: 2026, start: "2026-01-01", end: "2026-12-31", current: true }]
+    },
+    {
+      league: { id: 747, name: "Oberliga", type: "League" },
+      country: { name: "Germany" },
+      seasons: [{ year: 2026, start: "2026-01-01", end: "2026-12-31", current: true }]
+    },
+    {
+      league: { id: 79, name: "2. Bundesliga", type: "League" },
+      country: { name: "Germany" },
+      seasons: [{ year: 2026, start: "2026-01-01", end: "2026-12-31", current: true }]
+    }
+  ];
+  const byLeague: Record<number, ApiFixture[]> = {
+    81: cupHistory, 747: amateurHistory, 79: proHistory
+  };
+  const fake = {
+    requestCount: 0,
+    requestsRemaining: 7_500,
+    getLeagues: async () => leagues,
+    getFixturesForDate: async (date: string): Promise<ApiFixture[]> =>
+      date === "2026-08-23" ? [upcoming] : [],
+    getSeasonFixtures: async (leagueId: number) => byLeague[leagueId] ?? [],
+    getTeamRecentFixtures: async (teamId: number) =>
+      (teamId === 1 ? amateurHistory : proHistory)
+        .filter((match) => match.teams.home.id === teamId || match.teams.away.id === teamId)
+  } as unknown as ApiFootballClient;
+
+  const directory = await mkdtemp(path.join(os.tmpdir(), "football-cross-league-"));
+  const database = new AnalyzerDatabase(path.join(directory, "test.sqlite"));
+  // Nur die Profiligen haben ein belastbares Rating; die Oberliga muss geschätzt werden.
+  for (const [leagueId, rating] of [[78, 1717], [79, 1608], [80, 1461]] as const) {
+    database.saveLeagueStrength({
+      pool: "country:germany", leagueId, season: 2026, asOf: "2026-08-01T00:00:00Z",
+      rating, matches: 40, clubs: 8, reliable: true
+    });
+  }
+
+  const result = await runGoalLineAnalysis({
+    selections: [{ country: "Deutschland", league: "DFB Pokal" }],
+    markets: [],
+    dates: "both"
+  }, { client: fake, database, now });
+
+  const row = result.rows.find((item) => item.fixtureId === 950);
+  assert.ok(row, "Pokalpartie fehlt im Ergebnis");
+  assert.ok(row.strength, "Ligastärke wurde nicht ermittelt");
+  assert.equal(row.strength.home.leagueId, 747);
+  assert.equal(row.strength.home.reliable, false);
+  assert.equal(row.strength.away.leagueId, 79);
+  assert.equal(row.strength.away.reliable, true);
+  assert.ok(row.strength.factor < 1, "der unterklassige Gastgeber muss abgewertet werden");
+  assert.ok(
+    row.outcomeProbabilities.away > row.outcomeProbabilities.home,
+    `Gast muss Favorit sein, war ${JSON.stringify(row.outcomeProbabilities)}`
+  );
+  assert.ok(row.warnings.some((warning) => warning.includes("Ligastärke für")));
+  database.close();
 });

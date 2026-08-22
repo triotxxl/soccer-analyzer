@@ -272,6 +272,20 @@ export interface ModelResult {
   sample: { leagueMatches: number; homeTeamMatches: number; awayTeamMatches: number };
 }
 
+export interface LeagueRatingSummary {
+  leagueId: number;
+  rating: number;
+  /** false, wenn das Rating aus dem Pool-Floor geschätzt statt gemessen wurde. */
+  reliable: boolean;
+}
+
+/** Ligastärke beider Seiten einer Cross-League-Partie samt daraus abgeleitetem Torfaktor. */
+export interface LeagueStrengthComparison {
+  home: LeagueRatingSummary;
+  away: LeagueRatingSummary;
+  factor: number;
+}
+
 export interface GoalLineProbabilities {
   over15: number;
   under15: number;
@@ -308,6 +322,7 @@ export interface GoalLineRow {
   };
   probabilities: GoalLineProbabilities;
   defense?: { home: DefensiveProfile; away: DefensiveProfile };
+  strength?: LeagueStrengthComparison;
   standings?: Array<TableRow & { teamName: string }>;
   firstHalf: {
     expectedHomeGoals: number;

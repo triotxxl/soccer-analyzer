@@ -2,7 +2,7 @@ import { mkdir, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { config, ROOT_DIR } from "./config.ts";
 import { teamNameSimilarity } from "./team-resolver.ts";
-import type { DefensiveProfile, DrawAnalysisResult, FavoriteAnalysisResult, GoalLineAnalysisResult, GoalLineRow, LeagueStats, RecentMatchSummary, TipicoOdds } from "./types.ts";
+import type { DefensiveProfile, DrawAnalysisResult, FavoriteAnalysisResult, GoalLineAnalysisResult, GoalLineRow, LeagueStats, LeagueStrengthComparison, RecentMatchSummary, TipicoOdds } from "./types.ts";
 
 export interface DashboardInput {
   createdAt: string;
@@ -55,6 +55,7 @@ export interface DashboardFixture {
     matches: RecentMatchSummary[];
   };
   defense?: { home: DefensiveProfile; away: DefensiveProfile };
+  strength?: LeagueStrengthComparison;
   table?: Array<{
     position: number;
     teamName: string;
@@ -163,6 +164,11 @@ export function buildDashboardDocument(input: DashboardInput): DashboardDocument
     const h2hNotice = h2h && (h2h.consecutiveDraws >= 3 || h2h.allDraws)
       ? `Remis auffällig: ${h2h.consecutiveDraws} direkte Duelle in Folge remis${h2h.allDraws ? `; alle ${h2h.matches} verfügbaren H2H endeten remis` : ""}`
       : null;
+    const strengthDetail = row.strength
+      ? `Ligastärke: ${row.homeTeam} ${Math.round(row.strength.home.rating)}${row.strength.home.reliable ? "" : " (geschätzt)"}`
+        + ` vs. ${row.awayTeam} ${Math.round(row.strength.away.rating)}${row.strength.away.reliable ? "" : " (geschätzt)"}`
+        + ` · Torfaktor ${row.strength.factor.toFixed(2)}`
+      : null;
     const sharedDetails = warnings.length ? warnings : ["Keine zusätzlichen Warnsignale"];
     const firstHalfDetails = row.firstHalf.warnings.length
       ? row.firstHalf.warnings
@@ -175,7 +181,12 @@ export function buildDashboardDocument(input: DashboardInput): DashboardDocument
         probability: selectionProbability, odds: (selection === "1" ? tipico?.home : tipico?.away) ?? null,
         confidence: Math.min(row.dataConfidence, favorite?.confidence ?? row.dataConfidence), score: favorite?.score ?? null,
         crossLeague,
-        details: [`Sportlicher Tipp: ${selection} · ${selectedTeam}`, favorite ? `1X2-Profil: ${favorite.rating} · ${favorite.score} Punkte` : "Kein separates 1X2-Profil verfügbar", ...sharedDetails]
+        details: [
+          `Sportlicher Tipp: ${selection} · ${selectedTeam}`,
+          favorite ? `1X2-Profil: ${favorite.rating} · ${favorite.score} Punkte` : "Kein separates 1X2-Profil verfügbar",
+          ...(strengthDetail ? [strengthDetail] : []),
+          ...sharedDetails
+        ]
       }),
       createMarket({
         key: "draw", label: "Remis", selection: "Unentschieden (X)", pick: null, selectionTone: "draw",
@@ -226,6 +237,7 @@ export function buildDashboardDocument(input: DashboardInput): DashboardDocument
         consecutiveDraws: h2h?.consecutiveDraws ?? 0, matches: h2h?.recentMatches ?? []
       },
       ...(row.defense ? { defense: row.defense } : {}),
+      ...(row.strength ? { strength: row.strength } : {}),
       ...(row.standings ? { table: row.standings.map((standing) => ({
         position: standing.position, teamName: standing.teamName, played: standing.played,
         wins: standing.wins, draws: standing.draws, losses: standing.played - standing.wins - standing.draws,

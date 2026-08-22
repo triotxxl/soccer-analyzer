@@ -455,3 +455,54 @@ test("speichert und berichtet aktive Profilprognosen ohne Duplikate", async () =
   );
   database.close();
 });
+
+test("Pool-Floor nimmt das schwächste belastbare Ligarating", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "football-strength-floor-"));
+  const database = new AnalyzerDatabase(path.join(directory, "test.sqlite"));
+  const save = (
+    leagueId: number,
+    season: number,
+    asOf: string,
+    rating: number,
+    reliable: boolean
+  ) => database.saveLeagueStrength({
+    pool: "country:germany", leagueId, season, asOf, rating,
+    matches: reliable ? 40 : 3, clubs: reliable ? 8 : 1, reliable
+  });
+
+  save(78, 2026, "2026-08-01T00:00:00Z", 1717, true);
+  save(79, 2026, "2026-08-01T00:00:00Z", 1608, true);
+  save(80, 2026, "2026-08-01T00:00:00Z", 1461, true);
+  // Unbelastbar und niedriger - darf den Floor nicht nach unten ziehen.
+  save(747, 2026, "2026-08-01T00:00:00Z", 1200, false);
+
+  const floor = database.getPoolRatingFloor("country:germany", 2026, "2026-08-23T00:00:00Z");
+  assert.ok(floor !== null);
+  assert.ok(Math.abs(floor - 1461) < 1e-9, `unerwarteter Floor ${floor}`);
+
+  // Je Liga zählt der jüngste Snapshot, nicht der erste.
+  save(80, 2026, "2026-08-10T00:00:00Z", 1500, true);
+  const updated = database.getPoolRatingFloor("country:germany", 2026, "2026-08-23T00:00:00Z");
+  assert.ok(Math.abs(updated! - 1500) < 1e-9, `unerwarteter Floor ${updated}`);
+
+  // Der Cutoff blendet spätere Snapshots aus.
+  assert.equal(
+    database.getPoolRatingFloor("country:germany", 2026, "2026-07-01T00:00:00Z"),
+    null
+  );
+  assert.equal(database.getPoolRatingFloor("uefa", 2026, "2026-08-23T00:00:00Z"), null);
+  database.close();
+});
+
+test("Pool-Floor wertet ältere Saisons zum Anker hin ab", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "football-strength-decay-"));
+  const database = new AnalyzerDatabase(path.join(directory, "test.sqlite"));
+  database.saveLeagueStrength({
+    pool: "country:germany", leagueId: 80, season: 2024, asOf: "2024-08-01T00:00:00Z",
+    rating: 1300, matches: 40, clubs: 8, reliable: true
+  });
+  const floor = database.getPoolRatingFloor("country:germany", 2026, "2026-08-23T00:00:00Z");
+  // Zwei Saisons Abstand: 1500 + (1300 - 1500) * 0.8 ** 2 = 1372.
+  assert.ok(Math.abs(floor! - 1372) < 1e-9, `unerwarteter Floor ${floor}`);
+  database.close();
+});

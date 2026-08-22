@@ -6,7 +6,18 @@ import { scoreCrossLeagueDrawFixture } from "./cross-league-draw-criteria.ts";
 import { buildTable, consensusOdds, leagueAverages, scoreDrawFixture } from "./draw-criteria.ts";
 import { scoreFavoriteFixture } from "./favorite-criteria.ts";
 import { strengthPool } from "./league-strength.ts";
-import { analyzeFirstHalfGoals, analyzeFixture, buildDefenseRankings, candidatesForFixture, goalLineProbabilities } from "./model.ts";
+import {
+  analyzeFirstHalfGoals,
+  analyzeFixture,
+  buildDefenseRankings,
+  candidatesForFixture,
+  firstHalfLeagueBaseline,
+  goalLineProbabilities,
+  leagueBaseline,
+  type LeagueBaseline,
+  type SideBaselines
+} from "./model.ts";
+import { compareStrength, type StrengthComparison } from "./strength-factor.ts";
 import { buildLeagueStrength } from "./strength-builder.ts";
 import { resolveLeagues, saveAlias } from "./resolver.ts";
 import {
@@ -532,6 +543,61 @@ export async function runGoalLineAnalysis(
       standingsByCompetition.set(key, { table: buildTable(history, targetTimestamp), teamNames });
     }
 
+    const baselineCache = new Map<string, LeagueBaseline>();
+    const domesticBaseline = (
+      reference: DomesticLeagueReference,
+      targetTimestamp: number,
+      firstHalf: boolean
+    ): LeagueBaseline | null => {
+      const key = `${reference.leagueId}:${reference.season}`;
+      const fixtures = domesticHistory.get(key);
+      if (!fixtures || fixtures.length === 0) return null;
+      const cacheKey = `${key}|${targetTimestamp}|${firstHalf}`;
+      const cached = baselineCache.get(cacheKey);
+      if (cached) return cached;
+      const baseline = firstHalf
+        ? firstHalfLeagueBaseline(fixtures, targetTimestamp)
+        : leagueBaseline(fixtures, targetTimestamp);
+      baselineCache.set(cacheKey, baseline);
+      return baseline;
+    };
+    const baselinesFor = (
+      homeReference: DomesticLeagueReference,
+      awayReference: DomesticLeagueReference,
+      targetTimestamp: number,
+      firstHalf = false
+    ): SideBaselines | undefined => {
+      const home = domesticBaseline(homeReference, targetTimestamp, firstHalf);
+      const away = domesticBaseline(awayReference, targetTimestamp, firstHalf);
+      return home && away ? { home, away } : undefined;
+    };
+
+    const floorCache = new Map<string, number | null>();
+    const strengthFor = (
+      fixture: ApiFixture,
+      homeReference: DomesticLeagueReference,
+      awayReference: DomesticLeagueReference
+    ): StrengthComparison | null => {
+      if (homeReference.leagueId === awayReference.leagueId) return null;
+      const pool = strengthPool(fixture);
+      const floorKey = `${pool}|${fixture.league.season}|${fixture.fixture.date}`;
+      if (!floorCache.has(floorKey)) {
+        floorCache.set(floorKey, database.getPoolRatingFloor(
+          pool,
+          fixture.league.season,
+          fixture.fixture.date
+        ));
+      }
+      return compareStrength(
+        database,
+        pool,
+        homeReference,
+        awayReference,
+        fixture.fixture.date,
+        floorCache.get(floorKey) ?? null
+      );
+    };
+
     const rows = fixtures.map((fixture) => {
       const competitionKey = `${fixture.league.id}:${fixture.league.season}`;
       const history = competitionHistory.get(competitionKey) ?? [];
@@ -552,11 +618,30 @@ export async function runGoalLineAnalysis(
         if (!homeRanks || !awayRanks) return undefined;
         return { home: homeRanks.home, away: awayRanks.away };
       })() : rankingsByCompetition.get(competitionKey);
+      // Bei Cross-League-Partien stammt die Form beider Teams aus verschiedenen Ligen.
+      // Jede Seite wird deshalb gegen ihre eigene Ligabasis gemessen, und der
+      // Klassenunterschied kommt separat über das Ligarating dazu.
+      const homeRef = crossLeague ? domesticByTeam.get(fixture.teams.home.id) : undefined;
+      const awayRef = crossLeague ? domesticByTeam.get(fixture.teams.away.id) : undefined;
+      const sideBaselines = homeRef && awayRef
+        ? baselinesFor(homeRef, awayRef, fixture.fixture.timestamp)
+        : undefined;
+      const firstHalfSideBaselines = homeRef && awayRef
+        ? baselinesFor(homeRef, awayRef, fixture.fixture.timestamp, true)
+        : undefined;
+      const strength = homeRef && awayRef
+        ? strengthFor(fixture, homeRef, awayRef)
+        : null;
       const model = analyzeFixture(fixture, history, teamHistory, {
         expectedGoals: enriched.values,
-        rankings
+        rankings,
+        sideBaselines,
+        strengthFactor: strength?.factor
       });
-      const firstHalfModel = analyzeFirstHalfGoals(fixture, history, teamHistory);
+      const firstHalfModel = analyzeFirstHalfGoals(fixture, history, teamHistory, {
+        sideBaselines: firstHalfSideBaselines,
+        strengthFactor: strength?.factor
+      });
       const warnings: string[] = [];
       if (model.quality < 60) {
         warnings.push("Schwache Datenlage; Wahrscheinlichkeiten nicht als Empfehlung verwenden");
@@ -571,6 +656,15 @@ export async function runGoalLineAnalysis(
       }
       if (crossLeague) {
         warnings.push("Cross-League: Teamform aus Pflichtspielen verschiedener Wettbewerbe");
+        if (!sideBaselines) {
+          warnings.push("Keine eigene Ligabasis je Team; Stärke gegen den Wettbewerbsschnitt gemessen");
+        }
+        if (!strength) {
+          warnings.push("Kein Ligastärke-Vergleich verfügbar");
+        } else if (!strength.home.reliable || !strength.away.reliable) {
+          const estimated = strength.home.reliable ? fixture.teams.away.name : fixture.teams.home.name;
+          warnings.push(`Ligastärke für ${estimated} geschätzt statt gemessen`);
+        }
       }
       const firstHalfWarnings: string[] = [];
       if (firstHalfModel.quality < 60) {
@@ -607,6 +701,7 @@ export async function runGoalLineAnalysis(
         dataConfidence: model.quality,
         outcomeProbabilities: model.probabilities,
         defense: model.defense,
+        strength: strength ?? undefined,
         standings: crossLeague ? undefined : (() => {
           const entry = standingsByCompetition.get(competitionKey);
           return entry?.table.map((row) => ({ ...row, teamName: entry.teamNames.get(row.id) ?? "?" }));

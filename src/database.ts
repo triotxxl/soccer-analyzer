@@ -1495,6 +1495,35 @@ export class AnalyzerDatabase {
         };
   }
 
+  /**
+   * Schwächstes belastbares Ligarating eines Pools. Dient als Untergrenze für Ligen ohne
+   * eigenes Rating: die tauchen in der Elo-Kette nicht auf, weil sie unterklassig sind.
+   */
+  getPoolRatingFloor(pool: string, season: number, cutoff: string): number | null {
+    const rows = this.db.prepare(`
+      SELECT league_id, season, rating FROM (
+        SELECT
+          league_id,
+          season,
+          rating,
+          ROW_NUMBER() OVER (
+            PARTITION BY league_id ORDER BY season DESC, as_of DESC
+          ) AS position
+        FROM league_strength_snapshots
+        WHERE pool = ? AND season <= ? AND as_of < ? AND reliable = 1
+      )
+      WHERE position = 1
+    `).all(pool, season, cutoff) as Array<{
+      league_id: number;
+      season: number;
+      rating: number;
+    }>;
+    if (rows.length === 0) return null;
+    return Math.min(...rows.map((row) =>
+      1500 + (row.rating - 1500) * 0.8 ** Math.max(0, season - row.season)
+    ));
+  }
+
   saveTipicoImport(input: {
     sourceFile: string;
     dateRange: string;

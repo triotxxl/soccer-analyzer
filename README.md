@@ -329,6 +329,24 @@ Spieltag für API-Quoten ab 1,40. Für Torlinien erscheinen zusätzlich Trefferq
 durchschnittliche Wahrscheinlichkeit, Brier Score und Wilson-Intervall. Es findet kein
 automatisches Nachtrainieren oder Aktivieren statt.
 
+### Ligabasis und Ligastärke bei Cross-League-Partien
+
+Bei Pokal- und Cross-League-Partien stammt die Form beider Teams aus verschiedenen Ligen.
+Das Torlinienmodell misst Angriff und Abwehr deshalb ab Version 3.1.0 **je Seite gegen die
+eigene Heimatliga** statt gegen den Schnitt des Pokalwettbewerbs. Eine gemeinsame Basis
+kehrt den Klassenunterschied sonst um: Die Pokalbasis bildet bereits ab, dass unterklassige
+Gastgeber selten treffen, und teilt man die Torrate des Außenseiters durch genau diesen
+niedrigen Wert, wird er zum vermeintlichen Favoriten.
+
+Der tatsächliche Klassenunterschied kommt separat über das Ligarating dazu. Aus der
+Differenz beider Ligaratings entsteht ein Torfaktor `10 ** (Δ / 1200)`, der auf die
+erwarteten Heimtore multipliziert und von den Auswärtstoren geteilt wird; er ist auf
+0,5 bis 2,0 begrenzt. Ligen ohne belastbares eigenes Rating erhalten das schwächste
+belastbare Rating ihres Pools abzüglich eines Abschlags — wer in der Elo-Kette aus
+Pokalbegegnungen nie auftaucht, ist unterklassig und nicht Mittelfeld. Beide Werte
+erscheinen als Detailzeile am 1X2-Markt; geschätzte Ratings werden als Warnung
+ausgewiesen. Die Grenzwerte stehen in `config.strength`.
+
 Enthält eine reine Remis- oder 1X2-Analyse tatsächlich Cross-League-Partien, baut
 die CLI die Ligastärke bedarfsgesteuert nur für die ausgewählten Pokal- und
 Qualifikationswettbewerbe auf. Reine Ligaspiele lösen keine Strength-Abfragen aus.

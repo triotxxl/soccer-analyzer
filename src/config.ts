@@ -64,13 +64,24 @@ export const config = {
   apiRateLimitRetryMs: 60_000,
   modelVersion: "1.3.0",
   activeProfileVersion: "1.3.0",
-  goalLineModelVersion: "3.0.0",
+  goalLineModelVersion: "3.1.0",
   xgEnrichmentRequestBudget: 250,
   strengthOnDemandRequestBudget:
     Number.isInteger(strengthOnDemandRequestBudget) &&
     strengthOnDemandRequestBudget > 0
       ? strengthOnDemandRequestBudget
       : 25,
+  strength: {
+    // Elo-Differenz zweier Ligen -> Torfaktor je Seite: 10 ** (delta / factorDivisor).
+    // Kalibriert an Bundesliga 1717 gegen 3. Liga 1461: delta 256 ergibt 1,63 je Seite
+    // und damit ein erwartetes Torverhältnis von rund 2,7.
+    factorDivisor: 1200,
+    factorMin: 0.5,
+    factorMax: 2.0,
+    // Abschlag auf das schwächste belastbare Rating des Pools für Ligen ohne eigenes
+    // Rating. Wer nie in der Elo-Kette auftaucht, ist unterklassig, nicht Mittelfeld.
+    unratedPenalty: 80
+  },
   thresholds: {
     draw: 0.28,
     btts: 0.58,
