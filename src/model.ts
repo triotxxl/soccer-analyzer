@@ -27,6 +27,24 @@ interface WeightedValue {
   weight: number;
 }
 
+/** Durchschnittliche Heim- und Auswärtstore eines Wettbewerbs. */
+export interface LeagueBaseline {
+  homeGoals: number;
+  awayGoals: number;
+}
+
+/**
+ * Getrennte Basislinien je Seite. Nötig bei Pokal-/Cross-League-Partien: dort stammt die
+ * Form beider Teams aus verschiedenen Ligen, und eine gemeinsame Basis würde die Stärke
+ * der unterklassigen Seite systematisch überschätzen.
+ */
+export interface SideBaselines {
+  home: LeagueBaseline;
+  away: LeagueBaseline;
+}
+
+const DEFAULT_BASELINE: LeagueBaseline = { homeGoals: 1.45, awayGoals: 1.15 };
+
 function regulationScore(fixture: ApiFixture): { home: number; away: number } | null {
   const allowed = new Set(["FT", "AET", "PEN"]);
   if (!allowed.has(fixture.fixture.status.short)) return null;
@@ -333,7 +351,8 @@ export function firstHalfGoalLineProbabilities(
 export function analyzeFirstHalfGoals(
   fixture: ApiFixture,
   history: ApiFixture[],
-  teamHistory: ApiFixture[] = history
+  teamHistory: ApiFixture[] = history,
+  options: { sideBaselines?: SideBaselines; strengthFactor?: number } = {}
 ): {
   expectedHomeGoals: number;
   expectedAwayGoals: number;
@@ -386,28 +405,33 @@ export function analyzeFirstHalfGoals(
     })),
     fallbackAwayGoals
   ));
+  const homeBase = options.sideBaselines?.home
+    ?? { homeGoals: leagueHomeGoals, awayGoals: leagueAwayGoals };
+  const awayBase = options.sideBaselines?.away
+    ?? { homeGoals: leagueHomeGoals, awayGoals: leagueAwayGoals };
   const homeMetrics = buildTeamMetrics(
     fixture.teams.home.id,
     "home",
     teamMatches,
     fixture.fixture.timestamp,
-    leagueHomeGoals,
-    leagueAwayGoals
+    homeBase.homeGoals,
+    homeBase.awayGoals
   );
   const awayMetrics = buildTeamMetrics(
     fixture.teams.away.id,
     "away",
     teamMatches,
     fixture.fixture.timestamp,
-    leagueHomeGoals,
-    leagueAwayGoals
+    awayBase.homeGoals,
+    awayBase.awayGoals
   );
-  const homeAttack = (0.75 * homeMetrics.venueGoalsFor + 0.25 * homeMetrics.weightedGoalsFor) / leagueHomeGoals;
-  const awayDefense = (0.75 * awayMetrics.venueGoalsAgainst + 0.25 * awayMetrics.weightedGoalsAgainst) / leagueHomeGoals;
-  const awayAttack = (0.75 * awayMetrics.venueGoalsFor + 0.25 * awayMetrics.weightedGoalsFor) / leagueAwayGoals;
-  const homeDefense = (0.75 * homeMetrics.venueGoalsAgainst + 0.25 * homeMetrics.weightedGoalsAgainst) / leagueAwayGoals;
-  const expectedHomeGoals = clamp(leagueHomeGoals * homeAttack * awayDefense, 0.05, 2.5);
-  const expectedAwayGoals = clamp(leagueAwayGoals * awayAttack * homeDefense, 0.05, 2.5);
+  const homeAttack = (0.75 * homeMetrics.venueGoalsFor + 0.25 * homeMetrics.weightedGoalsFor) / homeBase.homeGoals;
+  const awayDefense = (0.75 * awayMetrics.venueGoalsAgainst + 0.25 * awayMetrics.weightedGoalsAgainst) / awayBase.homeGoals;
+  const awayAttack = (0.75 * awayMetrics.venueGoalsFor + 0.25 * awayMetrics.weightedGoalsFor) / awayBase.awayGoals;
+  const homeDefense = (0.75 * homeMetrics.venueGoalsAgainst + 0.25 * homeMetrics.weightedGoalsAgainst) / homeBase.awayGoals;
+  const strength = options.strengthFactor ?? 1;
+  const expectedHomeGoals = clamp(leagueHomeGoals * homeAttack * awayDefense * strength, 0.05, 2.5);
+  const expectedAwayGoals = clamp(leagueAwayGoals * awayAttack * homeDefense / strength, 0.05, 2.5);
   const coverage = fullTeamMatches.length === 0
     ? 0
     : clamp(teamMatches.length / fullTeamMatches.length, 0, 1);
@@ -433,11 +457,70 @@ export function analyzeFirstHalfGoals(
   };
 }
 
+function baselineOf(
+  matches: PlayedMatch[],
+  targetTimestamp: number,
+  fallback: LeagueBaseline,
+  floor: number
+): LeagueBaseline {
+  return {
+    homeGoals: Math.max(floor, weightedMean(
+      matches.map((match) => ({
+        value: match.homeGoals,
+        weight: recencyWeight(match.timestamp, targetTimestamp)
+      })),
+      fallback.homeGoals
+    )),
+    awayGoals: Math.max(floor, weightedMean(
+      matches.map((match) => ({
+        value: match.awayGoals,
+        weight: recencyWeight(match.timestamp, targetTimestamp)
+      })),
+      fallback.awayGoals
+    ))
+  };
+}
+
+/**
+ * Durchschnittliche Heim- und Auswärtstore eines Wettbewerbs. Dient als Nenner, gegen den
+ * Angriffs- und Abwehrstärke eines Teams gemessen werden.
+ */
+export function leagueBaseline(
+  fixtures: ApiFixture[],
+  targetTimestamp: number
+): LeagueBaseline {
+  return baselineOf(
+    playedMatches(fixtures).filter((match) => match.timestamp < targetTimestamp),
+    targetTimestamp,
+    DEFAULT_BASELINE,
+    0.2
+  );
+}
+
+/** Wie `leagueBaseline`, aber für Halbzeitstände; ohne eigene Historie 45 % der Gesamttore. */
+export function firstHalfLeagueBaseline(
+  fixtures: ApiFixture[],
+  targetTimestamp: number
+): LeagueBaseline {
+  const full = leagueBaseline(fixtures, targetTimestamp);
+  return baselineOf(
+    firstHalfPlayedMatches(fixtures).filter((match) => match.timestamp < targetTimestamp),
+    targetTimestamp,
+    { homeGoals: Math.max(0.05, full.homeGoals * 0.45), awayGoals: Math.max(0.05, full.awayGoals * 0.45) },
+    0.05
+  );
+}
+
 export function analyzeFixture(
   fixture: ApiFixture,
   history: ApiFixture[],
   teamHistory: ApiFixture[] = history,
-  options: { expectedGoals?: Map<number, FixtureExpectedGoals>; rankings?: DefenseRankings } = {}
+  options: {
+    expectedGoals?: Map<number, FixtureExpectedGoals>;
+    rankings?: DefenseRankings;
+    sideBaselines?: SideBaselines;
+    strengthFactor?: number;
+  } = {}
 ): ModelResult {
   const matches = playedMatches(history).filter(
     (match) => match.timestamp < fixture.fixture.timestamp
@@ -459,21 +542,27 @@ export function analyzeFixture(
     })),
     1.15
   ));
+  // Ohne Seiten-Basislinien misst jede Seite gegen den Wettbewerb der Partie - das bisherige
+  // Verhalten und für Ligaspiele auch das richtige.
+  const homeBase = options.sideBaselines?.home
+    ?? { homeGoals: leagueHomeGoals, awayGoals: leagueAwayGoals };
+  const awayBase = options.sideBaselines?.away
+    ?? { homeGoals: leagueHomeGoals, awayGoals: leagueAwayGoals };
   const homeMetrics = buildTeamMetrics(
     fixture.teams.home.id,
     "home",
     teamMatches,
     fixture.fixture.timestamp,
-    leagueHomeGoals,
-    leagueAwayGoals
+    homeBase.homeGoals,
+    homeBase.awayGoals
   );
   const awayMetrics = buildTeamMetrics(
     fixture.teams.away.id,
     "away",
     teamMatches,
     fixture.fixture.timestamp,
-    leagueHomeGoals,
-    leagueAwayGoals
+    awayBase.homeGoals,
+    awayBase.awayGoals
   );
   const homeVenueCount = homeMetrics.homeMatches;
   const awayVenueCount = awayMetrics.awayMatches;
@@ -483,15 +572,17 @@ export function analyzeFixture(
   const quality = Math.round(clamp(10 + venueScore + totalScore + leagueScore, 0, 100));
 
   const homeAttack = (0.75 * homeMetrics.venueGoalsFor + 0.25 * homeMetrics.weightedGoalsFor) /
-    leagueHomeGoals;
+    homeBase.homeGoals;
   const awayAttack = (0.75 * awayMetrics.venueGoalsFor + 0.25 * awayMetrics.weightedGoalsFor) /
-    leagueAwayGoals;
-  const homeProfile = defensiveProfile(fixture.teams.home.id, "home", teamMatches, fixture.fixture.timestamp, leagueHomeGoals, leagueAwayGoals, quality, options.expectedGoals, options.rankings);
-  const awayProfile = defensiveProfile(fixture.teams.away.id, "away", teamMatches, fixture.fixture.timestamp, leagueHomeGoals, leagueAwayGoals, quality, options.expectedGoals, options.rankings);
+    awayBase.awayGoals;
+  const homeProfile = defensiveProfile(fixture.teams.home.id, "home", teamMatches, fixture.fixture.timestamp, homeBase.homeGoals, homeBase.awayGoals, quality, options.expectedGoals, options.rankings);
+  const awayProfile = defensiveProfile(fixture.teams.away.id, "away", teamMatches, fixture.fixture.timestamp, awayBase.homeGoals, awayBase.awayGoals, quality, options.expectedGoals, options.rankings);
   const awayDefense = awayProfile.index ?? awayProfile.relativeToLeague;
   const homeDefense = homeProfile.index ?? homeProfile.relativeToLeague;
-  const expectedHomeGoals = clamp(leagueHomeGoals * homeAttack * awayDefense, 0.2, 4.5);
-  const expectedAwayGoals = clamp(leagueAwayGoals * awayAttack * homeDefense, 0.2, 4.5);
+  // Der Maßstab bleibt der Wettbewerb der Partie; seitenspezifisch sind nur die Nenner oben.
+  const strength = options.strengthFactor ?? 1;
+  const expectedHomeGoals = clamp(leagueHomeGoals * homeAttack * awayDefense * strength, 0.2, 4.5);
+  const expectedAwayGoals = clamp(leagueAwayGoals * awayAttack * homeDefense / strength, 0.2, 4.5);
 
   return {
     expectedHomeGoals,

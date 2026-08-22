@@ -6,7 +6,9 @@ import {
   buildDefenseRankings,
   candidatesForFixture,
   firstHalfGoalLineProbabilities,
+  firstHalfLeagueBaseline,
   firstHalfPlayedMatches,
+  leagueBaseline,
   goalLineProbabilities,
   playedMatches,
   poissonProbabilities
@@ -215,4 +217,123 @@ test("rollenbezogene Perzentile markieren nur Top 20 Prozent eines Pools ab acht
   const model = analyzeFixture(upcoming, games, games, { expectedGoals: xg, rankings });
   assert.equal(model.defense.home.badge, "verified");
   assert.ok((model.defense.home.percentile ?? 0) >= 0.8);
+});
+
+/**
+ * Baut ein Pokal-Szenario nach dem Muster Westfalia Rhynern - Dynamo Dresden:
+ * eine torreiche Amateurliga trifft auf eine torarme Profiliga, und die
+ * Pokalhistorie selbst besteht aus Amateur-Gastgebern gegen Profi-Gäste.
+ */
+function crossLeagueScenario(target: number) {
+  const amateurLeague = { leagueId: 747, leagueName: "Oberliga" };
+  const proLeague = { leagueId: 79, leagueName: "2. Bundesliga" };
+  let id = 1;
+
+  // Pokalhistorie: Gastgeber unterlegen, Gäste treffen häufig.
+  const cupHistory = Array.from({ length: 24 }, (_, index) => fixture({
+    id: id++, timestamp: target - (index + 1) * 86_400,
+    homeId: 300 + index, awayId: 400 + index,
+    homeGoals: index % 4 === 0 ? 2 : 0, awayGoals: index % 3 === 0 ? 3 : 2,
+    leagueId: 81, leagueName: "Pokal"
+  }));
+
+  // Amateurliga: viele Tore. Team 1 ist dort überdurchschnittlich, aber nicht extrem.
+  const amateurHistory: ReturnType<typeof fixture>[] = [];
+  for (let index = 0; index < 14; index += 1) {
+    amateurHistory.push(fixture({
+      id: id++, timestamp: target - (index + 1) * 86_400,
+      homeId: 100 + index, awayId: 200 + index,
+      homeGoals: index % 2 ? 3 : 2, awayGoals: index % 3 ? 2 : 1,
+      ...amateurLeague
+    }));
+  }
+  for (let index = 0; index < 7; index += 1) {
+    amateurHistory.push(fixture({
+      id: id++, timestamp: target - (index + 1) * 86_400 - 3600,
+      homeId: 1, awayId: 210 + index, homeGoals: 3, awayGoals: 2, ...amateurLeague
+    }));
+    amateurHistory.push(fixture({
+      id: id++, timestamp: target - (index + 1) * 86_400 - 7200,
+      homeId: 220 + index, awayId: 1, homeGoals: 2, awayGoals: 3, ...amateurLeague
+    }));
+  }
+
+  // Profiliga: wenige Tore. Team 2 ist dort ebenfalls überdurchschnittlich.
+  const proHistory: ReturnType<typeof fixture>[] = [];
+  for (let index = 0; index < 14; index += 1) {
+    proHistory.push(fixture({
+      id: id++, timestamp: target - (index + 1) * 86_400,
+      homeId: 500 + index, awayId: 600 + index,
+      homeGoals: index % 2 ? 1 : 2, awayGoals: index % 3 ? 1 : 0,
+      ...proLeague
+    }));
+  }
+  for (let index = 0; index < 7; index += 1) {
+    proHistory.push(fixture({
+      id: id++, timestamp: target - (index + 1) * 86_400 - 3600,
+      homeId: 2, awayId: 610 + index, homeGoals: 2, awayGoals: 0, ...proLeague
+    }));
+    proHistory.push(fixture({
+      id: id++, timestamp: target - (index + 1) * 86_400 - 7200,
+      homeId: 620 + index, awayId: 2, homeGoals: 1, awayGoals: 2, ...proLeague
+    }));
+  }
+
+  const upcoming = fixture({
+    id: 99_999, timestamp: target, homeId: 1, awayId: 2, leagueId: 81, leagueName: "Pokal"
+  });
+  const teamHistory = [
+    ...cupHistory,
+    ...amateurHistory.filter((match) => match.teams.home.id === 1 || match.teams.away.id === 1),
+    ...proHistory.filter((match) => match.teams.home.id === 2 || match.teams.away.id === 2)
+  ];
+  return { upcoming, cupHistory, amateurHistory, proHistory, teamHistory };
+}
+
+test("gemeinsame Pokalbasis überschätzt den unterklassigen Gastgeber", () => {
+  const target = Math.floor(Date.UTC(2026, 7, 23, 13, 30) / 1000);
+  const { upcoming, cupHistory, teamHistory } = crossLeagueScenario(target);
+  const model = analyzeFixture(upcoming, cupHistory, teamHistory);
+  // Der Fehler, um den es geht: die torreiche Amateurmannschaft wird zum Favoriten.
+  assert.ok(model.probabilities.home > model.probabilities.away);
+});
+
+test("eigene Ligabasis je Seite dreht die Cross-League-Inversion zurück", () => {
+  const target = Math.floor(Date.UTC(2026, 7, 23, 13, 30) / 1000);
+  const { upcoming, cupHistory, amateurHistory, proHistory, teamHistory } =
+    crossLeagueScenario(target);
+  const sideBaselines = {
+    home: leagueBaseline(amateurHistory, target),
+    away: leagueBaseline(proHistory, target)
+  };
+  assert.ok(sideBaselines.home.homeGoals > sideBaselines.away.homeGoals);
+  const model = analyzeFixture(upcoming, cupHistory, teamHistory, { sideBaselines });
+  assert.ok(model.probabilities.away > model.probabilities.home);
+});
+
+test("Stärkefaktor verschiebt die erwarteten Tore symmetrisch", () => {
+  const target = Math.floor(Date.UTC(2026, 7, 23, 13, 30) / 1000);
+  const { upcoming, cupHistory, teamHistory } = crossLeagueScenario(target);
+  const neutral = analyzeFixture(upcoming, cupHistory, teamHistory);
+  const weakened = analyzeFixture(upcoming, cupHistory, teamHistory, { strengthFactor: 0.5 });
+  assert.ok(weakened.expectedHomeGoals < neutral.expectedHomeGoals);
+  assert.ok(weakened.expectedAwayGoals > neutral.expectedAwayGoals);
+  assert.ok(weakened.probabilities.away > neutral.probabilities.away);
+});
+
+test("leagueBaseline fällt ohne Historie auf die Ligaprioren zurück", () => {
+  const target = Math.floor(Date.UTC(2026, 7, 23, 13, 30) / 1000);
+  assert.deepEqual(leagueBaseline([], target), { homeGoals: 1.45, awayGoals: 1.15 });
+  const firstHalf = firstHalfLeagueBaseline([], target);
+  assert.ok(Math.abs(firstHalf.homeGoals - 1.45 * 0.45) < 1e-12);
+  assert.ok(Math.abs(firstHalf.awayGoals - 1.15 * 0.45) < 1e-12);
+});
+
+test("ohne Seitenbasis und Stärkefaktor bleibt das Modell unverändert", () => {
+  const target = Math.floor(Date.UTC(2026, 7, 23, 13, 30) / 1000);
+  const { upcoming, cupHistory, teamHistory } = crossLeagueScenario(target);
+  const bare = analyzeFixture(upcoming, cupHistory, teamHistory);
+  const explicit = analyzeFixture(upcoming, cupHistory, teamHistory, { strengthFactor: 1 });
+  assert.equal(bare.expectedHomeGoals, explicit.expectedHomeGoals);
+  assert.equal(bare.expectedAwayGoals, explicit.expectedAwayGoals);
 });
