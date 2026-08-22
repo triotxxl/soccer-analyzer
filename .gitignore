@@ -9,6 +9,8 @@ data/cache/
 data/analysis-cache/
 data/analyzer.sqlite*
 data/tmp/
+data/live-snapshots/
+data/live-usage.json
 coverage/
 dist/
 *.log

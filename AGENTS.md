@@ -24,7 +24,10 @@ Benutzer auf Deutsch und führe Analyseaufträge selbstständig über die vorhan
    Modellwahrscheinlichkeit, Datenvertrauen und den vorhandenen Profilpunkten.
 5. H2H-Remisserie-Hinweise sind Auffälligkeiten und kein alleiniger Empfehlungsgrund.
 6. `next48` bedeutet strikt den Zeitraum vom Startzeitpunkt bis exakt 48 Stunden später;
-   es ist kein Kalenderfilter für „heute und morgen“.
+   es ist kein Kalenderfilter für „heute und morgen“. Die obere Grenze gilt
+   ausnahmslos. Die untere Grenze ist der Startzeitpunkt; nur über die Option
+   „Laufende / beendete Partien“ in der App werden zusätzlich bereits angepfiffene
+   Partien eingeblendet.
 7. Für eine Analyse der nächsten drei Wochen verwende `--dates twentyone`; das umfasst
    den heutigen Berliner Kalendertag und die folgenden 20 Kalendertage.
 
@@ -114,6 +117,19 @@ Benutzer auf Deutsch und führe Analyseaufträge selbstständig über die vorhan
   und Quoten 6 Stunden, Saison- und Teamhistorien 24 Stunden, H2H und Ligadaten 7 Tage.
 - Ein abgelaufener Cacheeintrag wird nicht gelöscht, sondern nur bei erneutem Bedarf
   über die API aktualisiert.
+- Bereits angepfiffene Partien werden mitanalysiert, solange sie laufen können: Der
+  Tipico-Import lässt Anstöße bis 200 Minuten in der Vergangenheit zu, und der Analyzer
+  bewertet Fixtures mit Live-Status ebenso wie `NS`/`TBD`. Beendete und abgesagte Partien
+  fallen heraus. Maßgeblich ist der Status von API-Football, nicht der möglicherweise
+  veraltete Status in `data.json`. Die Statuslogik steht zentral in `src/util.ts`.
+- Die Live-Ansicht der App fragt ausschließlich Fixtures aus `output/dashboard-latest.json`
+  ab, die laut Anstoßzeit gerade laufen können und von der Ansicht auch beobachtet werden.
+  Bis `LIVE_ALL_THRESHOLD` (25) Partien werden sie über `/fixtures?ids=` zu je 20 IDs
+  gebündelt, was 4 Anfragen pro Minute inklusive Statistiken ergibt. Darüber wechselt der
+  Dienst auf `/fixtures?live=all` im 15-Sekunden-Takt und zieht die Statistiken nur noch
+  minütlich über 20er-Bündel nach. Ohne laufende Partie entstehen keine Anfragen.
+  Begrenzt wird das über `LIVE_DAILY_REQUEST_BUDGET`. Live-Stände werden nach
+  `data/live-snapshots/` mitgeschrieben.
 - Der API-Football-Pro-Tarif erlaubt 5 Requests pro Sekunde, 300 Requests pro Minute
   und 7.500 pro Tag. Der Client glättet Netzwerkaufrufe auf beide kurzen Fenster und
   hält eine Tagesreserve zurück. Bei HTTP 429 oder `too many requests` wartet der

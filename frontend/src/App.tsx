@@ -1,11 +1,13 @@
 import {
-  Binoculars, CalendarBlank, CaretDoubleLeft, CaretDoubleRight, CaretLeft, CaretRight, Calculator, CheckCircle, ClockCounterClockwise, Funnel, ListBullets, RocketLaunch, Shield, ShieldCheck, Star, WarningCircle, X
+  Binoculars, Broadcast, CalendarBlank, CaretDoubleLeft, CaretDoubleRight, CaretLeft, CaretRight, Calculator, CheckCircle, ClockCounterClockwise, Funnel, ListBullets, RocketLaunch, Shield, ShieldCheck, Star, WarningCircle, X
 } from "@phosphor-icons/react";
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { BetBuilderDrawer, CartAddButton, CartBadge, MarketPickerModal } from "./BetCartUI";
 import { toCartEntry, useBetCart } from "./betCart";
 import { countryFlagCode } from "./countryFlags";
 import { useDashboardData } from "./data";
+import { useLiveBoard } from "./liveData";
+import { LiveView } from "./LiveView";
 import { edgeOf, loadKellySettings, loadKellyVisible, saveKellySettings, saveKellyVisible, type KellySettings } from "./kelly";
 import { KellyButton, KellyDialog } from "./KellyUI";
 import type { DashboardDocument, DashboardFixture, DashboardMarket, DashboardMarketKey, FormResult, LeagueStats, RecommendationLevel } from "./types";
@@ -29,6 +31,10 @@ type FormView = H2hView;
 type FullTimeOverLine = 1.5 | 2.5 | 3.5;
 type FirstHalfOverLine = 0.5 | 1.5;
 type SortKey = "kickoff" | "team" | "form" | "h2h" | "expected" | "score" | "market";
+
+// Entspricht config.liveCandidateTrailMs: so lange nach dem Anpfiff kann eine Partie
+// noch laufen. Nur innerhalb dieses Fensters bleiben angepfiffene Partien sichtbar.
+const IN_PLAY_LOOKBACK_MS = 200 * 60 * 1000;
 
 const levelRank: Record<RecommendationLevel, number> = { none: 0, recommended: 1, strong: 2 };
 const formSortModes = ["draw", "home", "away"] as const;
@@ -144,7 +150,7 @@ function leagueKey(country: string, league: string): string {
   return `${country}::${league}`;
 }
 
-function CountryFlag({ country }: { country: string }) {
+export function CountryFlag({ country }: { country: string }) {
   const code = countryFlagCode(country);
   if (!code) return null;
   return <span className={`fi fi-${code} country-flag`} aria-hidden />;
@@ -305,6 +311,28 @@ function saveBannerDismissed(): void {
     window.localStorage.setItem(BANNER_STORAGE_KEY, "1");
   } catch {
     // Storage unavailable - dismissal just doesn't persist for this session.
+  }
+}
+
+const VIEW_STORAGE_KEY = "football-analyzer:view";
+
+export type AppView = "prematch" | "live";
+
+function loadView(): AppView {
+  if (typeof window === "undefined") return "prematch";
+  try {
+    return window.localStorage.getItem(VIEW_STORAGE_KEY) === "live" ? "live" : "prematch";
+  } catch {
+    return "prematch";
+  }
+}
+
+function saveView(view: AppView): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(VIEW_STORAGE_KEY, view);
+  } catch {
+    // Storage unavailable - the choice just doesn't persist for this session.
   }
 }
 
@@ -503,7 +531,7 @@ function FormMatchDots({ matches, view, overLine, firstHalfOverLine }: {
   return <ViewDots values={matchViewDots(matches ?? [], view, overLine, firstHalfOverLine)} />;
 }
 
-function MarketCard({ market, showEdge }: { market: DashboardMarket; showEdge: boolean }) {
+export function MarketCard({ market, showEdge }: { market: DashboardMarket; showEdge: boolean }) {
   const percentage = Math.round(market.probability * 100);
   const edge = showEdge ? edgeOf(market) : null;
   return <div className={`market-card ${market.recommendation.level}`} title={`${market.selection} · ${market.recommendation.label}`}>
@@ -558,6 +586,7 @@ function standingsWindow(table: StandingsRow[], homeTeam: string, awayTeam: stri
 }
 
 function Dashboard({ document }: { document: DashboardDocument }) {
+  const [view, setView] = useState<AppView>(loadView);
   const [sidebarOpen, setSidebarOpen] = useState(defaultSidebarOpen);
   const [mobileViewport, setMobileViewport] = useState(() => !defaultSidebarOpen());
   const [banner, setBanner] = useState(() => !loadBannerDismissed());
@@ -591,8 +620,16 @@ function Dashboard({ document }: { document: DashboardDocument }) {
   const [builderOpen, setBuilderOpen] = useState(false);
   const [kellyOpen, setKellyOpen] = useState(false);
   const [showKelly, setShowKelly] = useState(() => loadKellyVisible());
+  const [liveRatedOnly, setLiveRatedOnly] = useState(false);
   const [kellySettings, setKellySettings] = useState<KellySettings>(() => loadKellySettings());
   const { cart, addEntry, removeEntry, clear: clearCart } = useBetCart();
+  const watchedFixtureIds = useMemo(() => document.fixtures
+    .filter((fixture) => !deselectedLeagues.has(leagueKey(fixture.country, fixture.league)))
+    .filter((fixture) => !liveRatedOnly
+      || fixture.markets.some((market) => market.recommendation.level !== "none"))
+    .map((fixture) => fixture.fixtureId),
+    [deselectedLeagues, document, liveRatedOnly]);
+  const live = useLiveBoard(view === "live", watchedFixtureIds);
   const dateControlRef = useRef<HTMLDivElement>(null);
   const now = Date.now();
   const pickerFixture = pickerFixtureId === null ? null : document.fixtures.find((item) => item.fixtureId === pickerFixtureId) ?? null;
@@ -702,6 +739,7 @@ function Dashboard({ document }: { document: DashboardDocument }) {
     return () => window.removeEventListener("keydown", closeOnEscape);
   }, [builderOpen, calendarOpen, kellyOpen, leagueFilterOpen, pickerFixtureId]);
 
+  useEffect(() => { saveView(view); }, [view]);
   useEffect(() => { saveKellySettings(kellySettings); }, [kellySettings]);
   useEffect(() => { saveKellyVisible(showKelly); }, [showKelly]);
 
@@ -737,7 +775,10 @@ function Dashboard({ document }: { document: DashboardDocument }) {
 
   const inSelectedRange = (fixture: DashboardFixture): boolean => {
     const kickoff = Date.parse(fixture.kickoff);
-    if (rangeMode === "next48") return kickoff >= now && kickoff <= now + 48 * 3_600_000;
+    if (rangeMode === "next48") {
+      const earliest = showPast ? now - IN_PLAY_LOOKBACK_MS : now;
+      return kickoff >= earliest && kickoff <= now + 48 * 3_600_000;
+    }
     if (!showPast && kickoff < now) return false;
     if (!customStart || !customEnd) return false;
     const localDate = berlinDate(fixture.kickoff, document.meta.timezone);
@@ -846,6 +887,10 @@ function Dashboard({ document }: { document: DashboardDocument }) {
     ? "Nächste 48 Stunden ab jetzt"
     : `${customStart ? formatCalendarDate(customStart) : "–"} – ${customEnd ? formatCalendarDate(customEnd) : "–"}`;
 
+  const isLeagueVisible = (country: string, league: string) =>
+    !deselectedLeagues.has(leagueKey(country, league));
+  const liveMatches = (live.board?.matches ?? []).filter((match) => isLeagueVisible(match.country, match.league));
+
   const kpis = [
     { key: "all" as const, icon: ListBullets, value: counts.all, label: "Alle Partien", tone: "neutral" },
     { key: "strong" as const, icon: Star, value: counts.strong, label: "Starke Tipps", tone: "gold" },
@@ -860,8 +905,13 @@ function Dashboard({ document }: { document: DashboardDocument }) {
         <div className="brand"><span className="brand-mark">FA</span>{sidebarOpen && <span><strong>Fußball-Analyzer</strong><small>Modell v3.2</small></span>}</div>
         <button className="sidebar-toggle" onClick={() => setSidebarOpen((value) => !value)} aria-controls="dashboard-sidebar" aria-expanded={sidebarOpen} aria-label={sidebarOpen ? "Sidebar einklappen" : "Sidebar ausklappen"} title={sidebarOpen ? "Sidebar einklappen" : "Sidebar ausklappen"}>{sidebarOpen ? <CaretDoubleLeft /> : <CaretDoubleRight />}</button>
       </div>
+      <div className="view-switch" role="group" aria-label="Ansicht">
+        {([["prematch", "Pre-Match", ListBullets], ["live", "Live", Broadcast]] as const).map(([key, label, Icon]) =>
+          <button key={key} className={view === key ? "active" : ""} aria-pressed={view === key} title={label}
+            onClick={() => setView(key)}><Icon size={15} weight="duotone" aria-hidden />{sidebarOpen && <span>{label}</span>}</button>)}
+      </div>
       {sidebarOpen && <>
-        <section className="sidebar-section">
+        {view === "prematch" && <section className="sidebar-section">
           <h2><CalendarBlank size={14} weight="bold" aria-hidden /> Zeitraum</h2>
           <div className="date-range-control" ref={dateControlRef}>
             <button className={`date-range-trigger ${rangeMode === "custom" ? "active" : ""}`} disabled={!document.meta.firstAvailableDate || !document.meta.lastAvailableDate} aria-label="Datumsbereich auswählen" aria-haspopup="dialog" aria-expanded={calendarOpen} onClick={() => calendarOpen ? setCalendarOpen(false) : openCalendar()}>
@@ -883,7 +933,20 @@ function Dashboard({ document }: { document: DashboardDocument }) {
           <label className="check-row"><input type="checkbox" checked={showCrossLeague} onChange={(event) => setShowCrossLeague(event.target.checked)} /> Pokal- / Cross-League</label>
           <label className="check-row"><input type="checkbox" checked={showPast} onChange={(event) => setShowPast(event.target.checked)} /> Laufende / beendete Partien</label>
           <p>{rangeLabel}<br />{filtered.length} von {document.meta.fixtureCount} Partien</p>
-        </section>
+        </section>}
+        {view === "live" && <section className="sidebar-section live-section">
+          <h2><Broadcast size={14} weight="bold" aria-hidden /> Live-Status</h2>
+          <p><strong>{liveMatches.length}</strong> laufende {liveMatches.length === 1 ? "Partie" : "Partien"}<br />
+            {live.board ? `${live.board.candidates} im Zeitfenster` : "Warte auf Daten"}</p>
+          {live.board && <p>API-Calls heute: {live.board.budget.usedToday} von {live.board.budget.capToday}
+            {live.board.budget.apiRequestsRemaining !== null && <><br />Kontingent verbleibend: {live.board.budget.apiRequestsRemaining}</>}</p>}
+          {live.board && <p>Aktualisiert: {formatDataTimestamp(live.board.createdAt, document.meta.timezone)}
+            <br />Abrufart: {live.board.strategy === "live-all" ? "Sammelabruf" : "Bündelabruf"}</p>}
+          <label className="check-row"><input type="checkbox" checked={liveRatedOnly}
+            onChange={(event) => setLiveRatedOnly(event.target.checked)} /> Nur bewertete Partien</label>
+          <p className="live-hint">Beobachtet werden {watchedFixtureIds.length} von {document.fixtures.length} Partien.
+            Abgewählte kosten keine API-Aufrufe.</p>
+        </section>}
         <section className="sidebar-section">
           <h2><ListBullets size={14} weight="bold" aria-hidden /> Wettbewerbe</h2>
           <button className={`league-filter-trigger ${deselectedLeagues.size > 0 ? "active" : ""}`}
@@ -899,17 +962,17 @@ function Dashboard({ document }: { document: DashboardDocument }) {
             if (!event.target.checked) setKellyOpen(false);
           }} /> Value & Kelly-Ansicht anzeigen</label>
         </section>
-        <section className="sidebar-section kpi-section">
+        {view === "prematch" && <section className="sidebar-section kpi-section">
           <h2><Funnel size={14} weight="bold" aria-hidden /> Filter & Kennzahlen</h2>
           {kpis.map(({ key, icon: Icon, value, label, tone }) => <button key={key} className={`kpi ${tone} ${levelFilter === key ? "active" : ""}`} aria-pressed={levelFilter === key} onClick={() => setLevelFilter((current) => current === key ? "all" : key)}>
             <span className="kpi-icon"><Icon size={16} weight="duotone" /></span><span className="kpi-label">{label}</span><strong className="kpi-value">{value}</strong>
           </button>)}
-        </section>
-        <section className="sidebar-section defense-legend" aria-label="Legende Defensivstärke">
+        </section>}
+        {view === "prematch" && <section className="sidebar-section defense-legend" aria-label="Legende Defensivstärke">
           <h2><ShieldCheck size={14} weight="bold" aria-hidden /> Defensivstärke</h2>
           <span title="Zählt laut Expected Goals Against (xGA) zu den 20 % defensivstärksten Teams der Liga. xGA bewertet die Qualität der gegnerischen Torchancen, nicht nur die tatsächlich kassierten Tore."><ShieldCheck size={16} weight="fill" aria-hidden /> Top 20 %, durch xGA verifiziert</span>
           <span title="Zählt zu den 20 % defensivstärksten Teams der Liga, gemessen an tatsächlich kassierten Toren. xGA-Daten waren für eine genauere Einordnung nicht verfügbar."><Shield size={16} weight="regular" aria-hidden /> Top 20 %, Torhistorie</span>
-        </section>
+        </section>}
         <div className="sidebar-footer">
           <ClockCounterClockwise size={14} weight="bold" aria-hidden />
           <span>Datenstand: {formatDataTimestamp(document.meta.createdAt, document.meta.timezone)}</span>
@@ -927,6 +990,7 @@ function Dashboard({ document }: { document: DashboardDocument }) {
       <nav className="market-tabs" aria-label="Marktfilter">
         {availableMarketOptions.map((option) => <button className={marketFilter === option.key ? "active" : ""} aria-pressed={marketFilter === option.key} key={option.key} onClick={() => selectMarket(option.key)}>{option.label}</button>)}
       </nav>
+      {view === "prematch" ? <>
       <div className="view-toolbar">
         <span>H2H</span>
         <div className="segmented" role="group" aria-label="H2H-Ansicht">
@@ -1059,6 +1123,12 @@ function Dashboard({ document }: { document: DashboardDocument }) {
         })}
         {sortedFixtures.length === 0 && <EmptyState title="Keine Partien für diese Auswahl" text="Wähle einen anderen Zeitraum oder setze den Bewertungsfilter zurück." />}
       </div>
+      </> : <LiveView
+        state={live}
+        marketFilter={marketFilter}
+        showEdge={showKelly}
+        isLeagueVisible={isLeagueVisible}
+      />}
     </main>
   </div>
   {pickerFixture && <MarketPickerModal

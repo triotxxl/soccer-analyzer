@@ -61,7 +61,7 @@ export interface ApiFixture {
     date: string;
     timestamp: number;
     timezone: string;
-    status: { long: string; short: string; elapsed: number | null };
+    status: { long: string; short: string; elapsed: number | null; extra?: number | null };
   };
   league: {
     id: number;
@@ -140,8 +140,16 @@ export interface LiveMatchSelection {
 export interface LiveTeamSnapshot {
   shotsOnGoal: number | null;
   totalShots: number | null;
+  shotsOffGoal: number | null;
+  blockedShots: number | null;
+  shotsInsideBox: number | null;
+  shotsOutsideBox: number | null;
   possession: number | null;
   corners: number | null;
+  offsides: number | null;
+  fouls: number | null;
+  goalkeeperSaves: number | null;
+  passAccuracy: number | null;
   yellowCards: number | null;
   redCards: number | null;
   expectedGoals: number | null;

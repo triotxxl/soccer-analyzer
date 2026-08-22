@@ -330,7 +330,11 @@ describe("React-Dashboard", () => {
   });
 
   it("filtert beim Start strikt vom aktuellen Zeitpunkt bis exakt 48 Stunden", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(rangeDocument()), { status: 200 })));
+    const current = rangeDocument();
+    // Angepfiffen, aber längst vorbei: liegt außerhalb des Live-Fensters von 200 Minuten.
+    current.fixtures.push(fixture(5, "Lange vorbei", "none", "2026-08-16T08:00:00.000Z"));
+    current.meta.fixtureCount = current.fixtures.length;
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(current), { status: 200 })));
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     render(<App />);
 
@@ -340,8 +344,13 @@ describe("React-Dashboard", () => {
     expect(screen.queryByText("Nach Ende")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "48h" })).toHaveAttribute("aria-pressed", "true");
 
+    // Der Haken ist der ausdrückliche Override: zusätzlich zu den kommenden Partien
+    // erscheinen die gerade laufenden. Die obere 48-Stunden-Grenze bleibt unangetastet,
+    // und längst beendete Partien bleiben ebenfalls draußen.
     await user.click(screen.getByRole("checkbox", { name: /Laufende \/ beendete Partien/i }));
-    expect(screen.queryByText("Vor Start")).not.toBeInTheDocument();
+    expect(screen.getByText("Vor Start")).toBeInTheDocument();
+    expect(screen.queryByText("Nach Ende")).not.toBeInTheDocument();
+    expect(screen.queryByText("Lange vorbei")).not.toBeInTheDocument();
   });
 
   it("wählt inklusive Datumsbereiche, normalisiert die Reihenfolge und erlaubt spielfreie Tage", async () => {

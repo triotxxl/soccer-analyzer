@@ -30,7 +30,7 @@ import type {
   ResolvedLeague
 } from "./types.ts";
 import type { TableRow } from "./draw-criteria.ts";
-import { datesForRange, normalizeText } from "./util.ts";
+import { datesForRange, isAnalyzableStatus, normalizeText } from "./util.ts";
 import { venueFormRow } from "./venue-form.ts";
 import { enrichFixtureExpectedGoals } from "./xg.ts";
 
@@ -316,7 +316,7 @@ export async function runAnalysis(
     database
   );
   const fixtures = scope.fixtures
-    .filter((fixture) => ["NS", "TBD"].includes(fixture.fixture.status.short))
+    .filter((fixture) => isAnalyzableStatus(fixture.fixture.status.short))
     .sort((a, b) => a.fixture.timestamp - b.fixture.timestamp);
 
   const leagueById = new Map(resolution.resolved.map((league) => [league.leagueId, league]));
@@ -422,7 +422,7 @@ export async function runGoalLineAnalysis(
       database
     );
     const fixtures = scope.fixtures
-      .filter((fixture) => ["NS", "TBD"].includes(fixture.fixture.status.short))
+      .filter((fixture) => isAnalyzableStatus(fixture.fixture.status.short))
       .sort((left, right) =>
         left.fixture.timestamp - right.fixture.timestamp ||
         left.teams.home.name.localeCompare(right.teams.home.name)
@@ -687,7 +687,7 @@ export async function runDrawCriteriaAnalysis(
     dependencies?.database
   );
   const fixtures = scope.fixtures
-    .filter((fixture) => ["NS", "TBD"].includes(fixture.fixture.status.short))
+    .filter((fixture) => isAnalyzableStatus(fixture.fixture.status.short))
     .sort((left, right) => left.fixture.timestamp - right.fixture.timestamp);
   const competitionsById = new Map(leagues.map((league) => [league.league.id, league]));
   const crossLeagueFixtureIds = new Set(
@@ -900,7 +900,7 @@ export async function runFavoriteAnalysis(
     dependencies?.database
   );
   const fixtures = scope.fixtures
-    .filter((fixture) => ["NS", "TBD"].includes(fixture.fixture.status.short))
+    .filter((fixture) => isAnalyzableStatus(fixture.fixture.status.short))
     .sort((left, right) => left.fixture.timestamp - right.fixture.timestamp);
   const competitionsById = new Map(leagues.map((league) => [league.league.id, league]));
   const crossLeagueFixtureIds = new Set(

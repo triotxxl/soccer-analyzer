@@ -131,3 +131,26 @@ export function localKickoff(iso: string, timezone: string): string {
     minute: "2-digit"
   }).format(new Date(iso));
 }
+
+// API-Football-Statuscodes. Eine Partie wird analysiert, solange sie noch nicht
+// angepfiffen ist oder gerade läuft; beendete und abgesagte Partien fallen heraus.
+const SCHEDULED_STATUSES = new Set(["NS", "TBD"]);
+const LIVE_STATUSES = new Set(["1H", "HT", "2H", "ET", "BT", "P", "SUSP", "INT", "LIVE"]);
+const FINISHED_STATUSES = new Set(["FT", "AET", "PEN", "PST", "CANC", "ABD", "AWD", "WO"]);
+
+export function isScheduledStatus(short: string): boolean {
+  return SCHEDULED_STATUSES.has(short);
+}
+
+export function isLiveStatus(short: string): boolean {
+  return LIVE_STATUSES.has(short);
+}
+
+export function isFinishedStatus(short: string): boolean {
+  return FINISHED_STATUSES.has(short);
+}
+
+/** Partien, die der Analyzer bewertet: noch nicht angepfiffen oder aktuell laufend. */
+export function isAnalyzableStatus(short: string): boolean {
+  return isScheduledStatus(short) || isLiveStatus(short);
+}

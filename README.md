@@ -29,6 +29,61 @@ Das Dashboard zeigt 1X2, Remis, BTTS, Über 1,5 und Über 2,5 mit eindeutigen Sy
 Cross-League-Spiele werden mit einem getrennten Modell gekennzeichnet. Remis-Serien aus
 direkten Duellen erscheinen als eigener Auffälligkeitshinweis.
 
+### Laufende Partien
+
+Der Analyzer bewertet neben noch nicht angepfiffenen auch **aktuell laufende** Partien.
+Der Tipico-Import lässt Anstöße bis 200 Minuten in der Vergangenheit zu; ob eine Partie
+wirklich noch läuft, entscheidet der Status von API-Football und nicht der Status in
+`data.json`, der beim Export eingefroren wurde. Beendete und abgesagte Partien fallen
+heraus.
+
+In der 48-Stunden-Ansicht bleibt die obere Grenze unangetastet. Angepfiffene Partien
+erscheinen dort erst, wenn die Option **Laufende / beendete Partien** gesetzt ist; sie
+sind in der Tabelle mit `angepfiffen` gekennzeichnet. In der Live-Ansicht erscheinen sie
+unabhängig davon.
+
+### Live-Ansicht
+
+Oben in der Seitenleiste wird zwischen **Pre-Match** und **Live** umgeschaltet. Die
+Live-Ansicht zeigt ausschließlich Partien aus dem letzten Dashboard-Lauf, die gerade
+laufen. Beim Überfahren einer Zeile öffnet sich ein Fenster mit Ballbesitz, Schüssen,
+Strafraumschüssen, Ecken, Paraden, Karten, xG, der Ereignisliste und der
+Pre-Match-Markttafel. Fehlende Statistiken erscheinen als `–` und werden nie als `0`
+gewertet.
+
+Der Abruf ist bewusst sparsam. Aus den Anstoßzeiten wird lokal bestimmt, welche Fixtures
+überhaupt laufen können, und die App meldet dem Server, welche davon sie beobachtet.
+Abhängig von deren Anzahl wählt der Dienst zwischen zwei Strategien:
+
+| Beobachtete Partien | Strategie | Kosten |
+|---|---|---|
+| bis 25 | **Bündelabruf** – `/fixtures?ids=` in 20er-Bündeln | 4 Anfragen pro Minute; eine Antwort enthält Spielstand, Minute, Ereignisse **und** Statistiken |
+| ab 26 | **Sammelabruf** – `/fixtures?live=all` im 15-s-Takt | 4 Anfragen pro Minute unabhängig von der Anzahl, plus ein 20er-Bündel je Minute für die Statistiken |
+
+Der Sammelabruf liefert keine Statistiken mit, dafür aber alle laufenden Partien in einem
+Aufruf. Da sich Statistiken laut API-Dokumentation ohnehin nur etwa einmal pro Minute
+ändern, werden sie im Minutentakt nachgezogen statt viermal pro Minute. An einem vollen
+Samstag mit rund 114 gleichzeitigen Partien senkt das den Verbrauch von 1.440 auf 600
+Anfragen pro Stunde.
+
+Weitere Sparmechanismen:
+
+- Abgewählte Wettbewerbe werden **nicht** abgefragt, nicht nur ausgeblendet.
+- Die Option **Nur bewertete Partien** beschränkt die Überwachung auf Begegnungen mit
+  Empfehlung – typisch weniger als die Hälfte des Umfangs.
+- keine laufende Partie oder Tab im Hintergrund: keine einzige Anfrage
+- Überfahren einer Zeile: keine zusätzliche Anfrage, die Daten liegen bereits vor
+- Beendete Partien fallen dauerhaft aus dem Umfang, die Abfrage schrumpft im Lauf des Abends
+
+Zwei Bremsen sichern das Tageskontingent ab: `LIVE_DAILY_REQUEST_BUDGET` (Standard 2.000)
+und die bestehende `API_DAILY_RESERVE`. Der Verbrauch steht in der Seitenleiste.
+Ligen ohne Statistikabdeckung werden nach einem erfolglosen Versuch nicht erneut abgefragt.
+
+Jeder Abruf wird als JSON-Zeile nach `data/live-snapshots/JJJJ-MM-TT.jsonl` geschrieben,
+solange sich Minute, Spielstand oder Statistiken geändert haben. Das kostet keine
+zusätzlichen Anfragen und schafft die Datenbasis für spätere Live-Auswertungen, da
+API-Football keine historischen Live-Quoten vorhält.
+
 Die H2H-Anzeige kann neben Ergebnis, BTTS und Gesamtspiel-Torlinien auch `1. HZ Über`
 für die Linien 0,5 und 1,5 in den letzten fünf direkten Duellen darstellen. Ausschließlich
 vorhandene Halbzeitstände zählen; fehlende Werte erscheinen als `–`.

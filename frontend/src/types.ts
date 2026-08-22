@@ -6,4 +6,11 @@ export type {
   FormResult,
   RecommendationLevel
 } from "../../src/dashboard.ts";
-export type { LeagueStats } from "../../src/types.ts";
+export type { LeagueStats, LiveTeamSnapshot } from "../../src/types.ts";
+export type {
+  LiveBoardBudget,
+  LiveBoardEvent,
+  LiveBoardMatch,
+  LiveBoardResponse,
+  LiveTeamSide
+} from "../../src/live-board.ts";

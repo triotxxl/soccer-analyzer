@@ -9,6 +9,11 @@
     "country": "Egypt",
     "league": "Premier League"
   },
+  "albanien|kategoria superiore": {
+    "leagueId": 310,
+    "country": "Albania",
+    "league": "Superliga"
+  },
   "argentinien|copa argentina": {
     "leagueId": 130,
     "country": "Argentina",
@@ -80,6 +85,11 @@
     "league": "Northern NSW NPL"
   },
   "australien|npl south australia": {
+    "leagueId": 194,
+    "country": "Australia",
+    "league": "South Australia NPL"
+  },
+  "australien|npl south australia finalrunde": {
     "leagueId": 194,
     "country": "Australia",
     "league": "South Australia NPL"
@@ -179,6 +189,11 @@
     "country": "Chile",
     "league": "Segunda División"
   },
+  "chile|segunda division promotion runde": {
+    "leagueId": 711,
+    "country": "Chile",
+    "league": "Segunda División"
+  },
   "china|china league 1": {
     "leagueId": 170,
     "country": "China",
@@ -258,6 +273,11 @@
     "leagueId": 79,
     "country": "Germany",
     "league": "2. Bundesliga"
+  },
+  "deutschland|bundesliga frauen": {
+    "leagueId": 82,
+    "country": "Germany",
+    "league": "Frauen Bundesliga"
   },
   "deutschland|franz beckenbauer super cup": {
     "leagueId": 529,
@@ -464,6 +484,11 @@
     "country": "Israel",
     "league": "Liga Leumit"
   },
+  "israel|premier league": {
+    "leagueId": 383,
+    "country": "Israel",
+    "league": "Ligat Ha'al"
+  },
   "italien|serie a": {
     "leagueId": 135,
     "country": "Italy",
@@ -529,6 +554,11 @@
     "country": "Croatia",
     "league": "HNL"
   },
+  "kroatien|prva nl": {
+    "leagueId": 211,
+    "country": "Croatia",
+    "league": "First NL"
+  },
   "lettland|virsliga": {
     "leagueId": 365,
     "country": "Latvia",
@@ -583,6 +613,11 @@
     "leagueId": 408,
     "country": "Northern-Ireland",
     "league": "Premiership"
+  },
+  "nordmazedonien|1 mfl": {
+    "leagueId": 371,
+    "country": "Macedonia",
+    "league": "First League"
   },
   "norwegen|1 division": {
     "leagueId": 104,
@@ -664,6 +699,11 @@
     "country": "Poland",
     "league": "Ekstraklasa"
   },
+  "portugal|liga 3 gruppe a": {
+    "leagueId": 865,
+    "country": "Portugal",
+    "league": "Liga 3"
+  },
   "portugal|liga 3 gruppe b": {
     "leagueId": 865,
     "country": "Portugal",
@@ -683,6 +723,11 @@
     "leagueId": 283,
     "country": "Romania",
     "league": "Liga I"
+  },
+  "saudi arabien|division 1": {
+    "leagueId": 308,
+    "country": "Saudi-Arabia",
+    "league": "Division 1"
   },
   "saudi arabien|saudi professional liga": {
     "leagueId": 307,
@@ -813,6 +858,11 @@
     "leagueId": 293,
     "country": "South-Korea",
     "league": "K League 2"
+  },
+  "sudkorea|k3 league": {
+    "leagueId": 295,
+    "country": "South-Korea",
+    "league": "K3 League"
   },
   "sudkorea|korea pokal": {
     "leagueId": 294,

@@ -19,7 +19,7 @@ import {
 } from "./output.ts";
 import { formatLiveAnalysis } from "./output.ts";
 import { runLiveAnalysis } from "./live.ts";
-import { saveAlias } from "./resolver.ts";
+import { resolveLeagues, saveAlias } from "./resolver.ts";
 import { saveTeamAlias } from "./team-resolver.ts";
 import { buildLeagueStrength } from "./strength-builder.ts";
 import { applyGoalLineFilters } from "./goal-line-filter.ts";
@@ -37,7 +37,7 @@ import type {
   LeagueSelection,
   LiveMatchSelection
 } from "./types.ts";
-import { parseMarkets, percent } from "./util.ts";
+import { aliasKey, parseMarkets, percent } from "./util.ts";
 
 interface ParsedArgs {
   positional: string[];
@@ -437,6 +437,38 @@ async function venueForm(args: ParsedArgs): Promise<void> {
   else console.log(formatVenueFormResult(result));
 }
 
+/**
+ * Entfernt Wettbewerbe, zu denen API-Football keine Liga führt. Ohne diese Möglichkeit
+ * verhindert ein einziger nicht abgedeckter Wettbewerb die Auswertung aller übrigen
+ * Partien. Mehrdeutige Zuordnungen bleiben ein Fehler - dort ist ein Alias die richtige
+ * Antwort, kein Überspringen.
+ */
+async function withoutUnresolvedLeagues(
+  input: AnalysisInput,
+  client: ApiFootballClient
+): Promise<AnalysisInput> {
+  const { failures } = await resolveLeagues(input.selections, await client.getLeagues());
+  if (failures.length === 0) return input;
+  const skipped = new Set(failures.map((failure) =>
+    aliasKey(failure.requested.country, failure.requested.league)));
+  for (const failure of failures) {
+    // Der Resolver liefert auch bei 0 % Ähnlichkeit Kandidaten, deshalb sagt die Meldung
+    // die beste erreichte Übereinstimmung statt eines pauschalen "mehrdeutig".
+    const best = failure.candidates[0];
+    console.warn(
+      `Übersprungen: ${failure.requested.country} | ${failure.requested.league}` +
+      (best
+        ? ` (beste Übereinstimmung: ${best.country} | ${best.league}, ${Math.round(best.score * 100)} %)`
+        : " (keine API-Football-Liga gefunden)")
+    );
+  }
+  return {
+    ...input,
+    selections: input.selections.filter((selection) =>
+      !skipped.has(aliasKey(selection.country, selection.league)))
+  };
+}
+
 async function dashboard(args: ParsedArgs): Promise<void> {
   const sourceFile = path.resolve(option(args, "input") ?? path.join(ROOT_DIR, "data.json"));
   const dates = (option(args, "dates") ?? "next48") as DateRange;
@@ -455,6 +487,9 @@ async function dashboard(args: ParsedArgs): Promise<void> {
       events: imported.events
     });
     const client = imported.selectedEvents > 0 ? new ApiFootballClient() : null;
+    const input = client && args.options.has("skip-unresolved")
+      ? await withoutUnresolvedLeagues(imported.input, client)
+      : imported.input;
     const emptyBase = {
       createdAt: new Date().toISOString(),
       dates: [],
@@ -464,13 +499,13 @@ async function dashboard(args: ParsedArgs): Promise<void> {
       leagues: []
     };
     const goalsResult = client
-      ? await runGoalLineAnalysis(imported.input, { client, database })
+      ? await runGoalLineAnalysis(input, { client, database })
       : emptyBase;
     const drawResult = client
-      ? await runDrawCriteriaAnalysis(imported.input, { client, database })
+      ? await runDrawCriteriaAnalysis(input, { client, database })
       : emptyBase;
     const favoriteResult = client
-      ? await runFavoriteAnalysis(imported.input, { client, database })
+      ? await runFavoriteAnalysis(input, { client, database })
       : emptyBase;
     const files = await writeDashboard({
       createdAt: goalsResult.createdAt,

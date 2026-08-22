@@ -86,3 +86,39 @@ test("liest Tipico-Events, IDs und gewünschte Quoten aus data.json", async () =
     await rm(directory, { recursive: true, force: true });
   }
 });
+
+test("nimmt laufende Partien auf und lässt lange beendete weg", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "tipico-inplay-"));
+  const filename = path.join(directory, "data.json");
+  const now = new Date("2026-08-20T19:00:00Z");
+  const minutesAgo = (minutes: number) => now.getTime() - minutes * 60_000;
+  const event = (id: string, startTime: number, status: string) => ({
+    id, eventStartTime: startTime, status,
+    team1: `Heim ${id}`, team2: `Gast ${id}`, team1Id: Number(id), team2Id: Number(id) + 1,
+    competitionId: 42
+  });
+  await writeFile(filename, JSON.stringify({
+    SELECTION: {
+      sportCompetitionMap: { soccer: [{ groupId: 42, name: "Bundesliga", parentName: "Deutschland" }] },
+      events: {
+        "1": event("1", minutesAgo(-120), "pre_match"),
+        "2": event("2", minutesAgo(35), "running"),
+        "3": event("3", minutesAgo(75), "pre_match"),
+        "4": event("4", minutesAgo(260), "pre_match"),
+        "5": { ...event("5", minutesAgo(20), "finished") }
+      }
+    }
+  }), "utf8");
+  try {
+    const result = await importTipicoData(filename, "today", now, "Europe/Berlin");
+    const ids = result.events.map((item) => item.tipicoEventId).sort();
+
+    // Angepfiffen und laufend gehört dazu, ebenso ein veralteter pre_match-Status.
+    assert.deepEqual(ids, ["1", "2", "3"]);
+    // Weit außerhalb des Live-Fensters und ausdrücklich beendet bleiben draußen.
+    assert.equal(ids.includes("4"), false);
+    assert.equal(ids.includes("5"), false);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});

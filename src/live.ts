@@ -25,20 +25,28 @@ function fixtureMatchScore(selection: LiveMatchSelection, fixture: ApiFixture): 
   ) / 2;
 }
 
-function numericStatistic(statistics: ApiFixtureStatistic[], type: string): number | null {
+export function numericStatistic(statistics: ApiFixtureStatistic[], type: string): number | null {
   const raw = statistics.find((item) => item.type.toLocaleLowerCase() === type.toLocaleLowerCase())?.value;
   if (raw === null || raw === undefined) return null;
   const parsed = typeof raw === "number" ? raw : Number(raw.replace("%", "").trim());
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-function teamSnapshot(statistics?: ApiTeamStatistics): LiveTeamSnapshot {
+export function teamSnapshot(statistics?: ApiTeamStatistics): LiveTeamSnapshot {
   const values = statistics?.statistics ?? [];
   return {
     shotsOnGoal: numericStatistic(values, "Shots on Goal"),
     totalShots: numericStatistic(values, "Total Shots"),
+    shotsOffGoal: numericStatistic(values, "Shots off Goal"),
+    blockedShots: numericStatistic(values, "Blocked Shots"),
+    shotsInsideBox: numericStatistic(values, "Shots insidebox"),
+    shotsOutsideBox: numericStatistic(values, "Shots outsidebox"),
     possession: numericStatistic(values, "Ball Possession"),
     corners: numericStatistic(values, "Corner Kicks"),
+    offsides: numericStatistic(values, "Offsides"),
+    fouls: numericStatistic(values, "Fouls"),
+    goalkeeperSaves: numericStatistic(values, "Goalkeeper Saves"),
+    passAccuracy: numericStatistic(values, "Passes %"),
     yellowCards: numericStatistic(values, "Yellow Cards"),
     redCards: numericStatistic(values, "Red Cards"),
     expectedGoals: numericStatistic(values, "expected_goals")
@@ -52,7 +60,7 @@ function activityValue(team: LiveTeamSnapshot): number | null {
     (team.corners ?? 0) + (team.possession ?? 0) / 10;
 }
 
-function activity(home: LiveTeamSnapshot, away: LiveTeamSnapshot): LiveMatchSnapshot["activity"] {
+export function activity(home: LiveTeamSnapshot, away: LiveTeamSnapshot): LiveMatchSnapshot["activity"] {
   const homeValue = activityValue(home);
   const awayValue = activityValue(away);
   if (homeValue === null || awayValue === null) return "nicht bestimmbar";

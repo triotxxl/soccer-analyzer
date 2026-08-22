@@ -2,6 +2,10 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   datesForRange,
+  isAnalyzableStatus,
+  isFinishedStatus,
+  isLiveStatus,
+  isScheduledStatus,
   normalizeCountry,
   normalizeText,
   parseMarkets,
@@ -73,4 +77,20 @@ test("berechnet einundzwanzig aufeinanderfolgende Berliner Kalendertage", () => 
 test("versteht deutsche und technische Marktnamen", () => {
   assert.deepEqual(parseMarkets("remis,btts,over2.5,1x2"), ["draw", "btts", "over25", "1x2"]);
   assert.throws(() => parseMarkets("ecken"), /Unbekannter Markt/);
+});
+
+test("laufende Partien gelten als analysierbar, beendete nicht", () => {
+  for (const status of ["NS", "TBD"]) {
+    assert.equal(isScheduledStatus(status), true, status);
+    assert.equal(isAnalyzableStatus(status), true, status);
+  }
+  for (const status of ["1H", "HT", "2H", "ET", "BT", "P", "SUSP", "INT", "LIVE"]) {
+    assert.equal(isLiveStatus(status), true, status);
+    assert.equal(isAnalyzableStatus(status), true, status);
+  }
+  for (const status of ["FT", "AET", "PEN", "PST", "CANC", "ABD", "AWD", "WO"]) {
+    assert.equal(isFinishedStatus(status), true, status);
+    assert.equal(isAnalyzableStatus(status), false, status);
+  }
+  assert.equal(isAnalyzableStatus("unbekannt"), false);
 });

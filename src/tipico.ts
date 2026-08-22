@@ -148,14 +148,18 @@ export async function importTipicoData(
   );
   const requestedDates = new Set(datesForRange(dates, timezone, now));
   const rollingLimit = dates === "next48" ? now.getTime() + 48 * 60 * 60 * 1000 : null;
+  // Bereits angepfiffene Partien bleiben so lange im Umfang, wie sie laufen können.
+  // Der Status in data.json ist der Stand des Exports und kann veraltet sein; ob eine
+  // Partie wirklich läuft, entscheidet später der Status von API-Football.
+  const earliestKickoff = now.getTime() - config.liveCandidateTrailMs;
   const allEvents = Object.values(selection.events);
   const selected = allEvents
     .filter((event) =>
-      event.status === "pre_match" &&
+      (event.status === "pre_match" || event.status === "running") &&
       typeof event.team1 === "string" && event.team1.trim().length > 0 &&
       typeof event.team2 === "string" && event.team2.trim().length > 0 &&
       Number.isInteger(event.team1Id) && Number.isInteger(event.team2Id) &&
-      event.eventStartTime > now.getTime() &&
+      event.eventStartTime > earliestKickoff &&
       (rollingLimit === null || event.eventStartTime <= rollingLimit) &&
       requestedDates.has(localDate(event.eventStartTime, timezone)) &&
       competitions.has(event.competitionId)

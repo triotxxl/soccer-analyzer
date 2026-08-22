@@ -46,6 +46,8 @@ export class ApiFootballClient {
   private rateLimitQueue: Promise<void> = Promise.resolve();
   requestCount = 0;
   requestsRemaining: number | null = null;
+  /** Paging der zuletzt beantworteten Anfrage. Nur für sequenzielle Aufrufe aussagekräftig. */
+  lastPaging: { current: number; total: number } | null = null;
   requestsRemainingThisMinute: number | null = null;
 
   constructor(options?: {
@@ -179,6 +181,7 @@ export class ApiFootballClient {
       }
       throw new ApiFootballError(`API-Football-Fehler: ${errors.join("; ")}`, response.status);
     }
+    this.lastPaging = envelope.paging ?? null;
     await this.cache.set(cacheKey, envelope.response);
     if (
       this.requestsRemaining !== null &&
@@ -212,8 +215,21 @@ export class ApiFootballClient {
     );
   }
 
-  getLiveFixtures(): Promise<ApiFixture[]> {
-    return this.get<ApiFixture[]>("fixtures", { live: "all" }, 0, true);
+  /**
+   * Alle laufenden Partien in einem Aufruf. An einem vollen Spieltag koennen das
+   * mehrere hundert sein, deshalb werden Folgeseiten mitgelesen.
+   */
+  async getLiveFixtures(maxPages = 5): Promise<ApiFixture[]> {
+    const fixtures: ApiFixture[] = [];
+    for (let page = 1; page <= maxPages; page += 1) {
+      const params: Record<string, string | number> = page === 1
+        ? { live: "all" }
+        : { live: "all", page };
+      fixtures.push(...await this.get<ApiFixture[]>("fixtures", params, 0, true));
+      const paging = this.lastPaging;
+      if (!paging || paging.current >= paging.total) break;
+    }
+    return fixtures;
   }
 
   getFixtureEvents(fixtureId: number): Promise<ApiFixtureEvent[]> {
@@ -229,14 +245,15 @@ export class ApiFootballClient {
     );
   }
 
-  getFixturesWithStatistics(fixtureIds: number[]): Promise<ApiFixture[]> {
+  getFixturesWithStatistics(fixtureIds: number[], fresh = false): Promise<ApiFixture[]> {
     if (fixtureIds.length === 0 || fixtureIds.length > 20) {
       throw new Error("Fixture-Batches müssen zwischen 1 und 20 IDs enthalten.");
     }
     return this.get<ApiFixture[]>(
       "fixtures",
       { ids: fixtureIds.join("-") },
-      config.cacheTtlMs.settledFixtures
+      fresh ? 0 : config.cacheTtlMs.settledFixtures,
+      fresh
     );
   }
 
