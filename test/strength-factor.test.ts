@@ -45,7 +45,19 @@ test("Stärkefaktor bleibt innerhalb der konfigurierten Grenzen", () => {
 
 test("Bundesliga gegen 3. Liga ergibt einen plausiblen Torfaktor", () => {
   const factor = strengthFactor(1717, 1461);
-  assert.ok(factor > 1.5 && factor < 1.8, `unerwarteter Faktor ${factor}`);
+  assert.ok(factor > 1.7 && factor < 2.2, `unerwarteter Faktor ${factor}`);
+});
+
+test("die Clamp-Grenzen greifen erst jenseits realistischer Ligaabstände", () => {
+  // Der größte gemessene Abstand im deutschen Pool ist Bundesliga gegen geschätzte
+  // Oberliga, rund 340 Punkte. Bis dorthin darf der Faktor nicht abgeschnitten werden,
+  // sonst unterscheidet das Modell große Klassenunterschiede nicht mehr voneinander.
+  const wide = strengthFactor(1717, 1381);
+  assert.ok(wide < config.strength.factorMax, `Faktor ${wide} hängt am oberen Clamp`);
+  assert.ok(
+    strengthFactor(1381, 1717) > config.strength.factorMin,
+    "Faktor hängt am unteren Clamp"
+  );
 });
 
 test("Liga ohne belastbares Rating fällt unter den schwächsten Pool-Wert", () => {

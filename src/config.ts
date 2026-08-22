@@ -73,14 +73,26 @@ export const config = {
       : 25,
   strength: {
     // Elo-Differenz zweier Ligen -> Torfaktor je Seite: 10 ** (delta / factorDivisor).
-    // Kalibriert an Bundesliga 1717 gegen 3. Liga 1461: delta 256 ergibt 1,63 je Seite
-    // und damit ein erwartetes Torverhältnis von rund 2,7.
-    factorDivisor: 1200,
-    factorMin: 0.5,
-    factorMax: 2.0,
+    // Seit dem neutralen Maßstab im Modell trägt dieser Faktor den Klassenunterschied
+    // allein; vorher hat die schiefe Pokal-Torbasis einen Teil davon verdeckt mitgetragen.
+    // Kalibriert am DFB-Pokal-Lauf vom 22.08.2026 (21 Partien mit Quote): mittlere
+    // absolute Abweichung zur Marktwahrscheinlichkeit 9,6 pp bei einem Bias von -3,5 pp.
+    // Der Bias wird bewusst nicht auf null gezogen, weil 1/Quote die Buchmachermarge
+    // enthält und die Marktwahrscheinlichkeit dadurch überzeichnet ist.
+    // Die Grenzen sind so gewählt, dass im gemessenen Feld kein Faktor am Clamp hängt -
+    // sonst unterscheidet das Modell große Klassenunterschiede nicht mehr voneinander.
+    // Basis ist eine einzige Pokalrunde; mit abgerechneten Ergebnissen aus `npm run report`
+    // gehört das nachgezogen.
+    factorDivisor: 900,
+    factorMin: 0.3,
+    factorMax: 3.5,
     // Abschlag auf das schwächste belastbare Rating des Pools für Ligen ohne eigenes
     // Rating. Wer nie in der Elo-Kette auftaucht, ist unterklassig, nicht Mittelfeld.
-    unratedPenalty: 80
+    // Am selben Lauf kalibriert (11 der 22 Partien hatten eine geschätzte Seite). Zwischen
+    // 120 und 300 ist die Abweichung praktisch flach; gewählt ist der konservative Rand,
+    // damit das Modell eher unter- als überschätzt - Überschätzung schlägt unmittelbar auf
+    // die Kelly-Einsätze durch.
+    unratedPenalty: 120
   },
   thresholds: {
     draw: 0.28,

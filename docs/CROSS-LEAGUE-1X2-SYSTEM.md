@@ -111,25 +111,30 @@ begrenzt. Freundschaftsspiele werden ignoriert. Die Differenz
 Nur Spiele mit Zeitstempel vor dem Anstoß fließen ein. Der Block ist erst ab sechs
 verwertbaren Pflichtspielen je Team verfügbar.
 
-### 3. Stärke der heimischen Liga – 15 Punkte
+### 3. Stärke der heimischen Liga – entfällt
 
-Jede Liga erhält pro Saison einen versionierten Stärkewert von 0 bis 100. Bevorzugte
-Grundlagen sind internationale Vereinsergebnisse und offizielle
-Konföderationskoeffizienten. Die Differenz der Ligastärken ergibt:
+Ursprünglich war hier ein Punkteblock von 15 Punkten vorgesehen. Er wurde nie belegt: Das
+Feld `leagueStrength` stand im Breakdown, wurde in zwei Summen eingerechnet und blieb
+konstant 0. Seit Torlinien-Modell `3.1.0` ist er **ersatzlos entfernt**.
 
-| Vorsprung der Liga des Favoriten | Punkte |
-|---:|---:|
-| ab 25 | 15 |
-| ab 18 | 12 |
-| ab 12 | 9 |
-| ab 7 | 6 |
-| ab 3 | 3 |
-| darunter | 0 |
+Der Grund ist keine fehlende Datenquelle mehr — die Ligaratings existieren in
+`league_strength_snapshots`. Sie wirken seither an einer anderen Stelle: als Torfaktor auf
+die erwarteten Tore, also auf die **Wahrscheinlichkeit** (siehe
+[TORLINIEN-MODELL.md](TORLINIEN-MODELL.md)). Die Empfehlungsstufe im Dashboard hängt an
+Wahrscheinlichkeit *und* Score. Ein Punkteblock an dieser Stelle würde denselben
+Klassenunterschied ein zweites Mal in dieselbe Entscheidung tragen.
 
-Für Ligen ohne belastbare Einstufung bleibt der Block unverfügbar. Kontinente dürfen
-nicht über frei geschätzte Konstanten miteinander verglichen werden. In Version
-`1.1.0` ist noch keine zulässige, versionierte Quelle angebunden; dieser Block bleibt
-daher technisch deaktiviert und wird nicht in das verfügbare Maximum eingerechnet.
+Was das Punktesystem ohnehin schon misst, deckt die Lücke mit ab: `Club-Rating` erfasst die
+relative Stärke aus den letzten Pflichtspielen, `Relative nationale Leistung` die
+Platzierung innerhalb der eigenen Liga. Gefehlt hat allein die *Vergleichbarkeit über
+Ligagrenzen* — und die sitzt jetzt im Modell.
+
+**Wieder aufnehmen** nur, wenn `npm run settle` und `npm run report` zeigen, dass
+Cross-League-Tipps schlechter abschneiden als Ligatipps. Dann zuerst prüfen, ob die
+Confidence-Schwelle (aktuell 70 für Cross-League) das bessere Stellrad ist. Ein neues
+Punkteband verschiebt `availableMaximum` und damit jeden bestehenden Score sowie das
+60-Punkte-Gate — also nur mit angehobener `activeProfileVersion` und gemessen gegen die
+vorherige Version.
 
 ### 4. Relative nationale Leistung – 15 Punkte
 
@@ -232,20 +237,24 @@ Pokal-Tabelle automatisch als Schwäche des Favoriten gilt.
 
 | Verfügbare und aktuelle Grundlage | Punkte |
 |---|---:|
-| vollständige API-Football-1X2-Quoten | 20 |
-| aktuelles Club-Rating für beide Teams | 20 |
-| versionierte Ligastärke für beide Ligen | 15 |
-| mindestens sechs nationale Ligaspiele je Team | 20 |
-| fünf verwertbare Formspiele je Team | 10 |
-| aktueller Kaderwert für beide Teams | 5 |
-| bestätigte Aufstellungs-/Ausfalldaten | 5 |
-| vollständiger Spielkontext | 5 |
-| **Gesamt** | **100** |
+| Verfügbare und aktuelle Grundlage | Punkte | Stand |
+|---|---:|---|
+| vollständige API-Football-1X2-Quoten | 20 | aktiv |
+| aktuelles Club-Rating für beide Teams | 20 | aktiv |
+| mindestens sechs nationale Ligaspiele je Team | 20 | aktiv, halbiert ab drei Spielen |
+| fünf verwertbare Formspiele je Team | 10 | aktiv |
+| vollständiger Spielkontext | 5 | aktiv |
+| aktueller Kaderwert für beide Teams | 5 | nicht angebunden |
+| bestätigte Aufstellungs-/Ausfalldaten | 5 | nicht angebunden |
+| **erreichbar** | **75** | |
 
-Weil Ligenstärke, Kaderwert und Aufstellungen in Version `1.1.0` bewusst nicht
-geschätzt werden, liegt das aktuell praktisch erreichbare Datenvertrauen bei höchstens
-75. Das genügt für eine belastbare Bewertung, weist aber transparent auf die noch
-fehlenden Datenblöcke hin.
+Kaderwert und Aufstellungen werden bewusst nicht geschätzt, solange keine belastbare
+Quelle angebunden ist. Das praktisch erreichbare Datenvertrauen liegt deshalb bei 75. Das
+genügt für eine belastbare Bewertung, weist aber transparent auf die fehlenden Blöcke hin.
+
+Der frühere Block „versionierte Ligastärke" (15 Punkte) ist entfallen, weil die
+Ligaratings seit Torlinien-Modell `3.1.0` auf die Wahrscheinlichkeit wirken statt auf die
+Punktzahl — siehe Abschnitt 3.
 
 `Spielkontext` umfasst Austragungsort sowie bei Rückspielen den Hinspielstand. Daten,
 die erst nach dem Anstoß verfügbar wurden, dürfen das historische Datenvertrauen nicht

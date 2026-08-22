@@ -298,7 +298,7 @@ test("gemeinsame Pokalbasis überschätzt den unterklassigen Gastgeber", () => {
   assert.ok(model.probabilities.home > model.probabilities.away);
 });
 
-test("eigene Ligabasis je Seite dreht die Cross-League-Inversion zurück", () => {
+test("eigene Ligabasis je Seite baut die Cross-League-Inversion ab", () => {
   const target = Math.floor(Date.UTC(2026, 7, 23, 13, 30) / 1000);
   const { upcoming, cupHistory, amateurHistory, proHistory, teamHistory } =
     crossLeagueScenario(target);
@@ -307,8 +307,72 @@ test("eigene Ligabasis je Seite dreht die Cross-League-Inversion zurück", () =>
     away: leagueBaseline(proHistory, target)
   };
   assert.ok(sideBaselines.home.homeGoals > sideBaselines.away.homeGoals);
-  const model = analyzeFixture(upcoming, cupHistory, teamHistory, { sideBaselines });
+  const before = analyzeFixture(upcoming, cupHistory, teamHistory);
+  const after = analyzeFixture(upcoming, cupHistory, teamHistory, { sideBaselines });
+  // Die Ligabasis nimmt die Verzerrung heraus. Sie behauptet aber nicht, eine der beiden
+  // Ligen sei stärker - dafür ist allein der Stärkefaktor zuständig.
+  assert.ok(after.probabilities.home < before.probabilities.home);
+  assert.ok(after.probabilities.away > before.probabilities.away);
+});
+
+test("erst der Stärkefaktor macht den höherklassigen Gast zum Favoriten", () => {
+  const target = Math.floor(Date.UTC(2026, 7, 23, 13, 30) / 1000);
+  const { upcoming, cupHistory, amateurHistory, proHistory, teamHistory } =
+    crossLeagueScenario(target);
+  const sideBaselines = {
+    home: leagueBaseline(amateurHistory, target),
+    away: leagueBaseline(proHistory, target)
+  };
+  const model = analyzeFixture(upcoming, cupHistory, teamHistory, {
+    sideBaselines, strengthFactor: 0.62
+  });
   assert.ok(model.probabilities.away > model.probabilities.home);
+});
+
+test("gleichklassige Pokalpaarungen erben keinen Auswärtsdrall des Wettbewerbs", () => {
+  const target = Math.floor(Date.UTC(2026, 7, 23, 13, 30) / 1000);
+  const { cupHistory } = crossLeagueScenario(target);
+  const league = { leagueId: 79, leagueName: "2. Bundesliga" };
+  let id = 5000;
+
+  // Eine Liga mit normalem Heimvorteil und zwei gleich starken Vereinen darin.
+  const leagueHistory = [
+    ...Array.from({ length: 16 }, (_, index) => fixture({
+      id: id++, timestamp: target - (index + 1) * 86_400,
+      homeId: 700 + index, awayId: 800 + index, homeGoals: 2, awayGoals: 1, ...league
+    })),
+    ...[2, 3].flatMap((teamId) => [
+      ...Array.from({ length: 7 }, (_, index) => fixture({
+        id: id++, timestamp: target - (index + 1) * 86_400 - 3600 * teamId,
+        homeId: teamId, awayId: 810 + index, homeGoals: 2, awayGoals: 1, ...league
+      })),
+      ...Array.from({ length: 7 }, (_, index) => fixture({
+        id: id++, timestamp: target - (index + 1) * 86_400 - 7200 * teamId,
+        homeId: 820 + index, awayId: teamId, homeGoals: 2, awayGoals: 1, ...league
+      }))
+    ])
+  ];
+  const upcoming = fixture({
+    id: 98_765, timestamp: target, homeId: 2, awayId: 3, leagueId: 81, leagueName: "Pokal"
+  });
+  const teamHistory = [...cupHistory, ...leagueHistory];
+
+  // Die Pokalhistorie besteht aus Amateurgastgebern gegen Profigäste. Genau dieser Drall
+  // darf bei zwei gleichklassigen Vereinen nicht in die Erwartung durchschlagen.
+  const cupBaseline = leagueBaseline(cupHistory, target);
+  assert.ok(
+    cupBaseline.awayGoals > cupBaseline.homeGoals * 2,
+    "die Pokalhistorie muss den erwarteten Auswärtsdrall haben"
+  );
+
+  const baseline = leagueBaseline(leagueHistory, target);
+  const model = analyzeFixture(upcoming, cupHistory, teamHistory, {
+    sideBaselines: { home: baseline, away: baseline }
+  });
+  assert.ok(
+    model.expectedHomeGoals > model.expectedAwayGoals,
+    `Heimvorteil erwartet, war λ ${model.expectedHomeGoals} : ${model.expectedAwayGoals}`
+  );
 });
 
 test("Stärkefaktor verschiebt die erwarteten Tore symmetrisch", () => {

@@ -1629,6 +1629,11 @@
     "apiTeamId": 3483,
     "apiTeamName": "Chrobry Głogów"
   },
+  "chuncheon fc": {
+    "tipicoName": "Chuncheon FC",
+    "apiTeamId": 7064,
+    "apiTeamName": "Chuncheon"
+  },
   "chungnam asan fc": {
     "tipicoName": "Chungnam Asan FC",
     "apiTeamId": 2753,
@@ -3714,6 +3719,11 @@
     "apiTeamId": 688,
     "apiTeamName": "Gandzasar"
   },
+  "gangneung city fc": {
+    "tipicoName": "Gangneung City FC",
+    "apiTeamId": 7075,
+    "apiTeamName": "Gangneung City"
+  },
   "gas alshimal": {
     "tipicoName": "Gas Alshimal",
     "apiTeamId": 28223,
@@ -3923,6 +3933,11 @@
     "tipicoName": "Guidonia Montecelio",
     "apiTeamId": 882,
     "apiTeamName": "Guidonia Montecelio 1937"
+  },
+  "gyeongju power fc": {
+    "tipicoName": "Gyeongju Power FC",
+    "apiTeamId": 7083,
+    "apiTeamName": "Gyeongju HNP"
   },
   "gyirmot fc": {
     "tipicoName": "Gyirmot FC",
@@ -4974,6 +4989,11 @@
     "apiTeamId": 899,
     "apiTeamName": "Modena"
   },
+  "mokpo city fc": {
+    "tipicoName": "Mokpo City FC",
+    "apiTeamId": 7096,
+    "apiTeamName": "Mokpo City"
+  },
   "mol fehervar fc": {
     "tipicoName": "MOL Fehérvár FC",
     "apiTeamId": 610,
@@ -5659,6 +5679,11 @@
     "apiTeamId": 1357,
     "apiTeamName": "Plymouth"
   },
+  "pocheon fc": {
+    "tipicoName": "Pocheon FC",
+    "apiTeamId": 7099,
+    "apiTeamName": "Pocheon"
+  },
   "pogon grodzisk mazowiecki": {
     "tipicoName": "Pogon Grodzisk Mazowiecki",
     "apiTeamId": 14750,
@@ -6333,6 +6358,11 @@
     "tipicoName": "Shrewsbury Town",
     "apiTeamId": 1352,
     "apiTeamName": "Shrewsbury"
+  },
+  "siheung citizen fc": {
+    "tipicoName": "Siheung Citizen FC",
+    "apiTeamId": 7105,
+    "apiTeamName": "Siheung Citizen"
   },
   "silkeborg if": {
     "tipicoName": "Silkeborg IF",
@@ -7438,6 +7468,11 @@
     "tipicoName": "Wycombe Wanderers",
     "apiTeamId": 1358,
     "apiTeamName": "Wycombe"
+  },
+  "yangpyeong fc": {
+    "tipicoName": "Yangpyeong FC",
+    "apiTeamId": 7111,
+    "apiTeamName": "Yangpyeong"
   },
   "yilport samsunspor": {
     "tipicoName": "Yilport Samsunspor",

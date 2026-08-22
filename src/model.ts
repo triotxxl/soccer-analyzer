@@ -429,9 +429,10 @@ export function analyzeFirstHalfGoals(
   const awayDefense = (0.75 * awayMetrics.venueGoalsAgainst + 0.25 * awayMetrics.weightedGoalsAgainst) / awayBase.homeGoals;
   const awayAttack = (0.75 * awayMetrics.venueGoalsFor + 0.25 * awayMetrics.weightedGoalsFor) / awayBase.awayGoals;
   const homeDefense = (0.75 * homeMetrics.venueGoalsAgainst + 0.25 * homeMetrics.weightedGoalsAgainst) / homeBase.awayGoals;
+  // Maßstab wie im Gesamtspielmodell: dieselbe Basis wie im Nenner der Angriffskennzahl.
   const strength = options.strengthFactor ?? 1;
-  const expectedHomeGoals = clamp(leagueHomeGoals * homeAttack * awayDefense * strength, 0.05, 2.5);
-  const expectedAwayGoals = clamp(leagueAwayGoals * awayAttack * homeDefense / strength, 0.05, 2.5);
+  const expectedHomeGoals = clamp(homeBase.homeGoals * homeAttack * awayDefense * strength, 0.05, 2.5);
+  const expectedAwayGoals = clamp(awayBase.awayGoals * awayAttack * homeDefense / strength, 0.05, 2.5);
   const coverage = fullTeamMatches.length === 0
     ? 0
     : clamp(teamMatches.length / fullTeamMatches.length, 0, 1);
@@ -579,10 +580,16 @@ export function analyzeFixture(
   const awayProfile = defensiveProfile(fixture.teams.away.id, "away", teamMatches, fixture.fixture.timestamp, awayBase.homeGoals, awayBase.awayGoals, quality, options.expectedGoals, options.rankings);
   const awayDefense = awayProfile.index ?? awayProfile.relativeToLeague;
   const homeDefense = homeProfile.index ?? homeProfile.relativeToLeague;
-  // Der Maßstab bleibt der Wettbewerb der Partie; seitenspezifisch sind nur die Nenner oben.
+  // Maßstab und Nenner der Angriffskennzahl müssen dieselbe Basis sein, sonst kürzen sie
+  // sich nicht und der Heim-/Auswärtsdrall einer fremden Torbasis landet in der Erwartung.
+  // Bei Ligaspielen sind beide ohnehin identisch. Bei Pokalpartien wäre der
+  // Wettbewerbsschnitt fatal: Er bildet den *durchschnittlichen* Klassenunterschied der
+  // Runde ab (Amateurgastgeber gegen Profigast) und würde ihn jeder Paarung aufdrücken -
+  // auch zwei gleichklassigen Vereinen - und bei ungleichen Paarungen ein zweites Mal
+  // zusätzlich zum Stärkefaktor. Der Klassenunterschied gehört allein in `strength`.
   const strength = options.strengthFactor ?? 1;
-  const expectedHomeGoals = clamp(leagueHomeGoals * homeAttack * awayDefense * strength, 0.2, 4.5);
-  const expectedAwayGoals = clamp(leagueAwayGoals * awayAttack * homeDefense / strength, 0.2, 4.5);
+  const expectedHomeGoals = clamp(homeBase.homeGoals * homeAttack * awayDefense * strength, 0.2, 4.5);
+  const expectedAwayGoals = clamp(awayBase.awayGoals * awayAttack * homeDefense / strength, 0.2, 4.5);
 
   return {
     expectedHomeGoals,
