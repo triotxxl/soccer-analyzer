@@ -487,10 +487,17 @@ export interface FavoriteScoreBreakdown {
   deductions: number;
 }
 
+/**
+ * Kein `leagueStrength`-Band: Der Klassenunterschied zwischen den Ligen wirkt seit
+ * Modellversion 3.1.0 über den Elo-Torfaktor auf die erwarteten Tore, also auf die
+ * Wahrscheinlichkeit. Ein zusätzliches Punkteband würde dieselbe Information ein
+ * zweites Mal in dieselbe Empfehlungsentscheidung tragen, weil die Stufe in
+ * `dashboard.ts` an Wahrscheinlichkeit *und* Score hängt. Siehe die Notiz in
+ * `cross-league-criteria.ts`, wann das wieder aufzunehmen wäre.
+ */
 export interface CrossLeagueScoreBreakdown {
   market: number;
   clubRating: number;
-  leagueStrength: number;
   domesticPerformance: number;
   form: number;
   squadStrength: number;

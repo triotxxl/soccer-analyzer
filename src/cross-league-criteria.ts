@@ -186,10 +186,21 @@ export function scoreCrossLeagueFixture(
   const favorite = favoriteIsHome ? home : away;
   const opponent = favoriteIsHome ? away : home;
   const favoriteOdds = favoriteIsHome ? odds.home : odds.away;
+  // Ligastärke ist hier bewusst kein eigenes Punkteband. Bis Modellversion 3.0.0 stand
+  // dafür ein Feld `leagueStrength` im Breakdown, das nie belegt wurde und konstant 0 blieb.
+  // Seit 3.1.0 wirkt der Klassenunterschied über den Elo-Torfaktor auf die erwarteten Tore
+  // (siehe strength-factor.ts). Die Empfehlungsstufe in dashboard.ts hängt an
+  // Wahrscheinlichkeit *und* Score, ein Band hier würde dieselbe Information doppelt zählen.
+  //
+  // WIEDER AUFNEHMEN, wenn `npm run settle` und `npm run report` zeigen, dass
+  // Cross-League-Tipps schlechter abschneiden als Ligatipps. Dann zuerst prüfen, ob die
+  // Confidence-Schwelle (aktuell 70 für Cross-League, dashboard.ts) das bessere Stellrad
+  // ist; erst danach ein Punkteband ergänzen. Beides verschiebt `availableMaximum` und
+  // damit jeden bestehenden Score sowie das 60-Punkte-Gate - also nur mit angehobener
+  // `activeProfileVersion` und gemessen gegen die vorherige Version.
   const breakdown: CrossLeagueScoreBreakdown = {
     market: 0,
     clubRating: 0,
-    leagueStrength: 0,
     domesticPerformance: 0,
     form: 0,
     squadStrength: 0,
@@ -291,7 +302,6 @@ export function scoreCrossLeagueFixture(
   breakdown.rawPoints =
     breakdown.market +
     breakdown.clubRating +
-    breakdown.leagueStrength +
     breakdown.domesticPerformance +
     breakdown.form +
     breakdown.squadStrength +
@@ -340,7 +350,6 @@ export function scoreCrossLeagueFixture(
     sportsScore: Math.round(clamp(
       (
         breakdown.clubRating +
-        breakdown.leagueStrength +
         breakdown.domesticPerformance +
         breakdown.form +
         breakdown.squadStrength +
