@@ -14,6 +14,11 @@
     "country": "Albania",
     "league": "Superliga"
   },
+  "algerien|ligue 1": {
+    "leagueId": 186,
+    "country": "Algeria",
+    "league": "Ligue 1"
+  },
   "argentinien|copa argentina": {
     "leagueId": 130,
     "country": "Argentina",
@@ -59,6 +64,11 @@
     "country": "Armenia",
     "league": "Premier League"
   },
+  "aserbaidschan|1 divizion": {
+    "leagueId": 418,
+    "country": "Azerbaijan",
+    "league": "Birinci Dasta"
+  },
   "aserbaidschan|premier league": {
     "leagueId": 419,
     "country": "Azerbaijan",
@@ -75,6 +85,11 @@
     "league": "Capital Territory NPL"
   },
   "australien|npl new south wales": {
+    "leagueId": 192,
+    "country": "Australia",
+    "league": "New South Wales NPL"
+  },
+  "australien|npl new south wales finalrunde": {
     "leagueId": 192,
     "country": "Australia",
     "league": "New South Wales NPL"
@@ -174,6 +189,11 @@
     "country": "World",
     "league": "UEFA Champions League"
   },
+  "chile|copa chile gruppe e": {
+    "leagueId": 267,
+    "country": "Chile",
+    "league": "Copa Chile"
+  },
   "chile|primera b": {
     "leagueId": 266,
     "country": "Chile",
@@ -209,6 +229,16 @@
     "country": "China",
     "league": "Super League"
   },
+  "china|fa pokal": {
+    "leagueId": 171,
+    "country": "China",
+    "league": "FA Cup"
+  },
+  "concacaf leagues cup|endrunde": {
+    "leagueId": 772,
+    "country": "World",
+    "league": "Leagues Cup"
+  },
   "concacaf leagues cup|ligaphase": {
     "leagueId": 772,
     "country": "World",
@@ -228,6 +258,11 @@
     "leagueId": 11,
     "country": "World",
     "league": "CONMEBOL Sudamericana"
+  },
+  "costa rica|liga de ascenso apertura gruppe 1": {
+    "leagueId": 163,
+    "country": "Costa-Rica",
+    "league": "Liga de Ascenso"
   },
   "costa rica|liga de ascenso apertura gruppe 2": {
     "leagueId": 163,
@@ -309,6 +344,11 @@
     "country": "England",
     "league": "League Cup"
   },
+  "england|frauen super league": {
+    "leagueId": 44,
+    "country": "England",
+    "league": "FA WSL"
+  },
   "england|league trophy northern gruppe b": {
     "leagueId": 46,
     "country": "England",
@@ -384,6 +424,11 @@
     "country": "Georgia",
     "league": "Erovnuli Liga"
   },
+  "griechenland|pokal hauptrunde": {
+    "leagueId": 199,
+    "country": "Greece",
+    "league": "Cup"
+  },
   "guatemala|liga nacional apertura": {
     "leagueId": 339,
     "country": "Guatemala",
@@ -403,6 +448,11 @@
     "leagueId": 234,
     "country": "Honduras",
     "league": "Liga Nacional"
+  },
+  "international clubs|fifa interkontinental pokal": {
+    "leagueId": 1168,
+    "country": "World",
+    "league": "FIFA Intercontinental Cup"
   },
   "international clubs|uefa super cup": {
     "leagueId": 531,
@@ -494,6 +544,11 @@
     "country": "Italy",
     "league": "Serie A"
   },
+  "japan|emperor pokal": {
+    "leagueId": 102,
+    "country": "Japan",
+    "league": "Emperor Cup"
+  },
   "japan|j league": {
     "leagueId": 98,
     "country": "Japan",
@@ -508,6 +563,21 @@
     "leagueId": 100,
     "country": "Japan",
     "league": "J3 League"
+  },
+  "japan|j league pokal": {
+    "leagueId": 101,
+    "country": "Japan",
+    "league": "J-League Cup"
+  },
+  "japan|we league frauen": {
+    "leagueId": 854,
+    "country": "Japan",
+    "league": "WE League"
+  },
+  "jordanien|jordan league": {
+    "leagueId": 387,
+    "country": "Jordan",
+    "league": "League"
   },
   "kanada|canadian premier league": {
     "leagueId": 479,
@@ -524,10 +594,20 @@
     "country": "Kazakhstan",
     "league": "Premier League"
   },
+  "katar|2 division": {
+    "leagueId": 306,
+    "country": "Qatar",
+    "league": "Second Division"
+  },
   "katar|stars league": {
     "leagueId": 305,
     "country": "Qatar",
     "league": "Stars League"
+  },
+  "kenia|premier league": {
+    "leagueId": 276,
+    "country": "Kenya",
+    "league": "FKF Premier League"
   },
   "kolumbien|copa colombia endrunde": {
     "leagueId": 241,
@@ -584,6 +664,11 @@
     "country": "Mexico",
     "league": "Liga MX"
   },
+  "moldawien|super liga": {
+    "leagueId": 394,
+    "country": "Moldova",
+    "league": "Super Liga"
+  },
   "montenegro|1 cfl": {
     "leagueId": 355,
     "country": "Montenegro",
@@ -629,15 +714,30 @@
     "country": "Norway",
     "league": "2. Division - Group 1"
   },
+  "norwegen|2 division gruppe 2": {
+    "leagueId": 474,
+    "country": "Norway",
+    "league": "2. Division - Group 2"
+  },
   "norwegen|eliteserien": {
     "leagueId": 103,
     "country": "Norway",
     "league": "Eliteserien"
   },
+  "norwegen|nm cupen": {
+    "leagueId": 105,
+    "country": "Norway",
+    "league": "NM Cupen"
+  },
   "norwegen|toppserien frauen": {
     "leagueId": 725,
     "country": "Norway",
     "league": "Toppserien"
+  },
+  "oman|oman professional liga": {
+    "leagueId": 406,
+    "country": "Oman",
+    "league": "Professional League"
   },
   "osterreich|2 liga": {
     "leagueId": 219,
@@ -648,6 +748,11 @@
     "leagueId": 218,
     "country": "Austria",
     "league": "Bundesliga"
+  },
+  "osterreich|ofb cup": {
+    "leagueId": 220,
+    "country": "Austria",
+    "league": "Cup"
   },
   "panama|liga prom apertura": {
     "leagueId": 304,
@@ -674,6 +779,11 @@
     "country": "Peru",
     "league": "Primera División"
   },
+  "peru|segunda division gruppe a": {
+    "leagueId": 282,
+    "country": "Peru",
+    "league": "Segunda División"
+  },
   "peru|segunda division gruppe b": {
     "leagueId": 282,
     "country": "Peru",
@@ -699,6 +809,11 @@
     "country": "Poland",
     "league": "Ekstraklasa"
   },
+  "polen|puchar polski": {
+    "leagueId": 108,
+    "country": "Poland",
+    "league": "Cup"
+  },
   "portugal|liga 3 gruppe a": {
     "leagueId": 865,
     "country": "Portugal",
@@ -718,6 +833,46 @@
     "leagueId": 284,
     "country": "Romania",
     "league": "Liga II"
+  },
+  "rumanien|liga iii seria 3": {
+    "leagueId": 786,
+    "country": "Romania",
+    "league": "Liga III - Serie 3"
+  },
+  "rumanien|liga iii seria 4": {
+    "leagueId": 787,
+    "country": "Romania",
+    "league": "Liga III - Serie 4"
+  },
+  "rumanien|liga iii seria 7": {
+    "leagueId": 790,
+    "country": "Romania",
+    "league": "Liga III - Serie 7"
+  },
+  "rumanien|liga iii seria 8": {
+    "leagueId": 791,
+    "country": "Romania",
+    "league": "Liga III - Serie 8"
+  },
+  "rumanien|rumanien cup gruppe 1": {
+    "leagueId": 285,
+    "country": "Romania",
+    "league": "Cupa României"
+  },
+  "rumanien|rumanien cup gruppe 2": {
+    "leagueId": 285,
+    "country": "Romania",
+    "league": "Cupa României"
+  },
+  "rumanien|rumanien cup gruppe 3": {
+    "leagueId": 285,
+    "country": "Romania",
+    "league": "Cupa României"
+  },
+  "rumanien|rumanien cup gruppe 4": {
+    "leagueId": 285,
+    "country": "Romania",
+    "league": "Cupa României"
   },
   "rumanien|superliga": {
     "leagueId": 283,
@@ -819,6 +974,11 @@
     "country": "Slovakia",
     "league": "2. liga"
   },
+  "slowakei|slovensky pohar": {
+    "leagueId": 680,
+    "country": "Slovakia",
+    "league": "Cup"
+  },
   "slowakei|superliga": {
     "leagueId": 332,
     "country": "Slovakia",
@@ -843,6 +1003,26 @@
     "leagueId": 141,
     "country": "Spain",
     "league": "Segunda División"
+  },
+  "spanien|primera division frauen": {
+    "leagueId": 142,
+    "country": "Spain",
+    "league": "Primera División Femenina"
+  },
+  "spanien|primera division rfef gruppe 1": {
+    "leagueId": 435,
+    "country": "Spain",
+    "league": "Primera División RFEF - Group 1"
+  },
+  "spanien|primera division rfef gruppe 2": {
+    "leagueId": 436,
+    "country": "Spain",
+    "league": "Primera División RFEF - Group 2"
+  },
+  "sudafrika|national first division": {
+    "leagueId": 289,
+    "country": "South-Africa",
+    "league": "1st Division"
   },
   "sudafrika|premier league": {
     "leagueId": 288,
@@ -894,10 +1074,30 @@
     "country": "Czech-Republic",
     "league": "3. liga - MSFL"
   },
+  "tschechien|pokal": {
+    "leagueId": 347,
+    "country": "Czech-Republic",
+    "league": "Cup"
+  },
+  "tunesien|ligue 1": {
+    "leagueId": 202,
+    "country": "Tunisia",
+    "league": "Ligue 1"
+  },
   "turkei|1 lig": {
     "leagueId": 204,
     "country": "Turkey",
     "league": "1. Lig"
+  },
+  "uefa champions league frauen|champions league qualifikationsrunde frauen": {
+    "leagueId": 525,
+    "country": "World",
+    "league": "UEFA Champions League Women"
+  },
+  "uefa europa cup frauen|europa cup qualifikationsrunde frauen": {
+    "leagueId": 1191,
+    "country": "World",
+    "league": "UEFA Europa Cup - Women"
   },
   "ungarn|nb i": {
     "leagueId": 271,
@@ -939,6 +1139,11 @@
     "country": "Venezuela",
     "league": "Primera División"
   },
+  "venezuela|segunda division zentral ost": {
+    "leagueId": 300,
+    "country": "Venezuela",
+    "league": "Segunda División"
+  },
   "venezuela|segunda division zentral west": {
     "leagueId": 300,
     "country": "Venezuela",
@@ -948,5 +1153,10 @@
     "leagueId": 110,
     "country": "Wales",
     "league": "Premier League"
+  },
+  "zypern|1 division": {
+    "leagueId": 318,
+    "country": "Cyprus",
+    "league": "1. Division"
   }
 }
