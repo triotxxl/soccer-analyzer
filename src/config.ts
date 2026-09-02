@@ -3,6 +3,9 @@ import path from "node:path";
 const strengthOnDemandRequestBudget = Number(
   process.env.STRENGTH_ON_DEMAND_REQUEST_BUDGET ?? 25
 );
+const settleRequestBudget = Number(
+  process.env.SETTLE_REQUEST_BUDGET ?? 200
+);
 const apiRequestsPerMinute = Number(
   process.env.API_REQUESTS_PER_MINUTE ?? 300
 );
@@ -66,6 +69,13 @@ export const config = {
   activeProfileVersion: "1.3.0",
   goalLineModelVersion: "3.1.0",
   xgEnrichmentRequestBudget: 250,
+  // Abrechnung fälliger Prognosen am Ende jedes Dashboard-Laufs. Klein gehalten, weil im
+  // laufenden Betrieb pro Tag nur Dutzende Partien anfallen; ein Rückstand wird über
+  // mehrere Läufe abgetragen. 0 schaltet die automatische Abrechnung ab.
+  settleRequestBudget:
+    Number.isInteger(settleRequestBudget) && settleRequestBudget >= 0
+      ? settleRequestBudget
+      : 200,
   strengthOnDemandRequestBudget:
     Number.isInteger(strengthOnDemandRequestBudget) &&
     strengthOnDemandRequestBudget > 0
@@ -75,15 +85,26 @@ export const config = {
     // Elo-Differenz zweier Ligen -> Torfaktor je Seite: 10 ** (delta / factorDivisor).
     // Seit dem neutralen Maßstab im Modell trägt dieser Faktor den Klassenunterschied
     // allein; vorher hat die schiefe Pokal-Torbasis einen Teil davon verdeckt mitgetragen.
-    // Kalibriert am DFB-Pokal-Lauf vom 22.08.2026 (21 Partien mit Quote): mittlere
-    // absolute Abweichung zur Marktwahrscheinlichkeit 9,6 pp bei einem Bias von -3,5 pp.
-    // Der Bias wird bewusst nicht auf null gezogen, weil 1/Quote die Buchmachermarge
-    // enthält und die Marktwahrscheinlichkeit dadurch überzeichnet ist.
+    // Am 31.08.2026 auf 379 abgerechnete Cross-League-Partien mit gemessener Ligastärke
+    // nachgezogen (vorher 900, kalibriert an einer einzigen Pokalrunde mit 21 Partien).
+    // Der Favorit traf dort 36,4 % statt der prognostizierten 49,3 %, und der Fehler wächst
+    // mit der Spreizung: -3,8 pp bei ausgeglichenen Partien, -13,9 und -17,3 pp in der Mitte,
+    // -27,1 pp im schiefsten Viertel. Diese Dosis-Wirkung ist die Signatur zu scharfer
+    // Klassentrennung und gehört genau hierher.
+    // Eine Poisson-Simulation über dieselben Partien senkt mit 1500 die mittlere
+    // Favoritenwahrscheinlichkeit von 49,3 auf 44,6 % und den Brier-Score von 0.684 auf 0.664.
+    // Stärkere Stauchung bringt kaum noch etwas (0.657 bei 3000), kostet aber die
+    // Trennschärfe zwischen großen und kleinen Klassenunterschieden - das schiefste Viertel
+    // trifft mit 48,6 % weiterhin deutlich häufiger als ausgeglichene Partien mit 35,6 %.
+    // Die Simulation staucht die gesamte Spreizung, also auch den Formanteil; 1500 ist damit
+    // die Untergrenze des passenden Bereichs und bewusst die konservative Wahl, weil
+    // Überschätzung unmittelbar auf die Kelly-Einsätze durchschlägt.
+    // Rund 4,5 pp der Lücke überleben auch extreme Stauchung: Cross-League-Partien enden
+    // häufiger remis (29,3 % statt prognostizierter 23,4 %) und die Heimseite gewinnt seltener
+    // (34,3 % statt 41,2 %). Das ist kein Klassenthema und nicht über diesen Wert zu heilen.
     // Die Grenzen sind so gewählt, dass im gemessenen Feld kein Faktor am Clamp hängt -
     // sonst unterscheidet das Modell große Klassenunterschiede nicht mehr voneinander.
-    // Basis ist eine einzige Pokalrunde; mit abgerechneten Ergebnissen aus `npm run report`
-    // gehört das nachgezogen.
-    factorDivisor: 900,
+    factorDivisor: 1500,
     factorMin: 0.3,
     factorMax: 3.5,
     // Abschlag auf das schwächste belastbare Rating des Pools für Ligen ohne eigenes

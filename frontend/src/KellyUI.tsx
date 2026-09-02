@@ -1,7 +1,7 @@
-import { Calculator, X } from "@phosphor-icons/react";
+import { Calculator, DownloadSimple, X } from "@phosphor-icons/react";
 import { useState, type ReactNode } from "react";
 import { formatOdd, formatPercent, sortStateLabel } from "./App";
-import { computeKellyCandidates, type KellyCandidate, type KellySettings } from "./kelly";
+import { buildKellyExport, computeKellyCandidates, kellyExportFileName, type KellyCandidate, type KellySettings } from "./kelly";
 import type { DashboardFixture, DashboardMarketKey } from "./types";
 
 export function KellyButton({ onOpen }: { onOpen(): void }) {
@@ -31,8 +31,65 @@ function sortValue(candidate: KellyCandidate, key: KellySortKey): number | strin
   return candidate.stake;
 }
 
+function downloadJson(fileName: string, payload: unknown): void {
+  const url = URL.createObjectURL(new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" }));
+  const anchor = window.document.createElement("a");
+  anchor.href = url;
+  anchor.download = fileName;
+  window.document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  // Firefox cancels the download when the URL is revoked in the same tick.
+  window.setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
 function SettingField({ label, children }: { label: string; children: ReactNode }) {
   return <label className="kelly-setting-field"><span>{label}</span>{children}</label>;
+}
+
+// 0.07 * 100 ergibt 7.000000000000001 - ohne Rundung landet der Float im Eingabefeld.
+function roundForDisplay(value: number): number {
+  return Math.round(value * 1e6) / 1e6;
+}
+
+/**
+ * Zahlenfeld mit Entwurfszustand: Solange getippt wird, zeigt das Feld exakt das an, was
+ * eingegeben wurde - auch die leere Eingabe. Nur gültige Zahlen werden nach oben gemeldet,
+ * geklemmt wird erst beim Verlassen des Feldes. Ohne den Entwurf würde ein geleertes Feld
+ * sofort wieder auf 0 springen und ließe sich nicht überschreiben.
+ */
+function NumberField({ label, value, scale = 1, min, max, step, disabled, onCommit }: {
+  label: string;
+  value: number;
+  scale?: number;
+  min?: number;
+  max?: number;
+  step?: number;
+  disabled?: boolean;
+  onCommit(value: number): void;
+}) {
+  const [draft, setDraft] = useState<string | null>(null);
+
+  const change = (raw: string) => {
+    setDraft(raw);
+    const parsed = Number(raw);
+    if (raw.trim() !== "" && Number.isFinite(parsed)) onCommit(parsed / scale);
+  };
+
+  const blur = () => {
+    const parsed = draft === null ? NaN : Number(draft);
+    const shown = draft !== null && draft.trim() !== "" && Number.isFinite(parsed) ? parsed : value * scale;
+    const clamped = Math.min(max ?? Infinity, Math.max(min ?? -Infinity, shown));
+    setDraft(null);
+    if (clamped / scale !== value) onCommit(clamped / scale);
+  };
+
+  return <SettingField label={label}>
+    <input type="number" min={min} max={max} step={step} disabled={disabled}
+      value={draft ?? String(roundForDisplay(value * scale))}
+      onChange={(event) => change(event.target.value)}
+      onBlur={blur} />
+  </SettingField>;
 }
 
 export function KellyDialog({ fixtures, marketFilter, marketLabel, settings, onSettingsChange, onClose }: {
@@ -46,7 +103,8 @@ export function KellyDialog({ fixtures, marketFilter, marketLabel, settings, onS
   const [sortKey, setSortKey] = useState<KellySortKey>("stake");
   const [sortDirection, setSortDirection] = useState<1 | -1>(-1);
 
-  const { candidates, evaluated, scaleFactor } = computeKellyCandidates(fixtures, marketFilter, settings);
+  const { candidates, evaluated, scaleFactor, gameRiskLimits } = computeKellyCandidates(fixtures, marketFilter, settings);
+  const limitedGames = gameRiskLimits.filter((game) => game.scaleFactor < 1);
   const sorted = [...candidates].sort((left, right) => {
     const leftValue = sortValue(left, sortKey);
     const rightValue = sortValue(right, sortKey);
@@ -67,22 +125,28 @@ export function KellyDialog({ fixtures, marketFilter, marketLabel, settings, onS
   const set = <K extends keyof KellySettings>(key: K, value: KellySettings[K]) =>
     onSettingsChange({ ...settings, [key]: value });
 
+  // Exportiert die Liste genau so, wie sie gerade gefiltert und sortiert angezeigt wird.
+  const exportList = () => downloadJson(
+    kellyExportFileName(marketFilter),
+    buildKellyExport({ candidates: sorted, evaluated, scaleFactor, gameRiskLimits }, { marketFilter, marketLabel, settings })
+  );
+
   return <div className="overlay-backdrop" onClick={onClose}>
     <div className="kelly-dialog" role="dialog" aria-label="Kelly-Kriterium" onClick={(event) => event.stopPropagation()}>
       <div className="overlay-head">
         <strong>Kelly-Kriterium · {marketLabel}</strong>
-        <button aria-label="Schließen" onClick={onClose}><X /></button>
+        <span className="overlay-head-actions">
+          <button aria-label="Liste als JSON exportieren" title="Liste als JSON exportieren"
+            disabled={sorted.length === 0} onClick={exportList}><DownloadSimple /></button>
+          <button aria-label="Schließen" onClick={onClose}><X /></button>
+        </span>
       </div>
 
       <div className="kelly-settings-grid">
-        <SettingField label="Budget (€)">
-          <input type="number" min={0} step={5} value={settings.budget}
-            onChange={(event) => set("budget", Math.max(0, Number(event.target.value) || 0))} />
-        </SettingField>
-        <SettingField label="Mindestquote">
-          <input type="number" min={1.01} step={0.05} value={settings.minOdds}
-            onChange={(event) => set("minOdds", Math.max(1.01, Number(event.target.value) || 1.01))} />
-        </SettingField>
+        <NumberField label="Budget (€)" value={settings.budget} min={0} step={5}
+          onCommit={(value) => set("budget", value)} />
+        <NumberField label="Mindestquote" value={settings.minOdds} min={1.01} step={0.05}
+          onCommit={(value) => set("minOdds", value)} />
         <SettingField label="Kelly-Fraktion">
           <select value={settings.kellyFraction} onChange={(event) => set("kellyFraction", Number(event.target.value))}>
             <option value={1}>Full Kelly</option>
@@ -91,18 +155,23 @@ export function KellyDialog({ fixtures, marketFilter, marketLabel, settings, onS
             <option value={0.125}>1/8 Kelly</option>
           </select>
         </SettingField>
-        <SettingField label="Max. Einsatz/Wette (%)">
-          <input type="number" min={0} max={100} step={0.5} value={settings.maxStakePercent * 100}
-            onChange={(event) => set("maxStakePercent", Math.max(0, Number(event.target.value) || 0) / 100)} />
+        <NumberField label="Max. Einsatz/Wette (%)" value={settings.maxStakePercent} scale={100} min={0} max={100} step={0.5}
+          onCommit={(value) => set("maxStakePercent", value)} />
+        <NumberField label="Max. Gesamtrisiko (%)" value={settings.maxExposurePercent} scale={100} min={0} max={100} step={1}
+          onCommit={(value) => set("maxExposurePercent", value)} />
+        <NumberField label="Mindest-Edge (PP)" value={settings.minEdge} scale={100} min={0} step={0.5}
+          onCommit={(value) => set("minEdge", value)} />
+        <SettingField label="Mehrere Märkte je Spiel">
+          <input type="checkbox" checked={settings.allowMultipleMarketsPerGame}
+            onChange={(event) => set("allowMultipleMarketsPerGame", event.target.checked)} />
         </SettingField>
-        <SettingField label="Max. Gesamtrisiko (%)">
-          <input type="number" min={0} max={100} step={1} value={settings.maxExposurePercent * 100}
-            onChange={(event) => set("maxExposurePercent", Math.max(0, Number(event.target.value) || 0) / 100)} />
+        <SettingField label="Game-Risk-Limit">
+          <input type="checkbox" checked={settings.enableGameRiskLimit}
+            onChange={(event) => set("enableGameRiskLimit", event.target.checked)} />
         </SettingField>
-        <SettingField label="Mindest-Edge (PP)">
-          <input type="number" min={0} step={0.5} value={settings.minEdge * 100}
-            onChange={(event) => set("minEdge", Math.max(0, Number(event.target.value) || 0) / 100)} />
-        </SettingField>
+        <NumberField label="Max. Risiko/Spiel (%)" value={settings.maxRiskPerGame} scale={100} min={0} max={100} step={0.5}
+          disabled={!settings.enableGameRiskLimit}
+          onCommit={(value) => set("maxRiskPerGame", value)} />
       </div>
 
       <div className="kelly-table-scroll">
@@ -116,7 +185,7 @@ export function KellyDialog({ fixtures, marketFilter, marketLabel, settings, onS
               <th><button onClick={() => sort("edge")} aria-label={sortStateLabel("Value", sortKey === "edge", sortDirection)}>Value {arrow("edge")}</button></th>
               <th><button onClick={() => sort("kelly")}
                 aria-label={sortStateLabel("Einsatzanteil nach Caps", sortKey === "kelly", sortDirection)}
-                title="Fractional Kelly, begrenzt durch Max-Einsatz/Wette und ggf. Gesamtrisiko-Skalierung">
+                title="Fractional Kelly, begrenzt durch Max-Einsatz/Wette und ggf. Game-Risk- und Gesamtrisiko-Skalierung">
                 Kelly* {arrow("kelly")}
               </button></th>
               <th><button onClick={() => sort("stake")} aria-label={sortStateLabel("Einsatz", sortKey === "stake", sortDirection)}>Einsatz {arrow("stake")}</button></th>
@@ -130,7 +199,9 @@ export function KellyDialog({ fixtures, marketFilter, marketLabel, settings, onS
               <td>{formatPercent(candidate.probability)}</td>
               <td className="kelly-edge">{formatEdge(candidate.edge)}</td>
               <td><strong>{formatPercent(candidate.stakePercent)}</strong><small>Full: {formatPercent(candidate.fullKelly)}</small></td>
-              <td><strong>{formatEuro(candidate.stake)}</strong></td>
+              <td><strong>{formatEuro(candidate.stake)}</strong>
+                {candidate.gameScaleFactor < 1 && <small>Spiel-Limit: {(candidate.gameScaleFactor * 100).toFixed(0)} %</small>}
+              </td>
             </tr>)}
             {sorted.length === 0 && <tr><td className="kelly-empty" colSpan={7}>Keine Value-Wetten im aktuellen Markt gefunden</td></tr>}
           </tbody>
@@ -142,8 +213,15 @@ export function KellyDialog({ fixtures, marketFilter, marketLabel, settings, onS
         <p>Summe Einsätze: <strong>{formatEuro(totalStake)}</strong> von {formatEuro(settings.budget)} Budget
           {scaleFactor < 1 && <> · Einsätze wegen Gesamtrisiko-Limit auf {(scaleFactor * 100).toFixed(0)} % skaliert</>}
         </p>
+        {limitedGames.length > 0 && <p>
+          Game-Risk-Limit {formatPercent(settings.maxRiskPerGame)} = {formatEuro(limitedGames[0]!.limit)} je Spiel ·{" "}
+          {limitedGames.length} Partie{limitedGames.length === 1 ? "" : "n"} begrenzt ·{" "}
+          Risiko dieser Partien {formatEuro(limitedGames.reduce((sum, game) => sum + game.stakeBefore, 0))} →{" "}
+          <strong>{formatEuro(limitedGames.reduce((sum, game) => sum + game.stakeAfter, 0))}</strong>
+        </p>}
         <p className="kelly-hint">Kelly setzt kalibrierte Wahrscheinlichkeiten voraus – die Modellwerte sind Schätzungen, keine Garantien. Fractional Kelly reduziert das Risiko bei Fehleinschätzungen.</p>
-        <p className="kelly-hint">* „Kelly" zeigt den finalen Einsatzanteil nach Fraktion, Pro-Wette- und Gesamtrisiko-Cap; „Full" darunter ist der ungedeckelte volle Kelly-Wert.</p>
+        <p className="kelly-hint">* „Kelly" zeigt den finalen Einsatzanteil nach Fraktion, Pro-Wette-, Spiel- und Gesamtrisiko-Cap; „Full" darunter ist der ungedeckelte volle Kelly-Wert.</p>
+        <p className="kelly-hint">Das Game-Risk-Limit deckelt das Risiko aller Märkte einer Partie gemeinsam, weil sie korreliert sind. Es skaliert die Einsätze einer Partie proportional herunter und verändert die Kelly-Berechnung nicht.</p>
       </div>
     </div>
   </div>;

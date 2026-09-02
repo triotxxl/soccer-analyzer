@@ -1,7 +1,7 @@
 import type { TableRow } from "./draw-criteria.ts";
 
 export type Market = "draw" | "btts" | "over25" | "1x2";
-export type DateRange = "today" | "tomorrow" | "both" | "next48" | "three" | "five" | "seven" | "fourteen" | "twentyone";
+export type DateRange = "today" | "tomorrow" | "tomorrow2" | "both" | "next48" | "three" | "five" | "seven" | "fourteen" | "twentyone";
 
 export interface LeagueSelection {
   country: string;

@@ -22,13 +22,26 @@ Benutzer auf Deutsch und führe Analyseaufträge selbstständig über die vorhan
    zeigt Tipico-Quoten deutlich, verwendet aber weder Quoten noch einen relativen
    Modellvorteil für die Empfehlungsstufe. Diese beruht ausschließlich auf absoluter
    Modellwahrscheinlichkeit, Datenvertrauen und den vorhandenen Profilpunkten.
-5. H2H-Remisserie-Hinweise sind Auffälligkeiten und kein alleiniger Empfehlungsgrund.
-6. `next48` bedeutet strikt den Zeitraum vom Startzeitpunkt bis exakt 48 Stunden später;
+5. Fehlt bei einer Cross-League-Partie der Ligastärke-Vergleich, trägt nichts im Modell
+   den Klassenunterschied. Der 1X2-Markt wird dann mit `probabilityReliable: false` markiert:
+   Das Dashboard zeigt weder Wahrscheinlichkeit noch Value, die Empfehlungsstufe ist immer
+   „Nicht empfehlenswert“, und der Markt taucht in der Kelly-Auswahl nicht auf. Torlinien und
+   BTTS bleiben bewertbar, weil der Torfaktor die Heimtore multipliziert und die Auswärtstore
+   teilt und die Torsumme dadurch nahezu unverändert lässt.
+6. Cross-League-Partien mit deutlichem Klassenunterschied tragen das Feld `classGap`
+   (`clear` oder `extreme`) und in der App ein Kürzel „Klasse“ mit Pfeil zur stärkeren
+   Seite. Quelle ist bevorzugt das Ligarating (Torfaktor ab 1,5 beziehungsweise 2,2, eine
+   nur geschätzte Seite genügt für die untere Stufe); fehlt es, das Verhältnis der
+   Tipico-Quoten für 1 und 2 (ab 4 beziehungsweise 8). Die Quelle steht im Feld und im
+   Tooltip. Eine Markierung aus dem Quotenbild bleibt eine nachgelagerte Kennzeichnung
+   und ändert weder Tipp noch Wahrscheinlichkeit.
+7. H2H-Remisserie-Hinweise sind Auffälligkeiten und kein alleiniger Empfehlungsgrund.
+8. `next48` bedeutet strikt den Zeitraum vom Startzeitpunkt bis exakt 48 Stunden später;
    es ist kein Kalenderfilter für „heute und morgen“. Die obere Grenze gilt
    ausnahmslos. Die untere Grenze ist der Startzeitpunkt; nur über die Option
    „Laufende / beendete Partien“ in der App werden zusätzlich bereits angepfiffene
    Partien eingeblendet.
-7. Für eine Analyse der nächsten drei Wochen verwende `--dates twentyone`; das umfasst
+9. Für eine Analyse der nächsten drei Wochen verwende `--dates twentyone`; das umfasst
    den heutigen Berliner Kalendertag und die folgenden 20 Kalendertage.
 
 ## Screenshot-Workflow
@@ -137,8 +150,23 @@ Benutzer auf Deutsch und führe Analyseaufträge selbstständig über die vorhan
   Request fortsetzt; brich den Auftrag nicht wegen dieses temporären Limits ab.
 - Die laufende Saison wird pro manuellem Dashboard-Lauf einmal frisch abgefragt.
   Abgeschlossene Saisons werden langfristig gespeichert und nicht bei jedem Lauf neu geladen.
-- Nach beendeten Spielen: `npm run settle`
-- Modellgüte anzeigen: `npm run report`
+- Nach beendeten Spielen: `npm run settle`. Jeder Dashboard-Lauf rechnet am Ende
+  automatisch fällige Prognosen ab, begrenzt durch `SETTLE_REQUEST_BUDGET` (Standard 200
+  Aufrufe, 0 schaltet es ab), neueste Partien zuerst. Für einen Rückstand `npm run settle --
+  --budget <n>` mit größerem Budget in Etappen laufen lassen; ohne `--budget` arbeitet der
+  Befehl den gesamten Rückstand ab und kann das Tagesbudget überschreiten.
+- Jeder Dashboard-Lauf gibt nach der Abrechnung eine Kalibrier-Kurzfassung aus: Trefferquote
+  des Modellfavoriten gegen seine mittlere Prognose, aufgeschlüsselt nach Ligastärke. Gruppen
+  unter 30 Partien sind als „Stichprobe zu klein“ markiert, ab 5 Prozentpunkten Abweichung
+  folgt ein Hinweis auf den vollständigen Bericht.
+- Modellgüte anzeigen: `npm run report`. Der Abschnitt „Ligastärke bei Cross-League-Partien“
+  schlüsselt die 1X2-Kalibrierung danach auf, wie gut die Ligastärke bekannt war (Ligapartie,
+  gemessen, geschätzt, ohne Rating). Die Spalte „Abweichung“ ist Trefferquote minus mittlere
+  Prognose des Modellfavoriten: deutlich positiv heißt, der Klassenunterschied wird
+  unterschätzt und `strength.unratedPenalty` gehört erhöht; deutlich negativ heißt, das
+  Modell trennt zu scharf und `strength.factorDivisor` gehört erhöht. Pokalpartien enden
+  häufiger remis als Ligapartien, was die Favoritenquote strukturell drückt - das gehört bei
+  der Auslegung mitbedacht.
 - Historische xG-Werte und bestätigte Nichtverfügbarkeit werden in SQLite gehalten; der
   xG-Erstaufbau darf pro Dashboard-Lauf höchstens 250 zusätzliche API-Anfragen auslösen.
 - Vor Codeänderungen und danach: `npm test` und `npm run typecheck`

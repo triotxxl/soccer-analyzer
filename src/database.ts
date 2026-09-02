@@ -86,6 +86,18 @@ export interface OutcomeProbabilityPerformanceRow {
   intervalHigh: number;
 }
 
+export interface LeagueStrengthPerformanceRow {
+  cohort: "Ligapartie" | "gemessen" | "geschätzt" | "ohne Rating";
+  total: number;
+  hits: number;
+  hitRate: number;
+  averageProbability: number;
+  bias: number;
+  brierScore: number;
+  intervalLow: number;
+  intervalHigh: number;
+}
+
 export interface DefenseBadgePerformanceRow {
   cohort: "verified" | "fallback" | "unmarked";
   teams: number;
@@ -797,20 +809,21 @@ export class AnalyzerDatabase {
 
   unsettledFixtures(now = new Date()): number[] {
     const rows = this.db.prepare(`
-      SELECT DISTINCT fixture_id FROM (
-        SELECT fixture_id
+      SELECT fixture_id, MAX(kickoff) AS kickoff FROM (
+        SELECT fixture_id, kickoff
         FROM candidates
         WHERE settled_at IS NULL AND kickoff < ?
-        UNION
-        SELECT fixture_id
+        UNION ALL
+        SELECT fixture_id, kickoff
         FROM profile_predictions
         WHERE settled_at IS NULL AND kickoff < ?
-        UNION
-        SELECT fixture_id
+        UNION ALL
+        SELECT fixture_id, kickoff
         FROM goal_line_predictions
         WHERE settled_at IS NULL AND kickoff < ?
       )
-      ORDER BY fixture_id
+      GROUP BY fixture_id
+      ORDER BY kickoff DESC, fixture_id DESC
     `).all(
       now.toISOString(),
       now.toISOString(),
@@ -1128,6 +1141,84 @@ export class AnalyzerDatabase {
           intervalHigh
         }];
       });
+    });
+  }
+
+  /**
+   * Kalibrierung der 1X2-Wahrscheinlichkeit danach aufgeschlüsselt, wie gut die Ligastärke
+   * der Partie bekannt war. Genau hier entscheidet sich, ob der Abschlag für Ligen ohne
+   * eigenes Rating (`strength.unratedPenalty`) passt: Liegt die Trefferquote des
+   * Modellfavoriten deutlich über seiner mittleren Wahrscheinlichkeit, rechnet das Modell
+   * zu ausgeglichen und unterschätzt den Klassenunterschied.
+   */
+  leagueStrengthReport(): LeagueStrengthPerformanceRow[] {
+    const rows = this.db.prepare(`
+      SELECT home_probability, draw_probability, away_probability,
+             actual_home_goals, actual_away_goals, warnings_json
+      FROM goal_line_predictions
+      WHERE settled_at IS NOT NULL
+        AND actual_home_goals IS NOT NULL
+        AND actual_away_goals IS NOT NULL
+        AND home_probability IS NOT NULL
+        AND draw_probability IS NOT NULL
+        AND away_probability IS NOT NULL
+    `).all() as Array<{
+      home_probability: number;
+      draw_probability: number;
+      away_probability: number;
+      actual_home_goals: number;
+      actual_away_goals: number;
+      warnings_json: string;
+    }>;
+    const cohortOf = (warnings: string): LeagueStrengthPerformanceRow["cohort"] => {
+      if (/Kein Ligastärke-Vergleich/.test(warnings)) return "ohne Rating";
+      if (/geschätzt statt gemessen/.test(warnings)) return "geschätzt";
+      if (/Cross-League/.test(warnings)) return "gemessen";
+      return "Ligapartie";
+    };
+    const groups = new Map<LeagueStrengthPerformanceRow["cohort"], Array<{
+      hit: boolean;
+      probability: number;
+      brier: number;
+    }>>();
+    for (const row of rows) {
+      const probabilities = [row.home_probability, row.draw_probability, row.away_probability];
+      const actual = row.actual_home_goals > row.actual_away_goals
+        ? 0
+        : row.actual_home_goals === row.actual_away_goals ? 1 : 2;
+      const predicted = probabilities.indexOf(Math.max(...probabilities));
+      const brier = probabilities.reduce(
+        (sum, probability, index) => sum + (probability - (index === actual ? 1 : 0)) ** 2,
+        0
+      );
+      const cohort = cohortOf(row.warnings_json ?? "");
+      const group = groups.get(cohort) ?? [];
+      group.push({ hit: predicted === actual, probability: probabilities[predicted]!, brier });
+      groups.set(cohort, group);
+    }
+    const order: Array<LeagueStrengthPerformanceRow["cohort"]> =
+      ["Ligapartie", "gemessen", "geschätzt", "ohne Rating"];
+    return order.flatMap((cohort) => {
+      const samples = groups.get(cohort);
+      if (!samples || samples.length === 0) return [];
+      const hits = samples.filter((sample) => sample.hit).length;
+      const [intervalLow, intervalHigh] = wilsonInterval(hits, samples.length);
+      const averageProbability =
+        samples.reduce((sum, sample) => sum + sample.probability, 0) / samples.length;
+      const hitRate = hits / samples.length;
+      return [{
+        cohort,
+        total: samples.length,
+        hits,
+        hitRate,
+        averageProbability,
+        // Positiv heißt: Der Favorit gewinnt öfter als vorhergesagt, das Modell rechnet die
+        // Partie also zu ausgeglichen.
+        bias: hitRate - averageProbability,
+        brierScore: samples.reduce((sum, sample) => sum + sample.brier, 0) / samples.length,
+        intervalLow,
+        intervalHigh
+      }];
     });
   }
 

@@ -72,6 +72,11 @@ export function zonedDate(base: Date, timezone: string, dayOffset = 0): string {
 export function datesForRange(range: DateRange, timezone: string, now = new Date()): string[] {
   if (range === "today") return [zonedDate(now, timezone)];
   if (range === "tomorrow") return [zonedDate(now, timezone, 1)];
+  // Morgen und übermorgen ohne den laufenden Tag - für Aufträge, die den heutigen
+  // Spieltag bewusst aussparen.
+  if (range === "tomorrow2") {
+    return Array.from({ length: 2 }, (_, offset) => zonedDate(now, timezone, offset + 1));
+  }
   if (range === "next48") {
     return Array.from({ length: 3 }, (_, offset) => zonedDate(now, timezone, offset));
   }

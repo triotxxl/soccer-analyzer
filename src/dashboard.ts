@@ -30,8 +30,30 @@ export interface DashboardMarket {
   odds: number | null;
   confidence: number;
   score: number | null;
+  /**
+   * false, wenn die Wahrscheinlichkeit auf einer Basis steht, die den Klassenunterschied
+   * nicht abbilden kann: eine Cross-League-Partie ohne Ligastärke-Vergleich. Der Torfaktor
+   * ist dann 1,0, und das heißt nicht "beide Ligen sind gleich stark", sondern "über die
+   * Ligen ist nichts bekannt". Value und Kelly setzen darauf nicht auf. Das Feld fehlt in
+   * Snapshots vor dieser Änderung und gilt dort als belastbar.
+   */
+  probabilityReliable?: boolean;
   recommendation: { level: RecommendationLevel; label: string };
   details: string[];
+}
+
+/**
+ * Deutlicher Klassenunterschied zweier Teams aus verschiedenen Ligen. `rating` stammt aus
+ * dem Ligastärke-Vergleich des Modells, `market` aus dem Verhältnis der Tipico-Quoten für
+ * 1 und 2 - Letzteres nur, wenn kein Rating existiert. Die Quelle steht bewusst im Feld:
+ * eine Markierung aus dem Quotenbild ist eine nachgelagerte Kennzeichnung und ändert weder
+ * den sportlichen Tipp noch eine Wahrscheinlichkeit.
+ */
+export interface ClassGap {
+  level: "clear" | "extreme";
+  stronger: "home" | "away";
+  source: "rating" | "market";
+  label: string;
 }
 
 export interface DashboardFixture {
@@ -43,6 +65,7 @@ export interface DashboardFixture {
   awayTeam: string;
   modelVersion: string;
   crossLeague: boolean;
+  classGap?: ClassGap;
   dataConfidence: number;
   warnings: string[];
   h2hNotice: string | null;
@@ -129,6 +152,56 @@ function matchingOdds(row: GoalLineRow, odds: TipicoOdds[]): TipicoOdds | undefi
     .sort((left, right) => right.score - left.score)[0]?.item;
 }
 
+// Torfaktor 1,5 entspricht rund 160 Elo-Punkten Unterschied, 2,2 rund 310.
+const CLASS_GAP_RATING = { clear: 1.5, extreme: 2.2 };
+// Verhältnis der beiden Quoten für 1 und 2. Ein Zehnfaches wie 1,24 zu 12,00 ist ein
+// eindeutiges Klassenbild, ein Vierfaches ein deutliches.
+const CLASS_GAP_MARKET = { clear: 4, extreme: 8 };
+
+function classGapOf(
+  crossLeague: boolean,
+  strength: LeagueStrengthComparison | undefined,
+  homeOdds: number | null | undefined,
+  awayOdds: number | null | undefined
+): ClassGap | undefined {
+  if (!crossLeague) return undefined;
+  const asOdd = (value: number) => value.toFixed(2).replace(".", ",");
+  if (strength) {
+    const ratio = Math.max(strength.factor, 1 / strength.factor);
+    // Eine geschätzte Seite hat kein eigenes Rating und liegt deshalb am Pool-Floor: Wer in
+    // der Elo-Kette aus Pokalbegegnungen nie auftaucht, ist unterklassig. Das allein reicht
+    // für die untere Stufe, auch wenn der Abschlag den Faktor noch nicht über 1,5 hebt.
+    const estimated = !strength.home.reliable || !strength.away.reliable;
+    const level = ratio >= CLASS_GAP_RATING.extreme
+      ? "extreme"
+      : ratio >= CLASS_GAP_RATING.clear || estimated
+        ? "clear"
+        : null;
+    if (!level) return undefined;
+    return {
+      level,
+      stronger: strength.factor >= 1 ? "home" : "away",
+      source: "rating",
+      label: `Ligastärke ${Math.round(strength.home.rating)} gegen ${Math.round(strength.away.rating)}`
+        + `${estimated ? " (eine Seite geschätzt)" : ""} · Torfaktor ${asOdd(strength.factor)}`
+    };
+  }
+  if (!homeOdds || !awayOdds) return undefined;
+  const ratio = Math.max(homeOdds / awayOdds, awayOdds / homeOdds);
+  const level = ratio >= CLASS_GAP_MARKET.extreme
+    ? "extreme"
+    : ratio >= CLASS_GAP_MARKET.clear
+      ? "clear"
+      : null;
+  if (!level) return undefined;
+  return {
+    level,
+    stronger: homeOdds <= awayOdds ? "home" : "away",
+    source: "market",
+    label: `Quotenbild ${asOdd(homeOdds)} gegen ${asOdd(awayOdds)} · kein Ligastärke-Vergleich vorhanden`
+  };
+}
+
 function berlinDate(value: string): string {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: config.timezone,
@@ -144,7 +217,9 @@ function createMarket(input: Omit<DashboardMarket, "recommendation"> & { crossLe
   const { crossLeague, ...result } = input;
   return {
     ...result,
-    recommendation: recommendation(result.key, result.probability, result.confidence, result.score ?? undefined, crossLeague)
+    recommendation: result.probabilityReliable === false
+      ? { level: "none", label: "Nicht empfehlenswert" }
+      : recommendation(result.key, result.probability, result.confidence, result.score ?? undefined, crossLeague)
   };
 }
 
@@ -164,6 +239,12 @@ export function buildDashboardDocument(input: DashboardInput): DashboardDocument
     const h2hNotice = h2h && (h2h.consecutiveDraws >= 3 || h2h.allDraws)
       ? `Remis auffällig: ${h2h.consecutiveDraws} direkte Duelle in Folge remis${h2h.allDraws ? `; alle ${h2h.matches} verfügbaren H2H endeten remis` : ""}`
       : null;
+    // Ohne Ligastärke-Vergleich fehlt bei einer Cross-League-Partie genau der Faktor, der
+    // den Klassenunterschied trägt. Torsumme und BTTS bleiben davon nahezu unberührt, weil
+    // der Faktor die Heimtore multipliziert und die Auswärtstore teilt; die Richtung des
+    // Ergebnisses kippt dagegen. Betroffen ist deshalb allein die 1X2-Wahrscheinlichkeit.
+    const outcomeUnreliable = crossLeague && !row.strength;
+    const classGap = classGapOf(crossLeague, row.strength, tipico?.home, tipico?.away);
     const strengthDetail = row.strength
       ? `Ligastärke: ${row.homeTeam} ${Math.round(row.strength.home.rating)}${row.strength.home.reliable ? "" : " (geschätzt)"}`
         + ` vs. ${row.awayTeam} ${Math.round(row.strength.away.rating)}${row.strength.away.reliable ? "" : " (geschätzt)"}`
@@ -181,8 +262,12 @@ export function buildDashboardDocument(input: DashboardInput): DashboardDocument
         probability: selectionProbability, odds: (selection === "1" ? tipico?.home : tipico?.away) ?? null,
         confidence: Math.min(row.dataConfidence, favorite?.confidence ?? row.dataConfidence), score: favorite?.score ?? null,
         crossLeague,
+        ...(outcomeUnreliable ? { probabilityReliable: false } : {}),
         details: [
           `Sportlicher Tipp: ${selection} · ${selectedTeam}`,
+          ...(outcomeUnreliable
+            ? ["Ohne Ligastärke-Vergleich keine belastbare Wahrscheinlichkeit; Value und Kelly bleiben aus"]
+            : []),
           favorite ? `1X2-Profil: ${favorite.rating} · ${favorite.score} Punkte` : "Kein separates 1X2-Profil verfügbar",
           ...(strengthDetail ? [strengthDetail] : []),
           ...sharedDetails
@@ -224,6 +309,7 @@ export function buildDashboardDocument(input: DashboardInput): DashboardDocument
     return {
       fixtureId: row.fixtureId, kickoff: row.kickoff, country: row.country, league: row.league,
       homeTeam: row.homeTeam, awayTeam: row.awayTeam, modelVersion: row.modelVersion, crossLeague,
+      ...(classGap ? { classGap } : {}),
       dataConfidence: row.dataConfidence, warnings, h2hNotice,
       form: {
         scope: crossLeague ? "overall" : "venue",

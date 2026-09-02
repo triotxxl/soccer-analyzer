@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { ApiFootballClient } from "./api.ts";
-import { ROOT_DIR } from "./config.ts";
+import { config, ROOT_DIR } from "./config.ts";
 import { AnalysisSnapshotCache } from "./analysis-cache.ts";
 import {
   runAnalysis,
@@ -20,6 +20,8 @@ import {
 import { formatLiveAnalysis } from "./output.ts";
 import { runLiveAnalysis } from "./live.ts";
 import { resolveLeagues, saveAlias } from "./resolver.ts";
+import { calibrationSummaryLines } from "./calibration.ts";
+import { settleFixtures } from "./settle.ts";
 import { saveTeamAlias } from "./team-resolver.ts";
 import { buildLeagueStrength } from "./strength-builder.ts";
 import { applyGoalLineFilters } from "./goal-line-filter.ts";
@@ -159,8 +161,8 @@ async function analysisInput(args: ParsedArgs): Promise<AnalysisInput> {
     return JSON.parse(await readFile(inputFile, "utf8")) as AnalysisInput;
   }
   const dates = (option(args, "dates") ?? "both") as DateRange;
-  if (!["today", "tomorrow", "both", "next48", "three", "five", "seven", "fourteen", "twentyone"].includes(dates)) {
-    throw new Error("--dates muss today, tomorrow, both, next48, three, five, seven, fourteen oder twentyone sein.");
+  if (!["today", "tomorrow", "tomorrow2", "both", "next48", "three", "five", "seven", "fourteen", "twentyone"].includes(dates)) {
+    throw new Error("--dates muss today, tomorrow, tomorrow2, both, next48, three, five, seven, fourteen oder twentyone sein.");
   }
   return {
     selections: selectionsFromArgs(args),
@@ -238,28 +240,18 @@ async function analyze(args: ParsedArgs): Promise<void> {
   else console.log(formatAnalysis(filtered));
 }
 
-async function settle(): Promise<void> {
-  const client = new ApiFootballClient();
-  const database = new AnalyzerDatabase();
-  const fixtureIds = database.unsettledFixtures();
-  let settled = 0;
-  for (const fixtureId of fixtureIds) {
-    const fixture = (await client.getFixture(fixtureId, true))[0];
-    if (fixture && ["FT", "AET", "PEN"].includes(fixture.fixture.status.short)) {
-      const statistics = await client.getFixtureStatistics(fixtureId, false);
-      const xg = parseExpectedGoals(statistics, fixture.teams.home.id, fixture.teams.away.id);
-      database.saveFixtureExpectedGoals([{
-        fixtureId, kickoff: fixture.fixture.date, leagueId: fixture.league.id, season: fixture.league.season,
-        homeTeamId: fixture.teams.home.id, awayTeamId: fixture.teams.away.id,
-        homeXg: xg.home, awayXg: xg.away,
-        status: xg.home !== null && xg.away !== null ? "available" : "unavailable",
-        fetchedAt: new Date().toISOString()
-      }]);
-      settled += database.settleFixture(fixture, xg);
-    }
+async function settle(args: ParsedArgs): Promise<void> {
+  const budgetOption = option(args, "budget");
+  const requestBudget = budgetOption === undefined ? null : Number(budgetOption);
+  if (requestBudget !== null && (!Number.isInteger(requestBudget) || requestBudget < 2)) {
+    throw new Error("--budget muss eine ganze Zahl ab 2 sein.");
   }
-  database.close();
-  console.log(`${settled} Kandidaten aus ${fixtureIds.length} fälligen Spielen abgerechnet.`);
+  const result = await settleFixtures({ requestBudget });
+  console.log(`${result.settled} Kandidaten aus ${result.checked} von ${result.due} fälligen Spielen abgerechnet.`);
+  console.log(`API-Aufrufe: ${result.apiRequests}`);
+  if (result.budgetReached) {
+    console.log(`Budget erreicht, ${result.due - result.checked} Partien bleiben offen.`);
+  }
 }
 
 async function goals(args: ParsedArgs): Promise<void> {
@@ -291,6 +283,7 @@ function report(): void {
   const goalLineRows = database.goalLineReport();
   const outcomeRows = database.outcomeProbabilityReport();
   const defenseRows = database.defenseBadgeReport();
+  const strengthRows = database.leagueStrengthReport();
   database.close();
   if (rows.length === 0 && profileRows.length === 0 && goalLineRows.length === 0) {
     console.log("Noch keine abgerechneten Kandidaten vorhanden.");
@@ -312,6 +305,21 @@ function report(): void {
     console.log("| Gruppe | Team-Spiele | Ø Gegentore | Zu-null-Quote |");
     console.log("|---|---:|---:|---:|");
     for (const row of defenseRows) console.log(`| ${row.cohort} | ${row.teams} | ${row.averageGoalsAgainst.toFixed(2)} | ${(row.cleanSheetRate * 100).toFixed(1)} % |`);
+  }
+  if (strengthRows.length > 0) {
+    console.log("\n## Ligastärke bei Cross-League-Partien\n");
+    console.log("| Ligastärke | Stichprobe | Favorit trifft | Trefferquote | Ø Prognose | Abweichung | Brier Score | 95-%-Intervall |");
+    console.log("|---|---:|---:|---:|---:|---:|---:|---:|");
+    for (const row of strengthRows) {
+      const bias = `${row.bias >= 0 ? "+" : ""}${(row.bias * 100).toFixed(1).replace(".", ",")} pp`;
+      console.log(
+        `| ${row.cohort} | ${row.total} | ${row.hits} | ${percent(row.hitRate)} | ${percent(row.averageProbability)} | ${bias} | ${row.brierScore.toFixed(3)} | ${percent(row.intervalLow)}–${percent(row.intervalHigh)} |`
+      );
+    }
+    console.log(
+      "\nEine deutlich positive Abweichung bei „geschätzt“ oder „ohne Rating“ heißt: Der " +
+      "Klassenunterschied wird unterschätzt, strength.unratedPenalty gehört erhöht."
+    );
   }
   if (outcomeRows.length > 0) {
     console.log("\n## Wahrscheinlichkeitsmodell: 1X2, Remis und BTTS\n");
@@ -472,8 +480,8 @@ async function withoutUnresolvedLeagues(
 async function dashboard(args: ParsedArgs): Promise<void> {
   const sourceFile = path.resolve(option(args, "input") ?? path.join(ROOT_DIR, "data.json"));
   const dates = (option(args, "dates") ?? "next48") as DateRange;
-  if (!["today", "tomorrow", "both", "next48", "three", "five", "seven", "fourteen", "twentyone"].includes(dates)) {
-    throw new Error("--dates muss today, tomorrow, both, next48, three, five, seven, fourteen oder twentyone sein.");
+  if (!["today", "tomorrow", "tomorrow2", "both", "next48", "three", "five", "seven", "fourteen", "twentyone"].includes(dates)) {
+    throw new Error("--dates muss today, tomorrow, tomorrow2, both, next48, three, five, seven, fourteen oder twentyone sein.");
   }
   const imported = await importTipicoData(sourceFile, dates);
   const database = new AnalyzerDatabase();
@@ -518,6 +526,21 @@ async function dashboard(args: ParsedArgs): Promise<void> {
       goals: goalsResult,
       tipicoOdds: imported.input.tipicoOdds ?? []
     });
+    if (client && config.settleRequestBudget > 0) {
+      try {
+        const settled = await settleFixtures({
+          client,
+          database,
+          requestBudget: config.settleRequestBudget
+        });
+        if (settled.checked > 0) {
+          console.log(`Abgerechnet: ${settled.settled} Prognosen aus ${settled.checked} von ${settled.due} fälligen Partien${settled.budgetReached ? " (Budget erreicht)" : ""}`);
+        }
+      } catch (error) {
+        console.error(`Abrechnung übersprungen: ${error instanceof Error ? error.message : String(error)}`);
+      }
+      for (const line of calibrationSummaryLines(database)) console.log(line);
+    }
     console.log(`Dashboard-Daten erstellt: ${files.latest}`);
     console.log(`JSON-Snapshot gespeichert: ${files.snapshot}`);
     console.log(`Tipico: ${imported.selectedEvents}/${imported.totalEvents} Events · ${imported.selectedCompetitions} Wettbewerbe`);
@@ -535,7 +558,7 @@ async function main(): Promise<void> {
   if (command === "analyze") await analyze(args);
   else if (command === "dashboard") await dashboard(args);
   else if (command === "goals") await goals(args);
-  else if (command === "settle") await settle();
+  else if (command === "settle") await settle(args);
   else if (command === "report") report();
   else if (command === "aliases") await aliases(args);
   else if (command === "team-aliases") await teamAliases(args);

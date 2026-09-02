@@ -23,6 +23,18 @@ test("berechnet heute und morgen an einer Berliner Mitternachtsgrenze", () => {
   assert.deepEqual(datesForRange("both", "Europe/Berlin", now), ["2026-07-30", "2026-07-31"]);
 });
 
+test("berechnet morgen und übermorgen ohne den laufenden Tag", () => {
+  assert.deepEqual(
+    datesForRange("tomorrow2", "Europe/Berlin", new Date("2026-08-23T19:30:00.000Z")),
+    ["2026-08-24", "2026-08-25"]
+  );
+  // Nach Berliner Mitternacht verschiebt sich das Fenster mit.
+  assert.deepEqual(
+    datesForRange("tomorrow2", "Europe/Berlin", new Date("2026-07-29T22:30:00.000Z")),
+    ["2026-07-31", "2026-08-01"]
+  );
+});
+
 test("berechnet fünf aufeinanderfolgende Berliner Kalendertage", () => {
   assert.deepEqual(
     datesForRange("five", "Europe/Berlin", new Date("2026-08-03T08:00:00.000Z")),

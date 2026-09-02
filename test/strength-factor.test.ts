@@ -44,8 +44,11 @@ test("Stärkefaktor bleibt innerhalb der konfigurierten Grenzen", () => {
 });
 
 test("Bundesliga gegen 3. Liga ergibt einen plausiblen Torfaktor", () => {
+  // Das Band folgt dem am 31.08.2026 auf 379 abgerechnete Cross-League-Partien
+  // nachgezogenen factorDivisor. Vorher galt 1,7 bis 2,2 aus einer einzigen Pokalrunde;
+  // gegen abgerechnete Ergebnisse hat sich diese Trennung als zu scharf erwiesen.
   const factor = strengthFactor(1717, 1461);
-  assert.ok(factor > 1.7 && factor < 2.2, `unerwarteter Faktor ${factor}`);
+  assert.ok(factor > 1.35 && factor < 1.65, `unerwarteter Faktor ${factor}`);
 });
 
 test("die Clamp-Grenzen greifen erst jenseits realistischer Ligaabstände", () => {

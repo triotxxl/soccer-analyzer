@@ -2,7 +2,7 @@ import {
   Binoculars, Broadcast, CalendarBlank, CaretDoubleLeft, CaretDoubleRight, CaretLeft, CaretRight, Calculator, CheckCircle, ClockCounterClockwise, Funnel, ListBullets, RocketLaunch, Shield, ShieldCheck, Star, WarningCircle, X
 } from "@phosphor-icons/react";
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { BetBuilderDrawer, CartAddButton, CartBadge, MarketPickerModal } from "./BetCartUI";
+import { BetBuilderDrawer, CartAddRadial, CartBadge } from "./BetCartUI";
 import { toCartEntry, useBetCart } from "./betCart";
 import { countryFlagCode } from "./countryFlags";
 import { useDashboardData } from "./data";
@@ -10,7 +10,7 @@ import { useLiveBoard } from "./liveData";
 import { LiveView } from "./LiveView";
 import { edgeOf, loadKellySettings, loadKellyVisible, saveKellySettings, saveKellyVisible, type KellySettings } from "./kelly";
 import { KellyButton, KellyDialog } from "./KellyUI";
-import type { DashboardDocument, DashboardFixture, DashboardMarket, DashboardMarketKey, FormResult, LeagueStats, RecommendationLevel } from "./types";
+import type { ClassGap, DashboardDocument, DashboardFixture, DashboardMarket, DashboardMarketKey, FormResult, LeagueStats, RecommendationLevel } from "./types";
 
 const MARKET_OPTIONS: Array<{ key: "all" | DashboardMarketKey; label: string }> = [
   { key: "all", label: "Alle Märkte" },
@@ -25,6 +25,7 @@ const MARKET_OPTIONS: Array<{ key: "all" | DashboardMarketKey; label: string }> 
 type MarketFilter = (typeof MARKET_OPTIONS)[number]["key"];
 type Density = "micro" | "compact" | "comfort";
 type LevelFilter = "all" | "strong" | "recommended";
+type ClassGapFilter = "all" | "only" | "hide";
 type RangeMode = "next48" | "custom";
 type H2hView = "outcome" | "btts" | "over" | "firstHalfOver";
 type FormView = H2hView;
@@ -533,19 +534,36 @@ function FormMatchDots({ matches, view, overLine, firstHalfOverLine }: {
 
 export function MarketCard({ market, showEdge }: { market: DashboardMarket; showEdge: boolean }) {
   const percentage = Math.round(market.probability * 100);
+  const reliable = market.probabilityReliable !== false;
   const edge = showEdge ? edgeOf(market) : null;
-  return <div className={`market-card ${market.recommendation.level}`} title={`${market.selection} · ${market.recommendation.label}`}>
+  return <div
+    className={`market-card ${market.recommendation.level}${reliable ? "" : " unreliable"}`}
+    title={reliable
+      ? `${market.selection} · ${market.recommendation.label}`
+      : `${market.selection} · ohne Ligastärke-Vergleich keine belastbare Wahrscheinlichkeit`}
+  >
     <div className="market-line">
       <span className="level-glyph">{market.recommendation.level === "strong" ? "★" : market.recommendation.level === "recommended" ? "✓" : "·"}</span>
       {market.pick && <strong className={`pick ${market.selectionTone}`}>{market.pick}</strong>}
       <strong className="odd">{formatOdd(market.odds)}</strong>
       {edge !== null && <span className={`market-edge ${edge >= 0 ? "pos" : "neg"}`} title="Value = Modellwahrscheinlichkeit − quotenimplizierte Wahrscheinlichkeit">{edge >= 0 ? "+" : ""}{(edge * 100).toFixed(1).replace(".", ",")} PP</span>}
     </div>
-    <div className="probability-line">
-      <span className="probability-track"><span style={{ width: `${percentage}%` }} /></span>
-      <span>{formatPercent(market.probability)}</span>
-    </div>
+    {reliable
+      ? <div className="probability-line">
+        <span className="probability-track"><span style={{ width: `${percentage}%` }} /></span>
+        <span>{formatPercent(market.probability)}</span>
+      </div>
+      : <div className="probability-line"><span className="probability-note">Ligastärke fehlt</span></div>}
   </div>;
+}
+
+export function ClassGapBadge({ gap, homeTeam, awayTeam }: { gap: ClassGap; homeTeam: string; awayTeam: string }) {
+  const stronger = gap.stronger === "home" ? homeTeam : awayTeam;
+  const title = `${gap.level === "extreme" ? "Sehr großer" : "Deutlicher"} Klassenunterschied · ${stronger} ist die höhere Klasse · `
+    + `${gap.source === "rating" ? "Modell" : "Markt"}: ${gap.label}`;
+  return <i className={`class-gap ${gap.level} ${gap.source}`} title={title} aria-label={title}>
+    Klasse {gap.stronger === "home" ? "↑" : "↓"}
+  </i>;
 }
 
 function EmptyState({ title, text }: { title: string; text: string }) {
@@ -610,13 +628,14 @@ function Dashboard({ document }: { document: DashboardDocument }) {
   const [overLine, setOverLine] = useState<FullTimeOverLine>(2.5);
   const [firstHalfOverLine, setFirstHalfOverLine] = useState<FirstHalfOverLine>(0.5);
   const [density, setDensity] = useState<Density>("comfort");
+  const [classGapFilter, setClassGapFilter] = useState<ClassGapFilter>("all");
   const [sortKey, setSortKey] = useState<SortKey>("kickoff");
   const [sortDirection, setSortDirection] = useState<1 | -1>(1);
   const [formSortMode, setFormSortMode] = useState(0);
   const [h2hSortMode, setH2hSortMode] = useState(0);
   const [secondarySortKey, setSecondarySortKey] = useState<"form" | "h2h" | null>(null);
   const [openFixture, setOpenFixture] = useState<number | null>(null);
-  const [pickerFixtureId, setPickerFixtureId] = useState<number | null>(null);
+  const [radialFixtureId, setRadialFixtureId] = useState<number | null>(null);
   const [builderOpen, setBuilderOpen] = useState(false);
   const [kellyOpen, setKellyOpen] = useState(false);
   const [showKelly, setShowKelly] = useState(() => loadKellyVisible());
@@ -632,7 +651,6 @@ function Dashboard({ document }: { document: DashboardDocument }) {
   const live = useLiveBoard(view === "live", watchedFixtureIds);
   const dateControlRef = useRef<HTMLDivElement>(null);
   const now = Date.now();
-  const pickerFixture = pickerFixtureId === null ? null : document.fixtures.find((item) => item.fixtureId === pickerFixtureId) ?? null;
 
   const availableLeagues = useMemo(() => {
     const map = new Map<string, { key: string; country: string; league: string; count: number }>();
@@ -700,7 +718,7 @@ function Dashboard({ document }: { document: DashboardDocument }) {
       setRangeMode("next48");
     }
     setOpenFixture((value) => value !== null && document.fixtures.some((fixture) => fixture.fixtureId === value) ? value : null);
-    setPickerFixtureId((value) => value !== null && document.fixtures.some((fixture) => fixture.fixtureId === value) ? value : null);
+    setRadialFixtureId((value) => value !== null && document.fixtures.some((fixture) => fixture.fixtureId === value) ? value : null);
     setMarketFilter((value) => value === "all" || document.fixtures.some((fixture) => fixture.markets.some((market) => market.key === value)) ? value : "all");
     setDeselectedLeagues((prev) => new Set([...prev].filter((key) => availableLeagues.some((item) => item.key === key))));
   }, [availableLeagues, document]);
@@ -728,7 +746,7 @@ function Dashboard({ document }: { document: DashboardDocument }) {
   useEffect(() => {
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
-      if (pickerFixtureId !== null) setPickerFixtureId(null);
+      if (radialFixtureId !== null) setRadialFixtureId(null);
       else if (builderOpen) setBuilderOpen(false);
       else if (kellyOpen) setKellyOpen(false);
       else if (calendarOpen) setCalendarOpen(false);
@@ -737,7 +755,7 @@ function Dashboard({ document }: { document: DashboardDocument }) {
     };
     window.addEventListener("keydown", closeOnEscape);
     return () => window.removeEventListener("keydown", closeOnEscape);
-  }, [builderOpen, calendarOpen, kellyOpen, leagueFilterOpen, pickerFixtureId]);
+  }, [builderOpen, calendarOpen, kellyOpen, leagueFilterOpen, radialFixtureId]);
 
   useEffect(() => { saveView(view); }, [view]);
   useEffect(() => { saveKellySettings(kellySettings); }, [kellySettings]);
@@ -795,6 +813,8 @@ function Dashboard({ document }: { document: DashboardDocument }) {
     recommended: scopedFixtures.filter((fixture) => levelRank[bestLevel(fixture, marketFilter)] >= levelRank.recommended).length
   };
   const filtered = scopedFixtures.filter((fixture) => {
+    if (classGapFilter === "only" && !fixture.classGap) return false;
+    if (classGapFilter === "hide" && fixture.classGap) return false;
     const level = bestLevel(fixture, marketFilter);
     return levelFilter === "all" || (levelFilter === "strong" ? level === "strong" : levelRank[level] >= levelRank.recommended);
   });
@@ -1012,6 +1032,10 @@ function Dashboard({ document }: { document: DashboardDocument }) {
             ? <><option value={0.5}>Über 0,5</option><option value={1.5}>Über 1,5</option></>
             : <><option value={1.5}>Über 1,5</option><option value={2.5}>Über 2,5</option><option value={3.5}>Über 3,5</option></>}
         </select>
+        <span>Klasse</span>
+        <div className="segmented" role="group" aria-label="Klassenunterschied">
+          {([ ["all", "Alle"], ["only", "Nur"], ["hide", "Ohne"] ] as const).map(([key, label]) => <button className={classGapFilter === key ? "active" : ""} aria-pressed={classGapFilter === key} onClick={() => setClassGapFilter(key)} key={key}>{label}</button>)}
+        </div>
         {showKelly && <KellyButton onOpen={() => setKellyOpen(true)} />}
         <div className="segmented density-switch">
           {([ ["micro", "XS"], ["compact", "Kompakt"], ["comfort", "Komfort"] ] as const).map(([key, label]) => <button className={density === key ? "active" : ""} aria-pressed={density === key} onClick={() => setDensity(key)} key={key}>{label}</button>)}
@@ -1048,14 +1072,21 @@ function Dashboard({ document }: { document: DashboardDocument }) {
           const markets = visibleMarkets(fixture, marketFilter);
           return <article className={`fixture-wrap level-${bestLevel(fixture, marketFilter)} ${openFixture === fixture.fixtureId ? "open" : ""}`} style={gridStyle} key={fixture.fixtureId}>
             <div className="fixture-row-wrap">
-            <CartAddButton fixture={fixture} onOpen={() => setPickerFixtureId(fixture.fixtureId)} />
+            <CartAddRadial
+              fixture={fixture}
+              cart={cart}
+              open={radialFixtureId === fixture.fixtureId}
+              onOpen={() => setRadialFixtureId(fixture.fixtureId)}
+              onClose={() => setRadialFixtureId((current) => current === fixture.fixtureId ? null : current)}
+              onSelect={(market) => addEntry(toCartEntry(fixture, market))}
+            />
             <button className={`${fixtureGridClass} fixture-row`} style={gridStyle} onClick={() => setOpenFixture((value) => value === fixture.fixtureId ? null : fixture.fixtureId)} aria-expanded={openFixture === fixture.fixtureId}>
               <span className="fixture-summary-cell">
                 <span className="teams-cell">
                   <span className="team-name"><strong>{fixture.homeTeam}</strong><DefenseShield profile={fixture.defense?.home} team={fixture.homeTeam} /></span>
                   <span className="team-name"><strong>{fixture.awayTeam}</strong><DefenseShield profile={fixture.defense?.away} team={fixture.awayTeam} /></span>
                 </span>
-                <span className="fixture-meta"><strong>{time.clock}{isPast && <em> angepfiffen</em>}</strong><small>{time.day} · <CountryFlag country={fixture.country} /> {fixture.country} · {fixture.league}</small>{(fixture.h2hNotice || fixture.warnings.length > 0) && <i>{fixture.h2hNotice ? "H2H" : "Daten"}</i>}</span>
+                <span className="fixture-meta"><strong>{time.clock}{isPast && <em> angepfiffen</em>}</strong><small>{time.day} · <CountryFlag country={fixture.country} /> {fixture.country} · {fixture.league}</small>{(fixture.h2hNotice || fixture.warnings.length > 0) && <i>{fixture.h2hNotice ? "H2H" : "Daten"}</i>}{fixture.classGap && <ClassGapBadge gap={fixture.classGap} homeTeam={fixture.homeTeam} awayTeam={fixture.awayTeam} />}</span>
               </span>
               <span className="form-cell">
                 <span className="form-labels" aria-label={fixture.form.scope === "overall" ? "Form insgesamt: Home und Away" : "Heim- und Auswärtsform"}>
@@ -1131,12 +1162,6 @@ function Dashboard({ document }: { document: DashboardDocument }) {
       />}
     </main>
   </div>
-  {pickerFixture && <MarketPickerModal
-    fixture={pickerFixture}
-    cart={cart}
-    onSelect={(market) => { addEntry(toCartEntry(pickerFixture, market)); setPickerFixtureId(null); }}
-    onClose={() => setPickerFixtureId(null)}
-  />}
   {leagueFilterOpen && <LeagueFilterModal
     leagues={availableLeagues}
     statsByKey={leagueStatsByKey}

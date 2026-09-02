@@ -506,3 +506,49 @@ test("Pool-Floor wertet ältere Saisons zum Anker hin ab", async () => {
   assert.ok(Math.abs(floor! - 1372) < 1e-9, `unerwarteter Floor ${floor}`);
   database.close();
 });
+
+test("Ligastärke-Bericht trennt gemessen, geschätzt und ohne Rating", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "football-strength-report-"));
+  const database = new AnalyzerDatabase(path.join(directory, "test.sqlite"));
+  const base: GoalLineRow = {
+    fixtureId: 0, kickoff: "2026-01-01T18:00:00.000Z", country: "Deutschland", league: "DFB Pokal",
+    homeTeam: "Heim", awayTeam: "Gast", modelVersion: "goals-test",
+    expectedHomeGoals: 2, expectedAwayGoals: 0.8, expectedTotalGoals: 2.8, dataConfidence: 80,
+    outcomeProbabilities: { home: 0.7, draw: 0.2, away: 0.1, btts: 0.5 },
+    probabilities: { over15: 0.8, under15: 0.2, over25: 0.6, under25: 0.4, over35: 0.35, under35: 0.65 },
+    firstHalf: {
+      expectedHomeGoals: 0.9, expectedAwayGoals: 0.4, expectedTotalGoals: 1.3, dataConfidence: 80,
+      probabilities: { over05: 0.7, under05: 0.3, over15: 0.4, under15: 0.6 }, warnings: []
+    },
+    warnings: []
+  };
+  const rows: GoalLineRow[] = [
+    { ...base, fixtureId: 1, warnings: ["Cross-League: Teamform aus Pflichtspielen verschiedener Wettbewerbe"] },
+    { ...base, fixtureId: 2, warnings: ["Cross-League: Teamform", "Ligastärke für Gast geschätzt statt gemessen"] },
+    { ...base, fixtureId: 3, warnings: ["Cross-League: Teamform", "Kein Ligastärke-Vergleich verfügbar"] },
+    { ...base, fixtureId: 4, warnings: [] }
+  ];
+  database.saveGoalLinePredictions("2025-12-31T10:00:00.000Z", rows, {
+    dates: ["2026-01-01"],
+    selections: [{ country: "Deutschland", league: "DFB Pokal" }],
+    matches: rows.map(() => ({ homeTeam: "Heim", awayTeam: "Gast" }))
+  });
+  // Der Heimsieg ist in allen vier Partien der Modellfavorit; nur die erste geht auf.
+  for (const [fixtureId, homeGoals, awayGoals] of [[1, 2, 0], [2, 0, 1], [3, 1, 1], [4, 0, 2]] as const) {
+    database.settleFixture(fixture({
+      id: fixtureId, timestamp: Date.parse(base.kickoff) / 1000, homeId: 1, awayId: 2, homeGoals, awayGoals
+    }));
+  }
+  const report = database.leagueStrengthReport();
+  assert.deepEqual(report.map((row) => row.cohort), ["Ligapartie", "gemessen", "geschätzt", "ohne Rating"]);
+  const byCohort = new Map(report.map((row) => [row.cohort, row]));
+  assert.equal(byCohort.get("gemessen")!.hits, 1);
+  assert.equal(byCohort.get("gemessen")!.hitRate, 1);
+  // Trefferquote 100 % bei 70 % Prognose: Der Favorit gewinnt öfter als vorhergesagt.
+  assert.equal(Math.round(byCohort.get("gemessen")!.bias * 1000) / 1000, 0.3);
+  assert.equal(byCohort.get("geschätzt")!.hits, 0);
+  assert.equal(Math.round(byCohort.get("geschätzt")!.bias * 1000) / 1000, -0.7);
+  assert.equal(byCohort.get("ohne Rating")!.total, 1);
+  assert.equal(byCohort.get("Ligapartie")!.total, 1);
+  database.close();
+});

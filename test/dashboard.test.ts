@@ -5,7 +5,7 @@ import path from "node:path";
 import test from "node:test";
 import { buildDashboardDocument, writeDashboard, type DashboardInput } from "../src/dashboard.ts";
 
-function dashboardInput(odds = 1.75): DashboardInput {
+function dashboardInput(odds = 1.75, strengthAvailable = true): DashboardInput {
   const base = { createdAt: "2026-08-11T16:00:00.000Z", dates: ["2026-08-11"], apiRequests: 0, apiRequestsRemaining: 7000 };
   return {
     createdAt: base.createdAt,
@@ -56,6 +56,11 @@ function dashboardInput(odds = 1.75): DashboardInput {
           away: { concededGoals: 1.4, relativeToLeague: 1.05, matches: 16, venueMatches: 8, strong: false }
         },
         probabilities: { over15: 0.86, under15: 0.14, over25: 0.71, under25: 0.29, over35: 0.4, under35: 0.6 },
+        ...(strengthAvailable ? { strength: {
+          home: { leagueId: 78, rating: 1620, reliable: true },
+          away: { leagueId: 79, rating: 1480, reliable: true },
+          factor: 1.43
+        } } : {}),
         firstHalf: {
           expectedHomeGoals: 0.7, expectedAwayGoals: 0.45, expectedTotalGoals: 1.15, dataConfidence: 85,
           probabilities: { over05: 0.78, under05: 0.22, over15: 0.42, under15: 0.58 }, warnings: ["Halbzeit-Warnung"]
@@ -129,4 +134,91 @@ test("Dashboard-Ausgabe schreibt latest und datierten Snapshot als JSON", async 
   } finally {
     await rm(directory, { recursive: true, force: true });
   }
+});
+
+test("Cross-League ohne Ligastärke-Vergleich weist keine 1X2-Wahrscheinlichkeit aus", () => {
+  const fixture = buildDashboardDocument(dashboardInput(1.75, false)).fixtures[0]!;
+  const outcome = fixture.markets.find((market) => market.key === "1x2")!;
+  assert.equal(fixture.crossLeague, true);
+  assert.equal(outcome.probabilityReliable, false);
+  assert.equal(outcome.recommendation.level, "none");
+  assert.ok(outcome.details.some((detail) => /Value und Kelly bleiben aus/.test(detail)));
+
+  // Der fehlende Torfaktor kippt die Richtung des Ergebnisses, lässt Torsumme und BTTS
+  // aber nahezu unberührt - diese Märkte bleiben deshalb bewertbar.
+  for (const key of ["draw", "btts", "over15", "over25"] as const) {
+    const market = fixture.markets.find((item) => item.key === key)!;
+    assert.equal(market.probabilityReliable, undefined);
+  }
+  assert.equal(fixture.markets.find((market) => market.key === "over15")!.recommendation.level, "strong");
+});
+
+test("Mit Ligastärke-Vergleich bleibt die 1X2-Bewertung unangetastet", () => {
+  const outcome = buildDashboardDocument(dashboardInput()).fixtures[0]!.markets[0]!;
+  assert.equal(outcome.probabilityReliable, undefined);
+  assert.equal(outcome.recommendation.level, "strong");
+  assert.ok(outcome.details.some((detail) => /Ligastärke: /.test(detail)));
+});
+
+test("Klassenunterschied kommt aus dem Ligarating, sobald der Torfaktor deutlich wird", () => {
+  const input = dashboardInput();
+  input.goals.rows[0]!.strength = {
+    home: { leagueId: 78, rating: 1700, reliable: true },
+    away: { leagueId: 79, rating: 1400, reliable: true },
+    factor: 2.15
+  };
+  const gap = buildDashboardDocument(input).fixtures[0]!.classGap!;
+  assert.equal(gap.level, "clear");
+  assert.equal(gap.stronger, "home");
+  assert.equal(gap.source, "rating");
+  assert.match(gap.label, /Ligastärke 1700 gegen 1400/);
+
+  input.goals.rows[0]!.strength.factor = 2.4;
+  assert.equal(buildDashboardDocument(input).fixtures[0]!.classGap!.level, "extreme");
+
+  // Ein Faktor unter 1,5 ist kein Klassenunterschied, sondern normale Ligastreuung.
+  input.goals.rows[0]!.strength.factor = 1.3;
+  assert.equal(buildDashboardDocument(input).fixtures[0]!.classGap, undefined);
+});
+
+test("Eine nur geschätzte Ligastärke genügt für die untere Stufe", () => {
+  const input = dashboardInput();
+  input.goals.rows[0]!.strength = {
+    home: { leagueId: 78, rating: 1560, reliable: true },
+    away: { leagueId: 0, rating: 1440, reliable: false },
+    factor: 1.36
+  };
+  const gap = buildDashboardDocument(input).fixtures[0]!.classGap!;
+  assert.equal(gap.level, "clear");
+  assert.equal(gap.stronger, "home");
+  assert.match(gap.label, /eine Seite geschätzt/);
+});
+
+test("Ohne Ligarating trägt das Quotenbild die Markierung", () => {
+  const input = dashboardInput(1.24, false);
+  input.tipicoOdds[0]!.away = 12;
+  const gap = buildDashboardDocument(input).fixtures[0]!.classGap!;
+  assert.equal(gap.level, "extreme");
+  assert.equal(gap.stronger, "home");
+  assert.equal(gap.source, "market");
+  assert.match(gap.label, /Quotenbild 1,24 gegen 12,00/);
+
+  // Der Tipp bleibt unberührt: Die Markierung ist nachgelagert, kein Modelleingang.
+  const outcome = buildDashboardDocument(input).fixtures[0]!.markets[0]!;
+  assert.equal(outcome.pick, "1");
+  assert.equal(outcome.probability, 0.72);
+});
+
+test("Ausgeglichene Quoten und Ligapartien bleiben unmarkiert", () => {
+  const balanced = dashboardInput(2.1, false);
+  balanced.tipicoOdds[0]!.away = 3.4;
+  assert.equal(buildDashboardDocument(balanced).fixtures[0]!.classGap, undefined);
+
+  const domestic = dashboardInput(1.24, false);
+  domestic.tipicoOdds[0]!.away = 12;
+  domestic.draw.rows[0]!.model = "league";
+  domestic.favorites.rows[0]!.model = "league";
+  const fixture = buildDashboardDocument(domestic).fixtures[0]!;
+  assert.equal(fixture.crossLeague, false);
+  assert.equal(fixture.classGap, undefined);
 });

@@ -1,7 +1,7 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { App } from "./App";
+import { App, MarketCard } from "./App";
 import type { DashboardDocument, DashboardFixture, DashboardMarket } from "./types";
 
 function markets(level: "none" | "recommended" | "strong", probability = 0.72): DashboardMarket[] {
@@ -480,20 +480,23 @@ describe("React-Dashboard", () => {
     expect(fetchMock.mock.calls.length).toBeGreaterThanOrEqual(2);
   });
 
-  it("sammelt Wetten über den Bet-Picker im Warenkorb und mischt eine Kombi", async () => {
+  it("sammelt Wetten über das Radialmenü im Warenkorb und mischt eine Kombi", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(document()), { status: 200 })));
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     render(<App />);
     expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "Zum Wett-Baukasten hinzufügen: Alpha FC – Gast FC" }));
-    let picker = screen.getByRole("dialog", { name: "Markt wählen: Alpha FC – Gast FC" });
-    await user.click(within(picker).getByRole("button", { name: /1X2/ }));
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+    await user.hover(screen.getByRole("button", { name: "Zum Wett-Baukasten hinzufügen: Alpha FC – Gast FC" }));
+    let radial = screen.getByRole("menu", { name: "Markt hinzufügen: Alpha FC – Gast FC" });
+    await user.click(within(radial).getByRole("menuitem", { name: /1X2/ }));
     expect(screen.getByRole("button", { name: /Wett-Baukasten öffnen \(1 Wette\)/ })).toBeInTheDocument();
+    // Der Fächer bleibt offen, der aufgenommene Markt ist darin gesperrt.
+    expect(within(radial).getByRole("menuitem", { name: /1X2.*bereits im Warenkorb/ })).toBeDisabled();
 
-    await user.click(screen.getByRole("button", { name: "Zum Wett-Baukasten hinzufügen: Zulu FC – Gast FC" }));
-    picker = screen.getByRole("dialog", { name: "Markt wählen: Zulu FC – Gast FC" });
-    await user.click(within(picker).getByRole("button", { name: /1X2/ }));
+    await user.hover(screen.getByRole("button", { name: "Zum Wett-Baukasten hinzufügen: Zulu FC – Gast FC" }));
+    radial = screen.getByRole("menu", { name: "Markt hinzufügen: Zulu FC – Gast FC" });
+    await user.click(within(radial).getByRole("menuitem", { name: /1X2/ }));
     const cartButton = screen.getByRole("button", { name: /Wett-Baukasten öffnen \(2 Wetten\)/ });
 
     await user.click(cartButton);
@@ -575,5 +578,88 @@ describe("React-Dashboard", () => {
     await user.click(screen.getByRole("button", { name: /Zulu FCGast FC/i }));
     expect(screen.getByText("Direkte Begegnungen")).toBeInTheDocument();
     expect(screen.queryByText("Ligatabelle")).not.toBeInTheDocument();
+  });
+});
+
+describe("MarketCard", () => {
+  afterEach(cleanup);
+
+  function outcomeMarket(overrides: Partial<DashboardMarket> = {}): DashboardMarket {
+    return {
+      key: "1x2", label: "1X2", selection: "Auswärtssieg Gast FC", pick: "2", selectionTone: "away",
+      probability: 0.65, odds: 12, confidence: 55, score: 0,
+      recommendation: { level: "none", label: "Nicht empfehlenswert" }, details: [],
+      ...overrides
+    };
+  }
+
+  it("zeigt Wahrscheinlichkeit und Value, solange die Basis belastbar ist", () => {
+    const { container } = render(<MarketCard market={outcomeMarket()} showEdge />);
+    expect(within(container).getByText("65,0 %")).toBeInTheDocument();
+    expect(within(container).getByText(/56,7 PP/)).toBeInTheDocument();
+    expect(container.querySelector(".market-card.unreliable")).toBeNull();
+  });
+
+  it("verschweigt Wahrscheinlichkeit und Value ohne Ligastärke-Vergleich", () => {
+    const { container } = render(<MarketCard market={outcomeMarket({ probabilityReliable: false })} showEdge />);
+    expect(within(container).queryByText("65,0 %")).not.toBeInTheDocument();
+    expect(within(container).queryByText(/PP/)).not.toBeInTheDocument();
+    expect(within(container).getByText("Ligastärke fehlt")).toBeInTheDocument();
+    expect(container.querySelector(".market-card.unreliable")).not.toBeNull();
+  });
+});
+
+describe("Klassenunterschied", () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date("2026-08-16T12:00:00.000Z"));
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+    window.localStorage.clear();
+  });
+
+  function gapDocument(): DashboardDocument {
+    const current = document();
+    current.fixtures[0]!.classGap = {
+      level: "extreme", stronger: "away", source: "market",
+      label: "Quotenbild 1,24 gegen 12,00 · kein Ligastärke-Vergleich vorhanden"
+    };
+    return current;
+  }
+
+  it("markiert die Partie und nennt die stärkere Seite samt Quelle", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(gapDocument()), { status: 200 })));
+    const { container } = render(<App />);
+    expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
+    const badge = container.querySelector(".class-gap")!;
+    expect(badge).not.toBeNull();
+    expect(badge.textContent).toMatch(/^Klasse/);
+    expect(badge.className).toContain("extreme");
+    expect(badge.className).toContain("market");
+    expect(badge).toHaveAttribute("title", expect.stringContaining("Sehr großer Klassenunterschied"));
+    expect(badge).toHaveAttribute("title", expect.stringContaining("Gast FC ist die höhere Klasse"));
+    expect(badge).toHaveAttribute("title", expect.stringContaining("Markt: Quotenbild 1,24 gegen 12,00"));
+  });
+
+  it("filtert Partien mit und ohne Klassenunterschied", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(gapDocument()), { status: 200 })));
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(<App />);
+    expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
+    expect(screen.getByText("Zulu FC")).toBeInTheDocument();
+
+    const group = screen.getByRole("group", { name: "Klassenunterschied" });
+    await user.click(within(group).getByRole("button", { name: "Nur" }));
+    expect(screen.getByText("Alpha FC")).toBeInTheDocument();
+    expect(screen.queryByText("Zulu FC")).not.toBeInTheDocument();
+
+    await user.click(within(group).getByRole("button", { name: "Ohne" }));
+    expect(screen.queryByText("Alpha FC")).not.toBeInTheDocument();
+    expect(screen.getByText("Zulu FC")).toBeInTheDocument();
   });
 });

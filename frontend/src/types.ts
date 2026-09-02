@@ -1,4 +1,5 @@
 export type {
+  ClassGap,
   DashboardDocument,
   DashboardFixture,
   DashboardMarket,
