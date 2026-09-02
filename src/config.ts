@@ -67,8 +67,36 @@ export const config = {
   apiRateLimitRetryMs: 60_000,
   modelVersion: "1.3.0",
   activeProfileVersion: "1.3.0",
-  goalLineModelVersion: "3.1.0",
+  goalLineModelVersion: "3.2.0",
   xgEnrichmentRequestBudget: 250,
+  // Rekalibrierung der Torerwartung: tatsächliche Torsumme = intercept + slope * erwartete.
+  // Kleinste Quadrate über 1306 abgerechnete Ligapartien der Version 3.1.0 (02.08.-29.08.2026),
+  // geprüft auf 560 später angepfiffenen Partien, die nicht im Fit stecken.
+  //
+  // Zwei Fehler stecken in derselben Zahl. Der Pegel: 3.1.0 erwartet im Mittel 2,70 Tore,
+  // gefallen sind 2,83. Die Spreizung: die Steigung unter 1 heißt, das Modell trennt zu
+  // scharf - bei erwarteten 2,0 Toren fielen 2,2, bei erwarteten 3,6 nur 3,55. Ein reiner
+  // Skalenfaktor von 1,048 heilt nur den Pegel, die Gerade beides.
+  //
+  // Out-of-Sample-Wirkung auf die Kalibrierung (Abweichung Eintritt minus Prognose):
+  //   Über 1,5   +3,3 pp -> +0,7 pp     1. HZ Über 0,5  +1,4 pp -> -0,7 pp
+  //   Über 2,5   +3,2 pp -> +0,0 pp     1. HZ Über 1,5  +1,0 pp -> -1,1 pp
+  //   Über 3,5   +3,1 pp -> +0,5 pp     BTTS            +4,7 pp -> +2,2 pp
+  // Mittlerer Brier-Score über alle Tormärkte 0.2142 -> 0.2130.
+  //
+  // Der Preis steht bewusst hier: Remis wird schlechter (+2,3 -> +3,1 pp Unterschätzung),
+  // weil mehr Tore weniger Remis bedeuten, und der 1X2-Brier bewegt sich um +0.0003.
+  // Beides ist gegen sechs deutlich besser kalibrierte Tormärkte abgewogen.
+  //
+  // Der Fit stammt aus Ligapartien; Cross-League-Partien lagen mit 188 Stück zu dünn für
+  // einen eigenen Wert und laufen vorerst über denselben. Bei genügend abgerechneten
+  // Cross-League-Partien gehört das getrennt nachgezogen.
+  goalLineCalibration: {
+    intercept: 0.4951,
+    slope: 0.8638,
+    firstHalfIntercept: 0.3002,
+    firstHalfSlope: 0.7984
+  },
   // Abrechnung fälliger Prognosen am Ende jedes Dashboard-Laufs. Klein gehalten, weil im
   // laufenden Betrieb pro Tag nur Dutzende Partien anfallen; ein Rückstand wird über
   // mehrere Läufe abgetragen. 0 schaltet die automatische Abrechnung ab.

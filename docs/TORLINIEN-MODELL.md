@@ -1,4 +1,4 @@
-# Torlinien-Modell 3.1.0
+# Torlinien-Modell 3.2.0
 
 ## Erwartete Tore
 
@@ -152,6 +152,73 @@ genug Cross-League-Partien ausgewertet sind.
 Bekannte verbleibende Schwäche: Bei Vereinen, deren Liga geschätzt werden muss, bleibt die
 Abweichung am größten. Rhynern gegen Dresden liegt bei 64 % gegen 91 % Markt — die
 Richtung stimmt, der Abstand nicht vollständig.
+
+## Rekalibrierung der Torerwartung (seit 3.2.0)
+
+Die aus Angriff, Abwehr und Stärkefaktor gebildete Erwartung wird zum Schluss auf den
+gemessenen Zusammenhang zwischen Prognose und Ergebnis gezogen:
+
+```
+λ gesamt korrigiert = 0,4951 + 0,8638 × λ gesamt
+λ heim, λ auswärts  = λ gesamt korrigiert, aufgeteilt im unveränderten Verhältnis
+```
+
+Für die erste Halbzeit gilt dieselbe Form mit eigenen Koeffizienten (0,3002 und 0,7984).
+
+Grundlage sind 1306 abgerechnete Ligapartien der Version 3.1.0 vom 02. bis 29.08.2026,
+geprüft auf 560 später angepfiffenen Partien, die nicht in den Fit eingegangen sind.
+Zwei Fehler stecken in derselben Zahl:
+
+- **Der Pegel.** 3.1.0 erwartete im Mittel 2,70 Tore, gefallen sind 2,83. Jede Über-Linie
+  wurde dadurch zu niedrig angesetzt.
+- **Die Spreizung.** Die Steigung unter 1 heißt, das Modell trennt zu scharf: bei
+  erwarteten 2,0 Toren fielen 2,2, bei erwarteten 3,6 nur 3,55. Der Fixpunkt der Geraden
+  liegt bei 3,64 Toren — darunter wird angehoben, darüber gesenkt.
+
+Ein reiner Skalenfaktor von 1,048 hätte nur den Pegel geheilt. Die Gerade trifft beides
+und war out of sample auch im Brier-Score besser (0.2137 gegen 0.2130).
+
+Wirkung auf die Kalibrierung, gemessen an den 560 zurückgehaltenen Partien
+(Abweichung = Eintritt minus Prognose):
+
+| Markt | 3.1.0 | 3.2.0 |
+|---|---:|---:|
+| Über 1,5 | +3,3 pp | +0,7 pp |
+| Über 2,5 | +3,2 pp | +0,0 pp |
+| Über 3,5 | +3,1 pp | +0,5 pp |
+| 1. HZ Über 0,5 | +1,4 pp | −0,7 pp |
+| 1. HZ Über 1,5 | +1,0 pp | −1,1 pp |
+| BTTS | +4,7 pp | +2,2 pp |
+| Mittlerer Brier | 0.2142 | 0.2130 |
+
+Korrigiert wird ausschließlich die **Summe**. Die Aufteilung auf Heim und Auswärts bleibt
+unangetastet, weil sie für die Torlinien ohnehin bedeutungslos ist: Die Summe zweier
+unabhängiger Poisson-Größen hängt nur von der Summe der λ ab. Auf 1X2 und Remis wirkt die
+Korrektur damit allein über das Torniveau.
+
+Der Preis steht bewusst hier: **Remis wird schlechter** (+2,3 auf +3,1 Prozentpunkte
+Unterschätzung), weil mehr Tore weniger Remis bedeuten, und der 1X2-Brier bewegt sich um
++0.0003. Beides ist gegen sechs deutlich besser kalibrierte Tormärkte abgewogen.
+
+Der Fit stammt aus Ligapartien. Cross-League-Partien lagen mit 188 Stück zu dünn für
+einen eigenen Wert und laufen vorerst über dieselbe Gerade; bei genügend abgerechneten
+Partien gehört das getrennt nachgezogen.
+
+### Was ausdrücklich nicht die Ursache war
+
+Naheliegend wäre gewesen, den Fehler in der Torrate zu suchen: Sie mischt 75 %
+venue-spezifische mit 25 % Gesamtspielen, und diese beiden Größen liegen auf
+verschiedenen Skalen — der Heimschnitt einer Liga ist höher als ihr Gesamtschnitt. Für
+ein exakt durchschnittliches Team ergibt das rechnerisch einen Heimangriff von 0,974
+statt 1,0 und einen Auswärtsangriff von 1,033. Das passt zum Befund, dass die Heimtore in
+jeder Liga und jedem Vertrauensband zu niedrig lagen.
+
+Nachgerechnet an den zurückgehaltenen Partien hält die Erklärung aber nicht: Die
+Auswärtstore waren mit 1,308 erwartet gegen 1,336 tatsächlich schon vorher richtig. Eine
+Korrektur der Aufteilung allein hätte sie auf 1,231 gedrückt, den 1X2-Brier von 0.6342
+auf 0.6359 verschlechtert und BTTS von +4,7 auf +5,1 Prozentpunkte. Andere Teile des
+Modells gleichen den Skalenversatz offenbar aus. Er bleibt deshalb unangetastet — wer ihn
+anfasst, muss die Gegenrechnung mitliefern.
 
 ## Gesamttorverteilung
 

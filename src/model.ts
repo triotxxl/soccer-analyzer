@@ -273,6 +273,31 @@ function buildTeamMetrics(
   };
 }
 
+/**
+ * Zieht die Torerwartung auf den gemessenen Zusammenhang zwischen Prognose und Ergebnis
+ * nach. Korrigiert wird ausschließlich die Summe; die Aufteilung auf Heim und Auswärts
+ * bleibt unangetastet, weil sie für die Torlinien ohnehin bedeutungslos ist - die Summe
+ * zweier unabhängiger Poisson-Größen hängt nur von der Summe der λ ab. Auf 1X2, BTTS und
+ * Remis wirkt die Korrektur damit allein über das Torniveau, nicht über den Heimvorteil.
+ * Die Herleitung der Koeffizienten steht in `config.goalLineCalibration`.
+ */
+export function recalibrateGoals(
+  homeGoals: number,
+  awayGoals: number,
+  calibration: { intercept: number; slope: number },
+  floor: number,
+  ceiling: number
+): { homeGoals: number; awayGoals: number } {
+  const total = homeGoals + awayGoals;
+  if (total <= 0) return { homeGoals, awayGoals };
+  const corrected = Math.max(0, calibration.intercept + calibration.slope * total);
+  const homeShare = homeGoals / total;
+  return {
+    homeGoals: clamp(corrected * homeShare, floor, ceiling),
+    awayGoals: clamp(corrected * (1 - homeShare), floor, ceiling)
+  };
+}
+
 function factorial(value: number): number {
   let result = 1;
   for (let index = 2; index <= value; index += 1) result *= index;
@@ -431,8 +456,16 @@ export function analyzeFirstHalfGoals(
   const homeDefense = (0.75 * homeMetrics.venueGoalsAgainst + 0.25 * homeMetrics.weightedGoalsAgainst) / homeBase.awayGoals;
   // Maßstab wie im Gesamtspielmodell: dieselbe Basis wie im Nenner der Angriffskennzahl.
   const strength = options.strengthFactor ?? 1;
-  const expectedHomeGoals = clamp(homeBase.homeGoals * homeAttack * awayDefense * strength, 0.05, 2.5);
-  const expectedAwayGoals = clamp(awayBase.awayGoals * awayAttack * homeDefense / strength, 0.05, 2.5);
+  const { homeGoals: expectedHomeGoals, awayGoals: expectedAwayGoals } = recalibrateGoals(
+    clamp(homeBase.homeGoals * homeAttack * awayDefense * strength, 0.05, 2.5),
+    clamp(awayBase.awayGoals * awayAttack * homeDefense / strength, 0.05, 2.5),
+    {
+      intercept: config.goalLineCalibration.firstHalfIntercept,
+      slope: config.goalLineCalibration.firstHalfSlope
+    },
+    0.05,
+    2.5
+  );
   const coverage = fullTeamMatches.length === 0
     ? 0
     : clamp(teamMatches.length / fullTeamMatches.length, 0, 1);
@@ -588,8 +621,13 @@ export function analyzeFixture(
   // auch zwei gleichklassigen Vereinen - und bei ungleichen Paarungen ein zweites Mal
   // zusätzlich zum Stärkefaktor. Der Klassenunterschied gehört allein in `strength`.
   const strength = options.strengthFactor ?? 1;
-  const expectedHomeGoals = clamp(homeBase.homeGoals * homeAttack * awayDefense * strength, 0.2, 4.5);
-  const expectedAwayGoals = clamp(awayBase.awayGoals * awayAttack * homeDefense / strength, 0.2, 4.5);
+  const { homeGoals: expectedHomeGoals, awayGoals: expectedAwayGoals } = recalibrateGoals(
+    clamp(homeBase.homeGoals * homeAttack * awayDefense * strength, 0.2, 4.5),
+    clamp(awayBase.awayGoals * awayAttack * homeDefense / strength, 0.2, 4.5),
+    config.goalLineCalibration,
+    0.2,
+    4.5
+  );
 
   return {
     expectedHomeGoals,

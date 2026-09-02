@@ -11,8 +11,10 @@ import {
   leagueBaseline,
   goalLineProbabilities,
   playedMatches,
-  poissonProbabilities
+  poissonProbabilities,
+  recalibrateGoals
 } from "../src/model.ts";
+import { config } from "../src/config.ts";
 import type { FixtureExpectedGoals } from "../src/types.ts";
 import { fixture, history } from "./helpers.ts";
 
@@ -400,4 +402,69 @@ test("ohne Seitenbasis und Stärkefaktor bleibt das Modell unverändert", () => 
   const explicit = analyzeFixture(upcoming, cupHistory, teamHistory, { strengthFactor: 1 });
   assert.equal(bare.expectedHomeGoals, explicit.expectedHomeGoals);
   assert.equal(bare.expectedAwayGoals, explicit.expectedAwayGoals);
+});
+
+test("recalibrateGoals zieht die Summe auf die Gerade und lässt die Aufteilung stehen", () => {
+  const calibration = { intercept: 0.5, slope: 0.85 };
+  const result = recalibrateGoals(1.8, 1.2, calibration, 0.2, 4.5);
+  const total = result.homeGoals + result.awayGoals;
+  assert.ok(Math.abs(total - (0.5 + 0.85 * 3)) < 1e-12);
+  // Der Heimanteil von 60 % bleibt erhalten - korrigiert wird nur das Niveau.
+  assert.ok(Math.abs(result.homeGoals / total - 0.6) < 1e-12);
+});
+
+test("recalibrateGoals hebt unterdurchschnittliche Partien und senkt torreiche", () => {
+  const calibration = config.goalLineCalibration;
+  const fixedPoint = calibration.intercept / (1 - calibration.slope);
+  const low = recalibrateGoals(1.0, 1.0, calibration, 0.2, 4.5);
+  const high = recalibrateGoals(2.6, 2.4, calibration, 0.2, 4.5);
+  assert.ok(low.homeGoals + low.awayGoals > 2, "unter dem Fixpunkt wird angehoben");
+  assert.ok(high.homeGoals + high.awayGoals < 5, "über dem Fixpunkt wird gesenkt");
+  assert.ok(fixedPoint > 3 && fixedPoint < 4, `Fixpunkt bei ${fixedPoint} erwartet zwischen 3 und 4`);
+});
+
+test("recalibrateGoals bleibt in den Grenzen und übersteht eine Nullerwartung", () => {
+  const calibration = { intercept: 0, slope: 0.0001 };
+  const tiny = recalibrateGoals(1.0, 1.0, calibration, 0.2, 4.5);
+  assert.equal(tiny.homeGoals, 0.2);
+  assert.equal(tiny.awayGoals, 0.2);
+  const huge = recalibrateGoals(4.5, 4.5, { intercept: 10, slope: 1 }, 0.2, 4.5);
+  assert.equal(huge.homeGoals, 4.5);
+  const zero = recalibrateGoals(0, 0, calibration, 0.2, 4.5);
+  assert.deepEqual(zero, { homeGoals: 0, awayGoals: 0 });
+});
+
+test("analyzeFixture wendet die Rekalibrierung an", () => {
+  const base = 1_800_000_000;
+  const upcoming = fixture({ id: 999, timestamp: base, homeId: 1, awayId: 2 });
+  const model = analyzeFixture(upcoming, history(base));
+  const { intercept, slope } = config.goalLineCalibration;
+  const total = model.expectedHomeGoals + model.expectedAwayGoals;
+  // Die Rohsumme lässt sich aus der Geraden zurückrechnen. Die Korrektur zieht sie zum
+  // Fixpunkt hin, also muss die korrigierte Summe echt dazwischen liegen.
+  const raw = (total - intercept) / slope;
+  const fixedPoint = intercept / (1 - slope);
+  assert.ok(Math.abs(raw - total) > 1e-9, `Rekalibrierung nicht angewandt, Rohsumme ${raw}`);
+  assert.ok(
+    (raw < total && total < fixedPoint) || (fixedPoint < total && total < raw),
+    `${total} sollte zwischen Rohsumme ${raw} und Fixpunkt ${fixedPoint} liegen`
+  );
+});
+
+test("analyzeFirstHalfGoals nutzt die eigenen Halbzeitkoeffizienten", () => {
+  const base = 1_800_000_000;
+  const upcoming = fixture({ id: 999, timestamp: base, homeId: 1, awayId: 2 });
+  const half = analyzeFirstHalfGoals(upcoming, history(base));
+  const intercept = config.goalLineCalibration.firstHalfIntercept;
+  const slope = config.goalLineCalibration.firstHalfSlope;
+  const total = half.expectedHomeGoals + half.expectedAwayGoals;
+  const raw = (total - intercept) / slope;
+  const fixedPoint = intercept / (1 - slope);
+  assert.ok(Math.abs(raw - total) > 1e-9, `Rekalibrierung nicht angewandt, Rohsumme ${raw}`);
+  assert.ok(
+    (raw < total && total < fixedPoint) || (fixedPoint < total && total < raw),
+    `${total} sollte zwischen Rohsumme ${raw} und Fixpunkt ${fixedPoint} liegen`
+  );
+  // Die Halbzeitgerade ist eine andere als die für das ganze Spiel.
+  assert.notEqual(intercept, config.goalLineCalibration.intercept);
 });
