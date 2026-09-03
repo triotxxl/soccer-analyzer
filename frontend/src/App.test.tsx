@@ -252,10 +252,16 @@ describe("React-Dashboard", () => {
     const line = screen.getByRole("combobox", { name: "Über-Linie für H2H & Form, 1. Halbzeit" });
     expect(within(line).getAllByRole("option").map((option) => option.textContent)).toEqual(["Über 0,5", "Über 1,5"]);
     const firstH2h = globalThis.document.querySelector(".fixture-row")!;
-    expect(Array.from(firstH2h.querySelectorAll(".h2h-cell .result-dot")).map((dot) => dot.textContent)).toEqual(["Ü", "U", "Ü", "Ü", "–"]);
+    const dots = () => Array.from(firstH2h.querySelectorAll(".h2h-cell .result-dot"));
+    // Die Punkte zeigen die Halbzeit-Torzahl; ob die Linie gerissen wurde, sagt die Farbe.
+    // Die Zahl bleibt deshalb gleich, wenn die Linie wechselt - hit/miss dreht sich.
+    const hits = () => dots().map((dot) => dot.classList.contains("hit") ? "Ü" : dot.classList.contains("miss") ? "U" : "–");
+    expect(dots().map((dot) => dot.textContent)).toEqual(["1", "0", "2", "1", "–"]);
+    expect(hits()).toEqual(["Ü", "U", "Ü", "Ü", "–"]);
 
     await user.selectOptions(line, "1.5");
-    expect(Array.from(firstH2h.querySelectorAll(".h2h-cell .result-dot")).map((dot) => dot.textContent)).toEqual(["U", "U", "Ü", "U", "–"]);
+    expect(dots().map((dot) => dot.textContent)).toEqual(["1", "0", "2", "1", "–"]);
+    expect(hits()).toEqual(["U", "U", "Ü", "U", "–"]);
   });
 
   it("sortiert H2H zuerst nach aktueller Serie und danach nach Ergebnispriorität", async () => {

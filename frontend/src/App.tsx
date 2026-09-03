@@ -438,21 +438,30 @@ function matchViewDots(
       const value = match.homeGoals > 0 && match.awayGoals > 0;
       return { value, text: value ? "✓" : "×", title: value ? "BTTS" : "Kein BTTS" };
     })
+    // Über/Unter zeigt die Torzahl statt eines "Ü"/"U": Die Farbe des Punktes sagt schon,
+    // ob die Linie gerissen wurde, der Buchstabe wiederholt das nur. Die Zahl beantwortet
+    // stattdessen, wie deutlich - ein 5:2 und ein 2:1 sind beide "Ü", aber nicht dasselbe.
     : view === "firstHalfOver"
       ? matches.map((match) => {
         if (typeof match.halfTimeHomeGoals !== "number" || typeof match.halfTimeAwayGoals !== "number") {
           return { value: null, text: "–", title: "Kein Halbzeitstand verfügbar" };
         }
-        const value = match.halfTimeHomeGoals + match.halfTimeAwayGoals > firstHalfOverLine;
+        const goals = match.halfTimeHomeGoals + match.halfTimeAwayGoals;
+        const value = goals > firstHalfOverLine;
         return {
           value,
-          text: value ? "Ü" : "U",
-          title: `1. Halbzeit ${match.halfTimeHomeGoals}:${match.halfTimeAwayGoals} · ${value ? "Über" : "Unter"} ${firstHalfOverLine.toLocaleString("de-DE")}`
+          text: String(goals),
+          title: `1. Halbzeit ${match.halfTimeHomeGoals}:${match.halfTimeAwayGoals} · ${goals} Tor${goals === 1 ? "" : "e"} · ${value ? "Über" : "Unter"} ${firstHalfOverLine.toLocaleString("de-DE")}`
         };
       })
       : matches.map((match) => {
-        const value = match.homeGoals + match.awayGoals > overLine;
-        return { value, text: value ? "Ü" : "U", title: `Endstand ${match.homeGoals}:${match.awayGoals}` };
+        const goals = match.homeGoals + match.awayGoals;
+        const value = goals > overLine;
+        return {
+          value,
+          text: String(goals),
+          title: `Endstand ${match.homeGoals}:${match.awayGoals} · ${goals} Tor${goals === 1 ? "" : "e"} · ${value ? "Über" : "Unter"} ${overLine.toLocaleString("de-DE")}`
+        };
       });
   while (values.length < 5) values.push({ value: null, text: "–", title: "Keine Daten" });
   return values.slice(0, 5);
