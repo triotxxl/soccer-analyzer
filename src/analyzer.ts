@@ -3,7 +3,7 @@ import { config, TEAM_ALIASES_FILE } from "./config.ts";
 import { AnalyzerDatabase } from "./database.ts";
 import { scoreCrossLeagueFixture } from "./cross-league-criteria.ts";
 import { scoreCrossLeagueDrawFixture } from "./cross-league-draw-criteria.ts";
-import { buildTable, consensusOdds, leagueAverages, scoreDrawFixture } from "./draw-criteria.ts";
+import { buildTable, consensusOdds, leagueAverages, scoreDrawFixture, tableScopeOf } from "./draw-criteria.ts";
 import { scoreFavoriteFixture } from "./favorite-criteria.ts";
 import { strengthPool } from "./league-strength.ts";
 import {
@@ -41,6 +41,15 @@ import type {
   ResolvedLeague
 } from "./types.ts";
 import type { TableRow } from "./draw-criteria.ts";
+
+/**
+ * Tabellen werden je Liga, Saison und Abschnitt geführt. Apertura und Clausura teilen sich
+ * bei API-Football Liga-ID und Saison, sind aber getrennte Wettbewerbe mit eigener Tabelle.
+ */
+function standingsKey(fixture: ApiFixture): string {
+  const scope = tableScopeOf(fixture);
+  return `${fixture.league.id}:${scope.season}:${scope.stage}`;
+}
 import { datesForRange, isAnalyzableStatus, normalizeText } from "./util.ts";
 import { venueFormRow } from "./venue-form.ts";
 import { enrichFixtureExpectedGoals } from "./xg.ts";
@@ -529,10 +538,21 @@ export async function runGoalLineAnalysis(
       rankingsByCompetition.set(key, buildDefenseRankings(history, enriched.values,
         Math.min(...fixtures.map((fixture) => fixture.fixture.timestamp))));
     }
+    // Die Tabelle wird je Abschnitt gerechnet, nicht je Liga: `competitionHistory` enthält
+    // die laufende und die vorige Saison, und innerhalb einer Saison führt API-Football
+    // Apertura und Clausura unter derselben ID. Ohne den Zuschnitt auf Saison und Abschnitt
+    // summiert sich das zu einem Bestand, den es als Tabelle nie gab.
     const standingsByCompetition = new Map<string, { table: TableRow[]; teamNames: Map<number, string> }>();
-    for (const [key, history] of competitionHistory) {
+    for (const fixture of fixtures) {
+      const key = standingsKey(fixture);
+      if (standingsByCompetition.has(key)) continue;
+      const history = competitionHistory.get(`${fixture.league.id}:${fixture.league.season}`);
+      if (!history) continue;
+      const scope = tableScopeOf(fixture);
+      // Der früheste Anpfiff des Abschnitts friert den Stand ein, damit alle Partien
+      // desselben Abschnitts dieselbe Tabelle zeigen.
       const targetTimestamp = Math.min(
-        ...fixtures.filter((fixture) => `${fixture.league.id}:${fixture.league.season}` === key).map((fixture) => fixture.fixture.timestamp)
+        ...fixtures.filter((entry) => standingsKey(entry) === key).map((entry) => entry.fixture.timestamp)
       );
       if (!Number.isFinite(targetTimestamp)) continue;
       const teamNames = new Map<number, string>();
@@ -540,7 +560,7 @@ export async function runGoalLineAnalysis(
         teamNames.set(match.teams.home.id, match.teams.home.name);
         teamNames.set(match.teams.away.id, match.teams.away.name);
       }
-      standingsByCompetition.set(key, { table: buildTable(history, targetTimestamp), teamNames });
+      standingsByCompetition.set(key, { table: buildTable(history, targetTimestamp, scope), teamNames });
     }
 
     const baselineCache = new Map<string, LeagueBaseline>();
@@ -703,8 +723,11 @@ export async function runGoalLineAnalysis(
         defense: model.defense,
         strength: strength ?? undefined,
         standings: crossLeague ? undefined : (() => {
-          const entry = standingsByCompetition.get(competitionKey);
-          return entry?.table.map((row) => ({ ...row, teamName: entry.teamNames.get(row.id) ?? "?" }));
+          const entry = standingsByCompetition.get(standingsKey(fixture));
+          // Eine leere Tabelle ist bei reinen Pokalwettbewerben der richtige Zustand: Dort
+          // gibt es keine Spieltage, aus denen sich ein Klassement ergibt.
+          if (!entry || entry.table.length === 0) return undefined;
+          return entry.table.map((row) => ({ ...row, teamName: entry.teamNames.get(row.id) ?? "?" }));
         })(),
         probabilities: goalLineProbabilities(
           model.expectedHomeGoals,

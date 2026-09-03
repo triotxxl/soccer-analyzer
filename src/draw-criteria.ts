@@ -124,7 +124,58 @@ function pointsBand(value: number, bands: Array<[number, number]>): number {
   return 0;
 }
 
-export function buildTable(fixtures: ApiFixture[], cutoff: number): TableRow[] {
+/**
+ * Der Abschnitt, über den eine Tabelle überhaupt gerechnet werden darf. API-Football führt
+ * Apertura und Clausura unter derselben Liga-ID und Saison, dazu die K.-o.-Runden am Ende;
+ * ohne diese Eingrenzung addiert `buildTable` alles zu einem Bestand, den es als Tabelle nie
+ * gab. Nicaragua stand so bei 50 Partien pro Team statt bei 6.
+ */
+export interface TableScope {
+  season: number;
+  /** `null`, wenn die Runde keinen Abschnitt nennt - etwa bei einer reinen Endrunde. */
+  stage: string | null;
+  /**
+   * `false`, wenn der Bestand überhaupt keine Runden führt. Dann bleibt es bei der
+   * Saison-Eingrenzung, statt mangels Spieltagsangabe alles zu verwerfen: Die Vorsaison
+   * herauszuhalten ist auch ohne Rundenkenntnis richtig.
+   */
+  matchdaysOnly: boolean;
+}
+
+/**
+ * Zerlegt `league.round` in Abschnitt und Spieltag. API-Football schreibt "Regular Season - 12",
+ * "Apertura - 5", "Apertura - Semi-finals" oder - bei reinen Endrunden - "Quarter-finals".
+ *
+ * `matchday` ist nur wahr, wenn hinter dem Abschnitt eine Spieltagsnummer steht; K.-o.-Partien
+ * zählen für keine Tabelle. `stage` ist `null`, wenn die Runde gar keinen Abschnitt nennt -
+ * dann lässt sich aus ihr nichts über die Zugehörigkeit ableiten.
+ */
+export function roundStage(round: string): { stage: string | null; matchday: boolean } {
+  const separator = round.lastIndexOf(" - ");
+  if (separator === -1) return { stage: null, matchday: false };
+  const tail = round.slice(separator + 3);
+  return { stage: round.slice(0, separator), matchday: /^\d+$/.test(tail.trim()) };
+}
+
+/**
+ * Für eine Endrundenpartie ist der Abschnitt entweder mitgeliefert ("Apertura - Semi-finals"
+ * gehört zur Apertura-Tabelle) oder nicht bestimmbar ("Quarter-finals"). Im zweiten Fall
+ * bleibt es bei der Saison-Eingrenzung, und weil K.-o.-Partien ohnehin nie mitzählen, ergibt
+ * das die Tabelle des reglären Spielbetriebs dieser Saison.
+ */
+export function tableScopeOf(fixture: ApiFixture): TableScope {
+  const round = fixture.league.round;
+  if (round === undefined || round.trim() === "") {
+    return { season: fixture.league.season, stage: null, matchdaysOnly: false };
+  }
+  return { season: fixture.league.season, stage: roundStage(round).stage, matchdaysOnly: true };
+}
+
+/**
+ * `scope` weggelassen heißt: alles zählen, was vor dem Cutoff liegt. Das bleibt für die
+ * Cross-League-Pfade so, die bewusst über den gesamten verfügbaren Bestand mitteln.
+ */
+export function buildTable(fixtures: ApiFixture[], cutoff: number, scope?: TableScope): TableRow[] {
   const rows = new Map<number, Omit<TableRow, "position">>();
   const get = (id: number): Omit<TableRow, "position"> => {
     const existing = rows.get(id);
@@ -148,6 +199,14 @@ export function buildTable(fixtures: ApiFixture[], cutoff: number): TableRow[] {
 
   for (const fixture of fixtures) {
     if (fixture.fixture.timestamp >= cutoff) continue;
+    if (scope) {
+      if (fixture.league.season !== scope.season) continue;
+      if (scope.matchdaysOnly) {
+        const round = roundStage(fixture.league.round ?? "");
+        if (!round.matchday) continue;
+        if (scope.stage !== null && round.stage !== scope.stage) continue;
+      }
+    }
     const score = completedScore(fixture);
     if (!score) continue;
     const home = get(fixture.teams.home.id);
@@ -361,7 +420,7 @@ function h2hSummary(
 
 export function scoreDrawFixture(context: DrawCriteriaContext): DrawScoreRow {
   const { fixture, seasonFixtures, standingsAvailable } = context;
-  const table = buildTable(seasonFixtures, fixture.fixture.timestamp);
+  const table = buildTable(seasonFixtures, fixture.fixture.timestamp, tableScopeOf(fixture));
   const home = table.find((row) => row.id === fixture.teams.home.id);
   const away = table.find((row) => row.id === fixture.teams.away.id);
   const homeForm = formStats(context.homeRecent, fixture.teams.home.id, table);

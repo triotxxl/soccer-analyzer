@@ -3,7 +3,8 @@ import {
   completedScore,
   consensusOdds,
   formStats,
-  tablePpg
+  tablePpg,
+  tableScopeOf
 } from "./draw-criteria.ts";
 import type {
   ApiFixture,
@@ -44,7 +45,7 @@ function advantagePoints(value: number, bands: Array<[number, number]>): number 
 
 export function scoreFavoriteFixture(context: FavoriteCriteriaContext): FavoriteScoreRow {
   const { fixture, standingsAvailable } = context;
-  const table = buildTable(context.seasonFixtures, fixture.fixture.timestamp);
+  const table = buildTable(context.seasonFixtures, fixture.fixture.timestamp, tableScopeOf(fixture));
   const home = table.find((row) => row.id === fixture.teams.home.id);
   const away = table.find((row) => row.id === fixture.teams.away.id);
   const homeForm = formStats(context.homeRecent, fixture.teams.home.id, table);

@@ -14,6 +14,7 @@ export function fixture(options: {
   leagueName?: string;
   country?: string;
   season?: number;
+  round?: string;
 }): ApiFixture {
   const status = options.status ?? (options.homeGoals === undefined ? "NS" : "FT");
   const date = new Date(options.timestamp * 1000).toISOString();
@@ -37,7 +38,8 @@ export function fixture(options: {
       id: options.leagueId ?? 78,
       name: options.leagueName ?? "Bundesliga",
       country: options.country ?? "Germany",
-      season: options.season ?? 2026
+      season: options.season ?? 2026,
+      ...(options.round === undefined ? {} : { round: options.round })
     },
     teams: {
       home: { id: options.homeId, name: `Team ${options.homeId}` },

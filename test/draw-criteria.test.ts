@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { leagueAverages, scoreDrawFixture } from "../src/draw-criteria.ts";
+import { buildTable, leagueAverages, roundStage, scoreDrawFixture, tableScopeOf } from "../src/draw-criteria.ts";
 import { formatDrawAnalysis } from "../src/output.ts";
 import type { ApiFixtureOdds, DrawScoreRow } from "../src/types.ts";
 import { fixture, history } from "./helpers.ts";
@@ -195,4 +195,95 @@ test("Ausgabe enthält nur Gesamttabelle und Top-12-Tabelle", () => {
   assert.equal((output.match(/Heim 1 – Auswärts 1/g) ?? []).length, 2);
   assert.equal((output.match(/Heim 13 – Auswärts 13/g) ?? []).length, 1);
   assert.doesNotMatch(output, /API-Aufrufe|Gewinnzusage/);
+});
+
+test("buildTable ohne Geltungsbereich zählt weiter alles vor dem Cutoff", () => {
+  const cutoff = 2_000_000_000;
+  const fixtures = [
+    fixture({ id: 1, timestamp: cutoff - 400, homeId: 1, awayId: 2, homeGoals: 2, awayGoals: 0, season: 2026, round: "Regular Season - 1" }),
+    fixture({ id: 2, timestamp: cutoff - 300, homeId: 1, awayId: 3, homeGoals: 1, awayGoals: 0, season: 2025, round: "Regular Season - 30" })
+  ];
+  const row = buildTable(fixtures, cutoff).find((entry) => entry.id === 1)!;
+  assert.equal(row.played, 2);
+});
+
+test("buildTable lässt die Vorsaison draußen, sobald ein Geltungsbereich gesetzt ist", () => {
+  const cutoff = 2_000_000_000;
+  const target = fixture({ id: 9, timestamp: cutoff + 100, homeId: 1, awayId: 2, season: 2026, round: "Regular Season - 2" });
+  const fixtures = [
+    fixture({ id: 1, timestamp: cutoff - 400, homeId: 1, awayId: 2, homeGoals: 2, awayGoals: 0, season: 2026, round: "Regular Season - 1" }),
+    fixture({ id: 2, timestamp: cutoff - 300, homeId: 1, awayId: 3, homeGoals: 1, awayGoals: 0, season: 2025, round: "Regular Season - 30" })
+  ];
+  const row = buildTable(fixtures, cutoff, tableScopeOf(target)).find((entry) => entry.id === 1)!;
+  assert.equal(row.played, 1);
+  assert.equal(row.points, 3);
+});
+
+test("buildTable trennt Apertura und Clausura derselben Saison", () => {
+  const cutoff = 2_000_000_000;
+  const target = fixture({ id: 9, timestamp: cutoff + 100, homeId: 1, awayId: 2, season: 2026, round: "Clausura - 3" });
+  const fixtures = [
+    fixture({ id: 1, timestamp: cutoff - 500, homeId: 1, awayId: 2, homeGoals: 3, awayGoals: 0, season: 2026, round: "Apertura - 1" }),
+    fixture({ id: 2, timestamp: cutoff - 400, homeId: 1, awayId: 3, homeGoals: 3, awayGoals: 0, season: 2026, round: "Apertura - 2" }),
+    fixture({ id: 3, timestamp: cutoff - 300, homeId: 1, awayId: 2, homeGoals: 1, awayGoals: 1, season: 2026, round: "Clausura - 1" })
+  ];
+  const row = buildTable(fixtures, cutoff, tableScopeOf(target)).find((entry) => entry.id === 1)!;
+  assert.equal(row.played, 1);
+  assert.equal(row.points, 1);
+});
+
+test("buildTable zählt K.-o.-Partien nicht in die Tabelle", () => {
+  const cutoff = 2_000_000_000;
+  const target = fixture({ id: 9, timestamp: cutoff + 100, homeId: 1, awayId: 2, season: 2026, round: "Apertura - 4" });
+  const fixtures = [
+    fixture({ id: 1, timestamp: cutoff - 500, homeId: 1, awayId: 2, homeGoals: 1, awayGoals: 0, season: 2026, round: "Apertura - 1" }),
+    fixture({ id: 2, timestamp: cutoff - 400, homeId: 1, awayId: 3, homeGoals: 4, awayGoals: 0, season: 2026, round: "Apertura - Semi-finals" })
+  ];
+  const row = buildTable(fixtures, cutoff, tableScopeOf(target)).find((entry) => entry.id === 1)!;
+  assert.equal(row.played, 1);
+  assert.equal(row.goalsFor, 1);
+});
+
+test("eine Endrunde ohne Abschnitt nutzt die Spieltage derselben Saison", () => {
+  const cutoff = 2_000_000_000;
+  // "Quarter-finals" nennt keinen Abschnitt - der Geltungsbereich fällt auf die Saison
+  // zurück, K.-o.-Partien bleiben trotzdem draußen.
+  const target = fixture({ id: 9, timestamp: cutoff + 100, homeId: 1, awayId: 2, season: 2026, round: "Quarter-finals" });
+  const fixtures = [
+    fixture({ id: 1, timestamp: cutoff - 500, homeId: 1, awayId: 2, homeGoals: 2, awayGoals: 1, season: 2026, round: "Regular Season - 1" }),
+    fixture({ id: 2, timestamp: cutoff - 450, homeId: 1, awayId: 3, homeGoals: 1, awayGoals: 0, season: 2025, round: "Regular Season - 20" }),
+    fixture({ id: 3, timestamp: cutoff - 400, homeId: 1, awayId: 3, homeGoals: 5, awayGoals: 0, season: 2026, round: "Round of 16" })
+  ];
+  const table = buildTable(fixtures, cutoff, tableScopeOf(target));
+  const row = table.find((entry) => entry.id === 1)!;
+  assert.equal(row.played, 1);
+  assert.equal(row.goalsFor, 2);
+});
+
+test("ein reiner Pokal ergibt gar keine Tabelle", () => {
+  const cutoff = 2_000_000_000;
+  const target = fixture({ id: 9, timestamp: cutoff + 100, homeId: 1, awayId: 2, season: 2026, round: "Semi-finals" });
+  const fixtures = [
+    fixture({ id: 1, timestamp: cutoff - 500, homeId: 1, awayId: 2, homeGoals: 2, awayGoals: 1, season: 2026, round: "Round of 32" }),
+    fixture({ id: 2, timestamp: cutoff - 400, homeId: 1, awayId: 3, homeGoals: 1, awayGoals: 0, season: 2026, round: "Round of 16" })
+  ];
+  assert.equal(buildTable(fixtures, cutoff, tableScopeOf(target)).length, 0);
+});
+
+test("fehlt die Runde ganz, bleibt es bei der Saison-Eingrenzung", () => {
+  const cutoff = 2_000_000_000;
+  const target = fixture({ id: 9, timestamp: cutoff + 100, homeId: 1, awayId: 2, season: 2026 });
+  const fixtures = [
+    fixture({ id: 1, timestamp: cutoff - 500, homeId: 1, awayId: 2, homeGoals: 2, awayGoals: 1, season: 2026 }),
+    fixture({ id: 2, timestamp: cutoff - 400, homeId: 1, awayId: 3, homeGoals: 1, awayGoals: 0, season: 2025 })
+  ];
+  const row = buildTable(fixtures, cutoff, tableScopeOf(target)).find((entry) => entry.id === 1)!;
+  assert.equal(row.played, 1);
+});
+
+test("roundStage erkennt Spieltag, Abschnitt und K.-o.-Runde", () => {
+  assert.deepEqual(roundStage("Regular Season - 12"), { stage: "Regular Season", matchday: true });
+  assert.deepEqual(roundStage("Apertura - 5"), { stage: "Apertura", matchday: true });
+  assert.deepEqual(roundStage("Apertura - Semi-finals"), { stage: "Apertura", matchday: false });
+  assert.deepEqual(roundStage("Quarter-finals"), { stage: null, matchday: false });
 });
