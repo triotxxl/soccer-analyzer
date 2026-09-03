@@ -23,7 +23,9 @@
     "app:test": "vitest run --config frontend/vite.config.ts",
     "test": "node --test --test-concurrency=1 \"test/**/*.test.ts\" && npm run app:test",
     "typecheck": "tsc --noEmit && tsc --project frontend/tsconfig.json --noEmit",
-    "smoke": "node --env-file-if-exists=.env src/cli.ts smoke"
+    "smoke": "node --env-file-if-exists=.env src/cli.ts smoke",
+    "edge-report": "node --env-file-if-exists=.env tools/edge-report.ts",
+    "kelly-tracker": "node --env-file-if-exists=.env tools/kelly-tracker.ts"
   },
   "engines": {
     "node": ">=24.0.0"

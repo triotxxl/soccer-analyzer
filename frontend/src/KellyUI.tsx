@@ -43,9 +43,24 @@ function downloadJson(fileName: string, payload: unknown): void {
   window.setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 
-function SettingField({ label, children }: { label: string; children: ReactNode }) {
-  return <label className="kelly-setting-field"><span>{label}</span>{children}</label>;
+// Die Filter tragen ihre Begründung als Titel-Tooltip mit sich - ohne die Messwerte daneben
+// wirken sie wie willkürliche Regler, und genau das sind sie nicht.
+function SettingField({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
+  return <label className="kelly-setting-field" title={hint}>
+    <span>{label}{hint === undefined ? null : <abbr title={hint} aria-label={hint}> ⓘ</abbr>}</span>
+    {children}
+  </label>;
 }
+
+const MARKET_TOGGLES: Array<[DashboardMarketKey, string]> = [
+  ["1x2", "1X2"],
+  ["draw", "Remis"],
+  ["btts", "BTTS"],
+  ["over15", "Ü1,5"],
+  ["over25", "Ü2,5"],
+  ["firstHalfOver05", "HZ Ü0,5"],
+  ["firstHalfOver15", "HZ Ü1,5"]
+];
 
 // 0.07 * 100 ergibt 7.000000000000001 - ohne Rundung landet der Float im Eingabefeld.
 function roundForDisplay(value: number): number {
@@ -58,8 +73,9 @@ function roundForDisplay(value: number): number {
  * geklemmt wird erst beim Verlassen des Feldes. Ohne den Entwurf würde ein geleertes Feld
  * sofort wieder auf 0 springen und ließe sich nicht überschreiben.
  */
-function NumberField({ label, value, scale = 1, min, max, step, disabled, onCommit }: {
+function NumberField({ label, hint, value, scale = 1, min, max, step, disabled, onCommit }: {
   label: string;
+  hint?: string;
   value: number;
   scale?: number;
   min?: number;
@@ -84,7 +100,7 @@ function NumberField({ label, value, scale = 1, min, max, step, disabled, onComm
     if (clamped / scale !== value) onCommit(clamped / scale);
   };
 
-  return <SettingField label={label}>
+  return <SettingField label={label} hint={hint}>
     <input type="number" min={min} max={max} step={step} disabled={disabled}
       value={draft ?? String(roundForDisplay(value * scale))}
       onChange={(event) => change(event.target.value)}
@@ -103,7 +119,7 @@ export function KellyDialog({ fixtures, marketFilter, marketLabel, settings, onS
   const [sortKey, setSortKey] = useState<KellySortKey>("stake");
   const [sortDirection, setSortDirection] = useState<1 | -1>(-1);
 
-  const { candidates, evaluated, scaleFactor, gameRiskLimits } = computeKellyCandidates(fixtures, marketFilter, settings);
+  const { candidates, evaluated, scaleFactor, gameRiskLimits, filtered } = computeKellyCandidates(fixtures, marketFilter, settings);
   const limitedGames = gameRiskLimits.filter((game) => game.scaleFactor < 1);
   const sorted = [...candidates].sort((left, right) => {
     const leftValue = sortValue(left, sortKey);
@@ -161,6 +177,35 @@ export function KellyDialog({ fixtures, marketFilter, marketLabel, settings, onS
           onCommit={(value) => set("maxExposurePercent", value)} />
         <NumberField label="Mindest-Edge (PP)" value={settings.minEdge} scale={100} min={0} step={0.5}
           onCommit={(value) => set("minEdge", value)} />
+        <SettingField label="Edge-Deckel"
+          hint="Über 13.124 abgerechneten Marktzeilen wächst die Selbstüberschätzung monoton mit dem Edge: 7–10 PP → −7,9 PP Bias, über 25 PP → −51,9 PP. Ein sehr hoher Edge ist ein Fehlersignal, kein Value.">
+          <input type="checkbox" checked={settings.maxEdge !== null}
+            aria-label="Edge-Deckel aktiv"
+            onChange={(event) => set("maxEdge", event.target.checked ? 0.12 : null)} />
+        </SettingField>
+        <NumberField label="Max. Edge (PP)" value={settings.maxEdge ?? 0.12} scale={100} min={0} step={0.5}
+          disabled={settings.maxEdge === null}
+          onCommit={(value) => set("maxEdge", value)} />
+        <NumberField label="Mindest-Datenvertrauen (%)" value={settings.minConfidence} min={0} max={100} step={5}
+          hint="0 = aus. Das Band 70–85 % liegt in beiden Datenhälften bei rund −59 % ROI, 95 %+ ist das einzige nicht durchgehend negative Band."
+          onCommit={(value) => set("minConfidence", value)} />
+        <SettingField label="Cross-League ausschließen"
+          hint="Cross-League-Auswahlen liegen bei −25,9 % ROI gegen −3,7 % innerhalb einer Liga, in beiden Datenhälften negativ.">
+          <input type="checkbox" checked={settings.excludeCrossLeague}
+            onChange={(event) => set("excludeCrossLeague", event.target.checked)} />
+        </SettingField>
+        <SettingField label="Märkte"
+          hint="Abgewählte Märkte werden gar nicht erst Kandidat. 1X2 liegt bei −39,3 % ROI mit Ø-Quote 6,16 bei behaupteten 50,1 % Trefferchance.">
+          <span className="kelly-market-toggles">
+            {MARKET_TOGGLES.map(([key, label]) => <label key={key}>
+              <input type="checkbox" checked={!settings.disabledMarkets.includes(key)}
+                onChange={(event) => set("disabledMarkets", event.target.checked
+                  ? settings.disabledMarkets.filter((entry) => entry !== key)
+                  : [...settings.disabledMarkets, key])} />
+              {label}
+            </label>)}
+          </span>
+        </SettingField>
         <SettingField label="Mehrere Märkte je Spiel">
           <input type="checkbox" checked={settings.allowMultipleMarketsPerGame}
             onChange={(event) => set("allowMultipleMarketsPerGame", event.target.checked)} />
@@ -210,6 +255,12 @@ export function KellyDialog({ fixtures, marketFilter, marketLabel, settings, onS
 
       <div className="kelly-footer">
         <p>{evaluated} Spiele im Markt „{marketLabel}" geprüft · {sorted.length} Kandidat{sorted.length === 1 ? "" : "en"} mit positivem Value</p>
+        {(filtered.crossLeague > 0 || filtered.overMaxEdge > 0) && <p>
+          Qualitätsfilter: {[
+            filtered.crossLeague > 0 ? `${filtered.crossLeague} Cross-League-Partien` : null,
+            filtered.overMaxEdge > 0 ? `${filtered.overMaxEdge} Kandidaten über dem Edge-Deckel` : null
+          ].filter((entry) => entry !== null).join(" · ")} aussortiert
+        </p>}
         <p>Summe Einsätze: <strong>{formatEuro(totalStake)}</strong> von {formatEuro(settings.budget)} Budget
           {scaleFactor < 1 && <> · Einsätze wegen Gesamtrisiko-Limit auf {(scaleFactor * 100).toFixed(0)} % skaliert</>}
         </p>

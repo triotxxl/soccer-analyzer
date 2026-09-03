@@ -10,6 +10,25 @@ export interface KellySettings {
   maxStakePercent: number;
   maxExposurePercent: number;
   minEdge: number;
+  /**
+   * Obergrenze für den Edge. Klingt widersinnig, ist aber gemessen: über 13.124 abgerechnete
+   * Marktzeilen aus den Dashboard-Snapshots wächst die Selbstüberschätzung monoton mit dem
+   * behaupteten Vorteil - 7-10 pp Edge liefern -7,9 pp Bias, 10-15 pp schon -16,0 pp,
+   * 15-25 pp -26,2 pp und über 25 pp -51,9 pp. Ein großer Edge misst also nicht den Vorsprung
+   * gegenüber dem Buchmacher, sondern die Wahrscheinlichkeit eines eigenen Rechenfehlers.
+   * `null` schaltet den Deckel ab.
+   */
+  maxEdge: number | null;
+  /** Mindest-Datenvertrauen des Marktes in Prozent. 0 schaltet die Prüfung ab. */
+  minConfidence: number;
+  /**
+   * Cross-League-Partien ausschließen: ROI -25,9 % gegen -3,7 % innerhalb einer Liga, in
+   * beiden Datenhälften negativ. Deckt zugleich die Partien ohne Ligastärke-Vergleich ab -
+   * alle 46 gemessenen Fälle waren Cross-League.
+   */
+  excludeCrossLeague: boolean;
+  /** Märkte, die gar nicht erst als Kandidat gelten. 1X2 liegt bei -39,3 % ROI. */
+  disabledMarkets: DashboardMarketKey[];
   allowMultipleMarketsPerGame: boolean;
   enableGameRiskLimit: boolean;
   maxRiskPerGame: number;
@@ -22,6 +41,13 @@ export const DEFAULT_KELLY_SETTINGS: KellySettings = {
   maxStakePercent: 0.03,
   maxExposurePercent: 0.25,
   minEdge: 0.02,
+  maxEdge: 0.12,
+  // Aus, weil die Konfidenzbänder nicht monoton sind: 70-85 % ist mit -60 % ROI das
+  // schlechteste Band, 95 %+ das beste, dazwischen springt es. Eine Schwelle bei 95 wäre
+  // an den Daten gefittet, deshalb bleibt der Regler da, aber die Vorgabe neutral.
+  minConfidence: 0,
+  excludeCrossLeague: true,
+  disabledMarkets: ["1x2"],
   allowMultipleMarketsPerGame: false,
   enableGameRiskLimit: true,
   maxRiskPerGame: 0.05
@@ -82,8 +108,13 @@ function candidateOf(
 ): KellyCandidate | null {
   if (market.odds === null || market.odds < settings.minOdds) return null;
   if (market.probabilityReliable === false) return null;
+  if (settings.disabledMarkets.includes(market.key)) return null;
+  if (market.confidence < settings.minConfidence) return null;
   const edge = market.probability - impliedProbability(market.odds);
   if (edge < settings.minEdge) return null;
+  // Nach oben offen wäre der Filter ein Fehlersucher statt eines Value-Suchers, siehe
+  // den Kommentar an `maxEdge`.
+  if (settings.maxEdge !== null && edge > settings.maxEdge) return null;
   const fullKelly = fullKellyOf(market.probability, market.odds);
   if (fullKelly <= 0) return null;
   const stakePercent = Math.min(fullKelly * settings.kellyFraction, settings.maxStakePercent);
@@ -174,17 +205,38 @@ function applyGameRiskLimit(
   return { candidates: scaled, games };
 }
 
+/** Was die Qualitätsfilter weggenommen haben - damit der Dialog es benennen kann. */
+export interface KellyFilterReport {
+  crossLeague: number;
+  overMaxEdge: number;
+}
+
 export function computeKellyCandidates(
   fixtures: DashboardFixture[],
   marketFilter: "all" | DashboardMarketKey,
   settings: KellySettings
-): { candidates: KellyCandidate[]; evaluated: number; scaleFactor: number; gameRiskLimits: GameRiskLimit[] } {
+): {
+  candidates: KellyCandidate[];
+  evaluated: number;
+  scaleFactor: number;
+  gameRiskLimits: GameRiskLimit[];
+  filtered: KellyFilterReport;
+} {
   const candidates: KellyCandidate[] = [];
+  const filtered: KellyFilterReport = { crossLeague: 0, overMaxEdge: 0 };
   let evaluated = 0;
   for (const fixture of fixtures) {
     const markets = marketFilter === "all" ? fixture.markets : fixture.markets.filter((market) => market.key === marketFilter);
     if (markets.length === 0) continue;
     evaluated += 1;
+    if (settings.excludeCrossLeague && fixture.crossLeague) { filtered.crossLeague += 1; continue; }
+    // Nur zählen, was ohne den Deckel Kandidat geworden wäre - sonst zählt der Report jede
+    // Zeile mit hohem Edge mit, auch die, die schon an Quote oder Markt scheitert.
+    if (settings.maxEdge !== null) {
+      const withoutCap = { ...settings, maxEdge: null };
+      filtered.overMaxEdge += marketCandidates(fixture, markets, withoutCap)
+        .filter((candidate) => candidate.edge > settings.maxEdge!).length;
+    }
     candidates.push(...marketCandidates(fixture, markets, settings));
   }
 
@@ -201,7 +253,7 @@ export function computeKellyCandidates(
         stake: candidate.stake * scaleFactor
       }));
 
-  return { candidates: scaled, evaluated, scaleFactor, gameRiskLimits: limited.games };
+  return { candidates: scaled, evaluated, scaleFactor, gameRiskLimits: limited.games, filtered };
 }
 
 export interface KellyExport {
@@ -281,6 +333,10 @@ function isOptionalType(value: unknown, type: "number" | "boolean"): boolean {
   return value === undefined || typeof value === type;
 }
 
+function isOptionalMarketList(value: unknown): boolean {
+  return value === undefined || (Array.isArray(value) && value.every((entry) => typeof entry === "string"));
+}
+
 function isKellySettings(value: unknown): value is Partial<KellySettings> {
   if (!value || typeof value !== "object") return false;
   const candidate = value as Partial<KellySettings>;
@@ -291,10 +347,15 @@ function isKellySettings(value: unknown): value is Partial<KellySettings> {
     && typeof candidate.maxExposurePercent === "number"
     && typeof candidate.minEdge === "number"
     // Settings stored before the game risk limit existed lack these keys - they inherit the
-    // defaults instead of invalidating the whole stored state.
+    // defaults instead of invalidating the whole stored state. Das gilt genauso für die
+    // Filter, die erst mit der Bias-Auswertung dazugekommen sind.
     && isOptionalType(candidate.allowMultipleMarketsPerGame, "boolean")
     && isOptionalType(candidate.enableGameRiskLimit, "boolean")
-    && isOptionalType(candidate.maxRiskPerGame, "number");
+    && isOptionalType(candidate.maxRiskPerGame, "number")
+    && (candidate.maxEdge === undefined || candidate.maxEdge === null || typeof candidate.maxEdge === "number")
+    && isOptionalType(candidate.minConfidence, "number")
+    && isOptionalType(candidate.excludeCrossLeague, "boolean")
+    && isOptionalMarketList(candidate.disabledMarkets);
 }
 
 export function loadKellySettings(): KellySettings {

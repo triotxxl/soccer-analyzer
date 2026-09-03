@@ -22,8 +22,14 @@ function fixture(id: number, homeTeam: string, markets: DashboardMarket[]): Dash
   };
 }
 
+/**
+ * Die Qualitätsfilter (Edge-Deckel, Marktsperre, Cross-League) sind hier standardmäßig
+ * neutral: Die Tests der Einsatzrechnung arbeiten absichtlich mit extremen Werten wie 90 %
+ * bei Quote 3, und das sind 57 PP Edge. Ohne die Neutralstellung würden sie den Deckel
+ * prüfen statt die Kelly-Formel. Die Filter haben ihren eigenen Block weiter unten.
+ */
 function settings(overrides: Partial<KellySettings> = {}): KellySettings {
-  return { ...DEFAULT_KELLY_SETTINGS, ...overrides };
+  return { ...DEFAULT_KELLY_SETTINGS, maxEdge: null, disabledMarkets: [], ...overrides };
 }
 
 describe("impliedProbability", () => {
@@ -336,6 +342,63 @@ describe("Game-Risk-Limit", () => {
     } finally {
       window.localStorage.removeItem("football-analyzer:kelly-settings");
     }
+  });
+});
+
+describe("Qualitätsfilter", () => {
+  it("deckelt den Edge nach oben", () => {
+    // 70 % bei Quote 2,5 sind 30 PP Edge - genau die Zone, in der die Messung -26 PP
+    // Selbstüberschätzung zeigt.
+    const fixtures = [fixture(1, "Alpha", [market("btts", 0.7, 2.5)])];
+    const { candidates, filtered } = computeKellyCandidates(fixtures, "btts", settings({ maxEdge: 0.12 }));
+    expect(candidates).toHaveLength(0);
+    expect(filtered.overMaxEdge).toBe(1);
+  });
+
+  it("lässt den Kandidaten unter dem Deckel durch", () => {
+    const fixtures = [fixture(1, "Alpha", [market("btts", 0.55, 2.1)])];
+    const { candidates, filtered } = computeKellyCandidates(fixtures, "btts", settings({ maxEdge: 0.12 }));
+    expect(candidates).toHaveLength(1);
+    expect(filtered.overMaxEdge).toBe(0);
+  });
+
+  it("zählt nur Kandidaten über dem Deckel, nicht Zeilen, die schon an der Quote scheitern", () => {
+    const belowMinOdds = market("btts", 0.95, 1.2);
+    const { filtered } = computeKellyCandidates([fixture(1, "Alpha", [belowMinOdds])], "btts",
+      settings({ maxEdge: 0.12, minOdds: 1.5 }));
+    expect(filtered.overMaxEdge).toBe(0);
+  });
+
+  it("schaltet den Deckel mit null ab", () => {
+    const fixtures = [fixture(1, "Alpha", [market("btts", 0.7, 2.5)])];
+    expect(computeKellyCandidates(fixtures, "btts", settings({ maxEdge: null })).candidates).toHaveLength(1);
+  });
+
+  it("sperrt abgewählte Märkte", () => {
+    const fixtures = [fixture(1, "Alpha", [market("1x2", 0.55, 2.1)])];
+    expect(computeKellyCandidates(fixtures, "1x2", settings({ disabledMarkets: ["1x2"] })).candidates).toHaveLength(0);
+    expect(computeKellyCandidates(fixtures, "1x2", settings({ disabledMarkets: [] })).candidates).toHaveLength(1);
+  });
+
+  it("schließt Cross-League-Partien aus und meldet sie", () => {
+    const crossLeague = { ...fixture(1, "Alpha", [market("btts", 0.55, 2.1)]), crossLeague: true };
+    const { candidates, evaluated, filtered } =
+      computeKellyCandidates([crossLeague], "btts", settings({ excludeCrossLeague: true }));
+    expect(candidates).toHaveLength(0);
+    // Die Partie bleibt geprüft - sonst stimmt die Zeile "n Spiele geprüft" im Dialog nicht.
+    expect(evaluated).toBe(1);
+    expect(filtered.crossLeague).toBe(1);
+  });
+
+  it("lässt Cross-League zu, wenn der Filter aus ist", () => {
+    const crossLeague = { ...fixture(1, "Alpha", [market("btts", 0.55, 2.1)]), crossLeague: true };
+    expect(computeKellyCandidates([crossLeague], "btts", settings({ excludeCrossLeague: false })).candidates).toHaveLength(1);
+  });
+
+  it("verlangt das Mindest-Datenvertrauen", () => {
+    const weak = { ...market("btts", 0.55, 2.1), confidence: 80 };
+    expect(computeKellyCandidates([fixture(1, "Alpha", [weak])], "btts", settings({ minConfidence: 95 })).candidates).toHaveLength(0);
+    expect(computeKellyCandidates([fixture(1, "Alpha", [weak])], "btts", settings({ minConfidence: 0 })).candidates).toHaveLength(1);
   });
 });
 
