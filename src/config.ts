@@ -21,6 +21,8 @@ const apiDailyReserve = Number(
 const livePollMs = Number(process.env.LIVE_POLL_MS ?? 15_000);
 const liveDailyRequestBudget = Number(process.env.LIVE_DAILY_REQUEST_BUDGET ?? 2_000);
 const liveAllThreshold = Number(process.env.LIVE_ALL_THRESHOLD ?? 25);
+const insightsHistoryLimit = Number(process.env.INSIGHTS_HISTORY_LIMIT ?? 20);
+const insightsH2hLimit = Number(process.env.INSIGHTS_H2H_LIMIT ?? 10);
 
 export const ROOT_DIR = path.resolve(import.meta.dirname, "..");
 export const DATA_DIR = path.join(ROOT_DIR, "data");
@@ -156,6 +158,21 @@ export const config = {
     // damit das Modell eher unter- als überschätzt - Überschätzung schlägt unmittelbar auf
     // die Kelly-Einsätze durch.
     unratedPenalty: 120
+  },
+  // Detailansicht einer aufgeklappten Partie. Die Grenzen bestimmen unmittelbar die Kosten:
+  // Team- und H2H-Historien liegen aus dem Lauf bereits im Cache, neu sind nur die Bündel
+  // aus `/fixtures?ids=` zu je 20 Partien. Mit 20 Partien je Team und 10 direkten Duellen
+  // bleiben es höchstens drei Bündel, also drei Anfragen je Partie - einmalig, danach
+  // einen Monat lang aus dem Cache.
+  insights: {
+    historyLimit:
+      Number.isInteger(insightsHistoryLimit) && insightsHistoryLimit > 0
+        ? insightsHistoryLimit
+        : 20,
+    h2hLimit:
+      Number.isInteger(insightsH2hLimit) && insightsH2hLimit > 0
+        ? insightsH2hLimit
+        : 10
   },
   thresholds: {
     draw: 0.28,

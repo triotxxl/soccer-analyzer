@@ -9,6 +9,11 @@ export type {
 } from "../../src/dashboard.ts";
 export type { LeagueStats, LiveTeamSnapshot } from "../../src/types.ts";
 export type {
+  FixtureInsights,
+  InsightMatch,
+  InsightTeamStats
+} from "../../src/fixture-insights.ts";
+export type {
   LiveBoardBudget,
   LiveBoardEvent,
   LiveBoardMatch,
