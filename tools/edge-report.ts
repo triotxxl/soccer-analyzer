@@ -17,143 +17,8 @@
  */
 import fs from "node:fs";
 import path from "node:path";
-import { DatabaseSync } from "node:sqlite";
-import { DB_FILE, ROOT_DIR } from "../src/config.ts";
-import type { DashboardFixture, DashboardMarket } from "../src/dashboard.ts";
-
-const OUTPUT_DIR = path.join(ROOT_DIR, "output");
-
-interface Observation {
-  fixtureId: number;
-  marketKey: string;
-  marketLabel: string;
-  selection: string;
-  kickoff: string;
-  country: string;
-  league: string;
-  probability: number;
-  odds: number;
-  implied: number;
-  edge: number;
-  confidence: number;
-  crossLeague: boolean;
-  hasStrength: boolean;
-  hit: 0 | 1;
-}
-
-interface Outcome {
-  homeGoals: number;
-  awayGoals: number;
-  halftimeHomeGoals: number | null;
-  halftimeAwayGoals: number | null;
-}
-
-/** Gleiche Marktlogik wie im Kelly-Tracker: `null` heißt nicht entscheidbar. */
-function decide(marketKey: string, selection: string, outcome: Outcome): boolean | null {
-  const total = outcome.homeGoals + outcome.awayGoals;
-  const halftime = outcome.halftimeHomeGoals === null || outcome.halftimeAwayGoals === null
-    ? null
-    : outcome.halftimeHomeGoals + outcome.halftimeAwayGoals;
-  switch (marketKey) {
-    case "over15": return total >= 2;
-    case "over25": return total >= 3;
-    case "over35": return total >= 4;
-    case "under15": return total <= 1;
-    case "under25": return total <= 2;
-    case "under35": return total <= 3;
-    case "btts": return outcome.homeGoals >= 1 && outcome.awayGoals >= 1;
-    case "firstHalfOver05": return halftime === null ? null : halftime >= 1;
-    case "firstHalfOver15": return halftime === null ? null : halftime >= 2;
-    case "firstHalfUnder05": return halftime === null ? null : halftime < 1;
-    case "firstHalfUnder15": return halftime === null ? null : halftime < 2;
-    case "draw": return outcome.homeGoals === outcome.awayGoals;
-    case "1x2":
-      if (selection.startsWith("Heimsieg")) return outcome.homeGoals > outcome.awayGoals;
-      if (selection.startsWith("Auswärtssieg")) return outcome.awayGoals > outcome.homeGoals;
-      if (selection.startsWith("Unentschieden")) return outcome.homeGoals === outcome.awayGoals;
-      return null;
-    default: return null;
-  }
-}
-
-/**
- * Je Partie und Markt zählt der jüngste Snapshot: Quoten werden bis zum Anpfiff
- * nachgeführt, und der Picker arbeitet immer auf dem letzten Stand.
- */
-function collectSnapshots(): Map<string, Observation> {
-  const latest = new Map<string, Observation & { stamp: string }>();
-  const files = fs.existsSync(OUTPUT_DIR)
-    ? fs.readdirSync(OUTPUT_DIR).filter((file) => file.startsWith("dashboard-") && file.endsWith(".json"))
-    : [];
-  for (const file of files) {
-    let snapshot: { fixtures?: DashboardFixture[] };
-    try {
-      snapshot = JSON.parse(fs.readFileSync(path.join(OUTPUT_DIR, file), "utf8")) as { fixtures?: DashboardFixture[] };
-    } catch {
-      continue; // Ein abgebrochener Lauf hinterlässt gelegentlich eine halbe Datei.
-    }
-    const stamp = file.slice("dashboard-".length, -".json".length);
-    for (const fixture of snapshot.fixtures ?? []) {
-      for (const market of (fixture.markets ?? []) as DashboardMarket[]) {
-        if (market.odds === null || market.odds <= 1) continue;
-        if (market.probability === null || market.probability === undefined) continue;
-        if (market.probabilityReliable === false) continue;
-        const key = `${fixture.fixtureId}|${market.key}|${market.selection}`;
-        const previous = latest.get(key);
-        if (previous && previous.stamp >= stamp) continue;
-        latest.set(key, {
-          stamp,
-          fixtureId: fixture.fixtureId,
-          marketKey: market.key,
-          marketLabel: market.label,
-          selection: market.selection,
-          kickoff: fixture.kickoff,
-          country: fixture.country,
-          league: fixture.league,
-          probability: market.probability,
-          odds: market.odds,
-          implied: 1 / market.odds,
-          edge: market.probability - 1 / market.odds,
-          confidence: market.confidence,
-          crossLeague: fixture.crossLeague === true,
-          hasStrength: fixture.strength !== undefined,
-          hit: 0
-        });
-      }
-    }
-  }
-  return latest as Map<string, Observation>;
-}
-
-function buildObservations(): Observation[] {
-  const database = new DatabaseSync(DB_FILE, { readOnly: true });
-  const outcomes = new Map<number, Outcome>();
-  const rows = database.prepare(`
-    SELECT fixture_id, actual_home_goals, actual_away_goals,
-           actual_halftime_home_goals, actual_halftime_away_goals
-    FROM goal_line_predictions
-    WHERE settled_at IS NOT NULL AND actual_home_goals IS NOT NULL AND actual_away_goals IS NOT NULL
-  `).all() as Array<Record<string, number | null>>;
-  for (const row of rows) {
-    outcomes.set(row.fixture_id as number, {
-      homeGoals: row.actual_home_goals as number,
-      awayGoals: row.actual_away_goals as number,
-      halftimeHomeGoals: row.actual_halftime_home_goals as number | null,
-      halftimeAwayGoals: row.actual_halftime_away_goals as number | null
-    });
-  }
-  database.close();
-
-  const observations: Observation[] = [];
-  for (const candidate of collectSnapshots().values()) {
-    const outcome = outcomes.get(candidate.fixtureId);
-    if (!outcome) continue;
-    const won = decide(candidate.marketKey, candidate.selection, outcome);
-    if (won === null) continue;
-    observations.push({ ...candidate, hit: won ? 1 : 0 });
-  }
-  return observations.sort((left, right) => left.kickoff.localeCompare(right.kickoff));
-}
+import { buildObservations, type EdgeObservation as Observation } from "../src/market-profile-service.ts";
+import { autoDecide, buildMarketProfile } from "../src/market-profile.ts";
 
 interface Metrics {
   n: number;
@@ -263,4 +128,102 @@ if (jsonIndex !== -1 && process.argv[jsonIndex + 1] !== undefined) {
     byMarket: groupBy(selected, (entry) => entry.marketLabel).map(([name, group]) => ({ name, ...metricsOf(group) }))
   }, null, 2));
   console.log(`\nJSON geschrieben: ${target}`);
+}
+
+/**
+ * Rückrechnung der Automatik: Trägt die korrigierte Auswahl auf Daten, die sie nie gesehen hat?
+ *
+ * Die Kalibrierung wird ausschließlich aus der ersten Zeithälfte gebildet und auf die zweite
+ * angewendet. Eine Korrektur, die aus denselben Zeilen stammt, an denen sie gemessen wird,
+ * sieht immer gut aus - deshalb ist allein die Spalte "2. Hälfte" die Antwort auf die Frage,
+ * ob die Automatik ausgeliefert werden darf.
+ */
+if (process.argv.includes("--simulate")) {
+  const playable = observations.filter((entry) => entry.edge > 0);
+  const kickoffs = playable.map((entry) => entry.kickoff).sort();
+  const splitAt = kickoffs[Math.floor(kickoffs.length / 2)]!;
+  const training = playable.filter((entry) => entry.kickoff < splitAt);
+  const holdout = playable.filter((entry) => entry.kickoff >= splitAt);
+  const profile = buildMarketProfile(training);
+
+  const flatRoi = (entries: Observation[]): string => entries.length === 0
+    ? "  -"
+    : percent(entries.reduce((sum, entry) => sum + (entry.hit ? entry.odds - 1 : -1), 0) / entries.length);
+  const hitRate = (entries: Observation[]): string => entries.length === 0
+    ? "  -"
+    : percent(entries.reduce((sum, entry) => sum + entry.hit, 0) / entries.length);
+
+  // Die heutige Vorgabe als Vergleichslinie, damit der Gewinn nicht gegen nichts gemessen wird.
+  const currentRule = (entry: Observation): boolean =>
+    entry.odds >= 1.5 && entry.edge >= 0.02 && entry.edge <= 0.12
+    && entry.marketKey !== "1x2" && !entry.crossLeague;
+
+  const autoRule = (entry: Observation): boolean =>
+    autoDecide(profile, {
+      marketKey: entry.marketKey,
+      probability: entry.probability,
+      odds: entry.odds,
+      crossLeague: entry.crossLeague
+    }).accepted;
+
+  console.log("\n\nRückrechnung der Automatik");
+  console.log(`  Kalibriert auf ${training.length} Zeilen vor ${splitAt.slice(0, 10)},`
+    + ` geprüft auf ${holdout.length} Zeilen danach.`);
+  console.log(`  ${"Regel".padEnd(24)}${"Wetten".padStart(8)}${"Treffer".padStart(10)}${"flat-ROI".padStart(11)}`);
+  for (const [name, rule] of [["heutige Vorgabe", currentRule], ["Automatik", autoRule]] as const) {
+    const chosen = holdout.filter(rule);
+    console.log(`  ${name.padEnd(24)}${String(chosen.length).padStart(8)}${hitRate(chosen).padStart(10)}${flatRoi(chosen).padStart(11)}`);
+  }
+
+  console.log("\n  Zum Vergleich dieselben Regeln auf der Trainingshälfte - hier hat die Automatik");
+  console.log("  die Antworten gekannt, diese Zeilen sind also kein Beleg:");
+  for (const [name, rule] of [["heutige Vorgabe", currentRule], ["Automatik", autoRule]] as const) {
+    const chosen = training.filter(rule);
+    console.log(`  ${name.padEnd(24)}${String(chosen.length).padStart(8)}${hitRate(chosen).padStart(10)}${flatRoi(chosen).padStart(11)}`);
+  }
+
+  console.log("\n  Automatik-Auswahl der Prüfhälfte nach Markt:");
+  for (const [label, group] of groupBy(holdout.filter(autoRule), (entry) => entry.marketLabel)) {
+    console.log(`  ${label.padEnd(24)}${String(group.length).padStart(8)}${hitRate(group).padStart(10)}${flatRoi(group).padStart(11)}`);
+  }
+}
+
+/**
+ * Belastbarkeitsprobe: Ein einzelner Zeitschnitt kann zufällig günstig liegen. Deshalb
+ * dieselbe Rückrechnung an mehreren Trennstellen, und zusätzlich ohne den Markt, der am
+ * meisten beigetragen hat - trägt das Ergebnis nur eine Handvoll hoher Quoten, ist es kein
+ * Ergebnis, sondern Rauschen.
+ */
+if (process.argv.includes("--simulate")) {
+  const playable = observations.filter((entry) => entry.edge > 0);
+  const kickoffs = playable.map((entry) => entry.kickoff).sort();
+
+  const roiOf = (entries: Observation[]): number | null => entries.length === 0
+    ? null
+    : entries.reduce((sum, entry) => sum + (entry.hit ? entry.odds - 1 : -1), 0) / entries.length;
+  const show = (value: number | null) => value === null ? "  -" : percent(value);
+
+  console.log("\n  Dieselbe Prüfung an mehreren Trennstellen:");
+  console.log(`  ${"Schnitt".padEnd(14)}${"Training".padStart(10)}${"Prüfung".padStart(9)}${"Wetten".padStart(8)}${"ROI".padStart(9)}${"ohne Remis".padStart(12)}${"Vorgabe".padStart(10)}`);
+  for (const share of [0.4, 0.5, 0.6]) {
+    const splitAt = kickoffs[Math.floor(kickoffs.length * share)]!;
+    const training = playable.filter((entry) => entry.kickoff < splitAt);
+    const holdout = playable.filter((entry) => entry.kickoff >= splitAt);
+    const profile = buildMarketProfile(training);
+    const chosen = holdout.filter((entry) => autoDecide(profile, {
+      marketKey: entry.marketKey,
+      probability: entry.probability,
+      odds: entry.odds,
+      crossLeague: entry.crossLeague
+    }).accepted);
+    const baseline = holdout.filter((entry) => entry.odds >= 1.5 && entry.edge >= 0.02
+      && entry.edge <= 0.12 && entry.marketKey !== "1x2" && !entry.crossLeague);
+    console.log(`  ${splitAt.slice(0, 10).padEnd(14)}${String(training.length).padStart(10)}${String(holdout.length).padStart(9)}`
+      + `${String(chosen.length).padStart(8)}${show(roiOf(chosen)).padStart(9)}`
+      + `${show(roiOf(chosen.filter((entry) => entry.marketKey !== "draw"))).padStart(12)}`
+      + `${show(roiOf(baseline)).padStart(10)}`);
+  }
+  console.log("\n  Lesehinweis: Wechselt der ROI zwischen den Trennstellen das Vorzeichen oder hängt er");
+  console.log("  ganz am Remis, ist die Automatik nicht belegt - dann ist sie bestenfalls die weniger");
+  console.log("  verlustreiche Auswahl, nicht eine gewinnbringende.");
 }

@@ -9,6 +9,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { DB_FILE, ROOT_DIR } from "../src/config.ts";
+import { decideMarket, type Outcome } from "../src/market-outcome.ts";
 
 const DOCS_DIR = path.join(ROOT_DIR, "docs");
 const TRACKER_FILE = path.join(DOCS_DIR, "kelly-tracker.json");
@@ -28,44 +29,6 @@ interface Bet {
   impliedProbability: number;
   edge: number;
   stake: number;
-}
-
-interface Outcome {
-  homeGoals: number;
-  awayGoals: number;
-  halftimeHomeGoals: number | null;
-  halftimeAwayGoals: number | null;
-}
-
-/**
- * Entscheidet einen Markt gegen den Endstand. `null` heißt: nicht entscheidbar, weil der
- * nötige Teilstand fehlt - das ist bei Halbzeitmärkten ohne Pausenstand der Fall.
- */
-function decide(bet: Bet, outcome: Outcome): boolean | null {
-  const total = outcome.homeGoals + outcome.awayGoals;
-  const halftime = outcome.halftimeHomeGoals === null || outcome.halftimeAwayGoals === null
-    ? null
-    : outcome.halftimeHomeGoals + outcome.halftimeAwayGoals;
-  switch (bet.marketKey) {
-    case "over15": return total >= 2;
-    case "over25": return total >= 3;
-    case "over35": return total >= 4;
-    case "under15": return total <= 1;
-    case "under25": return total <= 2;
-    case "under35": return total <= 3;
-    case "btts": return outcome.homeGoals >= 1 && outcome.awayGoals >= 1;
-    case "firstHalfOver05": return halftime === null ? null : halftime >= 1;
-    case "firstHalfOver15": return halftime === null ? null : halftime >= 2;
-    case "firstHalfUnder05": return halftime === null ? null : halftime < 1;
-    case "firstHalfUnder15": return halftime === null ? null : halftime < 2;
-    case "draw": return outcome.homeGoals === outcome.awayGoals;
-    case "1x2":
-      if (bet.selection.startsWith("Heimsieg")) return outcome.homeGoals > outcome.awayGoals;
-      if (bet.selection.startsWith("Auswärtssieg")) return outcome.awayGoals > outcome.homeGoals;
-      if (bet.selection.startsWith("Unentschieden")) return outcome.homeGoals === outcome.awayGoals;
-      return null;
-    default: return null;
-  }
 }
 
 function round(value: number, digits = 2): number {
@@ -161,7 +124,7 @@ const runs = inputs.map((file) => {
       halftimeHomeGoals: row.actual_halftime_home_goals as number | null,
       halftimeAwayGoals: row.actual_halftime_away_goals as number | null
     };
-    const won = decide(bet, outcome);
+    const won = decideMarket(bet.marketKey, bet.selection, outcome);
     const result = {
       ...outcome,
       score: `${outcome.homeGoals}:${outcome.awayGoals}`,
