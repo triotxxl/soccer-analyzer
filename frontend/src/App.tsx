@@ -1,15 +1,18 @@
 import {
-  Binoculars, Broadcast, CalendarBlank, CaretDoubleLeft, CaretDoubleRight, CaretLeft, CaretRight, Calculator, CheckCircle, ClockCounterClockwise, Funnel, ListBullets, RocketLaunch, Shield, ShieldCheck, Star, WarningCircle, X
+  Binoculars, Broadcast, ChartBar, CalendarBlank, CaretDoubleLeft, CaretDoubleRight, CaretLeft, CaretRight, Calculator, CheckCircle, ClockCounterClockwise, Funnel, ListBullets, RocketLaunch, Shield, ShieldCheck, Star, WarningCircle, X
 } from "@phosphor-icons/react";
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { BetBuilderDrawer, CartAddRadial, CartBadge } from "./BetCartUI";
 import { toCartEntry, useBetCart } from "./betCart";
 import { countryFlagCode } from "./countryFlags";
+import { FixtureInsightPanels, InsightsNotice, useFixtureInsights } from "./FixtureInsights";
 import { useDashboardData } from "./data";
 import { useLiveBoard } from "./liveData";
 import { LiveView } from "./LiveView";
-import { edgeOf, loadKellySettings, loadKellyVisible, saveKellySettings, saveKellyVisible, type KellySettings } from "./kelly";
+import { edgeOf, loadKellyAuto, loadKellySettings, loadKellyVisible, saveKellyAuto, saveKellySettings, saveKellyVisible, type KellySettings } from "./kelly";
 import { KellyButton, KellyDialog } from "./KellyUI";
+import { MarketProfileView } from "./MarketProfileUI";
+import { useMarketProfile } from "./marketProfile";
 import type { ClassGap, DashboardDocument, DashboardFixture, DashboardMarket, DashboardMarketKey, FormResult, LeagueStats, RecommendationLevel } from "./types";
 
 const MARKET_OPTIONS: Array<{ key: "all" | DashboardMarketKey; label: string }> = [
@@ -17,13 +20,28 @@ const MARKET_OPTIONS: Array<{ key: "all" | DashboardMarketKey; label: string }> 
   { key: "1x2", label: "1X2" },
   { key: "draw", label: "Remis" },
   { key: "btts", label: "BTTS" },
+  { key: "bttsNo", label: "BTTS Nein" },
   { key: "over15", label: "Über 1,5" },
+  { key: "under15", label: "Unter 1,5" },
   { key: "over25", label: "Über 2,5" },
+  { key: "under25", label: "Unter 2,5" },
+  { key: "over35", label: "Über 3,5" },
+  { key: "under35", label: "Unter 3,5" },
   { key: "firstHalfOver05", label: "1. HZ Ü0,5" },
-  { key: "firstHalfOver15", label: "1. HZ Ü1,5" }
+  { key: "firstHalfUnder05", label: "1. HZ U0,5" },
+  { key: "firstHalfOver15", label: "1. HZ Ü1,5" },
+  { key: "firstHalfUnder15", label: "1. HZ U1,5" }
+];
+
+/**
+ * Märkte, die auf das Ausbleiben setzen. Für sie kehrt sich die Bedeutung der H2H- und
+ * Form-Punkte um: Getroffen hat, wer unter der Linie geblieben ist. Ohne diese Umkehr zeigte
+ * die Ansicht zu einem Unter-Markt die Über-Treffer - ein Fehler, der plausibel aussieht.
+ */
+const COUNTER_MARKETS: DashboardMarketKey[] = [
+  "bttsNo", "under15", "under25", "under35", "firstHalfUnder05", "firstHalfUnder15"
 ];
 type MarketFilter = (typeof MARKET_OPTIONS)[number]["key"];
-type Density = "micro" | "compact" | "comfort";
 type LevelFilter = "all" | "strong" | "recommended";
 type ClassGapFilter = "all" | "only" | "hide";
 type RangeMode = "next48" | "custom";
@@ -317,12 +335,15 @@ function saveBannerDismissed(): void {
 
 const VIEW_STORAGE_KEY = "football-analyzer:view";
 
-export type AppView = "prematch" | "live";
+export type AppView = "prematch" | "live" | "profile";
+
+const VIEWS: AppView[] = ["prematch", "live", "profile"];
 
 function loadView(): AppView {
   if (typeof window === "undefined") return "prematch";
   try {
-    return window.localStorage.getItem(VIEW_STORAGE_KEY) === "live" ? "live" : "prematch";
+    const stored = window.localStorage.getItem(VIEW_STORAGE_KEY);
+    return VIEWS.find((view) => view === stored) ?? "prematch";
   } catch {
     return "prematch";
   }
@@ -431,12 +452,15 @@ function matchViewDots(
   matches: MatchSummary[],
   view: Exclude<H2hView, "outcome">,
   overLine: FullTimeOverLine,
-  firstHalfOverLine: FirstHalfOverLine
+  firstHalfOverLine: FirstHalfOverLine,
+  /** Bei einem Gegenmarkt zählt das Ausbleiben als Treffer. */
+  inverted = false
 ): Array<{ value: boolean | null; text: string; title: string }> {
   const values = view === "btts"
     ? matches.map((match) => {
-      const value = match.homeGoals > 0 && match.awayGoals > 0;
-      return { value, text: value ? "✓" : "×", title: value ? "BTTS" : "Kein BTTS" };
+      const both = match.homeGoals > 0 && match.awayGoals > 0;
+      const value = inverted ? !both : both;
+      return { value, text: both ? "✓" : "×", title: both ? "BTTS" : "Kein BTTS" };
     })
     // Über/Unter zeigt die Torzahl statt eines "Ü"/"U": Die Farbe des Punktes sagt schon,
     // ob die Linie gerissen wurde, der Buchstabe wiederholt das nur. Die Zahl beantwortet
@@ -447,20 +471,22 @@ function matchViewDots(
           return { value: null, text: "–", title: "Kein Halbzeitstand verfügbar" };
         }
         const goals = match.halfTimeHomeGoals + match.halfTimeAwayGoals;
-        const value = goals > firstHalfOverLine;
+        const over = goals > firstHalfOverLine;
+        const value = inverted ? !over : over;
         return {
           value,
           text: String(goals),
-          title: `1. Halbzeit ${match.halfTimeHomeGoals}:${match.halfTimeAwayGoals} · ${goals} Tor${goals === 1 ? "" : "e"} · ${value ? "Über" : "Unter"} ${firstHalfOverLine.toLocaleString("de-DE")}`
+          title: `1. Halbzeit ${match.halfTimeHomeGoals}:${match.halfTimeAwayGoals} · ${goals} Tor${goals === 1 ? "" : "e"} · ${over ? "Über" : "Unter"} ${firstHalfOverLine.toLocaleString("de-DE")}`
         };
       })
       : matches.map((match) => {
         const goals = match.homeGoals + match.awayGoals;
-        const value = goals > overLine;
+        const over = goals > overLine;
+        const value = inverted ? !over : over;
         return {
           value,
           text: String(goals),
-          title: `Endstand ${match.homeGoals}:${match.awayGoals} · ${goals} Tor${goals === 1 ? "" : "e"} · ${value ? "Über" : "Unter"} ${overLine.toLocaleString("de-DE")}`
+          title: `Endstand ${match.homeGoals}:${match.awayGoals} · ${goals} Tor${goals === 1 ? "" : "e"} · ${over ? "Über" : "Unter"} ${overLine.toLocaleString("de-DE")}`
         };
       });
   while (values.length < 5) values.push({ value: null, text: "–", title: "Keine Daten" });
@@ -471,9 +497,10 @@ function formMatchesStreak(
   matches: MatchSummary[] | undefined,
   view: Exclude<FormView, "outcome">,
   overLine: FullTimeOverLine,
-  firstHalfOverLine: FirstHalfOverLine
+  firstHalfOverLine: FirstHalfOverLine,
+  inverted = false
 ): number {
-  return consecutive(matchViewDots(matches ?? [], view, overLine, firstHalfOverLine).map((item) => item.value));
+  return consecutive(matchViewDots(matches ?? [], view, overLine, firstHalfOverLine, inverted).map((item) => item.value));
 }
 
 function columnComparison(
@@ -485,7 +512,8 @@ function columnComparison(
   formSortMode: number,
   h2hSortMode: number,
   overLine: FullTimeOverLine,
-  firstHalfOverLine: FirstHalfOverLine
+  firstHalfOverLine: FirstHalfOverLine,
+  inverted: boolean
 ): number {
   if (key === "form") {
     if (formView === "outcome") {
@@ -495,21 +523,26 @@ function columnComparison(
       return countResults([...left.form.home, ...left.form.away], "draw") - countResults([...right.form.home, ...right.form.away], "draw");
     }
     const pairScore = (fixture: DashboardFixture) => {
-      const homeStreak = formMatchesStreak(fixture.form.homeMatches, formView, overLine, firstHalfOverLine);
-      const awayStreak = formMatchesStreak(fixture.form.awayMatches, formView, overLine, firstHalfOverLine);
+      const homeStreak = formMatchesStreak(fixture.form.homeMatches, formView, overLine, firstHalfOverLine, inverted);
+      const awayStreak = formMatchesStreak(fixture.form.awayMatches, formView, overLine, firstHalfOverLine, inverted);
       return { min: Math.min(homeStreak, awayStreak), sum: homeStreak + awayStreak };
     };
     const l = pairScore(left);
     const r = pairScore(right);
     return (l.min - r.min) || (l.sum - r.sum);
   }
-  if (h2hView === "btts") return consecutive(left.h2h.btts) - consecutive(right.h2h.btts);
+  // Auch die Sortierung folgt der Richtung: Bei einem Unter-Markt steht oben, wer die längste
+  // Serie unter der Linie hat.
+  const flip = (values: Array<boolean | null>) => inverted
+    ? values.map((value) => value === null ? null : !value)
+    : values;
+  if (h2hView === "btts") return consecutive(flip(left.h2h.btts)) - consecutive(flip(right.h2h.btts));
   if (h2hView === "over") {
-    const streak = (fixture: DashboardFixture) => consecutive(fixture.h2h.matches.map((match) => match.homeGoals + match.awayGoals > overLine));
+    const streak = (fixture: DashboardFixture) => consecutive(flip(fixture.h2h.matches.map((match) => match.homeGoals + match.awayGoals > overLine)));
     return streak(left) - streak(right);
   }
   if (h2hView === "firstHalfOver") {
-    const streak = (fixture: DashboardFixture) => consecutive(firstHalfOverResults(fixture, firstHalfOverLine));
+    const streak = (fixture: DashboardFixture) => consecutive(flip(firstHalfOverResults(fixture, firstHalfOverLine)));
     return streak(left) - streak(right);
   }
   const target = h2hSortTargets[h2hSortMode]!;
@@ -522,23 +555,25 @@ function ViewDots({ values }: { values: Array<{ value: boolean | null; text: str
   </div>;
 }
 
-function H2hDots({ fixture, view, overLine, firstHalfOverLine }: {
+function H2hDots({ fixture, view, overLine, firstHalfOverLine, inverted }: {
   fixture: DashboardFixture;
   view: H2hView;
   overLine: FullTimeOverLine;
   firstHalfOverLine: FirstHalfOverLine;
+  inverted: boolean;
 }) {
   if (view === "outcome") return <FormDots results={fixture.h2h.outcomes} h2h />;
-  return <ViewDots values={matchViewDots(fixture.h2h.matches, view, overLine, firstHalfOverLine)} />;
+  return <ViewDots values={matchViewDots(fixture.h2h.matches, view, overLine, firstHalfOverLine, inverted)} />;
 }
 
-function FormMatchDots({ matches, view, overLine, firstHalfOverLine }: {
+function FormMatchDots({ matches, view, overLine, firstHalfOverLine, inverted }: {
   matches: MatchSummary[] | undefined;
   view: Exclude<FormView, "outcome">;
   overLine: FullTimeOverLine;
   firstHalfOverLine: FirstHalfOverLine;
+  inverted: boolean;
 }) {
-  return <ViewDots values={matchViewDots(matches ?? [], view, overLine, firstHalfOverLine)} />;
+  return <ViewDots values={matchViewDots(matches ?? [], view, overLine, firstHalfOverLine, inverted)} />;
 }
 
 export function MarketCard({ market, showEdge }: { market: DashboardMarket; showEdge: boolean }) {
@@ -614,6 +649,9 @@ function standingsWindow(table: StandingsRow[], homeTeam: string, awayTeam: stri
 
 function Dashboard({ document }: { document: DashboardDocument }) {
   const [view, setView] = useState<AppView>(loadView);
+  // Zeigt die H2H- und Form-Spalte auf das Ausbleiben statt auf das Eintreten.
+  const [counterDirection, setCounterDirection] = useState(false);
+  const [kellyAuto, setKellyAuto] = useState(loadKellyAuto);
   const [sidebarOpen, setSidebarOpen] = useState(defaultSidebarOpen);
   const [mobileViewport, setMobileViewport] = useState(() => !defaultSidebarOpen());
   const [banner, setBanner] = useState(() => !loadBannerDismissed());
@@ -636,7 +674,6 @@ function Dashboard({ document }: { document: DashboardDocument }) {
   const [formView, setFormView] = useState<FormView>("outcome");
   const [overLine, setOverLine] = useState<FullTimeOverLine>(2.5);
   const [firstHalfOverLine, setFirstHalfOverLine] = useState<FirstHalfOverLine>(0.5);
-  const [density, setDensity] = useState<Density>("comfort");
   const [classGapFilter, setClassGapFilter] = useState<ClassGapFilter>("all");
   const [sortKey, setSortKey] = useState<SortKey>("kickoff");
   const [sortDirection, setSortDirection] = useState<1 | -1>(1);
@@ -644,6 +681,8 @@ function Dashboard({ document }: { document: DashboardDocument }) {
   const [h2hSortMode, setH2hSortMode] = useState(0);
   const [secondarySortKey, setSecondarySortKey] = useState<"form" | "h2h" | null>(null);
   const [openFixture, setOpenFixture] = useState<number | null>(null);
+  // Der Abruf hängt allein an der aufgeklappten Partie: zugeklappt kostet die Ansicht nichts.
+  const insights = useFixtureInsights(openFixture);
   const [radialFixtureId, setRadialFixtureId] = useState<number | null>(null);
   const [builderOpen, setBuilderOpen] = useState(false);
   const [kellyOpen, setKellyOpen] = useState(false);
@@ -658,6 +697,7 @@ function Dashboard({ document }: { document: DashboardDocument }) {
     .map((fixture) => fixture.fixtureId),
     [deselectedLeagues, document, liveRatedOnly]);
   const live = useLiveBoard(view === "live", watchedFixtureIds);
+  const marketProfile = useMarketProfile(showKelly && view === "prematch");
   const dateControlRef = useRef<HTMLDivElement>(null);
   const now = Date.now();
 
@@ -688,25 +728,28 @@ function Dashboard({ document }: { document: DashboardDocument }) {
   const selectMarket = (market: MarketFilter) => {
     setMarketFilter(market);
     setOpenFixture(null);
-    if (market === "btts") {
+    // Die Richtung gehört zum Markt: Wer "Unter 2,5" wählt, will in H2H und Form die Partien
+    // hervorgehoben sehen, die unter der Linie geblieben sind.
+    setCounterDirection(COUNTER_MARKETS.includes(market as DashboardMarketKey));
+
+    const goalLine: Partial<Record<MarketFilter, FullTimeOverLine>> = {
+      over15: 1.5, under15: 1.5, over25: 2.5, under25: 2.5, over35: 3.5, under35: 3.5
+    };
+    const halfLine: Partial<Record<MarketFilter, FirstHalfOverLine>> = {
+      firstHalfOver05: 0.5, firstHalfUnder05: 0.5, firstHalfOver15: 1.5, firstHalfUnder15: 1.5
+    };
+
+    if (market === "btts" || market === "bttsNo") {
       setH2hView("btts");
       setFormView("btts");
-    } else if (market === "over15") {
+    } else if (goalLine[market] !== undefined) {
       setH2hView("over");
       setFormView("over");
-      setOverLine(1.5);
-    } else if (market === "over25") {
-      setH2hView("over");
-      setFormView("over");
-      setOverLine(2.5);
-    } else if (market === "firstHalfOver05") {
+      setOverLine(goalLine[market]!);
+    } else if (halfLine[market] !== undefined) {
       setH2hView("firstHalfOver");
       setFormView("firstHalfOver");
-      setFirstHalfOverLine(0.5);
-    } else if (market === "firstHalfOver15") {
-      setH2hView("firstHalfOver");
-      setFormView("firstHalfOver");
-      setFirstHalfOverLine(1.5);
+      setFirstHalfOverLine(halfLine[market]!);
     } else {
       setH2hView("outcome");
       setFormView("outcome");
@@ -760,15 +803,17 @@ function Dashboard({ document }: { document: DashboardDocument }) {
       else if (kellyOpen) setKellyOpen(false);
       else if (calendarOpen) setCalendarOpen(false);
       else if (leagueFilterOpen) setLeagueFilterOpen(false);
+      else if (openFixture !== null) setOpenFixture(null);
       else setSidebarOpen(false);
     };
     window.addEventListener("keydown", closeOnEscape);
     return () => window.removeEventListener("keydown", closeOnEscape);
-  }, [builderOpen, calendarOpen, kellyOpen, leagueFilterOpen, radialFixtureId]);
+  }, [builderOpen, calendarOpen, kellyOpen, leagueFilterOpen, openFixture, radialFixtureId]);
 
   useEffect(() => { saveView(view); }, [view]);
   useEffect(() => { saveKellySettings(kellySettings); }, [kellySettings]);
   useEffect(() => { saveKellyVisible(showKelly); }, [showKelly]);
+  useEffect(() => { saveKellyAuto(kellyAuto); }, [kellyAuto]);
 
   const openCalendar = () => {
     if (!document.meta.firstAvailableDate || !document.meta.lastAvailableDate) return;
@@ -841,9 +886,9 @@ function Dashboard({ document }: { document: DashboardDocument }) {
     else if (sortKey === "score") comparison = (marketFilter === "draw" ? left.scores.draw ?? -1 : left.scores.favorite ?? -1) - (marketFilter === "draw" ? right.scores.draw ?? -1 : right.scores.favorite ?? -1);
     else if (sortKey === "market") comparison = (marketFor(left, selectedMarket)?.probability ?? -1) - (marketFor(right, selectedMarket)?.probability ?? -1);
     else if (sortKey === "form" || sortKey === "h2h") {
-      comparison = columnComparison(sortKey, left, right, formView, h2hView, formSortMode, h2hSortMode, overLine, firstHalfOverLine);
+      comparison = columnComparison(sortKey, left, right, formView, h2hView, formSortMode, h2hSortMode, overLine, firstHalfOverLine, counterDirection);
       if (comparison === 0 && secondarySortKey) {
-        comparison = columnComparison(secondarySortKey, left, right, formView, h2hView, formSortMode, h2hSortMode, overLine, firstHalfOverLine);
+        comparison = columnComparison(secondarySortKey, left, right, formView, h2hView, formSortMode, h2hSortMode, overLine, firstHalfOverLine, counterDirection);
       }
     }
     return comparison * sortDirection || Date.parse(left.kickoff) - Date.parse(right.kickoff);
@@ -904,9 +949,7 @@ function Dashboard({ document }: { document: DashboardDocument }) {
   const showFirstHalfExpected = marketFilter === "firstHalfOver05" || marketFilter === "firstHalfOver15";
   const showScore = marketFilter === "all" || marketFilter === "1x2" || marketFilter === "draw";
   const columnCount = 5 + (showScore ? 1 : 0) + shownMarkets.length;
-  const minimumWidth = density === "micro"
-    ? 723 + (showScore ? 68 : 0) + shownMarkets.length * 108 + (columnCount - 1) * 12
-    : 860 + (showScore ? 82 : 0) + shownMarkets.length * 122 + (columnCount - 1) * 12;
+  const minimumWidth = 860 + (showScore ? 82 : 0) + shownMarkets.length * 122 + (columnCount - 1) * 12;
   const gridStyle = {
     "--market-count": shownMarkets.length,
     "--table-min-width": `${minimumWidth}px`
@@ -927,7 +970,7 @@ function Dashboard({ document }: { document: DashboardDocument }) {
   ];
 
   return <>
-  <div className={`app-shell density-${density} ${sidebarOpen ? "" : "sidebar-collapsed"}`}>
+  <div className={`app-shell density-compact ${sidebarOpen ? "" : "sidebar-collapsed"}`}>
     {sidebarOpen && mobileViewport && <button className="sidebar-backdrop" aria-label="Sidebar schließen" onClick={() => setSidebarOpen(false)} />}
     <aside className="sidebar" id="dashboard-sidebar" aria-label="Dashboard-Filter" aria-hidden={mobileViewport && !sidebarOpen}>
       <div className="sidebar-head">
@@ -935,7 +978,7 @@ function Dashboard({ document }: { document: DashboardDocument }) {
         <button className="sidebar-toggle" onClick={() => setSidebarOpen((value) => !value)} aria-controls="dashboard-sidebar" aria-expanded={sidebarOpen} aria-label={sidebarOpen ? "Sidebar einklappen" : "Sidebar ausklappen"} title={sidebarOpen ? "Sidebar einklappen" : "Sidebar ausklappen"}>{sidebarOpen ? <CaretDoubleLeft /> : <CaretDoubleRight />}</button>
       </div>
       <div className="view-switch" role="group" aria-label="Ansicht">
-        {([["prematch", "Pre-Match", ListBullets], ["live", "Live", Broadcast]] as const).map(([key, label, Icon]) =>
+        {([["prematch", "Pre-Match", ListBullets], ["live", "Live", Broadcast], ["profile", "Marktprofil", ChartBar]] as const).map(([key, label, Icon]) =>
           <button key={key} className={view === key ? "active" : ""} aria-pressed={view === key} title={label}
             onClick={() => setView(key)}><Icon size={15} weight="duotone" aria-hidden />{sidebarOpen && <span>{label}</span>}</button>)}
       </div>
@@ -1015,42 +1058,59 @@ function Dashboard({ document }: { document: DashboardDocument }) {
 
     <main className="content">
       <button className="mobile-sidebar-toggle" tabIndex={mobileViewport ? 0 : -1} aria-hidden={!mobileViewport} onClick={() => setSidebarOpen(true)} aria-controls="dashboard-sidebar" aria-expanded={sidebarOpen}><ListBullets size={17} weight="duotone" /> Filter & Zeitraum</button>
-      {banner && <div className="banner"><span><RocketLaunch size={20} weight="duotone" /></span><p><strong>Grün</strong> markierte Tipps erfüllen alle Modellkriterien, gelbe sind starke Kandidaten. Sortiere über die Spaltenköpfe, filtere Märkte über die Reiter.</p><button onClick={() => { setBanner(false); saveBannerDismissed(); }} aria-label="Hinweis schließen"><X /></button></div>}
-      <nav className="market-tabs" aria-label="Marktfilter">
-        {availableMarketOptions.map((option) => <button className={marketFilter === option.key ? "active" : ""} aria-pressed={marketFilter === option.key} key={option.key} onClick={() => selectMarket(option.key)}>{option.label}</button>)}
-      </nav>
+      {banner && <div className="banner"><span><RocketLaunch size={20} weight="duotone" /></span><p><strong>Grün</strong> markierte Tipps erfüllen alle Modellkriterien, gelbe sind starke Kandidaten. Sortiere über die Spaltenköpfe, filtere Märkte über die Auswahl darunter.</p><button onClick={() => { setBanner(false); saveBannerDismissed(); }} aria-label="Hinweis schließen"><X /></button></div>}
       {view === "prematch" ? <>
       <div className="view-toolbar">
-        <span>H2H</span>
-        <div className="segmented" role="group" aria-label="H2H-Ansicht">
-          {([ ["outcome", "Ergebnis"], ["btts", "BTTS"], ["over", "Über"], ["firstHalfOver", "1. HZ Über"] ] as const).map(([key, label]) => <button className={h2hView === key ? "active" : ""} aria-pressed={h2hView === key} onClick={() => setH2hView(key)} key={key}>{label}</button>)}
-        </div>
-        <span>Form</span>
-        <div className="segmented" role="group" aria-label="Form-Ansicht">
-          {([ ["outcome", "Ergebnis"], ["btts", "BTTS"], ["over", "Über"], ["firstHalfOver", "1. HZ Über"] ] as const).map(([key, label]) => <button className={formView === key ? "active" : ""} aria-pressed={formView === key} onClick={() => setFormView(key)} key={key}>{label}</button>)}
-        </div>
-        <select
-          aria-label={activeLineView === "firstHalfOver" ? "Über-Linie für H2H & Form, 1. Halbzeit" : "Über-Linie für H2H & Form"}
-          value={activeLineView === "firstHalfOver" ? firstHalfOverLine : overLine}
-          disabled={activeLineView === null}
-          onChange={(event) => activeLineView === "firstHalfOver"
-            ? setFirstHalfOverLine(Number(event.target.value) as FirstHalfOverLine)
-            : setOverLine(Number(event.target.value) as FullTimeOverLine)}
-        >
-          {activeLineView === "firstHalfOver"
-            ? <><option value={0.5}>Über 0,5</option><option value={1.5}>Über 1,5</option></>
-            : <><option value={1.5}>Über 1,5</option><option value={2.5}>Über 2,5</option><option value={3.5}>Über 3,5</option></>}
-        </select>
-        <span>Klasse</span>
-        <div className="segmented" role="group" aria-label="Klassenunterschied">
-          {([ ["all", "Alle"], ["only", "Nur"], ["hide", "Ohne"] ] as const).map(([key, label]) => <button className={classGapFilter === key ? "active" : ""} aria-pressed={classGapFilter === key} onClick={() => setClassGapFilter(key)} key={key}>{label}</button>)}
-        </div>
+        <label className="toolbar-field">
+          <span>Markt</span>
+          <select value={marketFilter} onChange={(event) => selectMarket(event.target.value as MarketFilter)}>
+            {availableMarketOptions.map((option) => <option value={option.key} key={option.key}>{option.label}</option>)}
+          </select>
+        </label>
+        <label className="toolbar-field">
+          <span>H2H</span>
+          <select value={h2hView} onChange={(event) => setH2hView(event.target.value as H2hView)}>
+            {([ ["outcome", "Ergebnis"], ["btts", "BTTS"], ["over", "Über"], ["firstHalfOver", "1. HZ Über"] ] as const).map(([key, label]) => <option value={key} key={key}>{label}</option>)}
+          </select>
+        </label>
+        <label className="toolbar-field">
+          <span>Form</span>
+          <select value={formView} onChange={(event) => setFormView(event.target.value as FormView)}>
+            {([ ["outcome", "Ergebnis"], ["btts", "BTTS"], ["over", "Über"], ["firstHalfOver", "1. HZ Über"] ] as const).map(([key, label]) => <option value={key} key={key}>{label}</option>)}
+          </select>
+        </label>
+        <label className="toolbar-field">
+          <span>Linie</span>
+          <select
+            aria-label={activeLineView === "firstHalfOver" ? "Linie für H2H & Form, 1. Halbzeit" : "Linie für H2H & Form"}
+            value={`${counterDirection ? "u" : "o"}:${activeLineView === "firstHalfOver" ? firstHalfOverLine : overLine}`}
+            disabled={activeLineView === null}
+            onChange={(event) => {
+              const [direction, line] = event.target.value.split(":");
+              setCounterDirection(direction === "u");
+              if (activeLineView === "firstHalfOver") setFirstHalfOverLine(Number(line) as FirstHalfOverLine);
+              else setOverLine(Number(line) as FullTimeOverLine);
+            }}
+          >
+            {(activeLineView === "firstHalfOver"
+              ? [[0.5, "0,5"], [1.5, "1,5"]] as const
+              : [[1.5, "1,5"], [2.5, "2,5"], [3.5, "3,5"]] as const
+            ).flatMap(([line, label]) => [
+              <option value={`o:${line}`} key={`o${line}`}>Über {label}</option>,
+              <option value={`u:${line}`} key={`u${line}`}>Unter {label}</option>
+            ])}
+          </select>
+        </label>
+        <label className="toolbar-field">
+          <span>Klasse</span>
+          <select value={classGapFilter} onChange={(event) => setClassGapFilter(event.target.value as ClassGapFilter)}>
+            {([ ["all", "Alle"], ["only", "Nur"], ["hide", "Ohne"] ] as const).map(([key, label]) => <option value={key} key={key}>{label}</option>)}
+          </select>
+        </label>
         {showKelly && <KellyButton onOpen={() => setKellyOpen(true)} />}
-        <div className="segmented density-switch">
-          {([ ["micro", "XS"], ["compact", "Kompakt"], ["comfort", "Komfort"] ] as const).map(([key, label]) => <button className={density === key ? "active" : ""} aria-pressed={density === key} onClick={() => setDensity(key)} key={key}>{label}</button>)}
-        </div>
       </div>
 
+      <div className="table-with-detail">
       <div className="table-scroll">
         <div className={`table-head ${fixtureGridClass}`} style={gridStyle}>
           <span className="fixture-summary-head">
@@ -1104,20 +1164,42 @@ function Dashboard({ document }: { document: DashboardDocument }) {
                 <span>{formView === "outcome"
                   ? <><FormDots results={fixture.form.home} /><FormDots results={fixture.form.away} /></>
                   : <>
-                    <FormMatchDots matches={fixture.form.homeMatches} view={formView} overLine={overLine} firstHalfOverLine={firstHalfOverLine} />
-                    <FormMatchDots matches={fixture.form.awayMatches} view={formView} overLine={overLine} firstHalfOverLine={firstHalfOverLine} />
+                    <FormMatchDots matches={fixture.form.homeMatches} view={formView} overLine={overLine} firstHalfOverLine={firstHalfOverLine} inverted={counterDirection} />
+                    <FormMatchDots matches={fixture.form.awayMatches} view={formView} overLine={overLine} firstHalfOverLine={firstHalfOverLine} inverted={counterDirection} />
                   </>}</span>
               </span>
-              <span className="h2h-cell"><H2hDots fixture={fixture} view={h2hView} overLine={overLine} firstHalfOverLine={firstHalfOverLine} /></span>
+              <span className="h2h-cell"><H2hDots fixture={fixture} view={h2hView} overLine={overLine} firstHalfOverLine={firstHalfOverLine} inverted={counterDirection} /></span>
               <span className="expected-cell"><strong>{(showFirstHalfExpected ? fixture.expectedFirstHalfGoals?.home ?? 0 : fixture.expectedGoals.home).toFixed(2).replace(".", ",")}</strong><i>:</i><strong>{(showFirstHalfExpected ? fixture.expectedFirstHalfGoals?.away ?? 0 : fixture.expectedGoals.away).toFixed(2).replace(".", ",")}</strong></span>
               {showScore && <span className="score-cell">{marketFilter !== "draw" && <span><small>1X2</small><strong>{fixture.scores.favorite ?? "–"}</strong></span>}{marketFilter !== "1x2" && <span><small>X</small><strong>{fixture.scores.draw ?? "–"}</strong></span>}</span>}
               {markets.map((item) => <MarketCard market={item} showEdge={showKelly} key={item.key} />)}
             </button>
             </div>
-            {openFixture === fixture.fixtureId && (() => {
-              const showTable = !fixture.crossLeague && !!fixture.table?.length;
-              return <div className={`fixture-details ${showTable ? "has-table" : ""}`}>
-              <section><h3>Direkte Begegnungen</h3>{fixture.h2h.matches.length
+          </article>;
+        })}
+        {sortedFixtures.length === 0 && <EmptyState title="Keine Partien für diese Auswahl" text="Wähle einen anderen Zeitraum oder setze den Bewertungsfilter zurück." />}
+      </div>
+      {openFixture !== null && (() => {
+        const fixture = sortedFixtures.find((item) => item.fixtureId === openFixture);
+        if (!fixture) return null;
+        const time = kickoffParts(fixture.kickoff, document.meta.timezone);
+        const showTable = !fixture.crossLeague && !!fixture.table?.length;
+        const detailed = insights.status === "ready" && insights.insights.fixtureId === fixture.fixtureId;
+        const loading = insights.status === "loading";
+        return <aside className="fixture-detail-panel" aria-label="Details">
+              <header className="fixture-detail-head">
+                <span className="fixture-detail-teams">
+                  <strong className="home">{fixture.homeTeam}</strong>
+                  <strong className="away">{fixture.awayTeam}</strong>
+                  <small>{time.clock} · {time.day} · <CountryFlag country={fixture.country} /> {fixture.country} · {fixture.league}</small>
+                </span>
+                <button className="fixture-detail-close" aria-label="Details schließen" onClick={() => setOpenFixture(null)}><X /></button>
+              </header>
+              {loading
+                ? <div className="insight-loading" role="status"><i aria-hidden /><span>Torphasen und Trends werden geladen …</span></div>
+                : <>
+              {detailed
+                ? <FixtureInsightPanels insights={insights.insights} timezone={document.meta.timezone} />
+                : <section className="insight-panel"><h3>Direkte Begegnungen</h3><InsightsNotice state={insights} />{fixture.h2h.matches.length
                 ? <ul className="h2h-match-list">{fixture.h2h.matches.map((match, index) => {
                     const outcome = fixture.h2h.outcomes[index];
                     const hasHalfTime = typeof match.halfTimeHomeGoals === "number" && typeof match.halfTimeAwayGoals === "number";
@@ -1141,9 +1223,9 @@ function Dashboard({ document }: { document: DashboardDocument }) {
                       {hasHalfTime && <span className="h2h-match-half">HZ {currentHalfHomeGoals}:{currentHalfAwayGoals}</span>}
                     </li>;
                   })}</ul>
-                : <p>Keine H2H-Ergebnisse verfügbar.</p>}</section>
-              {showTable && <section><h3>Ligatabelle</h3>
-                <table className="standings-table">
+                : <p>Keine H2H-Ergebnisse verfügbar.</p>}</section>}
+              {showTable && <section className="insight-panel"><h3>Ligatabelle</h3>
+                <table className="standings-table" aria-label="Ligatabelle">
                   <thead><tr><th>Pl.</th><th>Team</th><th>Sp</th><th>+/-</th><th>Pkt</th></tr></thead>
                   <tbody>{standingsWindow(fixture.table!, fixture.homeTeam, fixture.awayTeam).map((row, index) => row === null
                     ? <tr className="standings-gap" key={`gap-${index}`}><td colSpan={5}>⋯</td></tr>
@@ -1156,14 +1238,12 @@ function Dashboard({ document }: { document: DashboardDocument }) {
                       </tr>)}</tbody>
                 </table>
               </section>}
-              <section><h3>Bewertung je Markt</h3><div className="market-details">{fixture.markets.map((item) => <div key={item.key} className={item.recommendation.level}><i /><span><strong>{item.label} · {item.recommendation.label}</strong>{item.details.join(" · ")}</span></div>)}</div></section>
-            </div>;
-            })()}
-          </article>;
-        })}
-        {sortedFixtures.length === 0 && <EmptyState title="Keine Partien für diese Auswahl" text="Wähle einen anderen Zeitraum oder setze den Bewertungsfilter zurück." />}
+              <section className="insight-panel"><h3>Bewertung je Markt</h3><div className="market-details">{fixture.markets.map((item) => <div key={item.key} className={item.recommendation.level}><i /><span><strong>{item.label} · {item.recommendation.label}</strong>{item.details.join(" · ")}</span></div>)}</div></section>
+              </>}
+            </aside>;
+      })()}
       </div>
-      </> : <LiveView
+      </> : view === "profile" ? <MarketProfileView /> : <LiveView
         state={live}
         marketFilter={marketFilter}
         showEdge={showKelly}
@@ -1189,6 +1269,9 @@ function Dashboard({ document }: { document: DashboardDocument }) {
     marketFilter={marketFilter}
     marketLabel={MARKET_OPTIONS.find((option) => option.key === marketFilter)?.label ?? "Alle Märkte"}
     settings={kellySettings}
+    profile={marketProfile.profile}
+    auto={kellyAuto}
+    onAutoChange={setKellyAuto}
     onSettingsChange={setKellySettings}
     onClose={() => setKellyOpen(false)}
   />}

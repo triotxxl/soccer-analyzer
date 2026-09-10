@@ -2,7 +2,41 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testi
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App, MarketCard } from "./App";
-import type { DashboardDocument, DashboardFixture, DashboardMarket } from "./types";
+import type { DashboardDocument, DashboardFixture, DashboardMarket, FixtureInsights } from "./types";
+
+/**
+ * Ein leerer, aber gültiger Kennzahlenbestand. Die Detailpanels rendern damit, ohne dass
+ * jeder Test eigene Historien mitbringen muss.
+ */
+function emptyInsights(fixtureId: number): FixtureInsights {
+  return {
+    fixtureId,
+    league: { id: 78, name: "Bundesliga", country: "Deutschland", season: 2026 },
+    home: { id: 1, name: "Alpha FC" },
+    away: { id: 2, name: "Gast FC" },
+    homeMatches: [], awayMatches: [], h2h: [],
+    coverage: { matches: 0, withMinutes: 0, withStats: 0 },
+    fetchedAt: "2026-08-16T10:00:00.000Z",
+    apiRequests: 0
+  };
+}
+
+/** Beantwortet beide Endpunkte der App: den Dashboard-Lauf und die Detailkennzahlen. */
+function dashboardFetch(
+  read: () => DashboardDocument,
+  insights: (fixtureId: number) => unknown = emptyInsights
+) {
+  return vi.fn((url: string) => {
+    const target = String(url);
+    if (!target.startsWith("/api/fixture/insights")) {
+      return Promise.resolve(new Response(JSON.stringify(read()), { status: 200 }));
+    }
+    const fixtureId = Number(new URLSearchParams(target.split("?")[1] ?? "").get("fixture"));
+    const body = insights(fixtureId);
+    const failed = !!body && typeof body === "object" && "error" in body;
+    return Promise.resolve(new Response(JSON.stringify(body), { status: failed ? 503 : 200 }));
+  });
+}
 
 function markets(level: "none" | "recommended" | "strong", probability = 0.72): DashboardMarket[] {
   return ([
@@ -88,12 +122,12 @@ describe("React-Dashboard", () => {
   });
 
   it("filtert Empfehlungen und Märkte und öffnet Fixture-Details", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(document()), { status: 200 })));
+    vi.stubGlobal("fetch", dashboardFetch(() => document()));
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     render(<App />);
     expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
     expect(screen.getByText("Zulu FC")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "1. HZ Ü0,5" })).not.toBeInTheDocument();
+    expect(within(screen.getByLabelText("Markt")).queryByRole("option", { name: "1. HZ Ü0,5" })).not.toBeInTheDocument();
     const summary = globalThis.document.querySelector(".fixture-summary-cell");
     expect(summary).toHaveTextContent("Alpha FC");
     expect(summary).toHaveTextContent("20:00");
@@ -106,18 +140,18 @@ describe("React-Dashboard", () => {
 
     await user.click(screen.getByRole("button", { name: /Starke Tipps/i }));
     expect(screen.queryByText("Zulu FC")).not.toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: /^Remis$/i }));
+    await user.selectOptions(screen.getByLabelText("Markt"), "draw");
     expect(globalThis.document.querySelector(".table-head")?.textContent).toContain("Remis");
     expect(globalThis.document.querySelector(".table-head")).toHaveClass("has-score");
 
-    await user.click(within(screen.getByRole("navigation", { name: "Marktfilter" })).getByRole("button", { name: /^BTTS$/i }));
+    await user.selectOptions(screen.getByLabelText("Markt"), "btts");
     const bttsHeader = globalThis.document.querySelector<HTMLElement>(".table-head");
     expect(bttsHeader).not.toHaveClass("has-score");
     expect(bttsHeader?.style.getPropertyValue("--market-count")).toBe("1");
     expect(globalThis.document.querySelector(".fixture-row")).not.toHaveClass("has-score");
 
     await user.click(screen.getByRole("button", { name: /Alpha FCGast FC/i }));
-    expect(screen.getByText("Direkte Begegnungen")).toBeInTheDocument();
+    expect(await within(screen.getByLabelText("Details")).findByText("Direkte Begegnungen")).toBeInTheDocument();
     expect(screen.getAllByText(/Testbegründung/)).toHaveLength(5);
   });
 
@@ -129,42 +163,48 @@ describe("React-Dashboard", () => {
       markets: [
         ...item.markets,
         { ...item.markets[3]!, key: "firstHalfOver05", label: "1. HZ Ü0,5", selection: "1. Halbzeit: mindestens 1 Tor" },
-        { ...item.markets[3]!, key: "firstHalfOver15", label: "1. HZ Ü1,5", selection: "1. Halbzeit: mindestens 2 Tore" }
+        { ...item.markets[3]!, key: "firstHalfOver15", label: "1. HZ Ü1,5", selection: "1. Halbzeit: mindestens 2 Tore" },
+        { ...item.markets[3]!, key: "under25", label: "Unter 2,5", selection: "Höchstens 2 Tore" }
       ]
     }));
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(current), { status: 200 })));
+    vi.stubGlobal("fetch", dashboardFetch(() => current));
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     render(<App />);
     expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
-    const markets = within(screen.getByRole("navigation", { name: "Marktfilter" }));
-    const h2h = within(screen.getByRole("group", { name: "H2H-Ansicht" }));
-    const form = within(screen.getByRole("group", { name: "Form-Ansicht" }));
+    const markets = screen.getByLabelText("Markt");
+    const h2h = screen.getByLabelText("H2H");
+    const form = screen.getByLabelText("Form");
 
-    await user.click(markets.getByRole("button", { name: "BTTS" }));
-    expect(h2h.getByRole("button", { name: "BTTS" })).toHaveClass("active");
-    expect(form.getByRole("button", { name: "BTTS" })).toHaveClass("active");
+    await user.selectOptions(markets, "btts");
+    expect(h2h).toHaveValue("btts");
+    expect(form).toHaveValue("btts");
 
-    await user.click(markets.getByRole("button", { name: "Über 1,5" }));
-    expect(h2h.getByRole("button", { name: "Über" })).toHaveClass("active");
-    expect(form.getByRole("button", { name: "Über" })).toHaveClass("active");
-    expect(screen.getByRole("combobox", { name: "Über-Linie für H2H & Form" })).toHaveValue("1.5");
+    await user.selectOptions(markets, "over15");
+    expect(h2h).toHaveValue("over");
+    expect(form).toHaveValue("over");
+    expect(screen.getByRole("combobox", { name: "Linie für H2H & Form" })).toHaveValue("o:1.5");
 
-    await user.click(markets.getByRole("button", { name: "Über 2,5" }));
-    expect(screen.getByRole("combobox", { name: "Über-Linie für H2H & Form" })).toHaveValue("2.5");
+    await user.selectOptions(markets, "over25");
+    expect(screen.getByRole("combobox", { name: "Linie für H2H & Form" })).toHaveValue("o:2.5");
 
-    await user.click(markets.getByRole("button", { name: "1. HZ Ü0,5" }));
-    expect(h2h.getByRole("button", { name: "1. HZ Über" })).toHaveClass("active");
-    expect(form.getByRole("button", { name: "1. HZ Über" })).toHaveClass("active");
-    expect(screen.getByRole("combobox", { name: "Über-Linie für H2H & Form, 1. Halbzeit" })).toHaveValue("0.5");
+    // Ein Gegenmarkt stellt Linie und Richtung zugleich ein.
+    await user.selectOptions(markets, "under25");
+    expect(h2h).toHaveValue("over");
+    expect(screen.getByRole("combobox", { name: "Linie für H2H & Form" })).toHaveValue("u:2.5");
 
-    await user.click(markets.getByRole("button", { name: "1. HZ Ü1,5" }));
-    expect(screen.getByRole("combobox", { name: "Über-Linie für H2H & Form, 1. Halbzeit" })).toHaveValue("1.5");
+    await user.selectOptions(markets, "firstHalfOver05");
+    expect(h2h).toHaveValue("firstHalfOver");
+    expect(form).toHaveValue("firstHalfOver");
+    expect(screen.getByRole("combobox", { name: "Linie für H2H & Form, 1. Halbzeit" })).toHaveValue("o:0.5");
 
-    await user.click(markets.getByRole("button", { name: "1X2" }));
-    expect(h2h.getByRole("button", { name: "Ergebnis" })).toHaveClass("active");
-    expect(form.getByRole("button", { name: "Ergebnis" })).toHaveClass("active");
-    await user.click(markets.getByRole("button", { name: "Remis" }));
-    expect(h2h.getByRole("button", { name: "Ergebnis" })).toHaveClass("active");
+    await user.selectOptions(markets, "firstHalfOver15");
+    expect(screen.getByRole("combobox", { name: "Linie für H2H & Form, 1. Halbzeit" })).toHaveValue("o:1.5");
+
+    await user.selectOptions(markets, "1x2");
+    expect(h2h).toHaveValue("outcome");
+    expect(form).toHaveValue("outcome");
+    await user.selectOptions(markets, "draw");
+    expect(h2h).toHaveValue("outcome");
   });
 
   it("kennzeichnet besonders defensiv starke Teams mit einem Shield", async () => {
@@ -173,7 +213,7 @@ describe("React-Dashboard", () => {
       home: { concededGoals: 0.64, relativeToLeague: 0.54, matches: 18, venueMatches: 9, strong: true },
       away: { concededGoals: 1.3, relativeToLeague: 1.02, matches: 18, venueMatches: 9, strong: false }
     };
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(current), { status: 200 })));
+    vi.stubGlobal("fetch", dashboardFetch(() => current));
     render(<App />);
     expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
     expect(screen.getByRole("img", { name: /Alpha FC: durch Torhistorie belegte Top-20-%-Defensive/ })).toHaveClass("fallback");
@@ -190,7 +230,7 @@ describe("React-Dashboard", () => {
         xgMatches: 17, venueXgMatches: 8, xgCoverage: 0.94, venueXgCoverage: 0.89, confidence: 88 },
       away: { concededGoals: 1.3, relativeToLeague: 1.02, matches: 18, venueMatches: 9, strong: false }
     };
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(current), { status: 200 })));
+    vi.stubGlobal("fetch", dashboardFetch(() => current));
     render(<App />);
     const shield = await screen.findByRole("img", { name: /Alpha FC: xG-verifizierte Top-20-%-Defensive/ });
     expect(shield).toHaveClass("verified");
@@ -220,12 +260,12 @@ describe("React-Dashboard", () => {
         }
       ]
     }));
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(current), { status: 200 })));
+    vi.stubGlobal("fetch", dashboardFetch(() => current));
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     render(<App />);
     expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
 
-    await user.click(within(screen.getByRole("navigation", { name: "Marktfilter" })).getByRole("button", { name: "1. HZ Ü0,5" }));
+    await user.selectOptions(screen.getByLabelText("Markt"), "firstHalfOver05");
     expect(globalThis.document.querySelector(".table-head")?.textContent).toContain("Erw. Tore 1. HZ");
     const firstRow = globalThis.document.querySelector(".fixture-row");
     expect(firstRow?.textContent).toContain("0,70:0,40");
@@ -243,14 +283,15 @@ describe("React-Dashboard", () => {
       { date: "2026-02-05T18:00:00.000Z", homeTeam: "Gast FC", awayTeam: "Alpha FC", homeGoals: 1, awayGoals: 2, halfTimeHomeGoals: 0, halfTimeAwayGoals: 1 },
       { date: "2026-01-05T18:00:00.000Z", homeTeam: "Alpha FC", awayTeam: "Gast FC", homeGoals: 2, awayGoals: 0, halfTimeHomeGoals: null, halfTimeAwayGoals: null }
     ];
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(current), { status: 200 })));
+    vi.stubGlobal("fetch", dashboardFetch(() => current));
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     render(<App />);
     expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
 
-    await user.click(within(screen.getByRole("group", { name: "H2H-Ansicht" })).getByRole("button", { name: "1. HZ Über" }));
-    const line = screen.getByRole("combobox", { name: "Über-Linie für H2H & Form, 1. Halbzeit" });
-    expect(within(line).getAllByRole("option").map((option) => option.textContent)).toEqual(["Über 0,5", "Über 1,5"]);
+    await user.selectOptions(screen.getByLabelText("H2H"), "firstHalfOver");
+    const line = screen.getByRole("combobox", { name: "Linie für H2H & Form, 1. Halbzeit" });
+    expect(within(line).getAllByRole("option").map((option) => option.textContent))
+      .toEqual(["Über 0,5", "Unter 0,5", "Über 1,5", "Unter 1,5"]);
     const firstH2h = globalThis.document.querySelector(".fixture-row")!;
     const dots = () => Array.from(firstH2h.querySelectorAll(".h2h-cell .result-dot"));
     // Die Punkte zeigen die Halbzeit-Torzahl; ob die Linie gerissen wurde, sagt die Farbe.
@@ -259,9 +300,14 @@ describe("React-Dashboard", () => {
     expect(dots().map((dot) => dot.textContent)).toEqual(["1", "0", "2", "1", "–"]);
     expect(hits()).toEqual(["Ü", "U", "Ü", "Ü", "–"]);
 
-    await user.selectOptions(line, "1.5");
+    await user.selectOptions(line, "o:1.5");
     expect(dots().map((dot) => dot.textContent)).toEqual(["1", "0", "2", "1", "–"]);
     expect(hits()).toEqual(["U", "U", "Ü", "U", "–"]);
+
+    // Bei der Gegenrichtung bleibt die Torzahl gleich, aber getroffen hat, wer darunter blieb.
+    await user.selectOptions(line, "u:1.5");
+    expect(dots().map((dot) => dot.textContent)).toEqual(["1", "0", "2", "1", "–"]);
+    expect(hits()).toEqual(["Ü", "Ü", "U", "Ü", "–"]);
   });
 
   it("sortiert H2H zuerst nach aktueller Serie und danach nach Ergebnispriorität", async () => {
@@ -279,7 +325,7 @@ describe("React-Dashboard", () => {
       h2h: { ...fixture(index + 1, name, "none", "2026-08-17T12:00:00.000Z").h2h, outcomes: [...outcomes] }
     }));
     current.meta.fixtureCount = current.fixtures.length;
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(current), { status: 200 })));
+    vi.stubGlobal("fetch", dashboardFetch(() => current));
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     render(<App />);
     expect(await screen.findByText("Unterbrochen")).toBeInTheDocument();
@@ -317,7 +363,7 @@ describe("React-Dashboard", () => {
       return { ...base, form: { ...base.form, home: [...home], away: [...away] } };
     });
     current.meta.fixtureCount = current.fixtures.length;
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(current), { status: 200 })));
+    vi.stubGlobal("fetch", dashboardFetch(() => current));
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     render(<App />);
     expect(await screen.findByText("Heimstark")).toBeInTheDocument();
@@ -340,7 +386,7 @@ describe("React-Dashboard", () => {
     // Angepfiffen, aber längst vorbei: liegt außerhalb des Live-Fensters von 200 Minuten.
     current.fixtures.push(fixture(5, "Lange vorbei", "none", "2026-08-16T08:00:00.000Z"));
     current.meta.fixtureCount = current.fixtures.length;
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(current), { status: 200 })));
+    vi.stubGlobal("fetch", dashboardFetch(() => current));
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     render(<App />);
 
@@ -360,7 +406,7 @@ describe("React-Dashboard", () => {
   });
 
   it("wählt inklusive Datumsbereiche, normalisiert die Reihenfolge und erlaubt spielfreie Tage", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(rangeDocument()), { status: 200 })));
+    vi.stubGlobal("fetch", dashboardFetch(() => rangeDocument()));
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     render(<App />);
     expect(await screen.findByText("Exakter Start")).toBeInTheDocument();
@@ -390,7 +436,7 @@ describe("React-Dashboard", () => {
   });
 
   it("verwirft Kalenderentwürfe beim Abbrechen und mit Escape", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(rangeDocument()), { status: 200 })));
+    vi.stubGlobal("fetch", dashboardFetch(() => rangeDocument()));
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     render(<App />);
     expect(await screen.findByText("Exakter Start")).toBeInTheDocument();
@@ -409,7 +455,7 @@ describe("React-Dashboard", () => {
 
   it("begrenzt einen benutzerdefinierten Bereich nach einem Snapshot-Refresh", async () => {
     let current = rangeDocument();
-    const fetchMock = vi.fn().mockImplementation(() => Promise.resolve(new Response(JSON.stringify(current), { status: 200 })));
+    const fetchMock = dashboardFetch(() => current);
     vi.stubGlobal("fetch", fetchMock);
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     render(<App />);
@@ -433,7 +479,7 @@ describe("React-Dashboard", () => {
   });
 
   it("klappt die Desktop-Sidebar ein und filtert über die kompakte Iconleiste", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(document()), { status: 200 })));
+    vi.stubGlobal("fetch", dashboardFetch(() => document()));
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     render(<App />);
     expect(await screen.findByText("Fußball-Analyzer")).toBeInTheDocument();
@@ -455,7 +501,7 @@ describe("React-Dashboard", () => {
       addEventListener: (_type: string, listener: (event: MediaQueryListEvent) => void) => { breakpointListener = listener; },
       removeEventListener: vi.fn(), addListener: vi.fn(), removeListener: vi.fn(), dispatchEvent: vi.fn()
     }));
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(document()), { status: 200 })));
+    vi.stubGlobal("fetch", dashboardFetch(() => document()));
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     render(<App />);
     expect(await screen.findByRole("button", { name: "Filter & Zeitraum" })).toHaveAttribute("aria-expanded", "false");
@@ -476,7 +522,7 @@ describe("React-Dashboard", () => {
 
   it("lädt bei erneutem Fensterfokus einen neuen Lauf", async () => {
     let current = document();
-    const fetchMock = vi.fn().mockImplementation(() => Promise.resolve(new Response(JSON.stringify(current), { status: 200 })));
+    const fetchMock = dashboardFetch(() => current);
     vi.stubGlobal("fetch", fetchMock);
     render(<App />);
     expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
@@ -487,7 +533,7 @@ describe("React-Dashboard", () => {
   });
 
   it("sammelt Wetten über das Radialmenü im Warenkorb und mischt eine Kombi", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(document()), { status: 200 })));
+    vi.stubGlobal("fetch", dashboardFetch(() => document()));
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     render(<App />);
     expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
@@ -518,7 +564,7 @@ describe("React-Dashboard", () => {
   });
 
   it("merkt sich das Schließen des Hinweisbanners über einen Reload hinweg", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockImplementation(() => Promise.resolve(new Response(JSON.stringify(document()), { status: 200 }))));
+    vi.stubGlobal("fetch", dashboardFetch(() => document()));
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     const { unmount } = render(<App />);
     expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
@@ -549,19 +595,69 @@ describe("React-Dashboard", () => {
       { position: 11, teamName: "Team K", played: 10, wins: 1, draws: 3, losses: 6, points: 6, goalsFor: 7, goalsAgainst: 18 },
       { position: 12, teamName: "Schlusslicht FC", played: 10, wins: 0, draws: 2, losses: 8, points: 2, goalsFor: 4, goalsAgainst: 22 }
     ];
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(current), { status: 200 })));
+    vi.stubGlobal("fetch", dashboardFetch(() => current));
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     render(<App />);
     expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /Alpha FCGast FC/i }));
-    expect(screen.getByText("Ligatabelle")).toBeInTheDocument();
-    const standings = screen.getByRole("table");
+    expect(await screen.findByText("Ligatabelle")).toBeInTheDocument();
+    const standings = screen.getByRole("table", { name: "Ligatabelle" });
     expect(within(standings).getByText("Spitzenreiter FC")).toBeInTheDocument();
     expect(within(standings).getByText("Alpha FC")).toBeInTheDocument();
     expect(within(standings).getByText("Gast FC")).toBeInTheDocument();
     expect(within(standings).queryByText("Team E")).not.toBeInTheDocument();
     expect(within(standings).queryByText("Schlusslicht FC")).not.toBeInTheDocument();
+  });
+
+  it("zeigt beim Aufklappen die Torphasen und behält bei fehlenden Kennzahlen die H2H aus dem Lauf", async () => {
+    vi.stubGlobal("fetch", dashboardFetch(() => document()));
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(<App />);
+    expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /Alpha FCGast FC/i }));
+    const details = within(await screen.findByLabelText("Details"));
+    expect(await details.findByRole("region", { name: "Torphasen" })).toBeInTheDocument();
+    expect(details.getByRole("region", { name: "Trends" })).toBeInTheDocument();
+    expect(details.getByRole("region", { name: "Direkte Begegnungen" })).toBeInTheDocument();
+    cleanup();
+
+    // Ohne erreichbare Kennzahlen bleibt die Ansicht bei den direkten Duellen des Laufs.
+    vi.stubGlobal("fetch", dashboardFetch(
+      () => document(),
+      () => ({ error: "api_unavailable" })
+    ));
+    render(<App />);
+    expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /Alpha FCGast FC/i }));
+    expect(await screen.findByRole("status")).toHaveTextContent("API-Football ist gerade nicht erreichbar.");
+    expect(await screen.findByText("Direkte Begegnungen")).toBeInTheDocument();
+    expect(globalThis.document.querySelectorAll(".h2h-match-row")).toHaveLength(1);
+    expect(screen.queryByRole("region", { name: "Torphasen" })).not.toBeInTheDocument();
+  });
+
+  it("öffnet das Detail-Panel direkt mit dem Spinner und blendet alles andere aus", async () => {
+    const current = document();
+    current.fixtures[0]!.table = [
+      { position: 1, teamName: "Alpha FC", played: 10, wins: 8, draws: 1, losses: 1, points: 25, goalsFor: 24, goalsAgainst: 10 },
+      { position: 2, teamName: "Gast FC", played: 10, wins: 2, draws: 3, losses: 5, points: 9, goalsFor: 9, goalsAgainst: 16 }
+    ];
+    // Die Kennzahlen kommen nie zurück, damit der Ladezustand stehen bleibt und prüfbar ist.
+    vi.stubGlobal("fetch", vi.fn((url: string) => String(url).startsWith("/api/fixture/insights")
+      ? new Promise<Response>(() => {})
+      : Promise.resolve(new Response(JSON.stringify(current), { status: 200 }))));
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(<App />);
+    expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /Alpha FCGast FC/i }));
+    const details = within(screen.getByLabelText("Details"));
+    expect(details.getByRole("status")).toHaveTextContent("Torphasen und Trends werden geladen");
+    expect(globalThis.document.querySelector(".insight-loading")).toBeInTheDocument();
+    expect(details.queryByText("Direkte Begegnungen")).not.toBeInTheDocument();
+    expect(details.queryByText("Ligatabelle")).not.toBeInTheDocument();
+    expect(details.queryByText("Bewertung je Markt")).not.toBeInTheDocument();
   });
 
   it("zeigt keine Ligatabelle bei Cross-League-Partien oder ohne Tabellendaten", async () => {
@@ -571,18 +667,18 @@ describe("React-Dashboard", () => {
       { position: 1, teamName: "Alpha FC", played: 10, wins: 8, draws: 1, losses: 1, points: 25, goalsFor: 24, goalsAgainst: 10 },
       { position: 2, teamName: "Gast FC", played: 10, wins: 2, draws: 3, losses: 5, points: 9, goalsFor: 9, goalsAgainst: 16 }
     ];
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(current), { status: 200 })));
+    vi.stubGlobal("fetch", dashboardFetch(() => current));
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     render(<App />);
     expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /Alpha FCGast FC/i }));
-    expect(screen.getByText("Direkte Begegnungen")).toBeInTheDocument();
+    expect(await screen.findByText("Direkte Begegnungen")).toBeInTheDocument();
     expect(screen.queryByText("Ligatabelle")).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /Alpha FCGast FC/i }));
     await user.click(screen.getByRole("button", { name: /Zulu FCGast FC/i }));
-    expect(screen.getByText("Direkte Begegnungen")).toBeInTheDocument();
+    expect(await screen.findByText("Direkte Begegnungen")).toBeInTheDocument();
     expect(screen.queryByText("Ligatabelle")).not.toBeInTheDocument();
   });
 });
@@ -639,7 +735,7 @@ describe("Klassenunterschied", () => {
   }
 
   it("markiert die Partie und nennt die stärkere Seite samt Quelle", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(gapDocument()), { status: 200 })));
+    vi.stubGlobal("fetch", dashboardFetch(() => gapDocument()));
     const { container } = render(<App />);
     expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
     const badge = container.querySelector(".class-gap")!;
@@ -653,18 +749,18 @@ describe("Klassenunterschied", () => {
   });
 
   it("filtert Partien mit und ohne Klassenunterschied", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(gapDocument()), { status: 200 })));
+    vi.stubGlobal("fetch", dashboardFetch(() => gapDocument()));
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     render(<App />);
     expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
     expect(screen.getByText("Zulu FC")).toBeInTheDocument();
 
-    const group = screen.getByRole("group", { name: "Klassenunterschied" });
-    await user.click(within(group).getByRole("button", { name: "Nur" }));
+    const classGap = screen.getByLabelText("Klasse");
+    await user.selectOptions(classGap, "only");
     expect(screen.getByText("Alpha FC")).toBeInTheDocument();
     expect(screen.queryByText("Zulu FC")).not.toBeInTheDocument();
 
-    await user.click(within(group).getByRole("button", { name: "Ohne" }));
+    await user.selectOptions(classGap, "hide");
     expect(screen.queryByText("Alpha FC")).not.toBeInTheDocument();
     expect(screen.getByText("Zulu FC")).toBeInTheDocument();
   });
