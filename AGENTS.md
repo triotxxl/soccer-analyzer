@@ -143,6 +143,21 @@ Benutzer auf Deutsch und führe Analyseaufträge selbstständig über die vorhan
   minütlich über 20er-Bündel nach. Ohne laufende Partie entstehen keine Anfragen.
   Begrenzt wird das über `LIVE_DAILY_REQUEST_BUDGET`. Live-Stände werden nach
   `data/live-snapshots/` mitgeschrieben.
+- Klappt die App eine Partie auf, lädt sie deren Detailkennzahlen über
+  `/api/fixture/insights`: Torphasen je Viertelstunde, direkte Duelle mit Liga und
+  Halbzeitstand sowie Trends über die letzten zehn Partien inklusive Ballbesitz und
+  Schüssen. Team- und H2H-Historien liegen aus dem Dashboard-Lauf im Cache; neu sind nur
+  die Bündel aus `/fixtures?ids=` zu je 20 Partien, die Ereignisse und Statistiken in
+  einem Aufruf tragen. Das kostet einmalig rund vier Anfragen je Partie und danach nichts
+  mehr, weil beendete Partien 30 Tage gespeichert bleiben. Zugeklappt entsteht kein
+  Aufruf. Grenzen: `INSIGHTS_HISTORY_LIMIT` (20 Partien je Team) und
+  `INSIGHTS_H2H_LIMIT` (10 direkte Duelle). Einzelne Partie prüfen:
+  `npm run insights-probe -- <fixtureId>`.
+- Torphasen zählen nur Partien, deren Ereignisliste jedes Tor des Endstands trägt.
+  Verlängerung, Elfmeterschießen und lückenhafte Listen bleiben ganz außen vor, statt die
+  Verteilung still nach unten zu ziehen. Ballbesitz und Schüsse führt API-Football nicht in
+  jeder Liga; die Ansicht mittelt dann über die Partien, die den Wert haben, und weist eine
+  fehlende Grundlage aus.
 - Der API-Football-Pro-Tarif erlaubt 5 Requests pro Sekunde, 300 Requests pro Minute
   und 7.500 pro Tag. Der Client glättet Netzwerkaufrufe auf beide kurzen Fenster und
   hält eine Tagesreserve zurück. Bei HTTP 429 oder `too many requests` wartet der
@@ -169,4 +184,75 @@ Benutzer auf Deutsch und führe Analyseaufträge selbstständig über die vorhan
   der Auslegung mitbedacht.
 - Historische xG-Werte und bestätigte Nichtverfügbarkeit werden in SQLite gehalten; der
   xG-Erstaufbau darf pro Dashboard-Lauf höchstens 250 zusätzliche API-Anfragen auslösen.
+## Märkte
+
+- Das Dashboard führt 14 Märkte, jeweils als Paar aus Basis- und Gegenrichtung: 1X2, Remis,
+  BTTS Ja/Nein, Über/Unter 1,5, Über/Unter 2,5, Über/Unter 3,5 sowie 1. HZ Über/Unter 0,5 und
+  1. HZ Über/Unter 1,5. Der Gegenmarkt steht in der Liste direkt hinter seinem Basismarkt.
+- Die Unter-Wahrscheinlichkeiten kommen unverändert aus dem Modell (`src/model.ts`), wo sie
+  ohnehin die primär gerechnete Größe sind; "BTTS Nein" ist `1 - btts`.
+- Tipico bietet je Partie **nur eine einzige Ganzspiel-Torlinie** an. Deshalb sucht der Parser
+  alle drei (1,5 / 2,5 / 3,5) und nimmt, was da ist. Vor dieser Erweiterung blieben die Partien
+  mit 3,5er-Linie ganz ohne Ganzspiel-Torquote — im 21-Tage-Fenster 168 von 662. Die 4,5er-Linie
+  bleibt bewusst außen vor.
+- Die Schwellen in `thresholds` (`src/dashboard.ts`) steuern allein die Empfehlungsampel, nicht
+  Kelly. Für Gegenmärkte sind sie an der Häufigkeit des Ereignisses ausgerichtet und nicht aus
+  dem Basismarkt gespiegelt: Unter 1,5 tritt selten ein, eine übernommene Schwelle von 0,75 wäre
+  dort nie erreichbar.
+- Ein neuer Markt braucht Einträge in `DashboardMarketKey`, `thresholds`, der Marktliste,
+  `decideMarket` (`src/market-outcome.ts`), `MARKET_OPTIONS`, `MARKET_TOGGLES` und
+  `RADIAL_LABELS`. Die letzten drei und `thresholds` sind als vollständige Records notiert,
+  der Compiler erzwingt sie also.
+
+## Kelly-Automatik und Marktprofil
+
+- Der Kelly-Picker hat zwei Modi. In der **Automatik** (Vorgabe) stellt der Benutzer nur
+  Budget und Kelly-Fraktion ein; welche Märkte und Partien gewählt werden, entscheidet
+  `autoDecide` in `src/market-profile.ts` anhand der eigenen abgerechneten Ergebnisse.
+  **Manuell** verhält sich unverändert wie zuvor.
+- Kern der Automatik ist die Korrektur der Wahrscheinlichkeit: Über alle archivierten
+  Snapshots sagt das Modell rund 51 % voraus, wo 42 % eintreten. Kelly rechnet deshalb nicht
+  mit `market.probability`, sondern mit dem um die gemessene Selbstüberschätzung
+  verringerten Wert. Der Abschlag stammt aus dem Edge-Band des jeweiligen Marktes und wird
+  gegen den Markt-Bias zusammengezogen, damit dünn besetzte Bänder nicht durchschlagen.
+- **Nie auf beide Seiten einer Partie setzen.** Schließen zwei Auswahlen einander aus, verliert
+  eine davon mit Sicherheit und übrig bleibt die Spanne des Buchmachers. `marketsExcludeEachOther`
+  (`src/market-outcome.ts`) erkennt solche Paare, indem es jeden plausiblen Spielausgang gegen
+  `decideMarket` prüft — das deckt auch die weniger offensichtlichen Fälle ab, etwa "1. HZ über
+  1,5" zusammen mit "Spiel unter 1,5". Der Picker behält von einem Paar die Seite mit dem höheren
+  vollen Kelly-Wert, weil der Trefferchance und Quote gegeneinander abwägt; die höhere Quote allein
+  gewinnt den Vergleich nicht. Die Reihenfolge der Liste bleibt dabei die des Dashboards.
+- Solange ein Gegenmarkt aus seinem Basismarkt gespiegelt ist, kann der Fall gar nicht eintreten:
+  Beide Wahrscheinlichkeiten ergeben zusammen exakt 1, beide Quoten wegen der Spanne mehr als 1,
+  also ist höchstens eine Seite im Vorteil. Erst wenn ein Gegenmarkt eigene Messwerte hat, bricht
+  diese Komplementarität — dafür ist die Sicherung da.
+- `autoDecide` ist die einzige Stelle, an der die Auswahlregel steht. Sowohl die App als
+  auch der Backtest rufen sie auf - eine zweite Fassung der Regel im Frontend würde die
+  Rückrechnung wertlos machen.
+- Die Ansicht **Marktprofil** in der App zeigt je Markt Prognose, tatsächliche Trefferquote,
+  Abweichung und Ertrag, aufklappbar nach Vorteilsband. Das Verdikt der Marktzeile gilt für
+  alle Zeilen mit Vorteil zusammen; die Automatik entscheidet dagegen je Band. Deshalb kann
+  sie aus einem Markt wählen, der insgesamt als „meiden“ ausgewiesen ist - beim Remis ist
+  genau das der Fall.
+- Belastbarkeit prüfen: `npm run edge-report -- --simulate`. Die Kalibrierung wird dabei nur
+  aus der ersten Zeithälfte gebildet und auf die zweite angewendet, zusätzlich an mehreren
+  Trennstellen und einmal ohne den Remis-Markt. Stand 09.09.2026 liegt die Automatik out of
+  sample bei −0,4 bis +3,3 % gegenüber −4,5 bis −4,9 % der früheren Vorgabe: **messbar besser
+  als vorher, aber nicht als gewinnbringend nachgewiesen**, und der Vorteil hängt fast
+  vollständig am Remis-Markt. Diese Einordnung gehört in jede Aussage über die Automatik.
+- **Gegenmärkte ohne eigene Historie** werden gespiegelt statt geschätzt: Weil
+  `Unter = 1 − Über` und `BTTS Nein = 1 − BTTS Ja` gilt, ist die Abweichung der Gegenrichtung
+  exakt der negierte Wert des Basismarktes. Aus −7,1 PP bei Über 2,5 werden +7,1 PP bei
+  Unter 2,5 — die Korrektur *hebt* Unter-Wahrscheinlichkeiten also an. Solche Einträge tragen
+  `derivedFrom`, `roi: null` und keine Edge-Bänder; sobald der Markt eigene abgerechnete Zeilen
+  über der Mindeststichprobe hat, ersetzt die eigene Messung die Spiegelung.
+- Für die gespiegelten Märkte gibt es **keinen Ertragsnachweis**: Historische Gegenquoten wurden
+  nie gespeichert, also lässt sich für sie kein ROI zurückrechnen. Die Wahrscheinlichkeit ist ab
+  dem ersten Lauf korrekt kalibriert, ob sich die Wetten zu den angebotenen Quoten rechnen, ist
+  offen. Über/Unter 3,5 hat gar keinen Spiegelpartner mit Historie und erscheint in der
+  Automatik erst mit eigenen Daten.
+- Marktprofil und Edge-Report kosten kein API-Budget - sie lesen nur `output/dashboard-*.json`
+  und die abgerechneten Ergebnisse aus SQLite. Je mehr abgerechnet ist, desto belastbarer die
+  Korrektur; deshalb gehört `npm run settle` vor jede Bewertung der Automatik.
+
 - Vor Codeänderungen und danach: `npm test` und `npm run typecheck`
