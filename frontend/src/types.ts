@@ -15,3 +15,11 @@ export type {
   LiveBoardResponse,
   LiveTeamSide
 } from "../../src/live-board.ts";
+export type {
+  Calibration,
+  EdgeBand,
+  MarketProfile,
+  MarketProfileEntry,
+  MarketVerdict,
+  Metrics
+} from "../../src/market-profile.ts";

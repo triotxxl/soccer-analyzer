@@ -111,7 +111,9 @@ describe("computeKellyCandidates", () => {
       fixture(2, "Beta", [market("btts", 0.9, 3)]),
       fixture(3, "Gamma", [market("btts", 0.9, 3)])
     ];
-    const config = settings({ kellyFraction: 1, maxStakePercent: 1, maxExposurePercent: 0.1, minEdge: 0 });
+    // minStake: 0 schaltet die Auswahl nach Mindesteinsatz ab - nur dann wird der Rahmen
+    // ueber kleinere Betraege eingehalten statt ueber weniger Wetten.
+    const config = settings({ kellyFraction: 1, maxStakePercent: 1, maxExposurePercent: 0.1, minEdge: 0, minStake: 0 });
     const { candidates, scaleFactor } = computeKellyCandidates(fixtures, "btts", config);
     expect(candidates).toHaveLength(3);
     expect(scaleFactor).toBeLessThan(1);
@@ -286,7 +288,8 @@ describe("Game-Risk-Limit", () => {
   it("wendet danach weiterhin das Gesamtrisiko-Limit an", () => {
     const fixtures = [1, 2, 3].map((id) =>
       fixture(id, `Team${id}`, [market("btts", 0.6, 2.2), market("over25", 0.65, 2.0)]));
-    const config = gameSettings({ maxExposurePercent: 0.1 });
+    // Ohne Mindesteinsatz, damit die proportionale Skalierung greift und nicht die Auswahl.
+    const config = gameSettings({ maxExposurePercent: 0.1, minStake: 0 });
     const { candidates, scaleFactor } = computeKellyCandidates(fixtures, "all", config);
 
     const gameLimit = config.budget * config.maxRiskPerGame;

@@ -1,8 +1,9 @@
-import { Calculator, DownloadSimple, X } from "@phosphor-icons/react";
+import { CaretDown, CaretRight, Calculator, DownloadSimple, X } from "@phosphor-icons/react";
 import { useState, type ReactNode } from "react";
 import { formatOdd, formatPercent, sortStateLabel } from "./App";
-import { buildKellyExport, computeKellyCandidates, kellyExportFileName, type KellyCandidate, type KellySettings } from "./kelly";
-import type { DashboardFixture, DashboardMarketKey } from "./types";
+import { buildKellyExport, computeKellyCandidates, expectedValueOf, kellyExportFileName, recommendedSettings, type KellyCandidate, type KellySettings } from "./kelly";
+import { formatPoints, formatRoi } from "./marketProfile";
+import type { DashboardFixture, DashboardMarketKey, MarketProfile } from "./types";
 
 export function KellyButton({ onOpen }: { onOpen(): void }) {
   return <button className="kelly-trigger" aria-label="Kelly-Kriterium öffnen" title="Kelly-Kriterium" onClick={onOpen}>
@@ -19,13 +20,26 @@ function formatEuro(value: number): string {
   return `${value.toFixed(2).replace(".", ",")} €`;
 }
 
-type KellySortKey = "team" | "market" | "odds" | "probability" | "edge" | "kelly" | "stake";
+function formatSignedEuro(value: number): string {
+  return `${value >= 0 ? "+" : "−"}${Math.abs(value).toFixed(2).replace(".", ",")} €`;
+}
+
+const FRACTION_LABELS: Record<string, string> = {
+  "1": "Full Kelly", "0.5": "1/2 Kelly", "0.25": "1/4 Kelly", "0.125": "1/8 Kelly"
+};
+
+function fractionLabel(fraction: number): string {
+  return FRACTION_LABELS[String(fraction)] ?? `${fraction}× Kelly`;
+}
+
+type KellySortKey = "team" | "market" | "odds" | "probability" | "calibrated" | "edge" | "kelly" | "stake";
 
 function sortValue(candidate: KellyCandidate, key: KellySortKey): number | string {
   if (key === "team") return `${candidate.homeTeam} ${candidate.awayTeam}`;
   if (key === "market") return candidate.marketLabel;
   if (key === "odds") return candidate.odds;
   if (key === "probability") return candidate.probability;
+  if (key === "calibrated") return candidate.calibratedProbability ?? candidate.probability;
   if (key === "edge") return candidate.edge;
   if (key === "kelly") return candidate.stakePercent;
   return candidate.stake;
@@ -56,10 +70,17 @@ const MARKET_TOGGLES: Array<[DashboardMarketKey, string]> = [
   ["1x2", "1X2"],
   ["draw", "Remis"],
   ["btts", "BTTS"],
+  ["bttsNo", "BTTS Nein"],
   ["over15", "Ü1,5"],
+  ["under15", "U1,5"],
   ["over25", "Ü2,5"],
+  ["under25", "U2,5"],
+  ["over35", "Ü3,5"],
+  ["under35", "U3,5"],
   ["firstHalfOver05", "HZ Ü0,5"],
-  ["firstHalfOver15", "HZ Ü1,5"]
+  ["firstHalfUnder05", "HZ U0,5"],
+  ["firstHalfOver15", "HZ Ü1,5"],
+  ["firstHalfUnder15", "HZ U1,5"]
 ];
 
 // 0.07 * 100 ergibt 7.000000000000001 - ohne Rundung landet der Float im Eingabefeld.
@@ -108,18 +129,103 @@ function NumberField({ label, hint, value, scale = 1, min, max, step, disabled, 
   </SettingField>;
 }
 
-export function KellyDialog({ fixtures, marketFilter, marketLabel, settings, onSettingsChange, onClose }: {
+/** Die drei Zahlen, wegen derer der Dialog geöffnet wird - lesbar statt im Fließtext. */
+function MetricCard({ label, value, note, tone, title }: {
+  label: string;
+  value: string;
+  note: string;
+  tone?: "good" | "bad";
+  title?: string;
+}) {
+  return <div className="kelly-metric" title={title}>
+    <span className="kelly-metric-label">{label}</span>
+    <strong className={tone === undefined ? "kelly-metric-value" : `kelly-metric-value kelly-metric-${tone}`}>{value}</strong>
+    <span className="kelly-metric-note">{note}</span>
+  </div>;
+}
+
+/** Ein Textbutton, der einen erklärenden Abschnitt auf- und zuklappt. */
+function Disclosure({ open, onToggle, label, openLabel }: {
+  open: boolean;
+  onToggle(): void;
+  label: string;
+  openLabel: string;
+}) {
+  return <button className="kelly-disclosure" aria-expanded={open} onClick={onToggle}>
+    {open ? openLabel : label}
+  </button>;
+}
+
+/**
+ * Kopfzeile der Automatik: was gerade gespielt wird und was nicht.
+ *
+ * Der Abschnitt ist bewusst ausführlich. Eine Liste, die ohne Begründung weniger Wetten
+ * zeigt als der manuelle Modus, wirkt kaputt - erst die Zahl dahinter macht sie
+ * nachvollziehbar. Die Einordnung, wie belastbar die Korrektur ist, steht dagegen hinter
+ * einem Aufklapper: Sie ist beim ersten Blick nicht nötig, beim zweiten aber wichtig.
+ */
+function AutoSummary({ profile, candidates }: { profile: MarketProfile; candidates: KellyCandidate[] }) {
+  const [showDetail, setShowDetail] = useState(false);
+  const chosen = new Set<string>(candidates.map((candidate) => candidate.marketKey));
+  const active = profile.markets.filter((entry) => chosen.has(entry.marketKey));
+  const idle = profile.markets.filter((entry) => !chosen.has(entry.marketKey));
+
+  return <div className="kelly-auto">
+    <p className="kelly-auto-lead">
+      Die Auswahl rechnet nicht mit der Modellwahrscheinlichkeit, sondern mit dem, was der
+      jeweilige Markt in {profile.observations.toLocaleString("de-DE")} abgerechneten Zeilen
+      wirklich erreicht hat. Du stellst nur das Budget ein.
+    </p>
+
+    {active.length > 0 && <p className="kelly-auto-chips">
+      <span className="kelly-auto-label">Gespielt wird</span>
+      {active.map((entry) => <span key={entry.marketKey} className="kelly-auto-chip">
+        {entry.marketLabel} <small>{formatPoints(entry.metrics.bias)}</small>
+      </span>)}
+    </p>}
+
+    {idle.length > 0 && <p className="kelly-auto-chips">
+      <span className="kelly-auto-label">Nichts gefunden in</span>
+      {idle.map((entry) => <span key={entry.marketKey} className="kelly-auto-chip kelly-auto-chip-idle"
+        title={`${(entry.metrics.hitRate * 100).toFixed(1)} % eingetreten bei ${(entry.metrics.predicted * 100).toFixed(1)} % Prognose über ${entry.metrics.n} Fälle · Ertrag ${formatRoi(entry.metrics.roi)}`}>
+        {entry.marketLabel}
+      </span>)}
+    </p>}
+
+    <Disclosure open={showDetail} onToggle={() => setShowDetail((value) => !value)}
+      label="Wie die Korrektur zustande kommt" openLabel="Weniger anzeigen" />
+    {showDetail && <p className="kelly-auto-detail">
+      In der Rückrechnung auf Ergebnisse, die die Korrektur nicht kannte, lag diese Auswahl bei
+      −0,4 bis +3,3 % gegenüber −4,5 bis −4,9 % der früheren Vorgabe. Sie ist damit messbar
+      besser als vorher, aber sie ist nicht als gewinnbringend nachgewiesen – und ihr Vorteil
+      hängt fast vollständig am Remis-Markt.
+    </p>}
+  </div>;
+}
+
+export function KellyDialog({ fixtures, marketFilter, marketLabel, settings, profile, auto, onAutoChange, onSettingsChange, onClose }: {
   fixtures: DashboardFixture[];
   marketFilter: "all" | DashboardMarketKey;
   marketLabel: string;
   settings: KellySettings;
+  /** Die gemessene Historie. Fehlt sie, bleibt nur der manuelle Modus. */
+  profile: MarketProfile | null;
+  auto: boolean;
+  onAutoChange(auto: boolean): void;
   onSettingsChange(settings: KellySettings): void;
   onClose(): void;
 }) {
   const [sortKey, setSortKey] = useState<KellySortKey>("stake");
   const [sortDirection, setSortDirection] = useState<1 | -1>(-1);
+  const [showSettings, setShowSettings] = useState(false);
+  const [showGlossary, setShowGlossary] = useState(false);
 
-  const { candidates, evaluated, scaleFactor, gameRiskLimits, filtered } = computeKellyCandidates(fixtures, marketFilter, settings);
+  // Ohne Profil ist die Automatik nicht moeglich - dann bleibt der Dialog manuell, statt eine
+  // Empfehlung vorzutaeuschen, hinter der keine Messung steht.
+  const automatic = auto && profile !== null;
+  const effectiveSettings = automatic ? recommendedSettings(settings) : settings;
+  const { candidates, evaluated, scaleFactor, gameRiskLimits, filtered } =
+    computeKellyCandidates(fixtures, marketFilter, effectiveSettings, automatic ? profile : null);
   const limitedGames = gameRiskLimits.filter((game) => game.scaleFactor < 1);
   const sorted = [...candidates].sort((left, right) => {
     const leftValue = sortValue(left, sortKey);
@@ -138,19 +244,41 @@ export function KellyDialog({ fixtures, marketFilter, marketLabel, settings, onS
   const arrow = (key: KellySortKey) => sortKey === key ? (sortDirection === 1 ? "↑" : "↓") : "↕";
 
   const totalStake = sorted.reduce((sum, candidate) => sum + candidate.stake, 0);
+  const expected = expectedValueOf(sorted);
   const set = <K extends keyof KellySettings>(key: K, value: KellySettings[K]) =>
     onSettingsChange({ ...settings, [key]: value });
 
   // Exportiert die Liste genau so, wie sie gerade gefiltert und sortiert angezeigt wird.
   const exportList = () => downloadJson(
     kellyExportFileName(marketFilter),
-    buildKellyExport({ candidates: sorted, evaluated, scaleFactor, gameRiskLimits }, { marketFilter, marketLabel, settings })
+    buildKellyExport({ candidates: sorted, evaluated, scaleFactor, gameRiskLimits },
+      { marketFilter, marketLabel, settings: effectiveSettings })
   );
+
+  const settingsSummary = automatic
+    ? `Budget ${formatEuro(settings.budget)} · ${fractionLabel(settings.kellyFraction)}`
+    : `Budget ${formatEuro(settings.budget)} · Quote ab ${formatOdd(settings.minOdds)}`
+      + ` · max. ${formatPercent(settings.maxStakePercent)} je Wette · ${formatPercent(settings.maxExposurePercent)} gesamt`;
+
+  const notices: string[] = [];
+  if (filtered.crossLeague > 0) notices.push(`${filtered.crossLeague} Cross-League-Partien aussortiert`);
+  if (filtered.overMaxEdge > 0) notices.push(`${filtered.overMaxEdge} Kandidaten über dem Edge-Deckel aussortiert`);
+  if (filtered.belowMinStake > 0) {
+    notices.push(`${filtered.belowMinStake} weitere Auswahlen mit Value passten nicht mehr in den Einsatzrahmen`
+      + ` – bei ${formatEuro(settings.minStake)} Mindesteinsatz sind daraus höchstens`
+      + ` ${Math.floor(settings.budget * settings.maxExposurePercent / Math.max(settings.minStake, 0.01))} Wetten finanzierbar`);
+  }
+  if (scaleFactor < 1) notices.push(`Gesamtrisiko-Limit erreicht – alle Einsätze auf ${(scaleFactor * 100).toFixed(0)} % skaliert`);
+  if (limitedGames.length > 0) {
+    notices.push(`Game-Risk-Limit ${formatPercent(settings.maxRiskPerGame)}`
+      + ` (${formatEuro(limitedGames[0]!.limit)} je Spiel) greift bei ${limitedGames.length}`
+      + ` Partie${limitedGames.length === 1 ? "" : "n"}`);
+  }
 
   return <div className="overlay-backdrop" onClick={onClose}>
     <div className="kelly-dialog" role="dialog" aria-label="Kelly-Kriterium" onClick={(event) => event.stopPropagation()}>
-      <div className="overlay-head">
-        <strong>Kelly-Kriterium · {marketLabel}</strong>
+      <div className="overlay-head kelly-head">
+        <strong>Kelly-Kriterium <span className="kelly-head-market">{marketLabel}</span></strong>
         <span className="overlay-head-actions">
           <button aria-label="Liste als JSON exportieren" title="Liste als JSON exportieren"
             disabled={sorted.length === 0} onClick={exportList}><DownloadSimple /></button>
@@ -158,121 +286,205 @@ export function KellyDialog({ fixtures, marketFilter, marketLabel, settings, onS
         </span>
       </div>
 
-      <div className="kelly-settings-grid">
-        <NumberField label="Budget (€)" value={settings.budget} min={0} step={5}
-          onCommit={(value) => set("budget", value)} />
-        <NumberField label="Mindestquote" value={settings.minOdds} min={1.01} step={0.05}
-          onCommit={(value) => set("minOdds", value)} />
-        <SettingField label="Kelly-Fraktion">
-          <select value={settings.kellyFraction} onChange={(event) => set("kellyFraction", Number(event.target.value))}>
-            <option value={1}>Full Kelly</option>
-            <option value={0.5}>1/2 Kelly</option>
-            <option value={0.25}>1/4 Kelly</option>
-            <option value={0.125}>1/8 Kelly</option>
-          </select>
-        </SettingField>
-        <NumberField label="Max. Einsatz/Wette (%)" value={settings.maxStakePercent} scale={100} min={0} max={100} step={0.5}
-          onCommit={(value) => set("maxStakePercent", value)} />
-        <NumberField label="Max. Gesamtrisiko (%)" value={settings.maxExposurePercent} scale={100} min={0} max={100} step={1}
-          onCommit={(value) => set("maxExposurePercent", value)} />
-        <NumberField label="Mindest-Edge (PP)" value={settings.minEdge} scale={100} min={0} step={0.5}
-          onCommit={(value) => set("minEdge", value)} />
-        <SettingField label="Edge-Deckel"
-          hint="Über 13.124 abgerechneten Marktzeilen wächst die Selbstüberschätzung monoton mit dem Edge: 7–10 PP → −7,9 PP Bias, über 25 PP → −51,9 PP. Ein sehr hoher Edge ist ein Fehlersignal, kein Value.">
-          <input type="checkbox" checked={settings.maxEdge !== null}
-            aria-label="Edge-Deckel aktiv"
-            onChange={(event) => set("maxEdge", event.target.checked ? 0.12 : null)} />
-        </SettingField>
-        <NumberField label="Max. Edge (PP)" value={settings.maxEdge ?? 0.12} scale={100} min={0} step={0.5}
-          disabled={settings.maxEdge === null}
-          onCommit={(value) => set("maxEdge", value)} />
-        <NumberField label="Mindest-Datenvertrauen (%)" value={settings.minConfidence} min={0} max={100} step={5}
-          hint="0 = aus. Das Band 70–85 % liegt in beiden Datenhälften bei rund −59 % ROI, 95 %+ ist das einzige nicht durchgehend negative Band."
-          onCommit={(value) => set("minConfidence", value)} />
-        <SettingField label="Cross-League ausschließen"
-          hint="Cross-League-Auswahlen liegen bei −25,9 % ROI gegen −3,7 % innerhalb einer Liga, in beiden Datenhälften negativ.">
-          <input type="checkbox" checked={settings.excludeCrossLeague}
-            onChange={(event) => set("excludeCrossLeague", event.target.checked)} />
-        </SettingField>
-        <SettingField label="Märkte"
-          hint="Abgewählte Märkte werden gar nicht erst Kandidat. 1X2 liegt bei −39,3 % ROI mit Ø-Quote 6,16 bei behaupteten 50,1 % Trefferchance.">
-          <span className="kelly-market-toggles">
-            {MARKET_TOGGLES.map(([key, label]) => <label key={key}>
-              <input type="checkbox" checked={!settings.disabledMarkets.includes(key)}
-                onChange={(event) => set("disabledMarkets", event.target.checked
-                  ? settings.disabledMarkets.filter((entry) => entry !== key)
-                  : [...settings.disabledMarkets, key])} />
-              {label}
-            </label>)}
-          </span>
-        </SettingField>
-        <SettingField label="Mehrere Märkte je Spiel">
-          <input type="checkbox" checked={settings.allowMultipleMarketsPerGame}
-            onChange={(event) => set("allowMultipleMarketsPerGame", event.target.checked)} />
-        </SettingField>
-        <SettingField label="Game-Risk-Limit">
-          <input type="checkbox" checked={settings.enableGameRiskLimit}
-            onChange={(event) => set("enableGameRiskLimit", event.target.checked)} />
-        </SettingField>
-        <NumberField label="Max. Risiko/Spiel (%)" value={settings.maxRiskPerGame} scale={100} min={0} max={100} step={0.5}
-          disabled={!settings.enableGameRiskLimit}
-          onCommit={(value) => set("maxRiskPerGame", value)} />
-      </div>
+      <div className="kelly-body">
+        <div className="kelly-mode">
+          <div className="kelly-mode-switch" role="group" aria-label="Auswahlmodus">
+            <button className={automatic ? "active" : ""} aria-pressed={automatic}
+              disabled={profile === null}
+              title={profile === null ? "Es sind noch keine Partien abgerechnet" : "Auswahl aus der eigenen Historie"}
+              onClick={() => onAutoChange(true)}>Automatik</button>
+            <button className={automatic ? "" : "active"} aria-pressed={!automatic}
+              onClick={() => onAutoChange(false)}>Manuell</button>
+          </div>
+          {auto && profile === null && <small className="kelly-mode-note">
+            Für die Automatik fehlen abgerechnete Partien – es gilt die manuelle Einstellung.
+          </small>}
+        </div>
 
-      <div className="kelly-table-scroll">
-        <table className="kelly-table">
-          <thead>
-            <tr>
-              <th><button onClick={() => sort("team")} aria-label={sortStateLabel("Partie", sortKey === "team", sortDirection)}>Partie {arrow("team")}</button></th>
-              <th><button onClick={() => sort("market")} aria-label={sortStateLabel("Markt", sortKey === "market", sortDirection)}>Markt {arrow("market")}</button></th>
-              <th><button onClick={() => sort("odds")} aria-label={sortStateLabel("Quote", sortKey === "odds", sortDirection)}>Quote {arrow("odds")}</button></th>
-              <th><button onClick={() => sort("probability")} aria-label={sortStateLabel("Modell", sortKey === "probability", sortDirection)}>Modell {arrow("probability")}</button></th>
-              <th><button onClick={() => sort("edge")} aria-label={sortStateLabel("Value", sortKey === "edge", sortDirection)}>Value {arrow("edge")}</button></th>
-              <th><button onClick={() => sort("kelly")}
-                aria-label={sortStateLabel("Einsatzanteil nach Caps", sortKey === "kelly", sortDirection)}
-                title="Fractional Kelly, begrenzt durch Max-Einsatz/Wette und ggf. Game-Risk- und Gesamtrisiko-Skalierung">
-                Kelly* {arrow("kelly")}
-              </button></th>
-              <th><button onClick={() => sort("stake")} aria-label={sortStateLabel("Einsatz", sortKey === "stake", sortDirection)}>Einsatz {arrow("stake")}</button></th>
-            </tr>
-          </thead>
-          <tbody>
-            {sorted.map((candidate) => <tr key={`${candidate.fixtureId}:${candidate.marketKey}`}>
-              <td><strong>{candidate.homeTeam} – {candidate.awayTeam}</strong><small>{candidate.country} · {candidate.league}</small></td>
-              <td><strong>{candidate.marketLabel}</strong><small>{candidate.selection}</small></td>
-              <td>{formatOdd(candidate.odds)}</td>
-              <td>{formatPercent(candidate.probability)}</td>
-              <td className="kelly-edge">{formatEdge(candidate.edge)}</td>
-              <td><strong>{formatPercent(candidate.stakePercent)}</strong><small>Full: {formatPercent(candidate.fullKelly)}</small></td>
-              <td><strong>{formatEuro(candidate.stake)}</strong>
-                {candidate.gameScaleFactor < 1 && <small>Spiel-Limit: {(candidate.gameScaleFactor * 100).toFixed(0)} %</small>}
-              </td>
-            </tr>)}
-            {sorted.length === 0 && <tr><td className="kelly-empty" colSpan={7}>Keine Value-Wetten im aktuellen Markt gefunden</td></tr>}
-          </tbody>
-        </table>
-      </div>
+        <div className="kelly-metrics">
+          <MetricCard label="Einsatz gesamt" value={formatEuro(totalStake)}
+            note={`von ${formatEuro(settings.budget)} Budget`} />
+          <MetricCard label="Wetten" value={String(sorted.length)}
+            note={`aus ${evaluated} geprüften Spielen`}
+            title="Geprüft wird, was die Ansicht gerade zeigt: Zeitraum, Ligaauswahl und der Cross-League-Schalter aus der Seitenleiste gelten auch hier." />
+          <MetricCard label="Erwarteter Ertrag" value={formatSignedEuro(expected)}
+            tone={expected >= 0 ? "good" : "bad"}
+            note={automatic ? "auf Basis der Korrektur" : "auf Basis der Modellwerte"} />
+        </div>
 
-      <div className="kelly-footer">
-        <p>{evaluated} Spiele im Markt „{marketLabel}" geprüft · {sorted.length} Kandidat{sorted.length === 1 ? "" : "en"} mit positivem Value</p>
-        {(filtered.crossLeague > 0 || filtered.overMaxEdge > 0) && <p>
-          Qualitätsfilter: {[
-            filtered.crossLeague > 0 ? `${filtered.crossLeague} Cross-League-Partien` : null,
-            filtered.overMaxEdge > 0 ? `${filtered.overMaxEdge} Kandidaten über dem Edge-Deckel` : null
-          ].filter((entry) => entry !== null).join(" · ")} aussortiert
-        </p>}
-        <p>Summe Einsätze: <strong>{formatEuro(totalStake)}</strong> von {formatEuro(settings.budget)} Budget
-          {scaleFactor < 1 && <> · Einsätze wegen Gesamtrisiko-Limit auf {(scaleFactor * 100).toFixed(0)} % skaliert</>}
-        </p>
-        {limitedGames.length > 0 && <p>
-          Game-Risk-Limit {formatPercent(settings.maxRiskPerGame)} = {formatEuro(limitedGames[0]!.limit)} je Spiel ·{" "}
-          {limitedGames.length} Partie{limitedGames.length === 1 ? "" : "n"} begrenzt ·{" "}
-          Risiko dieser Partien {formatEuro(limitedGames.reduce((sum, game) => sum + game.stakeBefore, 0))} →{" "}
-          <strong>{formatEuro(limitedGames.reduce((sum, game) => sum + game.stakeAfter, 0))}</strong>
-        </p>}
-        <p className="kelly-hint">Kelly setzt kalibrierte Wahrscheinlichkeiten voraus – die Modellwerte sind Schätzungen, keine Garantien. Fractional Kelly reduziert das Risiko bei Fehleinschätzungen.</p>
-        <p className="kelly-hint">* „Kelly" zeigt den finalen Einsatzanteil nach Fraktion, Pro-Wette-, Spiel- und Gesamtrisiko-Cap; „Full" darunter ist der ungedeckelte volle Kelly-Wert.</p>
-        <p className="kelly-hint">Das Game-Risk-Limit deckelt das Risiko aller Märkte einer Partie gemeinsam, weil sie korreliert sind. Es skaliert die Einsätze einer Partie proportional herunter und verändert die Kelly-Berechnung nicht.</p>
+        {notices.length > 0 && <ul className="kelly-notices">
+          {notices.map((notice) => <li key={notice}>{notice}</li>)}
+        </ul>}
+
+        {automatic && profile !== null && <AutoSummary profile={profile} candidates={sorted} />}
+
+        <section className="kelly-panel">
+          <button className="kelly-panel-head" aria-expanded={showSettings}
+            onClick={() => setShowSettings((value) => !value)}>
+            {showSettings ? <CaretDown size={11} weight="bold" /> : <CaretRight size={11} weight="bold" />}
+            <strong>Einstellungen</strong>
+            <span className="kelly-panel-summary">{settingsSummary}</span>
+          </button>
+
+          {showSettings && (automatic
+            ? <div className="kelly-settings-grid">
+                <NumberField label="Budget (€)" value={settings.budget} min={0} step={5}
+                  onCommit={(value) => set("budget", value)} />
+                <SettingField label="Kelly-Fraktion"
+                  hint="Der Anteil des rechnerisch vollen Einsatzes. Ein Viertel ist die Vorgabe, weil auch die korrigierte Wahrscheinlichkeit eine Schätzung bleibt.">
+                  <select value={settings.kellyFraction} onChange={(event) => set("kellyFraction", Number(event.target.value))}>
+                    <option value={1}>Full Kelly</option>
+                    <option value={0.5}>1/2 Kelly</option>
+                    <option value={0.25}>1/4 Kelly</option>
+                    <option value={0.125}>1/8 Kelly</option>
+                  </select>
+                </SettingField>
+                <NumberField label="Mindesteinsatz (€)" value={settings.minStake} min={0} step={0.5}
+                  hint="Der kleinste Betrag, den ein Wettanbieter annimmt. Er bestimmt zugleich, wie viele Wetten überhaupt in den Einsatzrahmen passen."
+                  onCommit={(value) => set("minStake", value)} />
+                <NumberField label="Höchstens … Wetten" value={settings.maxBets ?? 0} min={0} step={1}
+                  hint="0 = keine eigene Grenze; dann zählt nur, wie viele Wetten zum Mindesteinsatz in den Einsatzrahmen passen."
+                  onCommit={(value) => set("maxBets", value <= 0 ? null : Math.round(value))} />
+              </div>
+            : <div className="kelly-settings-grid">
+                <NumberField label="Budget (€)" value={settings.budget} min={0} step={5}
+                  onCommit={(value) => set("budget", value)} />
+                <NumberField label="Mindestquote" value={settings.minOdds} min={1.01} step={0.05}
+                  onCommit={(value) => set("minOdds", value)} />
+                <SettingField label="Kelly-Fraktion">
+                  <select value={settings.kellyFraction} onChange={(event) => set("kellyFraction", Number(event.target.value))}>
+                    <option value={1}>Full Kelly</option>
+                    <option value={0.5}>1/2 Kelly</option>
+                    <option value={0.25}>1/4 Kelly</option>
+                    <option value={0.125}>1/8 Kelly</option>
+                  </select>
+                </SettingField>
+                <NumberField label="Max. Einsatz/Wette (%)" value={settings.maxStakePercent} scale={100} min={0} max={100} step={0.5}
+                  onCommit={(value) => set("maxStakePercent", value)} />
+                <NumberField label="Max. Gesamtrisiko (%)" value={settings.maxExposurePercent} scale={100} min={0} max={100} step={1}
+                  onCommit={(value) => set("maxExposurePercent", value)} />
+                <NumberField label="Mindest-Edge (PP)" value={settings.minEdge} scale={100} min={0} step={0.5}
+                  onCommit={(value) => set("minEdge", value)} />
+                <SettingField label="Edge-Deckel"
+                  hint="Über 13.124 abgerechneten Marktzeilen wächst die Selbstüberschätzung monoton mit dem Edge: 7–10 PP → −7,9 PP Bias, über 25 PP → −51,9 PP. Ein sehr hoher Edge ist ein Fehlersignal, kein Value.">
+                  <input type="checkbox" checked={settings.maxEdge !== null}
+                    aria-label="Edge-Deckel aktiv"
+                    onChange={(event) => set("maxEdge", event.target.checked ? 0.12 : null)} />
+                </SettingField>
+                <NumberField label="Max. Edge (PP)" value={settings.maxEdge ?? 0.12} scale={100} min={0} step={0.5}
+                  disabled={settings.maxEdge === null}
+                  onCommit={(value) => set("maxEdge", value)} />
+                <NumberField label="Mindest-Datenvertrauen (%)" value={settings.minConfidence} min={0} max={100} step={5}
+                  hint="0 = aus. Das Band 70–85 % liegt in beiden Datenhälften bei rund −59 % ROI, 95 %+ ist das einzige nicht durchgehend negative Band."
+                  onCommit={(value) => set("minConfidence", value)} />
+                <SettingField label="Cross-League ausschließen"
+                  hint="Cross-League-Auswahlen liegen bei −25,9 % ROI gegen −3,7 % innerhalb einer Liga, in beiden Datenhälften negativ.">
+                  <input type="checkbox" checked={settings.excludeCrossLeague}
+                    onChange={(event) => set("excludeCrossLeague", event.target.checked)} />
+                </SettingField>
+                <SettingField label="Märkte"
+                  hint="Abgewählte Märkte werden gar nicht erst Kandidat. 1X2 liegt bei −39,3 % ROI mit Ø-Quote 6,16 bei behaupteten 50,1 % Trefferchance.">
+                  <span className="kelly-market-toggles">
+                    {MARKET_TOGGLES.map(([key, label]) => <label key={key}>
+                      <input type="checkbox" checked={!settings.disabledMarkets.includes(key)}
+                        onChange={(event) => set("disabledMarkets", event.target.checked
+                          ? settings.disabledMarkets.filter((entry) => entry !== key)
+                          : [...settings.disabledMarkets, key])} />
+                      {label}
+                    </label>)}
+                  </span>
+                </SettingField>
+                <SettingField label="Mehrere Märkte je Spiel">
+                  <input type="checkbox" checked={settings.allowMultipleMarketsPerGame}
+                    onChange={(event) => set("allowMultipleMarketsPerGame", event.target.checked)} />
+                </SettingField>
+                <SettingField label="Game-Risk-Limit">
+                  <input type="checkbox" checked={settings.enableGameRiskLimit}
+                    onChange={(event) => set("enableGameRiskLimit", event.target.checked)} />
+                </SettingField>
+                <NumberField label="Max. Risiko/Spiel (%)" value={settings.maxRiskPerGame} scale={100} min={0} max={100} step={0.5}
+                  disabled={!settings.enableGameRiskLimit}
+                  onCommit={(value) => set("maxRiskPerGame", value)} />
+                <NumberField label="Mindesteinsatz (€)" value={settings.minStake} min={0} step={0.5}
+                  hint="0 schaltet die Prüfung ab und verteilt den Einsatzrahmen wie früher auf alle Kandidaten – auch wenn dabei Beträge herauskommen, die kein Anbieter annimmt."
+                  onCommit={(value) => set("minStake", value)} />
+                <NumberField label="Höchstens … Wetten" value={settings.maxBets ?? 0} min={0} step={1}
+                  hint="0 = keine eigene Grenze."
+                  onCommit={(value) => set("maxBets", value <= 0 ? null : Math.round(value))} />
+              </div>)}
+        </section>
+
+        <div className="kelly-table-wrap">
+          <table className="kelly-table">
+            <thead>
+              <tr>
+                <th><button onClick={() => sort("team")} aria-label={sortStateLabel("Partie", sortKey === "team", sortDirection)}>Partie {arrow("team")}</button></th>
+                <th><button onClick={() => sort("market")} aria-label={sortStateLabel("Markt", sortKey === "market", sortDirection)}>Markt {arrow("market")}</button></th>
+                <th><button onClick={() => sort("odds")} aria-label={sortStateLabel("Quote", sortKey === "odds", sortDirection)}>Quote {arrow("odds")}</button></th>
+                <th><button onClick={() => sort("probability")} aria-label={sortStateLabel("Modell", sortKey === "probability", sortDirection)}>Modell {arrow("probability")}</button></th>
+                {automatic && <th><button onClick={() => sort("calibrated")}
+                  aria-label={sortStateLabel("Korrigierte Wahrscheinlichkeit", sortKey === "calibrated", sortDirection)}
+                  title="Die Modellwahrscheinlichkeit abzüglich der gemessenen Selbstüberschätzung dieses Marktes. Mit diesem Wert rechnet der Einsatz.">
+                  Korrigiert {arrow("calibrated")}
+                </button></th>}
+                <th><button onClick={() => sort("edge")} aria-label={sortStateLabel("Value", sortKey === "edge", sortDirection)}>Value {arrow("edge")}</button></th>
+                <th><button onClick={() => sort("kelly")}
+                  aria-label={sortStateLabel("Einsatzanteil nach Caps", sortKey === "kelly", sortDirection)}
+                  title="Fractional Kelly, begrenzt durch Max-Einsatz/Wette und ggf. Game-Risk- und Gesamtrisiko-Skalierung">
+                  Kelly {arrow("kelly")}
+                </button></th>
+                <th><button onClick={() => sort("stake")} aria-label={sortStateLabel("Einsatz", sortKey === "stake", sortDirection)}>Einsatz {arrow("stake")}</button></th>
+              </tr>
+            </thead>
+            <tbody>
+              {sorted.map((candidate) => <tr key={`${candidate.fixtureId}:${candidate.marketKey}`}>
+                <td><strong>{candidate.homeTeam} – {candidate.awayTeam}</strong><small>{candidate.country} · {candidate.league}</small></td>
+                <td><strong>{candidate.marketLabel}</strong><small>{candidate.selection}</small></td>
+                <td>{formatOdd(candidate.odds)}</td>
+                <td>{formatPercent(candidate.probability)}</td>
+                {automatic && <td className="kelly-calibrated">
+                  <strong>{candidate.calibratedProbability === null ? "–" : formatPercent(candidate.calibratedProbability)}</strong>
+                  {candidate.calibrationBias !== null && <small>{formatPoints(candidate.calibrationBias)}</small>}
+                </td>}
+                <td className="kelly-edge">
+                  {automatic && candidate.calibratedEdge !== null
+                    ? <><strong>{formatEdge(candidate.calibratedEdge)}</strong><small>roh {formatEdge(candidate.edge)}</small></>
+                    : <strong>{formatEdge(candidate.edge)}</strong>}
+                </td>
+                <td><strong>{formatPercent(candidate.stakePercent)}</strong><small>Full: {formatPercent(candidate.fullKelly)}</small></td>
+                <td className="kelly-stake"><strong>{formatEuro(candidate.stake)}</strong>
+                  {candidate.gameScaleFactor < 1 && <small>Spiel-Limit: {(candidate.gameScaleFactor * 100).toFixed(0)} %</small>}
+                </td>
+              </tr>)}
+              {sorted.length === 0 && <tr><td className="kelly-empty" colSpan={automatic ? 8 : 7}>Keine Value-Wetten im aktuellen Markt gefunden.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+
+        <Disclosure open={showGlossary} onToggle={() => setShowGlossary((value) => !value)}
+          label="Was bedeuten diese Zahlen?" openLabel="Weniger anzeigen" />
+        {showGlossary && <dl className="kelly-glossary">
+          <div>
+            <dt>Kelly</dt>
+            <dd>finaler Einsatzanteil nach Fraktion sowie Pro-Wette-, Spiel- und Gesamtrisiko-Deckel;
+              „Full" darunter ist der ungedeckelte Wert</dd>
+          </div>
+          <div>
+            <dt>Korrigiert</dt>
+            <dd>Modellwahrscheinlichkeit abzüglich des historischen Bias dieses Marktes; gerechnet
+              wird mit diesem Wert</dd>
+          </div>
+          <div>
+            <dt>Game-Risk-Limit</dt>
+            <dd>deckelt korrelierte Märkte einer Partie gemeinsam, skaliert Einsätze proportional,
+              verändert die Kelly-Berechnung nicht</dd>
+          </div>
+          <div>
+            <dt>Grenzen</dt>
+            <dd>Kelly setzt kalibrierte Wahrscheinlichkeiten voraus; Modellwerte sind Schätzungen,
+              Fractional Kelly senkt das Risiko bei Fehleinschätzungen</dd>
+          </div>
+        </dl>}
       </div>
     </div>
   </div>;
