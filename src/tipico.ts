@@ -81,6 +81,15 @@ function localDate(timestampMs: number, timezone: string): string {
   return `${value("year")}-${value("month")}-${value("day")}`;
 }
 
+/**
+ * Wie Tipico die beiden Seiten eines Marktes benennt. Gesucht wird sowohl in `caption` als
+ * auch in `choiceParam`, deshalb genuegt je Seite eine kurze Liste.
+ */
+const YES = ["j", "ja", "yes"];
+const NO = ["n", "nein", "no"];
+const OVER = ["+", "over"];
+const UNDER = ["-", "under"];
+
 function quotedResult(market: TipicoMarket | undefined, values: string[]): number | undefined {
   const normalized = new Set(values.map((value) => value.toLocaleLowerCase()));
   const result = market?.results?.find((item) =>
@@ -98,25 +107,34 @@ function oddsForEvent(
   const standard = markets.standard?.[0];
   const btts = markets["score-both"]?.[0];
   const totals = markets["points-more-less-than"] ?? [];
-  const over15 = totals.find((market) => market.fixedParamText === "1.5");
-  const over25 = totals.find((market) => market.fixedParamText === "2.5");
+  // Tipico stellt je Partie nur eine einzige Ganzspiel-Torlinie ein. Deshalb werden alle drei
+  // gesucht und nicht nur eine: 553 Partien tragen die 2,5er, 192 die 3,5er, 42 die 1,5er.
+  const fullTimeLine = (value: string) => totals.find((market) => market.fixedParamText === value);
+  const fullTime15 = fullTimeLine("1.5");
+  const fullTime25 = fullTimeLine("2.5");
+  const fullTime35 = fullTimeLine("3.5");
   const firstHalfTotals = (markets["section-points-more-less"] ?? [])
     .filter((market) => market.section === 1);
   const firstHalf05 = firstHalfTotals.find((market) => market.fixedParamText === "0.5");
   const firstHalf15 = firstHalfTotals.find((market) => market.fixedParamText === "1.5");
-  const firstHalfOver05 = quotedResult(firstHalf05, ["+", "over"]);
-  const firstHalfUnder05 = quotedResult(firstHalf05, ["-", "under"]);
-  const firstHalfOver15 = quotedResult(firstHalf15, ["+", "over"]);
-  const firstHalfUnder15 = quotedResult(firstHalf15, ["-", "under"]);
+  const firstHalfOver05 = quotedResult(firstHalf05, OVER);
+  const firstHalfUnder05 = quotedResult(firstHalf05, UNDER);
+  const firstHalfOver15 = quotedResult(firstHalf15, OVER);
+  const firstHalfUnder15 = quotedResult(firstHalf15, UNDER);
   return {
     homeTeam: event.team1,
     awayTeam: event.team2,
     home: quotedResult(standard, ["1"]),
     draw: quotedResult(standard, ["x"]),
     away: quotedResult(standard, ["2"]),
-    bttsYes: quotedResult(btts, ["j", "ja", "yes"]),
-    over15: quotedResult(over15, ["+", "over"]),
-    over25: quotedResult(over25, ["+", "over"]),
+    bttsYes: quotedResult(btts, YES),
+    bttsNo: quotedResult(btts, NO),
+    over15: quotedResult(fullTime15, OVER),
+    under15: quotedResult(fullTime15, UNDER),
+    over25: quotedResult(fullTime25, OVER),
+    under25: quotedResult(fullTime25, UNDER),
+    over35: quotedResult(fullTime35, OVER),
+    under35: quotedResult(fullTime35, UNDER),
     ...(firstHalfOver05 === undefined ? {} : { firstHalfOver05 }),
     ...(firstHalfUnder05 === undefined ? {} : { firstHalfUnder05 }),
     ...(firstHalfOver15 === undefined ? {} : { firstHalfOver15 }),

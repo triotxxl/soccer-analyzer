@@ -17,7 +17,14 @@ export interface DashboardInput {
 }
 
 export type RecommendationLevel = "none" | "recommended" | "strong";
-export type DashboardMarketKey = "1x2" | "draw" | "btts" | "over15" | "over25" | "firstHalfOver05" | "firstHalfOver15";
+export type DashboardMarketKey =
+  | "1x2" | "draw"
+  | "btts" | "bttsNo"
+  | "over15" | "under15"
+  | "over25" | "under25"
+  | "over35" | "under35"
+  | "firstHalfOver05" | "firstHalfUnder05"
+  | "firstHalfOver15" | "firstHalfUnder15";
 export type FormResult = "win" | "draw" | "loss";
 
 export interface DashboardMarket {
@@ -115,14 +122,30 @@ export interface DashboardDocument {
   leagues: LeagueStats[];
 }
 
+/**
+ * Schwellen der Empfehlungsampel. Sie steuern allein die Einfaerbung im Dashboard - Kelly
+ * rechnet mit Wahrscheinlichkeit und Quote und sieht sie nie.
+ *
+ * Die Werte der Gegenmaerkte sind nicht aus dem Basismarkt gespiegelt, sondern an der
+ * Haeufigkeit des Ereignisses ausgerichtet: Unter 1,5 tritt in etwa jeder vierten Partie ein,
+ * eine uebernommene Schwelle von 0,75 waere dort nie erreichbar und der Markt bliebe dauerhaft
+ * ohne Empfehlung.
+ */
 const thresholds: Record<DashboardMarketKey, { recommended: number; strong: number }> = {
   "1x2": { recommended: 0.60, strong: 0.70 },
   draw: { recommended: 0.28, strong: 0.34 },
   btts: { recommended: 0.62, strong: 0.70 },
+  bttsNo: { recommended: 0.55, strong: 0.65 },
   over15: { recommended: 0.75, strong: 0.85 },
+  under15: { recommended: 0.35, strong: 0.45 },
   over25: { recommended: 0.60, strong: 0.70 },
+  under25: { recommended: 0.55, strong: 0.65 },
+  over35: { recommended: 0.35, strong: 0.45 },
+  under35: { recommended: 0.65, strong: 0.75 },
   firstHalfOver05: { recommended: 0.70, strong: 0.80 },
-  firstHalfOver15: { recommended: 0.35, strong: 0.45 }
+  firstHalfUnder05: { recommended: 0.40, strong: 0.50 },
+  firstHalfOver15: { recommended: 0.35, strong: 0.45 },
+  firstHalfUnder15: { recommended: 0.60, strong: 0.70 }
 };
 
 function recommendation(
@@ -280,9 +303,17 @@ export function buildDashboardDocument(input: DashboardInput): DashboardDocument
         crossLeague,
         details: [draw ? `Remis-Profil: ${draw.rating} · ${draw.score} Punkte` : "Kein separates Remis-Profil verfügbar", ...(h2hNotice ? [h2hNotice] : []), ...sharedDetails]
       }),
+      // Jeder Gegenmarkt steht direkt hinter seinem Basismarkt, damit die beiden Seiten in der
+      // App beieinanderliegen. Die Unter-Wahrscheinlichkeiten kommen unveraendert aus dem
+      // Modell - dort sind sie ohnehin die primaer gerechnete Groesse.
       createMarket({
         key: "btts", label: "BTTS", selection: "Beide Teams treffen: Ja", pick: null, selectionTone: "neutral",
         probability: row.outcomeProbabilities.btts, odds: tipico?.bttsYes ?? null, confidence: row.dataConfidence,
+        score: null, crossLeague, details: [`Datenvertrauen: ${row.dataConfidence} %`, ...sharedDetails]
+      }),
+      createMarket({
+        key: "bttsNo", label: "BTTS Nein", selection: "Beide Teams treffen: Nein", pick: null, selectionTone: "neutral",
+        probability: 1 - row.outcomeProbabilities.btts, odds: tipico?.bttsNo ?? null, confidence: row.dataConfidence,
         score: null, crossLeague, details: [`Datenvertrauen: ${row.dataConfidence} %`, ...sharedDetails]
       }),
       createMarket({
@@ -291,8 +322,28 @@ export function buildDashboardDocument(input: DashboardInput): DashboardDocument
         score: null, crossLeague, details: [`Erwartete Tore gesamt: ${row.expectedTotalGoals.toFixed(2)}`, ...sharedDetails]
       }),
       createMarket({
+        key: "under15", label: "Unter 1,5", selection: "Höchstens 1 Tor", pick: null, selectionTone: "neutral",
+        probability: row.probabilities.under15, odds: tipico?.under15 ?? null, confidence: row.dataConfidence,
+        score: null, crossLeague, details: [`Erwartete Tore gesamt: ${row.expectedTotalGoals.toFixed(2)}`, ...sharedDetails]
+      }),
+      createMarket({
         key: "over25", label: "Über 2,5", selection: "Mindestens 3 Tore", pick: null, selectionTone: "neutral",
         probability: row.probabilities.over25, odds: tipico?.over25 ?? null, confidence: row.dataConfidence,
+        score: null, crossLeague, details: [`Erwartete Tore gesamt: ${row.expectedTotalGoals.toFixed(2)}`, ...sharedDetails]
+      }),
+      createMarket({
+        key: "under25", label: "Unter 2,5", selection: "Höchstens 2 Tore", pick: null, selectionTone: "neutral",
+        probability: row.probabilities.under25, odds: tipico?.under25 ?? null, confidence: row.dataConfidence,
+        score: null, crossLeague, details: [`Erwartete Tore gesamt: ${row.expectedTotalGoals.toFixed(2)}`, ...sharedDetails]
+      }),
+      createMarket({
+        key: "over35", label: "Über 3,5", selection: "Mindestens 4 Tore", pick: null, selectionTone: "neutral",
+        probability: row.probabilities.over35, odds: tipico?.over35 ?? null, confidence: row.dataConfidence,
+        score: null, crossLeague, details: [`Erwartete Tore gesamt: ${row.expectedTotalGoals.toFixed(2)}`, ...sharedDetails]
+      }),
+      createMarket({
+        key: "under35", label: "Unter 3,5", selection: "Höchstens 3 Tore", pick: null, selectionTone: "neutral",
+        probability: row.probabilities.under35, odds: tipico?.under35 ?? null, confidence: row.dataConfidence,
         score: null, crossLeague, details: [`Erwartete Tore gesamt: ${row.expectedTotalGoals.toFixed(2)}`, ...sharedDetails]
       }),
       createMarket({
@@ -301,8 +352,18 @@ export function buildDashboardDocument(input: DashboardInput): DashboardDocument
         score: null, crossLeague, details: [`Erwartete Tore 1. Halbzeit: ${row.firstHalf.expectedTotalGoals.toFixed(2)}`, ...firstHalfDetails]
       }),
       createMarket({
+        key: "firstHalfUnder05", label: "1. HZ U0,5", selection: "1. Halbzeit: kein Tor", pick: null, selectionTone: "neutral",
+        probability: row.firstHalf.probabilities.under05, odds: tipico?.firstHalfUnder05 ?? null, confidence: row.firstHalf.dataConfidence,
+        score: null, crossLeague, details: [`Erwartete Tore 1. Halbzeit: ${row.firstHalf.expectedTotalGoals.toFixed(2)}`, ...firstHalfDetails]
+      }),
+      createMarket({
         key: "firstHalfOver15", label: "1. HZ Ü1,5", selection: "1. Halbzeit: mindestens 2 Tore", pick: null, selectionTone: "neutral",
         probability: row.firstHalf.probabilities.over15, odds: tipico?.firstHalfOver15 ?? null, confidence: row.firstHalf.dataConfidence,
+        score: null, crossLeague, details: [`Erwartete Tore 1. Halbzeit: ${row.firstHalf.expectedTotalGoals.toFixed(2)}`, ...firstHalfDetails]
+      }),
+      createMarket({
+        key: "firstHalfUnder15", label: "1. HZ U1,5", selection: "1. Halbzeit: höchstens 1 Tor", pick: null, selectionTone: "neutral",
+        probability: row.firstHalf.probabilities.under15, odds: tipico?.firstHalfUnder15 ?? null, confidence: row.firstHalf.dataConfidence,
         score: null, crossLeague, details: [`Erwartete Tore 1. Halbzeit: ${row.firstHalf.expectedTotalGoals.toFixed(2)}`, ...firstHalfDetails]
       })
     ];

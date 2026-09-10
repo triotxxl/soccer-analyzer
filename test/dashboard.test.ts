@@ -88,13 +88,53 @@ test("Dashboard-Dokument führt alle Analysen über fixtureId zusammen", () => {
   assert.equal(fixture.scores.draw, 65);
   assert.match(fixture.h2hNotice ?? "", /3 direkte Duelle/);
   assert.deepEqual(new Set(fixture.warnings), new Set(["Torlinien-Warnung", "Draw-Warnung", "Favoriten-Warnung"]));
-  assert.deepEqual(fixture.markets.map((market) => market.key), ["1x2", "draw", "btts", "over15", "over25", "firstHalfOver05", "firstHalfOver15"]);
+  // Jeder Gegenmarkt steht direkt hinter seinem Basismarkt.
+  assert.deepEqual(fixture.markets.map((market) => market.key), [
+    "1x2", "draw",
+    "btts", "bttsNo",
+    "over15", "under15",
+    "over25", "under25",
+    "over35", "under35",
+    "firstHalfOver05", "firstHalfUnder05",
+    "firstHalfOver15", "firstHalfUnder15"
+  ]);
   assert.deepEqual(fixture.expectedFirstHalfGoals, { home: 0.7, away: 0.45, total: 1.15 });
-  assert.equal(fixture.markets[5]?.odds, 1.35);
-  assert.equal(fixture.markets[5]?.recommendation.level, "recommended");
-  assert.equal(fixture.markets[0]?.pick, "1");
-  assert.equal(fixture.markets[0]?.odds, 1.75);
-  assert.equal(fixture.markets[0]?.recommendation.level, "strong");
+  // Über den Schlüssel gesucht, nicht über die Position: Sonst bricht jeder neue Markt in der
+  // Mitte diese Prüfung, ohne dass fachlich etwas kaputt wäre.
+  const market = (key: string) => fixture.markets.find((entry) => entry.key === key);
+  assert.equal(market("firstHalfOver05")?.odds, 1.35);
+  assert.equal(market("firstHalfOver05")?.recommendation.level, "recommended");
+  assert.equal(market("1x2")?.pick, "1");
+  assert.equal(market("1x2")?.odds, 1.75);
+  assert.equal(market("1x2")?.recommendation.level, "strong");
+});
+
+test("Gegenmärkte tragen die Gegenwahrscheinlichkeit und die Gegenquote", () => {
+  const input = dashboardInput();
+  input.tipicoOdds[0]!.bttsNo = 2.05;
+  input.tipicoOdds[0]!.under25 = 1.95;
+  input.tipicoOdds[0]!.over35 = 3.4;
+  input.tipicoOdds[0]!.under35 = 1.3;
+  const markets = buildDashboardDocument(input).fixtures[0]!.markets;
+  const market = (key: string) => markets.find((entry) => entry.key === key)!;
+
+  // BTTS Nein ist die Gegenwahrscheinlichkeit zu BTTS Ja (0,7).
+  assert.equal(market("btts").probability, 0.7);
+  assert.ok(Math.abs(market("bttsNo").probability - 0.3) < 1e-9);
+  assert.equal(market("bttsNo").odds, 2.05);
+
+  // Die Unter-Werte kommen unverändert aus dem Modell.
+  assert.equal(market("under25").probability, 0.29);
+  assert.equal(market("under25").odds, 1.95);
+  assert.equal(market("under15").probability, 0.14);
+  assert.equal(market("over35").probability, 0.4);
+  assert.equal(market("under35").probability, 0.6);
+  assert.equal(market("under35").odds, 1.3);
+  assert.equal(market("firstHalfUnder05").probability, 0.22);
+  assert.equal(market("firstHalfUnder15").probability, 0.58);
+
+  // Ohne Gegenquote bleibt der Markt bewertbar, nur ohne Quote.
+  assert.equal(market("under15").odds, null);
 });
 
 test("Tipico-Quote ändert weder sportliche Auswahl noch Empfehlungsstufe", () => {

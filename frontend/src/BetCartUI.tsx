@@ -5,7 +5,7 @@ import {
   canGenerate, cartEntryId, generateCombos, requestedTotal, sizeRange,
   type CartEntry, type Combo, type ComboSizeConfig
 } from "./betCart";
-import type { DashboardFixture, DashboardMarket } from "./types";
+import type { DashboardFixture, DashboardMarket, DashboardMarketKey } from "./types";
 
 /** Zwischen Nabe und Ring liegt eine Lücke ohne Zeiger-Ziel; erst nach dieser Verzögerung
  *  schließt das Menü, damit der Weg dorthin es nicht abreißen lässt. */
@@ -20,14 +20,33 @@ interface RadialLayout {
   item: number;
 }
 
-/** Der volle Marktname sprengt einen Kreis von 54 Pixeln. */
+/**
+ * Der volle Marktname sprengt einen Kreis von 54 Pixeln.
+ *
+ * Als Record notiert und nicht als If-Kette: So erzwingt der Compiler bei jedem neuen Markt
+ * eine eigene Beschriftung. Zuvor endete die Kette mit einem Rueckfall auf "HZ 1,5", der jeden
+ * unbekannten Schluessel stillschweigend falsch beschriftet haette.
+ */
+const RADIAL_LABELS: Record<DashboardMarketKey, string> = {
+  "1x2": "Heim",
+  draw: "Remis",
+  btts: "BTTS",
+  bttsNo: "BTTS ✗",
+  over15: "Ü 1,5",
+  under15: "U 1,5",
+  over25: "Ü 2,5",
+  under25: "U 2,5",
+  over35: "Ü 3,5",
+  under35: "U 3,5",
+  firstHalfOver05: "HZ Ü0,5",
+  firstHalfUnder05: "HZ U0,5",
+  firstHalfOver15: "HZ Ü1,5",
+  firstHalfUnder15: "HZ U1,5"
+};
+
 function radialLabel(market: DashboardMarket): string {
   if (market.key === "1x2") return market.pick === "2" ? "Gast" : "Heim";
-  if (market.key === "draw") return "Remis";
-  if (market.key === "btts") return "BTTS";
-  if (market.key === "over15") return "Ü 1,5";
-  if (market.key === "over25") return "Ü 2,5";
-  return market.key === "firstHalfOver05" ? "HZ 0,5" : "HZ 1,5";
+  return RADIAL_LABELS[market.key];
 }
 
 /** Die Märkte liegen als geschlossener Ring um die Nabe, beginnend oben im Uhrzeigersinn. */

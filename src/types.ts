@@ -24,8 +24,15 @@ export interface TipicoOdds {
   draw?: number;
   away?: number;
   bttsYes?: number;
+  bttsNo?: number;
   over15?: number;
+  under15?: number;
   over25?: number;
+  under25?: number;
+  // Tipico bietet je Partie nur eine einzige Ganzspiel-Torlinie an. Bei 192 von 846 Partien
+  // ist das die 3,5er - ohne sie bliebe diese Partie ganz ohne Ganzspiel-Torquote.
+  over35?: number;
+  under35?: number;
   firstHalfOver05?: number;
   firstHalfUnder05?: number;
   firstHalfOver15?: number;
