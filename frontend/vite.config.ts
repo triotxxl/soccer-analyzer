@@ -4,6 +4,8 @@ import { fileURLToPath } from "node:url";
 import react from "@vitejs/plugin-react";
 import type { Plugin } from "vite";
 import { defineConfig } from "vitest/config";
+import { InsightsError, insightsService } from "../src/insights-service.ts";
+import { MarketProfileError, marketProfileService } from "../src/market-profile-service.ts";
 import { LiveError, liveService } from "../src/live-service.ts";
 
 const frontendDirectory = path.dirname(fileURLToPath(import.meta.url));
@@ -101,9 +103,76 @@ function liveEndpoint(): Plugin {
   };
 }
 
+/**
+ * Die Detailkennzahlen einer Partie werden erst geladen, wenn die App sie aufklappt.
+ * Ohne aufgeklappte Partie entsteht kein einziger Aufruf.
+ */
+function insightsEndpoint(): Plugin {
+  const handler = async (request: { url?: string }, response: ServerResponse) => {
+    const raw = new URLSearchParams(request.url?.split("?")[1] ?? "").get("fixture");
+    const fixtureId = Number(raw);
+    if (!Number.isInteger(fixtureId) || fixtureId <= 0) {
+      sendJson(response, 400, { error: "fixture_unknown", message: "Es fehlt eine gültige Fixture-ID." });
+      return;
+    }
+    try {
+      sendJson(response, 200, await insightsService().get(fixtureId));
+    } catch (error) {
+      if (error instanceof InsightsError) {
+        sendJson(response, error.status, { error: error.code, message: error.message });
+        return;
+      }
+      sendJson(response, 500, {
+        error: "insights_unavailable",
+        message: error instanceof Error ? error.message : "Die Detailkennzahlen sind nicht verfügbar."
+      });
+    }
+  };
+  return {
+    name: "fixture-insights-endpoint",
+    configureServer(server) {
+      server.middlewares.use("/api/fixture/insights", handler);
+    },
+    configurePreviewServer(server) {
+      server.middlewares.use("/api/fixture/insights", handler);
+    }
+  };
+}
+
+/**
+ * Das Marktprofil kommt aus den lokalen Snapshots und der Datenbank - kein API-Aufruf, aber
+ * das Einlesen von rund fuenfzig Dateien. Der Dienst haelt das Ergebnis deshalb, bis sich
+ * Datenbank oder Snapshot-Ordner aendern.
+ */
+function marketProfileEndpoint(): Plugin {
+  const handler = async (_request: unknown, response: ServerResponse) => {
+    try {
+      sendJson(response, 200, marketProfileService().get());
+    } catch (error) {
+      if (error instanceof MarketProfileError) {
+        sendJson(response, error.status, { error: error.code, message: error.message });
+        return;
+      }
+      sendJson(response, 500, {
+        error: "market_profile_unavailable",
+        message: error instanceof Error ? error.message : "Das Marktprofil ist nicht verfuegbar."
+      });
+    }
+  };
+  return {
+    name: "market-profile-endpoint",
+    configureServer(server) {
+      server.middlewares.use("/api/market-profile", handler);
+    },
+    configurePreviewServer(server) {
+      server.middlewares.use("/api/market-profile", handler);
+    }
+  };
+}
+
 export default defineConfig({
   root: frontendDirectory,
-  plugins: [react(), dashboardEndpoint(), liveEndpoint()],
+  plugins: [react(), dashboardEndpoint(), liveEndpoint(), insightsEndpoint(), marketProfileEndpoint()],
   build: {
     outDir: path.resolve(frontendDirectory, "../dist/frontend"),
     emptyOutDir: true
