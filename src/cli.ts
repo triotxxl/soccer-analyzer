@@ -246,7 +246,12 @@ async function settle(args: ParsedArgs): Promise<void> {
   if (requestBudget !== null && (!Number.isInteger(requestBudget) || requestBudget < 2)) {
     throw new Error("--budget muss eine ganze Zahl ab 2 sein.");
   }
-  const result = await settleFixtures({ requestBudget });
+  const concurrencyOption = option(args, "concurrency");
+  const concurrency = concurrencyOption === undefined ? undefined : Number(concurrencyOption);
+  if (concurrency !== undefined && (!Number.isInteger(concurrency) || concurrency < 1)) {
+    throw new Error("--concurrency muss eine ganze Zahl ab 1 sein.");
+  }
+  const result = await settleFixtures({ requestBudget, concurrency });
   console.log(`${result.settled} Kandidaten aus ${result.checked} von ${result.due} fälligen Spielen abgerechnet.`);
   console.log(`API-Aufrufe: ${result.apiRequests}`);
   if (result.budgetReached) {

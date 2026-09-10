@@ -6,6 +6,9 @@ const strengthOnDemandRequestBudget = Number(
 const settleRequestBudget = Number(
   process.env.SETTLE_REQUEST_BUDGET ?? 200
 );
+const settleConcurrency = Number(
+  process.env.SETTLE_CONCURRENCY ?? 1
+);
 const apiRequestsPerMinute = Number(
   process.env.API_REQUESTS_PER_MINUTE ?? 300
 );
@@ -108,6 +111,13 @@ export const config = {
     Number.isInteger(settleRequestBudget) && settleRequestBudget >= 0
       ? settleRequestBudget
       : 200,
+  // Gleichzeitig abgefragte Partien bei der Abrechnung. Standard 1 (sequenziell): mehrere
+  // frisch geöffnete Verbindungen zur API laufen in diesem Netz reihenweise in einen
+  // Connect-Timeout und reißen den ganzen Lauf mit. Siehe Kommentar in settle.ts.
+  settleConcurrency:
+    Number.isInteger(settleConcurrency) && settleConcurrency > 0
+      ? settleConcurrency
+      : 1,
   strengthOnDemandRequestBudget:
     Number.isInteger(strengthOnDemandRequestBudget) &&
     strengthOnDemandRequestBudget > 0
