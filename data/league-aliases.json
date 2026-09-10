@@ -99,6 +99,11 @@
     "country": "Australia",
     "league": "Northern NSW NPL"
   },
+  "australien|npl queensland finalrunde": {
+    "leagueId": 482,
+    "country": "Australia",
+    "league": "Queensland NPL"
+  },
   "australien|npl south australia": {
     "leagueId": 194,
     "country": "Australia",
@@ -119,10 +124,25 @@
     "country": "Australia",
     "league": "Victoria NPL"
   },
+  "australien|npl victoria finalrunde": {
+    "leagueId": 195,
+    "country": "Australia",
+    "league": "Victoria NPL"
+  },
   "australien|npl western australia": {
     "leagueId": 196,
     "country": "Australia",
     "league": "Western Australia NPL"
+  },
+  "australien|npl western australia finalrunde": {
+    "leagueId": 196,
+    "country": "Australia",
+    "league": "Western Australia NPL"
+  },
+  "australien|pokal endrunde": {
+    "leagueId": 874,
+    "country": "Australia",
+    "league": "Australia Cup"
   },
   "belarus|pervaya liga": {
     "leagueId": 117,
@@ -169,6 +189,11 @@
     "country": "Brazil",
     "league": "Serie C"
   },
+  "brasilien|brasileiro serie c gruppe c": {
+    "leagueId": 75,
+    "country": "Brazil",
+    "league": "Serie C"
+  },
   "brasilien|copa do brasil": {
     "leagueId": 73,
     "country": "Brazil",
@@ -183,6 +208,16 @@
     "leagueId": 173,
     "country": "Bulgaria",
     "league": "Second League"
+  },
+  "bulgarien|super pokal": {
+    "leagueId": 656,
+    "country": "Bulgaria",
+    "league": "Super Cup"
+  },
+  "champions league|ligaphase": {
+    "leagueId": 2,
+    "country": "World",
+    "league": "UEFA Champions League"
   },
   "champions league|qualifikationsrunde": {
     "leagueId": 2,
@@ -334,6 +369,16 @@
     "country": "Ecuador",
     "league": "Liga Pro Serie B"
   },
+  "ecuador|ligapro primera b abstiegsrunde": {
+    "leagueId": 243,
+    "country": "Ecuador",
+    "league": "Liga Pro Serie B"
+  },
+  "ecuador|ligapro primera b aufstiegsrunde": {
+    "leagueId": 243,
+    "country": "Ecuador",
+    "league": "Liga Pro Serie B"
+  },
   "el salvador|primera division apertura": {
     "leagueId": 370,
     "country": "El-Salvador",
@@ -364,6 +409,16 @@
     "country": "England",
     "league": "EFL Trophy"
   },
+  "england|league trophy northern gruppe h": {
+    "leagueId": 46,
+    "country": "England",
+    "league": "EFL Trophy"
+  },
+  "england|league trophy southern gruppe a": {
+    "leagueId": 46,
+    "country": "England",
+    "league": "EFL Trophy"
+  },
   "england|league trophy southern gruppe c": {
     "leagueId": 46,
     "country": "England",
@@ -380,14 +435,14 @@
     "league": "EFL Trophy"
   },
   "england|national league nord": {
-    "leagueId": 43,
+    "leagueId": 50,
     "country": "England",
-    "league": "National League"
+    "league": "National League - North"
   },
   "england|national league sud": {
-    "leagueId": 43,
+    "leagueId": 51,
     "country": "England",
-    "league": "National League"
+    "league": "National League - South"
   },
   "england|premier league": {
     "leagueId": 39,
@@ -399,6 +454,11 @@
     "country": "Estonia",
     "league": "Meistriliiga"
   },
+  "europa league|ligaphase": {
+    "leagueId": 3,
+    "country": "World",
+    "league": "UEFA Europa League"
+  },
   "europa league|qualifikationsrunde": {
     "leagueId": 3,
     "country": "World",
@@ -409,7 +469,22 @@
     "country": "Faroe-Islands",
     "league": "Meistaradeildin"
   },
+  "finnland|suomen pokal": {
+    "leagueId": 246,
+    "country": "Finland",
+    "league": "Suomen Cup"
+  },
   "finnland|veikkausliiga": {
+    "leagueId": 244,
+    "country": "Finland",
+    "league": "Veikkausliiga"
+  },
+  "finnland|veikkausliiga championship round": {
+    "leagueId": 244,
+    "country": "Finland",
+    "league": "Veikkausliiga"
+  },
+  "finnland|veikkausliiga relegation round": {
     "leagueId": 244,
     "country": "Finland",
     "league": "Veikkausliiga"
@@ -418,6 +493,11 @@
     "leagueId": 1087,
     "country": "Finland",
     "league": "Ykkösliiga"
+  },
+  "frankreich|division 1 frauen": {
+    "leagueId": 64,
+    "country": "France",
+    "league": "Feminine Division 1"
   },
   "georgien|erovnuli liga": {
     "leagueId": 327,
@@ -448,6 +528,11 @@
     "leagueId": 234,
     "country": "Honduras",
     "league": "Liga Nacional"
+  },
+  "indonesien|liga 1": {
+    "leagueId": 274,
+    "country": "Indonesia",
+    "league": "Liga 1"
   },
   "international clubs|fifa interkontinental pokal": {
     "leagueId": 1168,
@@ -634,6 +719,11 @@
     "country": "Croatia",
     "league": "HNL"
   },
+  "kroatien|kroatien pokal": {
+    "leagueId": 212,
+    "country": "Croatia",
+    "league": "Cup"
+  },
   "kroatien|prva nl": {
     "leagueId": 211,
     "country": "Croatia",
@@ -654,6 +744,11 @@
     "country": "Lithuania",
     "league": "A Lyga"
   },
+  "luxemburg|division nationale": {
+    "leagueId": 261,
+    "country": "Luxembourg",
+    "league": "National Division"
+  },
   "mexiko|liga de expansion mx apertura": {
     "leagueId": 263,
     "country": "Mexico",
@@ -663,6 +758,11 @@
     "leagueId": 262,
     "country": "Mexico",
     "league": "Liga MX"
+  },
+  "mexiko|liga primera premier": {
+    "leagueId": 1242,
+    "country": "Mexico",
+    "league": "Primera Premier"
   },
   "moldawien|super liga": {
     "leagueId": 394,
@@ -834,6 +934,11 @@
     "country": "Romania",
     "league": "Liga II"
   },
+  "rumanien|liga iii seria 2": {
+    "leagueId": 785,
+    "country": "Romania",
+    "league": "Liga III - Serie 2"
+  },
   "rumanien|liga iii seria 3": {
     "leagueId": 786,
     "country": "Romania",
@@ -843,6 +948,16 @@
     "leagueId": 787,
     "country": "Romania",
     "league": "Liga III - Serie 4"
+  },
+  "rumanien|liga iii seria 5": {
+    "leagueId": 788,
+    "country": "Romania",
+    "league": "Liga III - Serie 5"
+  },
+  "rumanien|liga iii seria 6": {
+    "leagueId": 789,
+    "country": "Romania",
+    "league": "Liga III - Serie 6"
   },
   "rumanien|liga iii seria 7": {
     "leagueId": 790,
@@ -1148,6 +1263,11 @@
     "leagueId": 300,
     "country": "Venezuela",
     "league": "Segunda División"
+  },
+  "vietnam|v league": {
+    "leagueId": 340,
+    "country": "Vietnam",
+    "league": "V.League 1"
   },
   "wales|cymru premier league": {
     "leagueId": 110,
