@@ -65,6 +65,10 @@ export const config = {
   apiRateLimitWindowMs: 60_000,
   apiRateLimitSecondWindowMs: 1_000,
   apiRateLimitRetryMs: 60_000,
+  // Wiederholungen bei Verbindungsfehlern und Timeouts. Ein Lauf macht mehrere tausend
+  // Anfragen; ohne Wiederholung reicht ein einzelner Aussetzer, um alles abzubrechen.
+  apiTransportRetries: 3,
+  apiTransportRetryMs: 1_000,
   modelVersion: "1.3.0",
   activeProfileVersion: "1.3.0",
   goalLineModelVersion: "3.2.0",

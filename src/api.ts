@@ -40,6 +40,8 @@ export class ApiFootballClient {
   private readonly rateLimitWindowMs: number;
   private readonly rateLimitSecondWindowMs: number;
   private readonly rateLimitRetryMs: number;
+  private readonly transportRetries: number;
+  private readonly transportRetryMs: number;
   private requestTimestamps: number[] = [];
   private secondRequestTimestamps: number[] = [];
   private readonly seasonRequests = new Map<string, Promise<ApiFixture[]>>();
@@ -63,6 +65,8 @@ export class ApiFootballClient {
     rateLimitWindowMs?: number;
     rateLimitSecondWindowMs?: number;
     rateLimitRetryMs?: number;
+    transportRetries?: number;
+    transportRetryMs?: number;
   }) {
     this.apiKey = options?.apiKey ?? requireApiKey();
     this.baseUrl = options?.baseUrl ?? config.apiBaseUrl;
@@ -76,6 +80,8 @@ export class ApiFootballClient {
     this.rateLimitWindowMs = options?.rateLimitWindowMs ?? config.apiRateLimitWindowMs;
     this.rateLimitSecondWindowMs = options?.rateLimitSecondWindowMs ?? config.apiRateLimitSecondWindowMs;
     this.rateLimitRetryMs = options?.rateLimitRetryMs ?? config.apiRateLimitRetryMs;
+    this.transportRetries = options?.transportRetries ?? config.apiTransportRetries;
+    this.transportRetryMs = options?.transportRetryMs ?? config.apiTransportRetryMs;
   }
 
   private waitForRequestSlot(): Promise<void> {
@@ -112,7 +118,8 @@ export class ApiFootballClient {
     params: Record<string, string | number>,
     ttlMs: number,
     bypassCache = false,
-    attempt = 0
+    attempt = 0,
+    transportAttempt = 0
   ): Promise<T> {
     if (attempt > 5) {
       throw new ApiFootballError("API-Football blieb nach mehreren Warteversuchen im Rate-Limit.", 429);
@@ -127,17 +134,58 @@ export class ApiFootballClient {
 
     await this.waitForRequestSlot();
     const controller = new AbortController();
+    // Der Timer bleibt scharf, bis der Body vollständig gelesen ist. Nur die Header
+    // abzusichern reicht nicht: `fetch` kommt zurück, sobald die Header da sind, und ein
+    // danach hängender Body-Stream blockiert ohne Timer unbegrenzt - am 04.09.2026 stand
+    // ein Lauf deshalb acht Minuten still, ohne dass eine einzige Anfrage durchkam.
     const timer = setTimeout(() => controller.abort(), this.timeoutMs);
-    let response: Response;
+    let envelope: ApiEnvelope<T>;
+    let status: number | null = null;
     try {
       this.requestCount += 1;
-      response = await this.fetchFn(`${this.baseUrl}/${endpoint}?${query}`, {
+      const response = await this.fetchFn(`${this.baseUrl}/${endpoint}?${query}`, {
         headers: { "x-apisports-key": this.apiKey },
         signal: controller.signal
       });
+      status = response.status;
+
+      const remaining = response.headers.get("x-ratelimit-requests-remaining");
+      if (remaining !== null && Number.isFinite(Number(remaining))) {
+        this.requestsRemaining = Number(remaining);
+      }
+      const minuteRemaining = response.headers.get("x-ratelimit-remaining");
+      if (minuteRemaining !== null && Number.isFinite(Number(minuteRemaining))) {
+        this.requestsRemainingThisMinute = Number(minuteRemaining);
+      }
+      if (response.status === 429) {
+        await this.sleepFn(this.rateLimitRetryMs * 2 ** attempt);
+        return this.get<T>(endpoint, params, ttlMs, bypassCache, attempt + 1);
+      }
+      if (!response.ok) {
+        throw new ApiFootballError(
+          `API-Football meldet HTTP ${response.status} ${response.statusText}.`,
+          response.status
+        );
+      }
+      envelope = (await response.json()) as ApiEnvelope<T>;
     } catch (error) {
+      // Eine Antwort des Servers ist kein Transportfehler und geht unverändert weiter.
+      if (error instanceof ApiFootballError) throw error;
+      // Verbindungsabbrüche, Timeouts und abgeschnittene Bodys sind hier fast immer
+      // vorübergehend: gemessen am 04.09.2026 laufen einzelne Verbindungsversuche zu
+      // v3.football.api-sports.io in einen Connect-Timeout, während der nächste Versuch
+      // sofort durchgeht. Ohne diesen Retry reißt ein einziger Aussetzer einen Lauf mit
+      // mehreren tausend Anfragen ab.
+      if (transportAttempt < this.transportRetries) {
+        clearTimeout(timer);
+        await this.sleepFn(this.transportRetryMs * 2 ** transportAttempt);
+        return this.get<T>(endpoint, params, ttlMs, bypassCache, attempt, transportAttempt + 1);
+      }
       if (error instanceof Error && error.name === "AbortError") {
         throw new ApiFootballError(`API-Football antwortete nicht innerhalb von ${this.timeoutMs} ms.`);
+      }
+      if (error instanceof SyntaxError) {
+        throw new ApiFootballError("API-Football lieferte keine gültige JSON-Antwort.", status);
       }
       throw new ApiFootballError(
         `API-Football ist nicht erreichbar: ${error instanceof Error ? error.message : String(error)}`
@@ -146,31 +194,6 @@ export class ApiFootballClient {
       clearTimeout(timer);
     }
 
-    const remaining = response.headers.get("x-ratelimit-requests-remaining");
-    if (remaining !== null && Number.isFinite(Number(remaining))) {
-      this.requestsRemaining = Number(remaining);
-    }
-    const minuteRemaining = response.headers.get("x-ratelimit-remaining");
-    if (minuteRemaining !== null && Number.isFinite(Number(minuteRemaining))) {
-      this.requestsRemainingThisMinute = Number(minuteRemaining);
-    }
-    if (response.status === 429) {
-      await this.sleepFn(this.rateLimitRetryMs * 2 ** attempt);
-      return this.get<T>(endpoint, params, ttlMs, bypassCache, attempt + 1);
-    }
-    if (!response.ok) {
-      throw new ApiFootballError(
-        `API-Football meldet HTTP ${response.status} ${response.statusText}.`,
-        response.status
-      );
-    }
-
-    let envelope: ApiEnvelope<T>;
-    try {
-      envelope = (await response.json()) as ApiEnvelope<T>;
-    } catch {
-      throw new ApiFootballError("API-Football lieferte keine gültige JSON-Antwort.", response.status);
-    }
     const errors = Array.isArray(envelope.errors)
       ? envelope.errors
       : Object.values(envelope.errors ?? {});
@@ -179,7 +202,7 @@ export class ApiFootballClient {
         await this.sleepFn(this.rateLimitRetryMs * 2 ** attempt);
         return this.get<T>(endpoint, params, ttlMs, bypassCache, attempt + 1);
       }
-      throw new ApiFootballError(`API-Football-Fehler: ${errors.join("; ")}`, response.status);
+      throw new ApiFootballError(`API-Football-Fehler: ${errors.join("; ")}`, status);
     }
     this.lastPaging = envelope.paging ?? null;
     await this.cache.set(cacheKey, envelope.response);

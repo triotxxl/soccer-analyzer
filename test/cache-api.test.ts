@@ -146,12 +146,76 @@ test("übersetzt Timeouts in einen verständlichen Fehler", async () => {
   const timedOut = new ApiFootballClient({
     apiKey: "test",
     timeoutMs: 5,
+    transportRetries: 0,
     cache: new FileCache(timeoutDirectory),
     fetchFn: (async (_url, init) => new Promise((_resolve, reject) => {
       init?.signal?.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")));
     })) as typeof fetch
   });
   await assert.rejects(() => timedOut.getLeagues(), /antwortete nicht/);
+});
+
+test("bricht auch einen hängenden Body-Stream ab", async () => {
+  // Die Header sind da, der Body kommt nie. Ohne Timer über den Body-Read wartet der
+  // Aufruf unbegrenzt - genau daran stand am 04.09.2026 ein ganzer Lauf still.
+  const directory = await mkdtemp(path.join(os.tmpdir(), "football-hanging-body-"));
+  const client = new ApiFootballClient({
+    apiKey: "test",
+    timeoutMs: 20,
+    transportRetries: 0,
+    cache: new FileCache(directory),
+    fetchFn: (async (_url: unknown, init?: RequestInit) => ({
+      status: 200,
+      ok: true,
+      headers: new Headers(),
+      json: () => new Promise((_resolve, reject) => {
+        init?.signal?.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")));
+      })
+    })) as unknown as typeof fetch
+  });
+
+  await assert.rejects(() => client.getLeagues(), /antwortete nicht/);
+});
+
+test("wiederholt einen abgebrochenen Verbindungsversuch", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "football-transport-retry-"));
+  let calls = 0;
+  const slept: number[] = [];
+  const client = new ApiFootballClient({
+    apiKey: "test",
+    cache: new FileCache(directory),
+    transportRetryMs: 10,
+    sleepFn: async (ms) => { slept.push(ms); },
+    fetchFn: (async () => {
+      calls += 1;
+      if (calls < 3) throw new TypeError("fetch failed");
+      return new Response(JSON.stringify({ response: [{ league: { id: 1 } }] }), { status: 200 });
+    }) as typeof fetch
+  });
+
+  assert.equal((await client.getLeagues()).length, 1);
+  assert.equal(calls, 3);
+  // Wartezeit verdoppelt sich je Versuch.
+  assert.deepEqual(slept, [10, 20]);
+});
+
+test("gibt nach erschöpften Wiederholungen den Verbindungsfehler weiter", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "football-transport-give-up-"));
+  let calls = 0;
+  const client = new ApiFootballClient({
+    apiKey: "test",
+    cache: new FileCache(directory),
+    transportRetries: 2,
+    sleepFn: async () => {},
+    fetchFn: (async () => {
+      calls += 1;
+      throw new TypeError("fetch failed");
+    }) as typeof fetch
+  });
+
+  await assert.rejects(() => client.getLeagues(), /nicht erreichbar/);
+  // Erstversuch plus zwei Wiederholungen.
+  assert.equal(calls, 3);
 });
 
 test("lädt Fixture-Statistiken in API-konformen 20er-ID-Batches", async () => {
