@@ -1,0 +1,30 @@
+{
+  "stand": "2026-09-16",
+  "abgerechnet": 4543,
+  "stufen": {
+    "streng": {
+      "n": 61,
+      "proTag": 2.4,
+      "trefferquote": 0.705,
+      "roi": 0.027
+    },
+    "ausgewogen": {
+      "n": 134,
+      "proTag": 5,
+      "trefferquote": 0.687,
+      "roi": 0.022
+    },
+    "locker": {
+      "n": 181,
+      "proTag": 6.7,
+      "trefferquote": 0.63,
+      "roi": -0.064
+    },
+    "weit": {
+      "n": 259,
+      "proTag": 9.5,
+      "trefferquote": 0.583,
+      "roi": -0.11
+    }
+  }
+}

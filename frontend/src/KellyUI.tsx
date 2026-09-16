@@ -59,7 +59,9 @@ function downloadJson(fileName: string, payload: unknown): void {
 
 // Die Filter tragen ihre Begründung als Titel-Tooltip mit sich - ohne die Messwerte daneben
 // wirken sie wie willkürliche Regler, und genau das sind sie nicht.
-function SettingField({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
+// Exportiert, weil der Quickpicker dieselbe Zeile braucht: Zwei Kopien wären der Anfang
+// zweier auseinanderlaufender Hausstile.
+export function SettingField({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
   return <label className="kelly-setting-field" title={hint}>
     <span>{label}{hint === undefined ? null : <abbr title={hint} aria-label={hint}> ⓘ</abbr>}</span>
     {children}
@@ -94,7 +96,7 @@ function roundForDisplay(value: number): number {
  * geklemmt wird erst beim Verlassen des Feldes. Ohne den Entwurf würde ein geleertes Feld
  * sofort wieder auf 0 springen und ließe sich nicht überschreiben.
  */
-function NumberField({ label, hint, value, scale = 1, min, max, step, disabled, onCommit }: {
+export function NumberField({ label, hint, value, scale = 1, min, max, step, disabled, onCommit }: {
   label: string;
   hint?: string;
   value: number;

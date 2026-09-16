@@ -63,6 +63,54 @@ und werden bewusst nicht auf 100 % normiert.
 Alle Umschalter im Panel rechnen auf dem bereits geladenen Bestand und lösen keinen
 weiteren API-Aufruf aus.
 
+### Quickpicker
+
+Der Knopf **Quickpick** rechts in der Toolbar kürzt die Tabelle auf **klar überlegene
+Mannschaften**. Gedacht ist er für Kombis: Ein Knopf legt alle Treffer als 1X2-Tipp in den
+Wettschein, wo der Baukasten daraus Kombis baut. Bisher gibt es eine Voreinstellung,
+**Daves 1x2-Filter**, und sie verlangt der Reihe nach:
+
+- **Tabelle:** Vorsprung bei Platz, Punkten je Spiel und Tordifferenz.
+- **Form:** die getippte Seite deutlich stärker als die andere, gerechnet als Sieg 3, Remis 1,
+  Niederlage 0 über die letzten fünf Spiele — Remis zählen also als kein Verlust.
+- **Direkte Duelle:** kein Rückstand und keine zwei Niederlagen in Folge gegen die getippte
+  Seite.
+- **Favoritenpunkte** des Modells über der Schwelle und **Quote** ab 1,30.
+- Getippt wird immer die Seite des Modells; für die Gegenseite führt der Lauf keine Quote.
+
+Wie hoch die Schwellen liegen, bestimmt die Strengestufe (siehe unten).
+
+Ohne Ligatabelle ist Überlegenheit nicht prüfbar — Pokal- und Cross-League-Partien fallen
+deshalb weg, nicht als Werturteil, sondern mangels Grundlage.
+
+In den Einstellungen stehen vier **Strengestufen**. Auf jedem Knopf steht, was er kostet:
+
+| Stufe | Tipps je Tag | Treffer je Bein | 4er-Kombi |
+|---|---|---|---|
+| Streng | 2,4 | 70,5 % | 24,7 % |
+| **Ausgewogen** (Vorgabe) | 5,0 | 68,7 % | 22,2 % |
+| Locker | 6,7 | 63,0 % | 15,7 % |
+| Weit | 9,5 | 58,3 % | 11,6 % |
+
+Die Zahlen sind über die archivierten Läufe zurückgerechnet. Wer einen einzelnen Regler
+verstellt, steht auf „Eigene Werte“. Die Mindestpunkte sind dabei die empfindlichste
+Schraube — unterhalb von 70 fällt die Trefferquote deutlich schneller als bei allen anderen.
+
+Nachgerechnet wird mit `npm run quickpick-report`: Der Report misst jede Stufe neu, vergleicht
+sie mit den Zahlen auf den Knöpfen und meldet, wenn sie auseinanderlaufen. Fällig ist das alle
+2.000 neu abgerechneten Partien; er sagt selbst, wie viele seither dazugekommen sind.
+
+Ein Streifen neben dem Knopf nennt, wie viele Partien übrig bleiben, und hebt den Filter mit
+einem Klick wieder auf. Escape schließt nur das Panel. Die Regler bleiben über Sitzungen
+erhalten, der aktive Filter **nicht** — nach dem Neuladen ist die Tabelle wieder vollständig.
+
+Der Quickpicker liest ausschließlich den geladenen Lauf und löst keinen API-Aufruf aus.
+Auf der Vorgabe traf die Torfolge über die archivierten Läufe vom 16.08. bis 15.09.2026 in
+**68,7 % der Fälle** (134 Tipps, ±4,0) gegenüber 47,2 % ohne jeden Filter. Das ist ein
+**Hinweis und kein Beleg**: rund ein halbes Sigma über null, gemessen an einem Ertrag von
++2,2 %. Und Vorsicht bei langen Kombis — sie multiplizieren den Vorteil je Bein in beide
+Richtungen: Vier Beine zu 68,7 % gehen in 22 % der Fälle durch, zu 58,3 % nur noch in 12 %.
+
 ### Live-Ansicht
 
 Oben in der Seitenleiste wird zwischen **Pre-Match** und **Live** umgeschaltet. Die

@@ -303,4 +303,69 @@ Benutzer auf Deutsch und führe Analyseaufträge selbstständig über die vorhan
   und die abgerechneten Ergebnisse aus SQLite. Je mehr abgerechnet ist, desto belastbarer die
   Korrektur; deshalb gehört `npm run settle` vor jede Bewertung der Automatik.
 
+## Quickpicker
+
+- Der **Quickpicker** neben dem Kelly-Knopf filtert die Tabelle auf **klar überlegene
+  Mannschaften**. Zweck ist die Kombi: Die Treffer gehen per Knopf in den Wettschein, wo der
+  Baukasten daraus Kombis baut. Maßstab ist deshalb die Trefferquote je Bein, nicht der Ertrag
+  einer Einzelwette - eine Kombi multipliziert beides. Bei -10 % je Bein bleibt von einer
+  Sechserkombi im Erwartungswert die Hälfte des Einsatzes übrig.
+- Er liest ausschließlich den geladenen Snapshot und kostet **kein API-Budget**;
+  `frontend/src/quickpick.ts` enthält weder `fetch` noch `useEffect`.
+- **Er rechnet keine eigene Punktzahl**, sondern ist eine Folge unabhängiger Tore mit je einer
+  Schwelle. Die 1X2-Favoritenpunkte kommen unverändert aus `scores.favorite`
+  (`src/favorite-criteria.ts`); eine zweite Gewichtung daneben wäre nach diesem Dokument
+  verboten und wäre schwächer, weil die Heim-/Auswärtsspalten der Tabelle im Snapshot fehlen.
+- Die Torfolge in `evaluateFixture`, in dieser Reihenfolge: 1X2-Tipp vorhanden ->
+  **Venue-Form** (eine Seite >= 70 %, die andere <= 50 %, Formel Sieg 3 / Remis 1 /
+  Niederlage 0 aus `venueFormStats`) -> **Modellseite** (die Form muss dieselbe Seite meinen
+  wie `pick`) -> **Quote** >= 1,30 -> **Favoritenpunkte** >= 70 -> **H2H-Veto** ->
+  **Tabellenvorsprung** -> optional Siegesserie. Es gewinnt das erste greifende Tor, damit jede
+  Partie in der Bilanz genau einmal gezählt wird.
+- Das **H2H-Veto** lehnt ab, wenn die Gegenseite mehr Duelle gewonnen hat oder zwei in Folge.
+  `h2h.outcomes[0]` ist das jüngste Duell (`h2hSummary` sortiert absteigend), und die
+  Ergebnisse werden für einen Auswärtstipp gespiegelt. Die Serie ist die einzige Größe, die es
+  im Backend nicht gibt - `breakdown.headToHead` zählt Siege reihenfolgeblind.
+- Der **Tabellenvorsprung** verlangt 0,5 Punkte je Spiel, 0,4 Tordifferenz je Spiel und
+  3 Plätze. Ohne Tabelle ist Überlegenheit **nicht prüfbar**, die Partie fällt dann weg - das
+  trifft jede Cross-League-Partie, weil der Lauf dort nie eine Tabelle führt. Einen eigenen
+  Turnierschalter gibt es deshalb nicht mehr.
+- **Warum die Tore so aussehen:** Der erste Entwurf vom 16.09.2026 prüfte H2H und Tabelle gar
+  nicht - H2H war nur ein Abzeichen, die Tabelle war an `scores.favorite` delegiert. Dabei
+  rutschte Inter gegen FAS durch: 2,00 zu 2,00 Punkte je Spiel, Tordifferenz +8 zu +7, und die
+  letzten drei Duelle hatte der Gegner gewonnen. Ein Test hält genau diesen Fall fest.
+- **Rückrechnung** über 56 Snapshots und 4.543 abgerechnete Partien (16.08.-15.09.2026):
+  61 Tipps, **70,5 % Treffer (±5,8)**, Quote Ø 2,03, ROI +2,7 %; erste Hälfte 73,3 %, zweite
+  67,7 %. Zum Vergleich: ohne jeden Filter 47,2 %, mit dem ersten Entwurf 55,6 % bei -10,0 %
+  ROI. **Das ist ein Hinweis, kein Beleg** - ein halbes Sigma über null, und die Punktegrenze
+  70 stammt aus einem Durchprobieren der Regler an genau diesen Daten. Einzelne Tore gemessen:
+  Punkte >= 70 allein 61,4 %, Venue-Form allein 50,8 %, H2H-Veto allein 46,7 % - letzteres
+  trägt zur Trefferquote also nichts bei und steht dort, damit der Filter hält, was er zusagt.
+- Gegen die **Modellseite** wird nicht mehr getippt: Solche Zeilen lagen in der Rückrechnung
+  bei 29,5 % Treffern, und für die Gegenseite führt der Snapshot weder Quote noch
+  Wahrscheinlichkeit - zwei der fünf Kriterien wären dort gar nicht prüfbar.
+- Die Regel steht in `src/quickpick.ts`, nicht im Frontend - dort, wo auch der Backtest sie
+  aufruft. `frontend/src/quickpick.ts` reicht sie durch und hält nur das Laden und Speichern
+  der Einstellungen. Dieselbe Begründung wie bei `autoDecide`: Eine zweite Fassung im Frontend
+  würde die Rückrechnung wertlos machen.
+- **Vier Strengestufen** in `QUICKPICK_LEVELS` (streng, ausgewogen, locker, weit) verschieben
+  Formschwellen, Tabellenschwellen und Favoritenpunkte gemeinsam. Auf jedem Knopf stehen die
+  **gemessenen** Werte - Tipps je Tag und Trefferquote je Bein -, damit beim Wählen sichtbar
+  ist, was Menge kostet. Vorgabe ist **ausgewogen**: Zwei Tipps am Tag tragen keine lange
+  Kombi, und der Unterschied zur strengen Stufe ist mit 1,8 Punkten kleiner als die Streuung.
+  `minPoints` staffelt bewusst kaum mit - unterhalb von 70 bricht die Trefferquote ein
+  (65 -> 59,4 %, 60 -> 54,1 %), deshalb fasst nur die weiteste Stufe es an.
+- **Nachkalibrieren mit `npm run quickpick-report`**: Der Report rechnet jede Stufe gegen die
+  abgerechneten Ergebnisse zurück, vergleicht das Ergebnis mit den Zahlen auf den Knöpfen und
+  meldet eine Abweichung. Er hält seinen Stand in `docs/quickpick-kalibrierung.json` und nennt,
+  wie viele Partien seit dem letzten Kalibrierpunkt dazugekommen sind; fällig ist die
+  Nachkalibrierung alle **2.000 abgerechneten Partien**. Mit `--write` wird ein neuer Punkt
+  festgehalten. Kostet kein API-Budget. Stand 16.09.2026: streng 2,4/Tag bei 70,5 %,
+  ausgewogen 5,0 bei 68,7 %, locker 6,7 bei 63,0 %, weit 9,5 bei 58,3 %.
+- Das Prädikat sitzt in `filtered` (`frontend/src/App.tsx`), **nicht** in
+  `scopedFixtures`: Dort hingen auch die KPI-Zähler und die Kelly-Auswahl daran. Gespeichert
+  werden die Regler, **nicht** der aktive Zustand - ein Filter, der nach dem Neuladen unbemerkt
+  fast alle Zeilen ausblendet, wäre dieselbe Falle wie der geerbte Einsatzrahmen der
+  Kelly-Automatik.
+
 - Vor Codeänderungen und danach: `npm test` und `npm run typecheck`

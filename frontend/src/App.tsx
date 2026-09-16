@@ -1,7 +1,7 @@
 import {
   Binoculars, Broadcast, ChartBar, CalendarBlank, CaretDoubleLeft, CaretDoubleRight, CaretLeft, CaretRight, Calculator, CheckCircle, ClockCounterClockwise, Funnel, ListBullets, RocketLaunch, Shield, ShieldCheck, Star, WarningCircle, X
 } from "@phosphor-icons/react";
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { BetBuilderDrawer, CartAddRadial, CartBadge } from "./BetCartUI";
 import { toCartEntry, useBetCart } from "./betCart";
 import { countryFlagCode } from "./countryFlags";
@@ -12,6 +12,8 @@ import { LiveView } from "./LiveView";
 import { edgeOf, loadKellyAuto, loadKellySettings, loadKellyVisible, saveKellyAuto, saveKellySettings, saveKellyVisible, type KellySettings } from "./kelly";
 import { KellyButton, KellyDialog } from "./KellyUI";
 import { MarketProfileView } from "./MarketProfileUI";
+import { QuickpickButton, QuickpickChip, QuickpickDialog } from "./QuickpickUI";
+import { applyQuickpick, loadQuickpickSettings, saveQuickpickSettings, QUICKPICK_PRESETS, REJECTION_LABELS, type QuickpickFilterReport, type QuickpickRejection, type QuickpickSettings } from "./quickpick";
 import { TeamCrest } from "./TeamCrest";
 import { useMarketProfile } from "./marketProfile";
 import type { ClassGap, DashboardDocument, DashboardFixture, DashboardMarket, DashboardMarketKey, FormResult, LeagueStats, RecommendationLevel } from "./types";
@@ -611,12 +613,25 @@ export function ClassGapBadge({ gap, homeTeam, awayTeam }: { gap: ClassGap; home
   </i>;
 }
 
-function EmptyState({ title, text }: { title: string; text: string }) {
+function EmptyState({ title, text, action }: { title: string; text: string; action?: ReactNode }) {
   return <div className="empty-state">
     <Binoculars size={32} weight="duotone" />
     <strong>{title}</strong>
     <span>{text}</span>
+    {action}
   </div>;
+}
+
+/**
+ * Nennt den häufigsten Abweisungsgrund. Ohne ihn sucht der Benutzer die leere Tabelle beim
+ * Zeitraum, während in Wahrheit ein Regler zu eng steht.
+ */
+function quickpickReason(report: QuickpickFilterReport): string {
+  const top = (Object.entries(report.rejected) as Array<[QuickpickRejection, number]>)
+    .sort((left, right) => right[1] - left[1])[0];
+  const scope = `Von ${report.evaluated} geprüften Partien erfüllt keine die Kriterien.`;
+  if (!top || top[1] === 0) return `${scope} Öffne den Quickpicker, um die Regler zu lockern.`;
+  return `${scope} Häufigster Grund: ${REJECTION_LABELS[top[0]]} (${top[1]}×).`;
 }
 
 function defaultSidebarOpen(): boolean {
@@ -690,6 +705,12 @@ function Dashboard({ document }: { document: DashboardDocument }) {
   const [showKelly, setShowKelly] = useState(() => loadKellyVisible());
   const [liveRatedOnly, setLiveRatedOnly] = useState(false);
   const [kellySettings, setKellySettings] = useState<KellySettings>(() => loadKellySettings());
+  const [quickpickOpen, setQuickpickOpen] = useState(false);
+  // Die Regler werden gespeichert, der aktive Zustand nicht: Ein Filter, der nach einem
+  // Neuladen unbemerkt fast alle Zeilen ausblendet, wäre dieselbe Falle wie der geerbte
+  // Einsatzrahmen der Kelly-Automatik, der wochenlang unentdeckt auf 100 % stand.
+  const [quickpickActive, setQuickpickActive] = useState(false);
+  const [quickpickSettings, setQuickpickSettings] = useState<QuickpickSettings>(() => loadQuickpickSettings());
   const { cart, addEntry, removeEntry, clear: clearCart } = useBetCart();
   const watchedFixtureIds = useMemo(() => document.fixtures
     .filter((fixture) => !deselectedLeagues.has(leagueKey(fixture.country, fixture.league)))
@@ -802,6 +823,9 @@ function Dashboard({ document }: { document: DashboardDocument }) {
       if (radialFixtureId !== null) setRadialFixtureId(null);
       else if (builderOpen) setBuilderOpen(false);
       else if (kellyOpen) setKellyOpen(false);
+      // Schließt nur das Panel und hebt den Filter nicht auf - das ist der Klick aufs ✕ im
+      // Streifen, eine bewusste Handlung statt eines Nebeneffekts vom Wegklicken.
+      else if (quickpickOpen) setQuickpickOpen(false);
       else if (calendarOpen) setCalendarOpen(false);
       else if (leagueFilterOpen) setLeagueFilterOpen(false);
       else if (openFixture !== null) setOpenFixture(null);
@@ -809,10 +833,11 @@ function Dashboard({ document }: { document: DashboardDocument }) {
     };
     window.addEventListener("keydown", closeOnEscape);
     return () => window.removeEventListener("keydown", closeOnEscape);
-  }, [builderOpen, calendarOpen, kellyOpen, leagueFilterOpen, openFixture, radialFixtureId]);
+  }, [builderOpen, calendarOpen, kellyOpen, leagueFilterOpen, openFixture, quickpickOpen, radialFixtureId]);
 
   useEffect(() => { saveView(view); }, [view]);
   useEffect(() => { saveKellySettings(kellySettings); }, [kellySettings]);
+  useEffect(() => { saveQuickpickSettings(quickpickSettings); }, [quickpickSettings]);
   useEffect(() => { saveKellyVisible(showKelly); }, [showKelly]);
   useEffect(() => { saveKellyAuto(kellyAuto); }, [kellyAuto]);
 
@@ -867,7 +892,15 @@ function Dashboard({ document }: { document: DashboardDocument }) {
     strong: scopedFixtures.filter((fixture) => bestLevel(fixture, marketFilter) === "strong").length,
     recommended: scopedFixtures.filter((fixture) => levelRank[bestLevel(fixture, marketFilter)] >= levelRank.recommended).length
   };
+  // Bewusst aus `scopedFixtures` gerechnet und erst in `filtered` angewandt: In
+  // `scopedFixtures` hingen auch die KPI-Zahlen und die Kelly-Auswahl daran. Kelly ist eine
+  // eigene Regel mit eigener Rückrechnung und darf von einem Tabellenfilter nicht
+  // beschnitten werden.
+  const quickpick = applyQuickpick(quickpickActive ? scopedFixtures : [], quickpickSettings);
+  const quickpickLabel = QUICKPICK_PRESETS.find((entry) => entry.id === quickpickSettings.preset)?.label
+    ?? "Quickpick";
   const filtered = scopedFixtures.filter((fixture) => {
+    if (quickpickActive && !quickpick.passing.has(fixture.fixtureId)) return false;
     if (classGapFilter === "only" && !fixture.classGap) return false;
     if (classGapFilter === "hide" && fixture.classGap) return false;
     const level = bestLevel(fixture, marketFilter);
@@ -1108,7 +1141,13 @@ function Dashboard({ document }: { document: DashboardDocument }) {
             {([ ["all", "Alle"], ["only", "Nur"], ["hide", "Ohne"] ] as const).map(([key, label]) => <option value={key} key={key}>{label}</option>)}
           </select>
         </label>
-        {showKelly && <KellyButton onOpen={() => setKellyOpen(true)} />}
+        <div className="toolbar-actions">
+          {quickpickActive && <QuickpickChip label={quickpickLabel}
+            passed={quickpick.report.passed} evaluated={quickpick.report.evaluated}
+            onOpen={() => setQuickpickOpen(true)} onClear={() => setQuickpickActive(false)} />}
+          <QuickpickButton active={quickpickActive} onOpen={() => setQuickpickOpen(true)} />
+          {showKelly && <KellyButton onOpen={() => setKellyOpen(true)} />}
+        </div>
       </div>
 
       <div className="table-with-detail">
@@ -1177,7 +1216,13 @@ function Dashboard({ document }: { document: DashboardDocument }) {
             </div>
           </article>;
         })}
-        {sortedFixtures.length === 0 && <EmptyState title="Keine Partien für diese Auswahl" text="Wähle einen anderen Zeitraum oder setze den Bewertungsfilter zurück." />}
+        {sortedFixtures.length === 0 && (quickpickActive
+          ? <EmptyState title={`${quickpickLabel} lässt keine Partie übrig`}
+              text={quickpickReason(quickpick.report)}
+              action={<button className="empty-state-action" onClick={() => setQuickpickActive(false)}>
+                Filter aufheben
+              </button>} />
+          : <EmptyState title="Keine Partien für diese Auswahl" text="Wähle einen anderen Zeitraum oder setze den Bewertungsfilter zurück." />)}
       </div>
       {openFixture !== null && (() => {
         const fixture = sortedFixtures.find((item) => item.fixtureId === openFixture);
@@ -1275,6 +1320,24 @@ function Dashboard({ document }: { document: DashboardDocument }) {
     onAutoChange={setKellyAuto}
     onSettingsChange={setKellySettings}
     onClose={() => setKellyOpen(false)}
+  />}
+  {quickpickOpen && <QuickpickDialog
+    fixtures={scopedFixtures}
+    settings={quickpickSettings}
+    active={quickpickActive}
+    onSettingsChange={setQuickpickSettings}
+    onActiveChange={setQuickpickActive}
+    onAddAll={(hits) => {
+      // Der Weg, für den der Filter gedacht ist: Treffer in den Wettschein, dort Kombis
+      // bauen. Deshalb schließt der Quickpicker sich dabei und der Wettschein geht auf.
+      for (const hit of hits) {
+        const market = marketFor(hit, "1x2");
+        if (market) addEntry(toCartEntry(hit, market));
+      }
+      setQuickpickOpen(false);
+      setBuilderOpen(true);
+    }}
+    onClose={() => setQuickpickOpen(false)}
   />}
   </>;
 }

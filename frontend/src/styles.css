@@ -179,6 +179,42 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .kelly-glossary dt { display: inline; color: var(--text); font-weight: 700; }
 .kelly-glossary dt::after { content: " — "; color: #8f8f8f; font-weight: 400; }
 .kelly-glossary dd { display: inline; margin: 0; color: #9c9c9c; }
+
+/* Quickpicker: Auslöser, Streifen und Panel. Erbt bewusst die Kelly-Klassen, damit beide
+   Auswahlhilfen nicht auseinanderlaufen. */
+.quickpick-trigger[aria-pressed="true"] { border-color: var(--accent); background: #26312b; color: var(--accent); }
+.quickpick-chip { display: flex; align-items: center; height: 32px; border: 1px solid var(--accent); border-radius: 9px; background: #26312b; overflow: hidden; }
+.quickpick-chip-label { padding: 0 6px 0 11px; border: 0; background: transparent; color: var(--accent); font-size: 11px; font-weight: 700; }
+.quickpick-chip-clear { display: grid; place-items: center; width: 24px; height: 100%; padding: 0; border: 0; border-left: 1px solid rgba(255,255,255,.12); background: transparent; color: var(--accent); }
+.quickpick-chip-clear:hover { background: rgba(255,255,255,.08); }
+.quickpick-preset { margin-top: 14px; padding: 13px 15px; border: 1px solid #383838; border-radius: 10px; background: #232324; }
+.quickpick-preset-head { display: flex; gap: 14px; align-items: flex-start; justify-content: space-between; }
+.quickpick-preset-head strong { color: var(--text); font-size: 13px; }
+.quickpick-preset-head p { margin: 4px 0 0; color: #9c9c9c; font-size: 11px; line-height: 1.5; }
+.quickpick-apply { flex: none; height: 32px; padding: 0 14px; border: 1px solid var(--line); border-radius: 9px; background: #1e1e1e; color: #b8b8b8; font-size: 11px; font-weight: 700; }
+.quickpick-apply:hover { border-color: var(--accent); color: var(--accent); }
+.quickpick-apply.active { border-color: var(--accent); background: var(--accent); color: #10281a; }
+.quickpick-criteria { margin: 10px 0 0; padding-left: 16px; color: #9c9c9c; font-size: 11px; }
+.quickpick-criteria li { margin-top: 3px; line-height: 1.5; }
+.quickpick-honesty { margin: 12px 0 0; padding: 9px 12px; border: 1px solid #3a3730; border-radius: 9px; background: #211f1a; color: #c8a978; font-size: 11px; line-height: 1.6; }
+.quickpick-honesty strong { color: #e0bf87; }
+.quickpick-honesty code { color: #cfcfcf; font-size: 10px; }
+.quickpick-table td.quickpick-side small.quickpick-badge { display: inline-block; margin-top: 4px; padding: 1px 6px; border-radius: 5px; background: #3a2f22; color: #d9a05b; font-weight: 700; }
+.quickpick-levels { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; padding: 14px 2px 0; }
+.quickpick-levels button { display: flex; flex-direction: column; gap: 3px; padding: 9px 11px; border: 1px solid var(--line); border-radius: 9px; background: #1a1a1a; color: #b8b8b8; text-align: left; }
+.quickpick-levels button:hover { border-color: #5a5a5a; }
+.quickpick-levels button.active { border-color: var(--accent); background: #26312b; color: var(--accent); }
+.quickpick-levels button strong { font-size: 12px; font-weight: 700; }
+.quickpick-levels button small { color: #8f8f8f; font-size: 10px; font-variant-numeric: tabular-nums; }
+.quickpick-levels button.active small { color: inherit; opacity: .8; }
+.quickpick-levels-note { grid-column: 1 / -1; margin: 2px 0 0; color: #8f8f8f; font-size: 10px; line-height: 1.6; }
+.quickpick-rejections { margin-top: 14px; padding: 12px 14px; border: 1px solid #333; border-radius: 10px; background: #1a1a1a; }
+.quickpick-rejections strong { color: var(--text); font-size: 12px; }
+.quickpick-rejections ul { margin: 8px 0 0; padding: 0; list-style: none; }
+.quickpick-rejections li { display: flex; gap: 8px; align-items: baseline; margin-top: 4px; color: #9c9c9c; font-size: 11px; }
+.quickpick-rejection-count { min-width: 28px; color: var(--text); font-weight: 700; font-variant-numeric: tabular-nums; text-align: right; }
+.empty-state-action { margin-top: 4px; height: 30px; padding: 0 14px; border: 1px solid var(--line); border-radius: 9px; background: #1e1e1e; color: #b8b8b8; font-size: 11px; font-weight: 700; }
+.empty-state-action:hover { border-color: var(--accent); color: var(--accent); }
 .market-edge { font-size: 9px; font-weight: 700; white-space: nowrap; }
 .market-edge.pos { color: var(--green); }
 .market-edge.neg { color: #d17a7a; }
@@ -219,7 +255,9 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .segmented button.active { background: #37373d; color: #ffffff; font-weight: 700; }
 .view-toolbar select { height: 30px; padding: 0 8px; border: 1px solid var(--line); border-radius: 8px; background: #1e1e1e; color: #b8b8b8; font-size: 11px; }
 .view-toolbar select:disabled { opacity: .35; }
-.view-toolbar .kelly-trigger { margin-left: auto; }
+/* Die Auslöser rücken als Gruppe nach rechts - ein margin-left am einzelnen Knopf würde
+   die Gruppe auseinanderreißen, sobald ein zweiter danebensteht. */
+.view-toolbar .toolbar-actions { display: flex; align-items: center; gap: 8px; margin-left: auto; }
 
 .table-with-detail { display: flex; min-height: 0; flex: 1; margin: 0 -28px; }
 .table-scroll { min-width: 0; min-height: 0; flex: 1; padding: 0 28px 24px; overflow: auto; }

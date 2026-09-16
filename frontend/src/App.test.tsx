@@ -778,4 +778,123 @@ describe("Klassenunterschied", () => {
     expect(screen.queryByText("Alpha FC")).not.toBeInTheDocument();
     expect(screen.getByText("Zulu FC")).toBeInTheDocument();
   });
+
+  /**
+   * Alpha FC erfüllt Daves Kriterien (7 Plätze und 1,5 Punkte je Spiel voraus, Heimform
+   * 80 % gegen 7 %, Quote 1,80, 75 Punkte), Zulu FC nicht - dort stehen beide Seiten in
+   * gleich guter Form, es gibt also keine klar stärkere.
+   */
+  function quickpickDocument(): DashboardDocument {
+    const current = document();
+    current.fixtures[0]!.form = {
+      ...current.fixtures[0]!.form,
+      home: ["win", "win", "win", "win", "loss"],
+      away: ["loss", "loss", "loss", "draw", "loss"]
+    };
+    current.fixtures[0]!.table = [
+      { position: 1, teamName: "Alpha FC", played: 10, wins: 8, draws: 1, losses: 1, points: 25, goalsFor: 25, goalsAgainst: 8 },
+      { position: 8, teamName: "Gast FC", played: 10, wins: 3, draws: 1, losses: 6, points: 10, goalsFor: 10, goalsAgainst: 18 }
+    ];
+    current.fixtures[1]!.form = {
+      ...current.fixtures[1]!.form,
+      home: ["win", "win", "win", "win", "loss"],
+      away: ["win", "win", "win", "win", "loss"]
+    };
+    return current;
+  }
+
+  async function applyQuickpick(user: ReturnType<typeof userEvent.setup>): Promise<void> {
+    await user.click(screen.getByRole("button", { name: "Quickpicker öffnen" }));
+    await user.click(screen.getByRole("button", { name: "Filter anwenden" }));
+    await user.keyboard("{Escape}");
+  }
+
+  it("kürzt die Tabelle auf die Treffer des Quickpickers", async () => {
+    vi.stubGlobal("fetch", dashboardFetch(() => quickpickDocument()));
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(<App />);
+    expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
+
+    await applyQuickpick(user);
+
+    expect(screen.getByText("Alpha FC")).toBeInTheDocument();
+    expect(screen.queryByText("Zulu FC")).not.toBeInTheDocument();
+  });
+
+  /**
+   * Die Kennzahlen zählen weiter den vollen Umfang - wie bei Bewertungs- und Klassenfilter.
+   * Sonst hinge auch die Kelly-Auswahl am Tabellenfilter, und die hat ihre eigene Regel.
+   */
+  it("lässt die Kennzahlen der Seitenleiste unberührt", async () => {
+    vi.stubGlobal("fetch", dashboardFetch(() => quickpickDocument()));
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(<App />);
+    expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
+    const total = () => screen.getByRole("button", { name: /Alle Partien/ }).textContent;
+    expect(total()).toContain("2");
+
+    await applyQuickpick(user);
+
+    expect(total()).toContain("2");
+  });
+
+  it("nimmt den Filter mit einem Klick auf das Kreuz zurück", async () => {
+    vi.stubGlobal("fetch", dashboardFetch(() => quickpickDocument()));
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(<App />);
+    expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
+
+    await applyQuickpick(user);
+    expect(screen.getByText(/Daves 1x2-Filter · 1 von 2/)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Quickpick-Filter aufheben" }));
+    expect(screen.getByText("Zulu FC")).toBeInTheDocument();
+  });
+
+  /** Escape schließt das Panel - der Filter bleibt, sonst ginge er beim Wegklicken verloren. */
+  it("behält den Filter, wenn das Panel mit Escape geschlossen wird", async () => {
+    vi.stubGlobal("fetch", dashboardFetch(() => quickpickDocument()));
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(<App />);
+    expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
+
+    await applyQuickpick(user);
+
+    expect(screen.queryByRole("dialog", { name: "Quickpicker" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Zulu FC")).not.toBeInTheDocument();
+  });
+
+  /**
+   * Der eigentliche Zweck des Filters: Treffer in den Wettschein, dort Kombis bauen.
+   * Deshalb ist der Weg vom Panel zum geöffneten Baukasten ein Test wert.
+   */
+  it("legt die Treffer in den Wettschein und öffnet den Baukasten", async () => {
+    vi.stubGlobal("fetch", dashboardFetch(() => quickpickDocument()));
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(<App />);
+    expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Quickpicker öffnen" }));
+    await user.click(screen.getByRole("button", { name: /in den Wettschein/ }));
+
+    const drawer = screen.getByRole("dialog", { name: "Wett-Baukasten" });
+    expect(within(drawer).getByText(/Alpha FC/)).toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: "Quickpicker" })).not.toBeInTheDocument();
+  });
+
+  it("erklärt eine leere Tabelle mit dem Quickpicker statt mit dem Zeitraum", async () => {
+    const empty = quickpickDocument();
+    empty.fixtures[0]!.form = { ...empty.fixtures[0]!.form, away: ["win", "win", "win", "win", "loss"] };
+    vi.stubGlobal("fetch", dashboardFetch(() => empty));
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(<App />);
+    expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
+
+    await applyQuickpick(user);
+
+    expect(screen.getByText(/Daves 1x2-Filter lässt keine Partie übrig/)).toBeInTheDocument();
+    expect(screen.getByText(/keine klar stärkere Seite in der Form/)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Filter aufheben" }));
+    expect(screen.getByText("Alpha FC")).toBeInTheDocument();
+  });
 });
