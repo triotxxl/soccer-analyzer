@@ -147,6 +147,9 @@ describe("autoDecide", () => {
 
   it("nimmt eine Zeile an, die auch nach der Korrektur Vorteil hat", () => {
     // Eingetreten 30 % bei behaupteten 32 % - der Abschlag ist klein, die Quote 5 verlangt 20 %.
+    // Der rohe Vorteil liegt bei 12 PP und fällt damit in ein Band, das der Markt gar nicht
+    // besetzt (seine Zeilen liegen bei 7-10 PP). Der Test pinnt damit zugleich die Regel,
+    // dass ein unbesetztes Band passieren lässt - fehlende Evidenz ist kein Verlustnachweis.
     const decision = autoDecide(solid(), {
       marketKey: "draw", probability: 0.32, odds: 5, crossLeague: false
     });
@@ -156,6 +159,10 @@ describe("autoDecide", () => {
   });
 
   it("lehnt ab, wenn der Vorteil erst durch die Selbstüberschätzung entsteht", () => {
+    // Der kanonische Fall, in dem Korrektur und Bandverdikt dasselbe sagen: Die Zelle
+    // verliert in beiden Zeithälften und ist "meiden", und die Korrektur frisst den Vorteil
+    // ohnehin auf. Weil die Bandprüfung hinter der Korrektur steht, nennt der Grund die
+    // Korrektur - der erste wirkliche Hinderungsgrund, nicht der zweite.
     const optimistic = buildMarketProfile(observations({
       marketKey: "firstHalfOver15", n: 200, wins: 60, probability: 0.55, odds: 2
     }));
@@ -164,6 +171,23 @@ describe("autoDecide", () => {
     });
     assert.equal(decision.accepted, false);
     assert.match(decision.reason, /nach Korrektur kein Vorteil/);
+  });
+
+  it("lässt eine Zeile ohne eigenen Modellvorteil nicht durch die Korrektur entstehen", () => {
+    // Ein Markt, den das Modell unterschätzt: behauptet 50 %, eingetreten 60 %. Die Korrektur
+    // hebt jede Wahrscheinlichkeit um 10 PP an. Die Messzeilen laufen über Quote 2,2, haben
+    // also selbst positiven Vorteil - nur so kommen sie überhaupt ins Profil. Die geprüfte
+    // Zeile dagegen hat bei Quote 1,9 einen rohen Vorteil von -2,6 PP; ohne Untergrenze käme
+    // sie korrigiert auf 60 % gegen 52,6 % und wäre angenommen, obwohl das Modell dort selbst
+    // keinen Vorteil sieht und der Bias an solchen Zeilen nie gemessen wurde.
+    const underrated = buildMarketProfile(observations({
+      marketKey: "over25", n: 200, wins: 120, probability: 0.5, odds: 2.2
+    }));
+    const decision = autoDecide(underrated, {
+      marketKey: "over25", probability: 0.5, odds: 1.9, crossLeague: false
+    });
+    assert.equal(decision.accepted, false);
+    assert.match(decision.reason, /sieht hier keinen Vorteil/);
   });
 
   it("hält sich von Cross-League und zu niedrigen Quoten fern", () => {
@@ -175,12 +199,22 @@ describe("autoDecide", () => {
     }).accepted, false);
   });
 
-  it("verwirft einen unglaubwürdig hohen Vorteil als Datenfehler", () => {
-    const decision = autoDecide(solid(), {
+  it("verwirft einen zu hohen Vorteil, weil dort der Modellfehler wächst", () => {
+    // Weit oben ist es ein Datenfehler: 95 % behauptet bei Quote 4.
+    const broken = autoDecide(solid(), {
       marketKey: "draw", probability: 0.95, odds: 4, crossLeague: false
     });
-    assert.equal(decision.accepted, false);
-    assert.match(decision.reason, /Datenfehler/);
+    assert.equal(broken.accepted, false);
+    assert.match(broken.reason, /Modellfehler/);
+
+    // Und schon bei 20 PP rohem Vorteil - 45 % behauptet, die Quote 4 verlangt 25 %. Diese
+    // Zeile wurde vor der Grenze bei 15 PP angenommen; die Bänder darüber sind mit -20,1 %
+    // und -84,3 % gleichsinnig negativ.
+    const overclaimed = autoDecide(solid(), {
+      marketKey: "draw", probability: 0.45, odds: 4, crossLeague: false
+    });
+    assert.equal(overclaimed.accepted, false);
+    assert.match(overclaimed.reason, /15 PP/);
   });
 
   it("empfiehlt nichts in einem Markt ohne genug Ergebnisse", () => {

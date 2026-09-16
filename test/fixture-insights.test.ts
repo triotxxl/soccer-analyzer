@@ -7,7 +7,8 @@ import {
   selectH2h,
   selectHistory,
   teamMatchStats,
-  toInsightMatch
+  toInsightMatch,
+  type InsightTeamStats
 } from "../src/fixture-insights.ts";
 import type { ApiFixture, ApiFixtureEvent } from "../src/types.ts";
 import { fixture } from "./helpers.ts";
@@ -49,19 +50,68 @@ test("schreibt ein Eigentor dem Gegner gut und lässt verschossene Elfmeter aus"
   ]);
 });
 
-test("liest Ballbesitz und Schüsse je Mannschaft", () => {
+/** Der leere Katalog - so bleibt sichtbar, welche Felder eine Prüfung bewusst offen lässt. */
+function emptyStats(): InsightTeamStats {
+  return {
+    possession: null, shots: null, shotsOnGoal: null, shotsOffGoal: null, blockedShots: null,
+    shotsInsideBox: null, shotsOutsideBox: null, corners: null, fouls: null, offsides: null,
+    yellowCards: null, redCards: null, goalkeeperSaves: null, totalPasses: null, passesAccurate: null
+  };
+}
+
+test("liest den vollen Statistikkatalog je Mannschaft", () => {
   const stats = teamMatchStats([
     {
       team: { id: 10, name: "Heim" },
       statistics: [
         { type: "Ball Possession", value: "55%" },
         { type: "Total Shots", value: 14 },
-        { type: "Shots on Goal", value: 6 }
+        { type: "Shots on Goal", value: 6 },
+        { type: "Shots off Goal", value: 5 },
+        { type: "Blocked Shots", value: 3 },
+        { type: "Shots insidebox", value: 9 },
+        { type: "Shots outsidebox", value: 5 },
+        { type: "Corner Kicks", value: 7 },
+        { type: "Fouls", value: 11 },
+        { type: "Offsides", value: 2 },
+        { type: "Yellow Cards", value: 1 },
+        { type: "Red Cards", value: 0 },
+        { type: "Goalkeeper Saves", value: 4 },
+        { type: "Total passes", value: 512 },
+        { type: "Passes accurate", value: 431 },
+        // "Passes %" normalisiert zu `passes` und wird bewusst nicht übernommen.
+        { type: "Passes %", value: "84%" }
       ]
     }
   ], 10);
-  assert.deepEqual(stats, { possession: 55, shots: 14, shotsOnGoal: 6 });
+  assert.deepEqual(stats, {
+    possession: 55, shots: 14, shotsOnGoal: 6, shotsOffGoal: 5, blockedShots: 3,
+    shotsInsideBox: 9, shotsOutsideBox: 5, corners: 7, fouls: 11, offsides: 2,
+    yellowCards: 1, redCards: 0, goalkeeperSaves: 4, totalPasses: 512, passesAccurate: 431
+  });
   assert.equal(teamMatchStats([], 10), null);
+});
+
+test("lässt nicht gelieferte Einzelwerte null, statt sie als 0 zu führen", () => {
+  const stats = teamMatchStats([
+    {
+      team: { id: 10, name: "Heim" },
+      statistics: [
+        { type: "Ball Possession", value: "48%" },
+        { type: "Corner Kicks", value: 0 },
+        // API-Football liefert einen nicht erhobenen Wert als null, nicht als 0.
+        { type: "Goalkeeper Saves", value: null }
+      ]
+    }
+  ], 10);
+  assert.deepEqual(stats, { ...emptyStats(), possession: 48, corners: 0 });
+});
+
+test("führt eine Mannschaft ohne einen einzigen Wert gar nicht", () => {
+  const stats = teamMatchStats([
+    { team: { id: 10, name: "Heim" }, statistics: [{ type: "Ball Possession", value: null }] }
+  ], 10);
+  assert.equal(stats, null);
 });
 
 test("markiert eine Partie erst mit lückenloser Ereignisliste als auswertbar", () => {
@@ -102,10 +152,12 @@ test("wählt die jüngste Historie ohne Freundschaftsspiele und ohne die Partie 
   assert.deepEqual(selectHistory(history, 10, NOW, 2).map((match) => match.fixture.id), [11, 12]);
 });
 
-test("begrenzt die direkten Duelle auf abgeschlossene Partien vor dem Anpfiff", () => {
+test("begrenzt die direkten Duelle auf abgeschlossene Wettbewerbspartien vor dem Anpfiff", () => {
   const duels: ApiFixture[] = [
     fixture({ id: 21, timestamp: NOW + 3_600, homeId: 10, awayId: 20, status: "NS" }),
     fixture({ id: 22, timestamp: NOW - 86_400, homeId: 10, awayId: 20, homeGoals: 1, awayGoals: 1 }),
+    // Ein Testspiel gegen denselben Gegner zählt so wenig wie in der Teamhistorie.
+    fixture({ id: 24, timestamp: NOW - 86_400 - 3_600, homeId: 10, awayId: 20, homeGoals: 4, awayGoals: 0, leagueName: "Club Friendlies" }),
     fixture({ id: 23, timestamp: NOW - 2 * 86_400, homeId: 20, awayId: 10, homeGoals: 0, awayGoals: 2 })
   ];
   assert.deepEqual(selectH2h(duels, NOW, 5).map((match) => match.fixture.id), [22, 23]);

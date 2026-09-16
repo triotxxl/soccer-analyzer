@@ -22,29 +22,11 @@
   "summary": {
     "evaluated": 100,
     "candidates": 57,
-    "totalStake": 99.75,
+    "totalStake": 99.7,
     "exposureScaleFactor": 1,
     "limitedGames": 18
   },
   "gameRiskLimits": [
-    {
-      "fixtureId": 1634286,
-      "homeTeam": "Al-Jazira",
-      "awayTeam": "Al Nasr",
-      "limit": 4,
-      "stakeBefore": 2,
-      "stakeAfter": 2,
-      "scaleFactor": 1
-    },
-    {
-      "fixtureId": 1634288,
-      "homeTeam": "Al Ain",
-      "awayTeam": "Al-Wasl FC",
-      "limit": 4,
-      "stakeBefore": 4,
-      "stakeAfter": 4,
-      "scaleFactor": 1
-    },
     {
       "fixtureId": 1597930,
       "homeTeam": "Al-Sailiya",
@@ -52,24 +34,6 @@
       "limit": 4,
       "stakeBefore": 3.26,
       "stakeAfter": 3.26,
-      "scaleFactor": 1
-    },
-    {
-      "fixtureId": 1497689,
-      "homeTeam": "Falkenbergs FF",
-      "awayTeam": "Osters IF",
-      "limit": 4,
-      "stakeBefore": 2.6,
-      "stakeAfter": 2.6,
-      "scaleFactor": 1
-    },
-    {
-      "fixtureId": 1497695,
-      "homeTeam": "GIF Sundsvall",
-      "awayTeam": "Orebro SK",
-      "limit": 4,
-      "stakeBefore": 0.92,
-      "stakeAfter": 0.92,
       "scaleFactor": 1
     },
     {
@@ -109,33 +73,6 @@
       "scaleFactor": 0.894124
     },
     {
-      "fixtureId": 1564305,
-      "homeTeam": "Stevenage",
-      "awayTeam": "Luton",
-      "limit": 4,
-      "stakeBefore": 1.73,
-      "stakeAfter": 1.73,
-      "scaleFactor": 1
-    },
-    {
-      "fixtureId": 1575465,
-      "homeTeam": "Estrela",
-      "awayTeam": "SC Braga",
-      "limit": 4,
-      "stakeBefore": 3.02,
-      "stakeAfter": 3.02,
-      "scaleFactor": 1
-    },
-    {
-      "fixtureId": 1520869,
-      "homeTeam": "Vila Nova",
-      "awayTeam": "Goias",
-      "limit": 4,
-      "stakeBefore": 2,
-      "stakeAfter": 2,
-      "scaleFactor": 1
-    },
-    {
       "fixtureId": 1581416,
       "homeTeam": "Alebrijes de Oaxaca",
       "awayTeam": "Durango",
@@ -163,42 +100,6 @@
       "scaleFactor": 0.716225
     },
     {
-      "fixtureId": 1556062,
-      "homeTeam": "Kyoto Sanga",
-      "awayTeam": "Kashiwa Reysol",
-      "limit": 4,
-      "stakeBefore": 0.96,
-      "stakeAfter": 0.96,
-      "scaleFactor": 1
-    },
-    {
-      "fixtureId": 1556069,
-      "homeTeam": "Vissel Kobe",
-      "awayTeam": "Kashima",
-      "limit": 4,
-      "stakeBefore": 3.6,
-      "stakeAfter": 3.6,
-      "scaleFactor": 1
-    },
-    {
-      "fixtureId": 1622765,
-      "homeTeam": "Dewa United",
-      "awayTeam": "Bhayangkara FC",
-      "limit": 4,
-      "stakeBefore": 0.63,
-      "stakeAfter": 0.63,
-      "scaleFactor": 1
-    },
-    {
-      "fixtureId": 1565249,
-      "homeTeam": "Farul Constanta",
-      "awayTeam": "Uta Arad",
-      "limit": 4,
-      "stakeBefore": 4.52,
-      "stakeAfter": 4,
-      "scaleFactor": 0.884104
-    },
-    {
       "fixtureId": 1504302,
       "homeTeam": "Kooteepee",
       "awayTeam": "JäPS",
@@ -206,15 +107,6 @@
       "stakeBefore": 2.68,
       "stakeAfter": 2.68,
       "scaleFactor": 1
-    },
-    {
-      "fixtureId": 1551337,
-      "homeTeam": "Hobro",
-      "awayTeam": "Vejle",
-      "limit": 4,
-      "stakeBefore": 5.49,
-      "stakeAfter": 4,
-      "scaleFactor": 0.728257
     },
     {
       "fixtureId": 1558215,
@@ -235,15 +127,6 @@
       "scaleFactor": 1
     },
     {
-      "fixtureId": 1567900,
-      "homeTeam": "Admira Wacker",
-      "awayTeam": "SV Kapfenberg",
-      "limit": 4,
-      "stakeBefore": 6,
-      "stakeAfter": 4,
-      "scaleFactor": 0.666667
-    },
-    {
       "fixtureId": 1567906,
       "homeTeam": "Rapid Wien II",
       "awayTeam": "First Vienna",
@@ -262,57 +145,12 @@
       "scaleFactor": 0.666667
     },
     {
-      "fixtureId": 1576172,
-      "homeTeam": "SV Darmstadt 98",
-      "awayTeam": "Arminia Bielefeld",
-      "limit": 4,
-      "stakeBefore": 5.76,
-      "stakeAfter": 4,
-      "scaleFactor": 0.694947
-    },
-    {
-      "fixtureId": 1553869,
-      "homeTeam": "Železničar Pančevo",
-      "awayTeam": "Macva",
-      "limit": 4,
-      "stakeBefore": 4,
-      "stakeAfter": 4,
-      "scaleFactor": 1
-    },
-    {
       "fixtureId": 1584405,
       "homeTeam": "Beşiktaş",
       "awayTeam": "Erzurumspor FK",
       "limit": 4,
       "stakeBefore": 3.21,
       "stakeAfter": 3.21,
-      "scaleFactor": 1
-    },
-    {
-      "fixtureId": 1601527,
-      "homeTeam": "Empoli",
-      "awayTeam": "Arezzo",
-      "limit": 4,
-      "stakeBefore": 2.57,
-      "stakeAfter": 2.57,
-      "scaleFactor": 1
-    },
-    {
-      "fixtureId": 1549016,
-      "homeTeam": "FC Copenhagen",
-      "awayTeam": "AC Horsens",
-      "limit": 4,
-      "stakeBefore": 2.68,
-      "stakeAfter": 2.68,
-      "scaleFactor": 1
-    },
-    {
-      "fixtureId": 1583992,
-      "homeTeam": "FC Viktoria Köln",
-      "awayTeam": "Hansa Rostock",
-      "limit": 4,
-      "stakeBefore": 0.65,
-      "stakeAfter": 0.65,
       "scaleFactor": 1
     },
     {
@@ -332,15 +170,6 @@
       "stakeBefore": 5.03,
       "stakeAfter": 4,
       "scaleFactor": 0.795584
-    },
-    {
-      "fixtureId": 1555053,
-      "homeTeam": "Rapperswil",
-      "awayTeam": "Yverdon Sport",
-      "limit": 4,
-      "stakeBefore": 2.03,
-      "stakeAfter": 2.03,
-      "scaleFactor": 1
     },
     {
       "fixtureId": 1561926,
@@ -370,15 +199,6 @@
       "scaleFactor": 1
     },
     {
-      "fixtureId": 1576493,
-      "homeTeam": "Torreense",
-      "awayTeam": "Leixoes",
-      "limit": 4,
-      "stakeBefore": 1.43,
-      "stakeAfter": 1.43,
-      "scaleFactor": 1
-    },
-    {
       "fixtureId": 1552162,
       "homeTeam": "AZ Alkmaar",
       "awayTeam": "Willem II",
@@ -386,15 +206,6 @@
       "stakeBefore": 5.38,
       "stakeAfter": 4,
       "scaleFactor": 0.743411
-    },
-    {
-      "fixtureId": 1551105,
-      "homeTeam": "Cherno More Varna",
-      "awayTeam": "Lokomotiv Sofia",
-      "limit": 4,
-      "stakeBefore": 1.1,
-      "stakeAfter": 1.1,
-      "scaleFactor": 1
     },
     {
       "fixtureId": 1552468,
@@ -406,30 +217,12 @@
       "scaleFactor": 0.666667
     },
     {
-      "fixtureId": 1581477,
-      "homeTeam": "Cruz Azul Hidalgo",
-      "awayTeam": "Piratas",
-      "limit": 4,
-      "stakeBefore": 2.1,
-      "stakeAfter": 2.1,
-      "scaleFactor": 1
-    },
-    {
       "fixtureId": 1565248,
       "homeTeam": "Csikszereda",
       "awayTeam": "Dinamo Bucuresti",
       "limit": 4,
       "stakeBefore": 4,
       "stakeAfter": 4,
-      "scaleFactor": 1
-    },
-    {
-      "fixtureId": 1552469,
-      "homeTeam": "Dijon",
-      "awayTeam": "Laval",
-      "limit": 4,
-      "stakeBefore": 2,
-      "stakeAfter": 2,
       "scaleFactor": 1
     },
     {
@@ -451,30 +244,12 @@
       "scaleFactor": 1
     },
     {
-      "fixtureId": 1552472,
-      "homeTeam": "Montpellier",
-      "awayTeam": "PAU",
-      "limit": 4,
-      "stakeBefore": 2.92,
-      "stakeAfter": 2.92,
-      "scaleFactor": 1
-    },
-    {
       "fixtureId": 1551792,
       "homeTeam": "MVV",
       "awayTeam": "Almere City FC",
       "limit": 4,
       "stakeBefore": 4,
       "stakeAfter": 4,
-      "scaleFactor": 1
-    },
-    {
-      "fixtureId": 1558010,
-      "homeTeam": "Brinje-Grosuplje",
-      "awayTeam": "Nafta",
-      "limit": 4,
-      "stakeBefore": 2.71,
-      "stakeAfter": 2.71,
       "scaleFactor": 1
     },
     {
@@ -505,24 +280,6 @@
       "scaleFactor": 1
     },
     {
-      "fixtureId": 1567907,
-      "homeTeam": "Wacker Innsbruck",
-      "awayTeam": "Voitsberg",
-      "limit": 4,
-      "stakeBefore": 3.14,
-      "stakeAfter": 3.14,
-      "scaleFactor": 1
-    },
-    {
-      "fixtureId": 1553170,
-      "homeTeam": "Wisla Krakow",
-      "awayTeam": "Jagiellonia",
-      "limit": 4,
-      "stakeBefore": 5.23,
-      "stakeAfter": 4,
-      "scaleFactor": 0.76533
-    },
-    {
       "fixtureId": 1492970,
       "homeTeam": "Cork City",
       "awayTeam": "Cobh Ramblers",
@@ -532,30 +289,12 @@
       "scaleFactor": 1
     },
     {
-      "fixtureId": 1492766,
-      "homeTeam": "Drogheda United",
-      "awayTeam": "Sligo Rovers",
-      "limit": 4,
-      "stakeBefore": 0.78,
-      "stakeAfter": 0.78,
-      "scaleFactor": 1
-    },
-    {
       "fixtureId": 1492767,
       "homeTeam": "Galway United",
       "awayTeam": "Bohemians",
       "limit": 4,
       "stakeBefore": 2,
       "stakeAfter": 2,
-      "scaleFactor": 1
-    },
-    {
-      "fixtureId": 1492971,
-      "homeTeam": "Kerry",
-      "awayTeam": "Bray Wanderers",
-      "limit": 4,
-      "stakeBefore": 1.3,
-      "stakeAfter": 1.3,
       "scaleFactor": 1
     },
     {
@@ -586,15 +325,6 @@
       "scaleFactor": 1
     },
     {
-      "fixtureId": 1492768,
-      "homeTeam": "Shelbourne",
-      "awayTeam": "Derry City",
-      "limit": 4,
-      "stakeBefore": 1.16,
-      "stakeAfter": 1.16,
-      "scaleFactor": 1
-    },
-    {
       "fixtureId": 1492972,
       "homeTeam": "UCD",
       "awayTeam": "Athlone Town",
@@ -604,57 +334,12 @@
       "scaleFactor": 0.776416
     },
     {
-      "fixtureId": 1492770,
-      "homeTeam": "Waterford",
-      "awayTeam": "Dundalk",
-      "limit": 4,
-      "stakeBefore": 2,
-      "stakeAfter": 2,
-      "scaleFactor": 1
-    },
-    {
       "fixtureId": 1492973,
       "homeTeam": "Wexford",
       "awayTeam": "Finn Harps",
       "limit": 4,
       "stakeBefore": 2.49,
       "stakeAfter": 2.49,
-      "scaleFactor": 1
-    },
-    {
-      "fixtureId": 1601524,
-      "homeTeam": "Benevento",
-      "awayTeam": "Hellas Verona",
-      "limit": 4,
-      "stakeBefore": 1.88,
-      "stakeAfter": 1.88,
-      "scaleFactor": 1
-    },
-    {
-      "fixtureId": 1601531,
-      "homeTeam": "Pisa",
-      "awayTeam": "Virtus Entella",
-      "limit": 4,
-      "stakeBefore": 1.94,
-      "stakeAfter": 1.94,
-      "scaleFactor": 1
-    },
-    {
-      "fixtureId": 1570381,
-      "homeTeam": "Sevilla",
-      "awayTeam": "Valencia",
-      "limit": 4,
-      "stakeBefore": 1.55,
-      "stakeAfter": 1.55,
-      "scaleFactor": 1
-    },
-    {
-      "fixtureId": 1492769,
-      "homeTeam": "St Patrick's Athl.",
-      "awayTeam": "Shamrock Rovers",
-      "limit": 4,
-      "stakeBefore": 4,
-      "stakeAfter": 4,
       "scaleFactor": 1
     },
     {
@@ -1979,5 +1664,14 @@
       "stake": 1.33,
       "gameScaleFactor": 0.666667
     }
-  ]
+  ],
+  "reinvested": {
+    "startBankroll": 100,
+    "bankrollBefore": 100,
+    "bankrollAfter": 105.91,
+    "originalBudget": 100,
+    "scaleFactor": 1,
+    "droppedBelowMinStake": 0,
+    "note": "Einsätze auf die reinvestierte Bankroll umgerechnet (Start 100 EUR am 10.09.2026)."
+  }
 }

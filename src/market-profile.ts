@@ -321,6 +321,20 @@ export function marketEntryOf(profile: MarketProfile, marketKey: string): Market
 }
 
 /**
+ * Das Vorteilsband, in das eine Zeile fällt.
+ *
+ * Eine eigene Funktion, weil zwei Stellen dasselbe Band meinen müssen: die Korrektur, die
+ * daraus ihren Abschlag zieht, und die Auswahlregel, die das Verdikt desselben Bandes liest.
+ * Zwei getrennte Suchen könnten auseinanderlaufen, ohne dass es auffiele.
+ *
+ * `undefined` heißt: Für diesen Vorteil führt der Markt keine Zeilen - bei einem gespiegelten
+ * Gegenmarkt trifft das auf jeden Wert zu, weil er gar keine Bänder hat.
+ */
+export function bandFor(entry: MarketProfileEntry, rawEdge: number): EdgeBand | undefined {
+  return entry.bands.find((candidate) => rawEdge >= candidate.from && rawEdge < candidate.to);
+}
+
+/**
  * Rechnet eine Modellwahrscheinlichkeit auf das um, was der Markt historisch wirklich
  * erreicht hat.
  *
@@ -340,7 +354,7 @@ export function calibrateProbability(
   const entry = marketEntryOf(profile, marketKey);
   if (entry === null || entry.metrics.n < MINIMUM_MARKET_SAMPLE) return null;
 
-  const band = entry.bands.find((candidate) => rawEdge >= candidate.from && rawEdge < candidate.to);
+  const band = bandFor(entry, rawEdge);
   const bandSample = band?.metrics.n ?? 0;
   const bandBias = band?.metrics.bias ?? entry.metrics.bias;
   const bias = (bandSample * bandBias + SHRINKAGE_WEIGHT * entry.metrics.bias)
@@ -366,11 +380,36 @@ export const AUTO_RULE = {
    *  eigentliche Auswahl bereits leistet. */
   minCalibratedEdge: 0.01,
   /**
-   * Sicherung gegen defekte Zeilen: Über 25 PP rohem Vorteil traten 1,8 % der Fälle ein,
-   * behauptet waren 55,3 %. Das ist kein Optimismus mehr, das sind kaputte Eingangsdaten -
-   * eine falsch zugeordnete Partie oder eine Quote zum falschen Markt.
+   * Untergrenze für den rohen Vorteil: Das Modell muss selbst einen sehen, die Korrektur
+   * darf ihn nicht erst erzeugen.
+   *
+   * Der Grund liegt in der Messgrundlage, nicht in einer Ertragszahl. `buildMarketProfile`
+   * misst ausschließlich Zeilen mit `edge > 0`. Der gemessene Bias ist damit eine Aussage
+   * über die Grundgesamtheit "Zeilen dieses Marktes mit positivem Modellvorteil". Auf eine
+   * Zeile mit negativem Rohvorteil angewendet, extrapoliert er aus seinem eigenen Messbereich
+   * heraus. Bei einem gespiegelten Gegenmarkt kommt hinzu, dass dessen `roi` per Konstruktion
+   * `null` ist - dort gibt es überhaupt keinen Ertragsnachweis, auf den man sich stützen
+   * könnte. Die Grenze lautet deshalb `> 0` und nicht `>= 0`: exakt dieselbe Bedingung, unter
+   * der das Profil gemessen wurde.
    */
-  maxRawEdge: 0.25,
+  minRawEdge: 0,
+  /**
+   * Obergrenze für den rohen Vorteil. Sie ist keine Sicherung gegen kaputte Daten mehr,
+   * sondern der gemessene Qualitätsverfall: Über 1061 abgerechnete Picker-Zeilen fällt der
+   * ROI monoton mit dem behaupteten Vorteil - 7-10 PP +3,1 %, 10-15 PP -7,1 %,
+   * 15-25 PP -20,1 %, ab 25 PP -84,3 %. Ein großer behaupteter Vorteil misst den eigenen
+   * Modellfehler, nicht eine Nachlässigkeit des Buchmachers.
+   *
+   * 0,15 und nicht 0,10, weil 0,15 bereits eine Grenze in `EDGE_BANDS` ist und damit kein
+   * frei gewählter Parameter: Die beiden Bänder darüber sind mit -20,1 % (n=159) und
+   * -84,3 % (n=58) gleichsinnig negativ, während das Band 10-15 PP mit -7,1 % (n=296) im
+   * Bereich einer Buchmacherspanne um null liegt und rund ein Viertel der Auswahl stellt.
+   *
+   * Der Datenfehler-Befund bleibt als Nebenbemerkung gültig: Über 25 PP traten 1,8 % der
+   * Fälle ein, behauptet waren 55,3 % - das sind keine optimistischen Prognosen mehr,
+   * sondern falsch zugeordnete Partien oder Quoten zum falschen Markt.
+   */
+  maxRawEdge: 0.15,
   minOdds: 1.5
 } as const;
 
@@ -413,7 +452,15 @@ export function autoDecide(profile: MarketProfile, input: AutoInput): AutoDecisi
   // gerade die tragenden Zeilen mitsperren. Die Auswahl trifft allein die Korrektur unten.
 
   const rawEdge = input.probability - 1 / input.odds;
-  if (rawEdge > AUTO_RULE.maxRawEdge) return reject("unglaubwürdig hoher Vorteil - vermutlich ein Datenfehler");
+  if (rawEdge <= AUTO_RULE.minRawEdge) {
+    return reject("das Modell sieht hier keinen Vorteil - er entstünde allein aus der Korrektur,"
+      + " und die ist nur an Zeilen mit eigenem Vorteil gemessen");
+  }
+  // Vergleich mit >=, damit "ab 15 PP" hier dasselbe heißt wie die Bandgrenze in EDGE_BANDS.
+  if (rawEdge >= AUTO_RULE.maxRawEdge) {
+    return reject(`ab ${(AUTO_RULE.maxRawEdge * 100).toFixed(0)} PP Vorteil verliert die Auswahl`
+      + " gemessen - je größer der behauptete Vorteil, desto größer der Modellfehler");
+  }
 
   const calibration = calibrateProbability(profile, input.marketKey, input.probability, rawEdge);
   if (calibration === null) return reject("für diesen Markt lässt sich noch nicht korrigieren");
@@ -428,6 +475,19 @@ export function autoDecide(profile: MarketProfile, input: AutoInput): AutoDecisi
       calibratedEdge
     };
   }
+
+  // Eine Ablehnung nach dem Verdikt des eigenen Vorteilsbandes wurde geprüft und wieder
+  // entfernt: Sie ist auf allen vorhandenen Daten redundant zur Korrektur oben.
+  //
+  // Der Grund ist Algebra. Für eine Zelle mit einheitlichen Quoten gilt
+  // `roi_band ≈ Quote · (Trefferquote − 1/Quote)`, und `calibratedEdge ≈ Trefferquote − 1/Quote`
+  // ist dieselbe Größe bis auf den positiven Faktor `Quote`. Ein negativer Band-ROI und ein
+  // negativer korrigierter Vorteil sind damit fast immer dasselbe Ereignis, und
+  // `minCalibratedEdge` fängt es zuerst ab. Auseinander laufen beide nur bei uneinheitlichen
+  // Quoten innerhalb einer Zelle - konstruierbar (60 Treffer auf Quote 1,60 gegen 40 Nieten
+  // auf Quote 2,50 ergeben Bias −1 PP bei ROI −4 %), in der Rückrechnung vom 15.09.2026 über
+  // 2462 Prüfzeilen aber **null Mal** aufgetreten. Die Regel hätte keine einzige Wette
+  // verändert. Siehe AGENTS.md, Abschnitt "Kelly-Automatik und Marktprofil".
 
   return {
     accepted: true,

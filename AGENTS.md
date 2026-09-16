@@ -143,6 +143,11 @@ Benutzer auf Deutsch und führe Analyseaufträge selbstständig über die vorhan
   minütlich über 20er-Bündel nach. Ohne laufende Partie entstehen keine Anfragen.
   Begrenzt wird das über `LIVE_DAILY_REQUEST_BUDGET`. Live-Stände werden nach
   `data/live-snapshots/` mitgeschrieben.
+- Die Übersicht stellt jedem Teamnamen sein Wappen voran. Die URL kommt aus der ohnehin
+  geladenen Fixture-Antwort von API-Football und steht als `homeCrest`/`awayCrest` im
+  Dashboard-Snapshot; das kostet keinen zusätzlichen Aufruf. Führt die Antwort kein Wappen
+  oder lädt das Bild nicht, zeigt die App die beiden Anfangsbuchstaben des Teams. Snapshots
+  aus Läufen vor dieser Ergänzung tragen die Felder nicht und bleiben bei den Initialen.
 - Klappt die App eine Partie auf, lädt sie deren Detailkennzahlen über
   `/api/fixture/insights`: Torphasen je Viertelstunde, direkte Duelle mit Liga und
   Halbzeitstand sowie Trends über die letzten zehn Partien inklusive Ballbesitz und
@@ -206,10 +211,19 @@ Benutzer auf Deutsch und führe Analyseaufträge selbstständig über die vorhan
 
 ## Kelly-Automatik und Marktprofil
 
-- Der Kelly-Picker hat zwei Modi. In der **Automatik** (Vorgabe) stellt der Benutzer nur
-  Budget und Kelly-Fraktion ein; welche Märkte und Partien gewählt werden, entscheidet
-  `autoDecide` in `src/market-profile.ts` anhand der eigenen abgerechneten Ergebnisse.
-  **Manuell** verhält sich unverändert wie zuvor.
+- Der Kelly-Picker hat zwei Modi. In der **Automatik** (Vorgabe) entscheidet `autoDecide` in
+  `src/market-profile.ts` anhand der eigenen abgerechneten Ergebnisse, welche Märkte und
+  Partien gewählt werden. **Manuell** verhält sich unverändert wie zuvor.
+- `recommendedSettings` (`frontend/src/kelly.ts`) sagt, was die Automatik übernimmt: die
+  Auswahlregler (`minOdds`, `minEdge`, `maxEdge`, `minConfidence`, `disabledMarkets`,
+  `excludeCrossLeague`) **und** `allowMultipleMarketsPerGame` - ob mehrere Märkte derselben
+  Partie zugleich gespielt werden, ist eine Frage der Auswahl, und die Korrelation kann eine
+  Einzelentscheidung nicht sehen. Beim Nutzer bleiben Budget, Kelly-Fraktion, Mindesteinsatz,
+  Höchstzahl und die Risiko-Deckel (`maxStakePercent`, `maxExposurePercent`,
+  `enableGameRiskLimit`, `maxRiskPerGame`) - das ist eine Frage des Geldbeutels.
+  **Achtung:** Diese Werte werden aus dem manuellen Modus geerbt. Damit das nicht unbemerkt
+  bleibt, nennt die Kopfzeile in der Automatik den Einsatzrahmen; in den Läufen bis zum
+  15.09.2026 stand er auf 100 % statt der Vorgabe 25 %, ohne dass es auffiel.
 - Kern der Automatik ist die Korrektur der Wahrscheinlichkeit: Über alle archivierten
   Snapshots sagt das Modell rund 51 % voraus, wo 42 % eintreten. Kelly rechnet deshalb nicht
   mit `market.probability`, sondern mit dem um die gemessene Selbstüberschätzung
@@ -229,17 +243,51 @@ Benutzer auf Deutsch und führe Analyseaufträge selbstständig über die vorhan
 - `autoDecide` ist die einzige Stelle, an der die Auswahlregel steht. Sowohl die App als
   auch der Backtest rufen sie auf - eine zweite Fassung der Regel im Frontend würde die
   Rückrechnung wertlos machen.
+- Die Grenzen stehen in `AUTO_RULE` (`src/market-profile.ts`) und sind **nicht frei wählbar,
+  sondern begründet**: `minRawEdge: 0`, weil das Profil ausschließlich Zeilen mit `edge > 0`
+  misst und eine Korrektur unterhalb davon aus ihrem eigenen Messbereich extrapoliert;
+  `maxRawEdge: 0.15`, weil der ROI monoton mit dem behaupteten Vorteil fällt (7-10 PP +3,1 %,
+  10-15 PP −7,1 %, 15-25 PP −20,1 %, ab 25 PP −84,3 % über 1061 Zeilen) und 0,15 bereits eine
+  Bandgrenze in `EDGE_BANDS` ist. Wer diese Werte ändert, sucht sonst einen Parameter, der zu
+  den Daten passt - genau das soll die Rückrechnung nicht belohnen.
+- **`minRawEdge` ist im Backtest nicht messbar.** Die Rückrechnung filtert vorab auf
+  `edge > 0`, dort erreicht keine Zeile mit negativem Rohvorteil `autoDecide`. In der App
+  dagegen wird jeder Markt einer Partie geprüft, dort greift die Grenze. Ihre Begründung ist
+  deshalb die Messgrundlage, keine Ertragszahl.
+- Bei `allowMultipleMarketsPerGame: false` wählt `marketCandidates` die Wette einer Partie
+  über den **vollen Kelly-Wert**, nicht über den rohen Vorteil - derselbe Maßstab wie in
+  `withoutOpposites` und `applyStakeFloor`. Out of sample liefern beide Maßstäbe denselben
+  Ertrag (+3,5 %), der Kelly-Wert mit etwas kleinerer Streuung.
 - Die Ansicht **Marktprofil** in der App zeigt je Markt Prognose, tatsächliche Trefferquote,
   Abweichung und Ertrag, aufklappbar nach Vorteilsband. Das Verdikt der Marktzeile gilt für
-  alle Zeilen mit Vorteil zusammen; die Automatik entscheidet dagegen je Band. Deshalb kann
-  sie aus einem Markt wählen, der insgesamt als „meiden“ ausgewiesen ist - beim Remis ist
-  genau das der Fall.
+  alle Zeilen mit Vorteil zusammen und wird von der Automatik **nicht** gelesen - sonst wäre
+  Remis gesperrt, das über alle Zeilen bei −18,2 % liegt, im Band ab 7 PP aber bei +18,4 %.
+  Das Band bestimmt die Höhe der Korrektur, nicht Annahme oder Ablehnung.
+- **Eine Ablehnung nach Bandverdikt wurde am 15.09.2026 geprüft und verworfen.** Sie ist
+  algebraisch fast dasselbe wie die bestehende Prüfung auf den korrigierten Vorteil:
+  `roi_band ≈ Quote · (Trefferquote − 1/Quote)` gegen `calibratedEdge ≈ Trefferquote − 1/Quote`
+  ist derselbe Wert bis auf den positiven Faktor `Quote`. Auseinander laufen beide nur bei
+  uneinheitlichen Quoten innerhalb einer Zelle - konstruierbar, aber über 2462 Prüfzeilen
+  **null Mal** aufgetreten. Nicht erneut einbauen, ohne vorher im Ablehnungsregister des
+  Edge-Reports nachzusehen, ob der Fall inzwischen vorkommt. Relevant wird das erst, wenn die
+  Gegenmärkte auch im Trainingsprofil eigene Bänder tragen; heute sind sie dort gespiegelt und
+  hätten ohnehin keins.
 - Belastbarkeit prüfen: `npm run edge-report -- --simulate`. Die Kalibrierung wird dabei nur
   aus der ersten Zeithälfte gebildet und auf die zweite angewendet, zusätzlich an mehreren
-  Trennstellen und einmal ohne den Remis-Markt. Stand 09.09.2026 liegt die Automatik out of
-  sample bei −0,4 bis +3,3 % gegenüber −4,5 bis −4,9 % der früheren Vorgabe: **messbar besser
-  als vorher, aber nicht als gewinnbringend nachgewiesen**, und der Vorteil hängt fast
-  vollständig am Remis-Markt. Diese Einordnung gehört in jede Aussage über die Automatik.
+  Trennstellen und einmal ohne den Remis-Markt. **Jeder ROI wird mit seinem Standardfehler
+  gedruckt** - ohne den ist eine Zahl auf diesen Stichproben nicht lesbar. Stand 15.09.2026
+  liegt die Automatik out of sample bei −0,2 bis +2,6 % gegenüber −5,1 bis −7,2 % der früheren
+  Vorgabe, bei einer Streuung von rund ±5 Punkten: Der Abstand ist damit etwa **ein Sigma und
+  belegt nichts**. Ohne den Remis-Markt steht sie bei −2,5 bis −4,0 %; ihr gesamter Vorsprung
+  hängt an diesem einen Markt, der in der Prüfhälfte auf 24 Wetten steht. **Messbar weniger
+  verlustreich als die frühere Vorgabe, nicht als gewinnbringend nachgewiesen.** Diese
+  Einordnung gehört in jede Aussage über die Automatik.
+- Der Report druckt außerdem einen **gepaarten Vergleich** (nur die Zeilen, in denen sich zwei
+  Regeln unterscheiden - gemeinsame Zeilen tragen zu beiden Seiten dasselbe Rauschen bei), ein
+  **Ablehnungsregister** je Zelle aus Markt und Band samt Verdikt, und die Zahl der
+  angenommenen Zeilen ohne eigenen Modellvorteil. Für eine Regeländerung sind das die
+  Instrumente; der Live-Verlauf im Kelly-Tracker taugt dafür nicht, weil seine ROI-Streuung
+  bei 158 Wetten bei ±9,6 % liegt.
 - **Gegenmärkte ohne eigene Historie** werden gespiegelt statt geschätzt: Weil
   `Unter = 1 − Über` und `BTTS Nein = 1 − BTTS Ja` gilt, ist die Abweichung der Gegenrichtung
   exakt der negierte Wert des Basismarktes. Aus −7,1 PP bei Über 2,5 werden +7,1 PP bei

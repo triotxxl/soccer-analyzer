@@ -155,6 +155,20 @@ describe("React-Dashboard", () => {
     expect(screen.getAllByText(/Testbegründung/)).toHaveLength(5);
   });
 
+  it("stellt jedem Teamnamen der Übersicht sein Wappen voran, ohne URL die Initialen", async () => {
+    const current = document();
+    current.fixtures[0] = { ...current.fixtures[0]!, homeCrest: "https://media.example/33.png" };
+    vi.stubGlobal("fetch", dashboardFetch(() => current));
+    render(<App />);
+    expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
+
+    const names = [...globalThis.document.querySelectorAll(".fixture-row .team-name")];
+    expect(names[0]!.firstElementChild).toHaveAttribute("src", "https://media.example/33.png");
+    expect(names[1]!.firstElementChild).toHaveTextContent("GA");
+    // Der Name steht direkt daneben; das Wappen darf ihn für Vorlesehilfen nicht verdoppeln.
+    expect(screen.getByRole("button", { name: /Alpha FCGast FC/i })).toBeInTheDocument();
+  });
+
   it("synchronisiert die H2H-Ansicht mit dem ausgewählten Markt", async () => {
     const current = document();
     current.schemaVersion = 2;

@@ -316,6 +316,12 @@ export interface GoalLineRow {
   league: string;
   homeTeam: string;
   awayTeam: string;
+  /**
+   * Wappen-URLs von API-Football. Sie fehlen, wenn die Fixture-Antwort sie nicht führt, und
+   * in jedem Lauf, der vor dieser Ergänzung entstanden ist; die App zeigt dann die Initialen.
+   */
+  homeCrest?: string;
+  awayCrest?: string;
   modelVersion: string;
   expectedHomeGoals: number;
   expectedAwayGoals: number;

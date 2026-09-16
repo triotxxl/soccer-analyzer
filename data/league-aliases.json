@@ -1,4 +1,14 @@
 {
+  "afc champions league|afc champions league elite region ost": {
+    "leagueId": 17,
+    "country": "World",
+    "league": "AFC Champions League Elite"
+  },
+  "afc champions league|afc champions league elite region west": {
+    "leagueId": 17,
+    "country": "World",
+    "league": "AFC Champions League Elite"
+  },
   "agypten|2nd division a": {
     "leagueId": 887,
     "country": "Egypt",
@@ -18,6 +28,11 @@
     "leagueId": 186,
     "country": "Algeria",
     "league": "Ligue 1"
+  },
+  "andorra|primera divisio": {
+    "leagueId": 312,
+    "country": "Andorra",
+    "league": "1a Divisió"
   },
   "argentinien|copa argentina": {
     "leagueId": 130,
@@ -95,6 +110,11 @@
     "league": "New South Wales NPL"
   },
   "australien|npl northern nsw": {
+    "leagueId": 481,
+    "country": "Australia",
+    "league": "Northern NSW NPL"
+  },
+  "australien|npl northern nsw finalrunde": {
     "leagueId": 481,
     "country": "Australia",
     "league": "Northern NSW NPL"
@@ -189,6 +209,11 @@
     "country": "Brazil",
     "league": "Serie C"
   },
+  "brasilien|brasileiro serie c gruppe b": {
+    "leagueId": 75,
+    "country": "Brazil",
+    "league": "Serie C"
+  },
   "brasilien|brasileiro serie c gruppe c": {
     "leagueId": 75,
     "country": "Brazil",
@@ -254,7 +279,22 @@
     "country": "China",
     "league": "League One"
   },
+  "china|china league 2 abstiegsrunde gr a": {
+    "leagueId": 929,
+    "country": "China",
+    "league": "League Two"
+  },
+  "china|china league 2 abstiegsrunde gr b": {
+    "leagueId": 929,
+    "country": "China",
+    "league": "League Two"
+  },
   "china|china league 2 nord": {
+    "leagueId": 929,
+    "country": "China",
+    "league": "League Two"
+  },
+  "china|china league 2 promotion round": {
     "leagueId": 929,
     "country": "China",
     "league": "League Two"
@@ -358,6 +398,11 @@
     "leagueId": 1137,
     "country": "Germany",
     "league": "Supercup der Frauen"
+  },
+  "dominikanische republik|liga dominicana de futbol": {
+    "leagueId": 759,
+    "country": "Dominican-Republic",
+    "league": "Liga Mayor"
   },
   "ecuador|ligapro primera a primera etapa": {
     "leagueId": 242,
@@ -529,10 +574,55 @@
     "country": "Honduras",
     "league": "Liga Nacional"
   },
+  "indonesien|championship gruppe a": {
+    "leagueId": 275,
+    "country": "Indonesia",
+    "league": "Liga 2"
+  },
+  "indonesien|championship gruppe b": {
+    "leagueId": 275,
+    "country": "Indonesia",
+    "league": "Liga 2"
+  },
   "indonesien|liga 1": {
     "leagueId": 274,
     "country": "Indonesia",
     "league": "Liga 1"
+  },
+  "international clubs|afc cl 2 gruppe a": {
+    "leagueId": 18,
+    "country": "World",
+    "league": "AFC Champions League Two"
+  },
+  "international clubs|afc cl 2 gruppe c": {
+    "leagueId": 18,
+    "country": "World",
+    "league": "AFC Champions League Two"
+  },
+  "international clubs|afc cl 2 gruppe d": {
+    "leagueId": 18,
+    "country": "World",
+    "league": "AFC Champions League Two"
+  },
+  "international clubs|afc cl 2 gruppe e": {
+    "leagueId": 18,
+    "country": "World",
+    "league": "AFC Champions League Two"
+  },
+  "international clubs|afc cl 2 gruppe f": {
+    "leagueId": 18,
+    "country": "World",
+    "league": "AFC Champions League Two"
+  },
+  "international clubs|afc cl 2 gruppe g": {
+    "leagueId": 18,
+    "country": "World",
+    "league": "AFC Champions League Two"
+  },
+  "international clubs|afc cl 2 gruppe h": {
+    "leagueId": 18,
+    "country": "World",
+    "league": "AFC Champions League Two"
   },
   "international clubs|fifa interkontinental pokal": {
     "leagueId": 1168,
@@ -614,6 +704,16 @@
     "country": "Iceland",
     "league": "Úrvalsdeild"
   },
+  "island|besta deild abstiegsrunde": {
+    "leagueId": 164,
+    "country": "Iceland",
+    "league": "Úrvalsdeild"
+  },
+  "island|besta deild meisterschaftsrunde": {
+    "leagueId": 164,
+    "country": "Iceland",
+    "league": "Úrvalsdeild"
+  },
   "israel|national league": {
     "leagueId": 382,
     "country": "Israel",
@@ -663,6 +763,11 @@
     "leagueId": 387,
     "country": "Jordan",
     "league": "League"
+  },
+  "kambodscha|premier league": {
+    "leagueId": 410,
+    "country": "Cambodia",
+    "league": "C-League"
   },
   "kanada|canadian premier league": {
     "leagueId": 479,
@@ -759,6 +864,11 @@
     "country": "Mexico",
     "league": "Liga MX"
   },
+  "mexiko|liga premier a": {
+    "leagueId": 722,
+    "country": "Mexico",
+    "league": "Liga Premier Serie A"
+  },
   "mexiko|liga primera premier": {
     "leagueId": 1242,
     "country": "Mexico",
@@ -793,6 +903,11 @@
     "leagueId": 396,
     "country": "Nicaragua",
     "league": "Primera Division"
+  },
+  "nigeria|professional league": {
+    "leagueId": 399,
+    "country": "Nigeria",
+    "league": "NPFL"
   },
   "nordirland|premiership": {
     "leagueId": 408,
@@ -889,6 +1004,11 @@
     "country": "Peru",
     "league": "Segunda División"
   },
+  "philippinen|pfl": {
+    "leagueId": 765,
+    "country": "Philippines",
+    "league": "PFL"
+  },
   "polen|1 liga": {
     "leagueId": 107,
     "country": "Poland",
@@ -933,6 +1053,11 @@
     "leagueId": 284,
     "country": "Romania",
     "league": "Liga II"
+  },
+  "rumanien|liga iii seria 1": {
+    "leagueId": 784,
+    "country": "Romania",
+    "league": "Liga III - Serie 1"
   },
   "rumanien|liga iii seria 2": {
     "leagueId": 785,
@@ -1084,6 +1209,11 @@
     "country": "Zimbabwe",
     "league": "Premier Soccer League"
   },
+  "singapur|premier league": {
+    "leagueId": 368,
+    "country": "Singapore",
+    "league": "Premier League"
+  },
   "slowakei|2 liga": {
     "leagueId": 506,
     "country": "Slovakia",
@@ -1214,6 +1344,11 @@
     "country": "World",
     "league": "UEFA Europa Cup - Women"
   },
+  "ungarn|magyar kupa": {
+    "leagueId": 273,
+    "country": "Hungary",
+    "league": "Magyar Kupa"
+  },
   "ungarn|nb i": {
     "leagueId": 271,
     "country": "Hungary",
@@ -1238,6 +1373,11 @@
     "leagueId": 254,
     "country": "USA",
     "league": "NWSL Women"
+  },
+  "usa|u s open cup": {
+    "leagueId": 257,
+    "country": "USA",
+    "league": "US Open Cup"
   },
   "usbekistan|pfl": {
     "leagueId": 369,

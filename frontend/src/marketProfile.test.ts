@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { buildMarketProfile, type MarketObservation } from "../../src/market-profile";
-import { computeKellyCandidates, DEFAULT_KELLY_SETTINGS, expectedValueOf, recommendedSettings } from "./kelly";
+import {
+  computeKellyCandidates, DEFAULT_KELLY_SETTINGS, expectedValueOf, recommendedSettings,
+  stakeSlots, TEST_RUN_SETTINGS
+} from "./kelly";
 import type { DashboardFixture, DashboardMarketKey } from "./types";
 
 function observations(marketKey: string, n: number, wins: number, probability: number, odds: number): MarketObservation[] {
@@ -76,7 +79,13 @@ describe("Automatik im Kelly-Picker", () => {
   });
 
   it("räumt in den abgeleiteten Einstellungen nur die Auswahlregler ab", () => {
-    const base = { ...DEFAULT_KELLY_SETTINGS, budget: 250, kellyFraction: 0.5 };
+    const base = {
+      ...DEFAULT_KELLY_SETTINGS,
+      budget: 250,
+      kellyFraction: 0.5,
+      maxExposurePercent: 1,
+      allowMultipleMarketsPerGame: true
+    };
     const derived = recommendedSettings(base);
     expect(derived.budget).toBe(250);
     expect(derived.kellyFraction).toBe(0.5);
@@ -85,6 +94,69 @@ describe("Automatik im Kelly-Picker", () => {
     expect(derived.maxEdge).toBeNull();
     expect(derived.minEdge).toBe(0);
     expect(derived.excludeCrossLeague).toBe(true);
+    // Mehrere Märkte je Partie sind eine Frage der Auswahl und gehören der Automatik ...
+    expect(derived.allowMultipleMarketsPerGame).toBe(false);
+    // ... der Einsatzrahmen dagegen ist eine Frage des Geldbeutels und bleibt beim Nutzer.
+    expect(derived.maxExposurePercent).toBe(1);
+  });
+
+  it("rechnet die Stückzahl aus dem Verhältnis der beiden Prozentsätze, nicht aus dem Budget", () => {
+    const base = { ...DEFAULT_KELLY_SETTINGS, maxStakePercent: 0.02, maxExposurePercent: 0.7, minStake: 1 };
+    // 0,70 / 0,02 = 35 Plätze - unabhängig davon, ob 100 oder 10.000 Euro im Spiel sind.
+    expect(stakeSlots({ ...base, budget: 100 }).plaetze).toBe(35);
+    expect(stakeSlots({ ...base, budget: 10_000 }).plaetze).toBe(35);
+    // Die alte Anzeige nannte allein diese optimistische Grenze und war damit doppelt so groß.
+    expect(stakeSlots({ ...base, budget: 100 }).hoechstens).toBe(70);
+    // Der enge Rahmen schneidet auf ein Drittel zusammen - das war der unbemerkte Hebel.
+    expect(stakeSlots({ ...base, budget: 100, maxExposurePercent: 0.25 }).plaetze).toBe(12);
+    // Bei sehr kleinem Budget bindet dagegen der Mindesteinsatz.
+    expect(stakeSlots({ ...base, budget: 20 }).plaetze).toBe(14);
+  });
+
+  it("setzt mit dem Testbetrieb alle Messeinstellungen in einem Zug", () => {
+    const abweichend = {
+      ...DEFAULT_KELLY_SETTINGS, budget: 126.26, kellyFraction: 1,
+      maxStakePercent: 0.03, maxExposurePercent: 1, minStake: 0, maxBets: 12
+    };
+    const gesetzt = { ...abweichend, ...TEST_RUN_SETTINGS };
+    expect(gesetzt.budget).toBe(100);
+    expect(gesetzt.kellyFraction).toBe(0.25);
+    expect(gesetzt.maxExposurePercent).toBe(0.7);
+    expect(gesetzt.maxBets).toBeNull();
+    // Der Rahmen ist weit genug, dass er die typische Auswahl von rund 30 Wetten nicht kappt.
+    expect(stakeSlots(gesetzt).plaetze).toBeGreaterThanOrEqual(30);
+    // Was die Auswahl betrifft, fasst der Testbetrieb nicht an - das bleibt die Automatik.
+    expect(gesetzt.disabledMarkets).toEqual(DEFAULT_KELLY_SETTINGS.disabledMarkets);
+  });
+
+  it("wählt je Partie nach dem vollen Kelly-Wert, nicht nach dem rohen Vorteil", () => {
+    // Zwei Märkte derselben Partie, bei denen die beiden Maßstäbe auseinanderfallen:
+    //   Über 2,5 – 70 % bei Quote 1,60: roher Vorteil 7,5 PP, voller Kelly-Wert 0,200
+    //   Remis    – 35 % bei Quote 4,00: roher Vorteil 10,0 PP, voller Kelly-Wert 0,133
+    // Der rohe Vorteil spricht für das Remis, der Kelly-Wert für Über 2,5. Weil der Einsatz
+    // sich nach dem Kelly-Wert bemisst und ein großer roher Vorteil gemessen das schlechtere
+    // Vorzeichen trägt, muss Über 2,5 übrig bleiben.
+    const both = {
+      fixtureId: 7, kickoff: "2026-09-10T18:00:00+02:00", country: "Deutschland",
+      league: "Bundesliga", homeTeam: "A", awayTeam: "B", crossLeague: false,
+      markets: [
+        {
+          key: "over25", label: "Über 2,5", selection: "Auswahl", pick: null, selectionTone: "neutral",
+          probability: 0.7, odds: 1.6, confidence: 90, score: null,
+          recommendation: { level: "none", label: "Nicht empfehlenswert" }, details: []
+        },
+        {
+          key: "draw", label: "Remis", selection: "Auswahl", pick: null, selectionTone: "neutral",
+          probability: 0.35, odds: 4, confidence: 90, score: null,
+          recommendation: { level: "none", label: "Nicht empfehlenswert" }, details: []
+        }
+      ]
+    } as unknown as DashboardFixture;
+
+    const settings = { ...DEFAULT_KELLY_SETTINGS, allowMultipleMarketsPerGame: false, minStake: 0 };
+    const { candidates } = computeKellyCandidates([both], "all", settings, null);
+    expect(candidates).toHaveLength(1);
+    expect(candidates[0]!.marketKey).toBe("over25");
   });
 
   it("rechnet den Erwartungswert aus der korrigierten Wahrscheinlichkeit", () => {
@@ -98,15 +170,13 @@ describe("Automatik im Kelly-Picker", () => {
 });
 
 describe("Gegenmärkte im Kelly-Picker", () => {
-  it("wählt einen Unter-Markt mit angehobener Wahrscheinlichkeit", () => {
+  it("hebt die Wahrscheinlichkeit eines Unter-Marktes an, wenn er selbst Vorteil hat", () => {
     // Über 2,5 behauptet 60 % und erreicht 45 % - also ist Unter 2,5 um 15 Punkte zu niedrig
-    // angesetzt: behauptet 40 %, tatsächlich 55 %. Die Quote 2,1 verlangt 47,6 %.
+    // angesetzt: behauptet 40 %, tatsächlich 55 %. Die Quote 2,6 verlangt 38,5 %, die Zeile
+    // hat damit schon roh 1,5 PP Vorteil und die Korrektur legt darauf.
     const profile = buildMarketProfile(observations("over25", 200, 90, 0.6, 1.9));
     const settings = recommendedSettings(DEFAULT_KELLY_SETTINGS);
-    const fixtures = [fixture("under25", 0.4, 2.1)];
-
-    // Ohne Korrektur sieht die Zeile nach einem Nachteil aus und fällt weg.
-    expect(computeKellyCandidates(fixtures, "all", settings, null).candidates).toHaveLength(0);
+    const fixtures = [fixture("under25", 0.4, 2.6)];
 
     const automatic = computeKellyCandidates(fixtures, "all", settings, profile);
     expect(automatic.candidates).toHaveLength(1);
@@ -115,7 +185,20 @@ describe("Gegenmärkte im Kelly-Picker", () => {
     // Nach oben korrigiert, nicht nach unten - das ist der Unterschied zu den Über-Märkten.
     expect(candidate.calibrationBias!).toBeGreaterThan(0);
     expect(candidate.calibratedProbability!).toBeGreaterThan(0.4);
-    expect(candidate.calibratedEdge!).toBeGreaterThan(0);
+    expect(candidate.calibratedEdge!).toBeGreaterThan(candidate.edge);
+  });
+
+  it("lässt einen Gegenmarkt nicht allein durch die Korrektur entstehen", () => {
+    // Dieselbe Korrektur, aber bei Quote 2,1 verlangt der Markt 47,6 % und das Modell sagt
+    // 40 % - roh also ein Nachteil von 7,6 PP. Angehoben käme die Zeile auf 55 % und sähe
+    // nach Vorteil aus; genau diesen Pfad sperrt `AUTO_RULE.minRawEdge`. Der Bias ist an
+    // Zeilen mit eigenem Vorteil gemessen und trägt hier nicht.
+    const profile = buildMarketProfile(observations("over25", 200, 90, 0.6, 1.9));
+    const settings = recommendedSettings(DEFAULT_KELLY_SETTINGS);
+    const fixtures = [fixture("under25", 0.4, 2.1)];
+
+    expect(computeKellyCandidates(fixtures, "all", settings, null).candidates).toHaveLength(0);
+    expect(computeKellyCandidates(fixtures, "all", settings, profile).candidates).toHaveLength(0);
   });
 
   it("empfiehlt keinen Gegenmarkt, wenn die Quote den Vorteil auffrisst", () => {

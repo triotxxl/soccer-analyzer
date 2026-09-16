@@ -2,11 +2,22 @@ import { act, cleanup, render, screen, waitFor, within } from "@testing-library/
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { FixtureInsightPanels, useFixtureInsights } from "./FixtureInsights";
-import type { FixtureInsights, InsightMatch } from "./types";
+import type { FixtureInsights, InsightMatch, InsightTeamStats } from "./types";
 
 const LEAGUE = { id: 78, name: "Bundesliga", country: "Deutschland", season: 2026 };
 const HOME = { id: 10, name: "Heim FC" };
 const AWAY = { id: 20, name: "Gast FC" };
+
+/** Statistiken einer Mannschaft; alles, was nicht genannt ist, führt die Partie nicht. */
+function stats(values: Partial<InsightTeamStats>): InsightTeamStats {
+  return {
+    possession: null, shots: null, shotsOnGoal: null, shotsOffGoal: null, blockedShots: null,
+    shotsInsideBox: null, shotsOutsideBox: null, corners: null, fouls: null, offsides: null,
+    yellowCards: null, redCards: null, goalkeeperSaves: null, totalPasses: null,
+    passesAccurate: null,
+    ...values
+  };
+}
 
 function match(overrides: Partial<InsightMatch> & { fixtureId: number }): InsightMatch {
   return {
@@ -26,12 +37,15 @@ function insights(overrides: Partial<FixtureInsights> = {}): FixtureInsights {
       match({
         fixtureId: 1, homeGoals: 2, awayGoals: 1, minutesComplete: true,
         goals: [{ teamId: HOME.id, minute: 5 }, { teamId: HOME.id, minute: 80 }, { teamId: AWAY.id, minute: 50 }],
-        stats: { home: { possession: 60, shots: 14, shotsOnGoal: 6 }, away: null }
+        stats: {
+          home: stats({ possession: 60, shots: 14, shotsOnGoal: 6, corners: 8, totalPasses: 400, passesAccurate: 320 }),
+          away: null
+        }
       }),
       match({
         fixtureId: 2, home: { id: 30, name: "Fremd FC" }, away: HOME, homeGoals: 0, awayGoals: 0,
         minutesComplete: true, goals: [],
-        stats: { home: null, away: { possession: 40, shots: 6, shotsOnGoal: 1 } }
+        stats: { home: null, away: stats({ possession: 40, shots: 6, shotsOnGoal: 1, corners: 4 }) }
       })
     ],
     awayMatches: [
@@ -42,14 +56,18 @@ function insights(overrides: Partial<FixtureInsights> = {}): FixtureInsights {
           { teamId: AWAY.id, minute: 20 }, { teamId: AWAY.id, minute: 25 },
           { teamId: AWAY.id, minute: 70 }, { teamId: 40, minute: 88 }
         ],
-        stats: { home: null, away: { possession: 48, shots: 11, shotsOnGoal: 4 } }
+        stats: { home: null, away: stats({ possession: 48, shots: 11, shotsOnGoal: 4, corners: 3 }) }
       })
     ],
     h2h: [
-      match({ fixtureId: 4, homeGoals: 3, awayGoals: 0, halfTimeHomeGoals: 1, halfTimeAwayGoals: 0 }),
+      match({
+        fixtureId: 4, homeGoals: 3, awayGoals: 0, halfTimeHomeGoals: 1, halfTimeAwayGoals: 0,
+        stats: { home: stats({ possession: 56, corners: 6 }), away: stats({ possession: 44, corners: 2 }) }
+      }),
       match({
         fixtureId: 5, home: AWAY, away: HOME, homeGoals: 2, awayGoals: 2,
-        halfTimeHomeGoals: 1, halfTimeAwayGoals: 2, date: "2025-11-02T18:00:00.000Z"
+        halfTimeHomeGoals: 1, halfTimeAwayGoals: 2, date: "2025-11-02T18:00:00.000Z",
+        stats: { home: stats({ possession: 52, corners: 5 }), away: stats({ possession: 48, corners: 7 }) }
       }),
       match({
         fixtureId: 6, leagueId: 81, league: "DFB-Pokal", homeGoals: 0, awayGoals: 1,
@@ -72,7 +90,7 @@ describe("Torphasen", () => {
 
   it("zeigt Tore je Viertelstunde und rechnet auf Heim- und Auswärtsspiele", async () => {
     const user = userEvent.setup();
-    panels();
+    const { panel } = panels();
 
     const scored = globalThis.document.querySelectorAll<HTMLElement>(".period-row.scored");
     // Nur das Heimspiel des Heimteams zählt: zwei Tore, in der ersten und der sechsten Phase.
@@ -81,7 +99,7 @@ describe("Torphasen", () => {
       .toEqual(["1", "0", "0", "0", "0", "1"]);
     expect(globalThis.document.querySelector(".period-head small")).toHaveTextContent("1 Partie · nur Heimspiele");
 
-    await user.click(screen.getByRole("checkbox", { name: "Heim / Auswärts" }));
+    await user.click(panel("Torphasen").getByRole("checkbox", { name: "Heim / Auswärts" }));
 
     // Ohne Ortsfilter kommt das torlose Auswärtsspiel des Heimteams dazu.
     expect(globalThis.document.querySelector(".period-head small")).toHaveTextContent("2 Partien");
@@ -109,7 +127,7 @@ describe("Torphasen", () => {
     const data = insights();
     panels({ ...data, home: { ...data.home, logo: "https://media.example/10.png" } });
 
-    const crests = [...globalThis.document.querySelectorAll<HTMLElement>(".period-row .period-crest")];
+    const crests = [...globalThis.document.querySelectorAll<HTMLElement>(".period-row .team-crest")];
     expect(crests[0]).toHaveAttribute("src", "https://media.example/10.png");
     expect(crests[1]).toHaveTextContent("GA");
   });
@@ -170,6 +188,21 @@ describe("Direkte Begegnungen", () => {
     expect(globalThis.document.querySelectorAll(".h2h-row")).toHaveLength(2);
   });
 
+  it("behält beim Ligafilter die Duelle früherer Spielzeiten", async () => {
+    const user = userEvent.setup();
+    const data = insights();
+    const { panel } = panels({
+      ...data,
+      // Dasselbe Duell, nur aus der Vorsaison - derselbe Wettbewerb bleibt derselbe Wettbewerb.
+      h2h: data.h2h.map((item, index) => (index === 1 ? { ...item, season: 2025 } : item))
+    });
+    await user.click(panel("Direkte Begegnungen").getByRole("checkbox", { name: "Diese Liga" }));
+
+    // Nur das Pokalduell fällt heraus, das Bundesligaduell der Vorsaison bleibt.
+    expect(screen.queryByText("DFB-Pokal")).not.toBeInTheDocument();
+    expect(globalThis.document.querySelectorAll(".h2h-row")).toHaveLength(2);
+  });
+
   it("hält die Liste ohne Auswahl leer statt leer wirkend", async () => {
     const user = userEvent.setup();
     const { panel } = panels({ ...insights(), h2h: [] });
@@ -177,6 +210,246 @@ describe("Direkte Begegnungen", () => {
     expect(panel("Direkte Begegnungen").getByText("S ×0")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "%" }));
     expect(panel("Direkte Begegnungen").getByText("S –")).toBeInTheDocument();
+  });
+});
+
+describe("Match-Statistiken", () => {
+  afterEach(cleanup);
+
+  const line = (label: string) => [...globalThis.document.querySelectorAll<HTMLElement>(".match-stat")]
+    .find((item) => item.querySelector(".match-stat-label")?.textContent === label)!;
+  const values = (label: string) =>
+    [...line(label).querySelectorAll(".match-stat-number")].map((item) => item.textContent);
+  const basis = (label: string) => line(label).querySelector(".match-stat-basis")?.textContent;
+  const widths = (label: string) =>
+    [...line(label).querySelectorAll<HTMLElement>(".match-stat-fill")].map((item) => item.style.width);
+  const rings = (caption: string) => [...globalThis.document.querySelectorAll<HTMLElement>(".stat-ring-group")]
+    .find((item) => item.querySelector("figcaption")?.textContent === caption)!;
+
+  /** Fünf Partien je Team - nur so entsteht ein Ø von 0,2 roten Karten. */
+  function seasonInsights(): FixtureInsights {
+    const run = (side: "home" | "away", reds: number[]) => reds.map((red, index) => match({
+      fixtureId: (side === "home" ? 100 : 200) + index,
+      stats: side === "home"
+        ? { home: stats({ redCards: red, shotsOutsideBox: 8, corners: 8 }), away: null }
+        : { home: null, away: stats({ redCards: red, shotsOutsideBox: 4, corners: 4 }) }
+    }));
+    return insights({
+      homeMatches: run("home", [1, 0, 0, 0, 0]),
+      awayMatches: run("away", [0, 0, 0, 0, 0])
+    });
+  }
+
+  it("legt beide Anteile gleichgerichtet in eine Spur vom Ø-Gesamtwert", () => {
+    const { panel } = panels();
+    const view = panel("Match-Statistiken");
+    expect(view.getByText("Ø letzte 5 Spiele")).toBeInTheDocument();
+    // Der volle Katalog ohne die beiden Prozentkennzahlen, die als Ringe darüber stehen.
+    expect(globalThis.document.querySelectorAll(".match-stat")).toHaveLength(14);
+    expect(globalThis.document.querySelectorAll(".match-stat .match-stat-bar")).toHaveLength(28);
+    // Heim FC 6,0 Ecken, Gast FC 3,0 - die Spur ist die Summe, die Anteile sind 2/3 und 1/3.
+    expect(values("Ecken")).toEqual(["6,0", "3,0"]);
+    expect(basis("Ecken")).toBe("Ø 9,0");
+    expect(widths("Ecken").map((width) => Math.round(Number.parseFloat(width)))).toEqual([67, 33]);
+    // Beide starten am linken Rand; nur der Abweichungsmodus rückt sie ein.
+    expect([...line("Ecken").querySelectorAll<HTMLElement>(".match-stat-fill")]
+      .map((item) => item.style.marginLeft)).toEqual(["0%", "0%"]);
+  });
+
+  it("zeigt eine Kennzahl ohne Daten als Strich", () => {
+    panels();
+    expect(values("Abseits")).toEqual(["–", "–"]);
+    expect(basis("Abseits")).toBe("Ø –");
+    // Der Balken bleibt dabei leer statt auf eine erfundene Null zu laufen.
+    expect(widths("Abseits")).toEqual(["0%", "0%"]);
+  });
+
+  it("gruppiert die Zeilen in Offensiv und Defensiv", () => {
+    const { panel } = panels();
+    const view = panel("Match-Statistiken");
+    expect(view.getByRole("heading", { name: "Offensiv" })).toBeInTheDocument();
+    expect(view.getByRole("heading", { name: "Defensiv" })).toBeInTheDocument();
+    const groups = [...globalThis.document.querySelectorAll<HTMLElement>(".match-stat-group")];
+    const labels = (group: HTMLElement) =>
+      [...group.querySelectorAll(".match-stat-label")].map((item) => item.textContent);
+    expect(labels(groups[0]!)).toContain("Ecken");
+    expect(labels(groups[1]!)).toEqual([
+      "Geblockte Schüsse", "Torwartparaden", "Fouls", "Gelbe Karten", "Rote Karten"
+    ]);
+  });
+
+  it("kennzeichnet die überlegene Seite in zwei Stufen", () => {
+    panels();
+    // 6,0 gegen 3,0 Ecken sind 50 % Unterschied: klar überlegen, also dicker Balken.
+    const corners = line("Ecken");
+    expect(corners.querySelector(".match-stat-number.lead")).toHaveTextContent("6,0");
+    expect(corners.querySelector(".match-stat-bar.home")!.className).toContain("strong");
+    expect(corners.querySelector(".match-stat-bar.away")!.className).toContain("dim");
+    // 10,0 gegen 11,0 Schüsse sind 9 %: leicht überlegen, der Balken bleibt normal hoch.
+    const shots = line("Schüsse insgesamt");
+    expect(shots.querySelector(".match-stat-number.lead")).toHaveTextContent("11,0");
+    expect(shots.querySelector(".match-stat-bar.away")!.className).not.toContain("strong");
+    expect(shots.querySelector(".match-stat-bar.home")!.className).toContain("dim");
+  });
+
+  it("bewertet weder uneindeutige Richtungen noch zu kleine Größen", () => {
+    panels(seasonInsights());
+    // Schüsse außerhalb: 8,0 gegen 4,0, aber hoch ist dort nicht besser als niedrig.
+    expect(line("Schüsse außerhalb").querySelector(".lead")).toBeNull();
+    expect(line("Schüsse außerhalb").querySelector(".dim")).toBeNull();
+    // 0,2 gegen 0,0 rote Karten ist eine einzige Karte über fünf Spiele.
+    expect(values("Rote Karten")).toEqual(["0,20", "0,00"]);
+    expect(line("Rote Karten").querySelector(".lead")).toBeNull();
+    expect(line("Rote Karten").querySelector(".dim")).toBeNull();
+    // Gegenprobe mit derselben Datenlage, nur mit eindeutiger Richtung und größerem Wert.
+    expect(line("Ecken").querySelector(".match-stat-number.lead")).toHaveTextContent("8,0");
+  });
+
+  it("schaltet auf die Abweichung vom Vergleichsschnitt um", async () => {
+    const user = userEvent.setup();
+    const { panel } = panels();
+    const view = panel("Match-Statistiken");
+    expect(view.getByText(/Spurlänge ist der Ø-Gesamtwert/)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Abweichung" }));
+
+    expect(view.getByText(/Mittellinie ist der Vergleichsschnitt/)).toBeInTheDocument();
+    // Schnitt der Ecken über beide Seiten aller sieben Partien mit Werten: 35 / 7 = 5,0.
+    expect(basis("Ecken")).toBe("Ø Vergleich 5,0");
+    expect(values("Ecken")).toEqual(["+20 %", "−40 %"]);
+    // Nach rechts über dem Schnitt, nach links darunter - die Nulllinie liegt bei 50 %.
+    const fills = [...line("Ecken").querySelectorAll<HTMLElement>(".match-stat-fill")];
+    expect(Math.round(Number.parseFloat(fills[0]!.style.marginLeft))).toBe(50);
+    expect(Math.round(Number.parseFloat(fills[1]!.style.marginLeft))).toBeLessThan(50);
+  });
+
+  it("lässt eine Zeile ohne Vergleichsschnitt im Abweichungsmodus leer", async () => {
+    const user = userEvent.setup();
+    panels();
+    await user.click(screen.getByRole("button", { name: "Abweichung" }));
+    expect(basis("Abseits")).toBe("Ø Vergleich –");
+    expect(values("Abseits")).toEqual(["–", "–"]);
+    expect(widths("Abseits")).toEqual(["0%", "0%"]);
+  });
+
+  it("löst beim Umschalten keinen weiteren Abruf aus", async () => {
+    const user = userEvent.setup();
+    const fetched = vi.fn();
+    vi.stubGlobal("fetch", fetched);
+    panels();
+    await user.click(screen.getByRole("button", { name: "Abweichung" }));
+    await user.click(screen.getByRole("button", { name: "Direkte Duelle" }));
+    expect(fetched).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
+  });
+
+  it("stellt Ballbesitz und Passquote als Ringe über die Liste", () => {
+    panels();
+    // Die Werte der letzten Spiele stammen aus verschiedenen Partien: zwei getrennte Ringe,
+    // keine Aufteilung auf 100 - 50 und 48 ergeben zusammen 98.
+    expect(rings("Ballbesitz").querySelector(".stat-ring-split")).toBeNull();
+    expect([...rings("Ballbesitz").querySelectorAll(".stat-ring-number")].map((item) => item.textContent))
+      .toEqual(["50 %", "48 %"]);
+    expect([...rings("Passquote").querySelectorAll(".stat-ring-number")].map((item) => item.textContent))
+      .toEqual(["80,0 %", "–"]);
+    // Die Zahl liegt als HTML über dem SVG, nicht als <text> darin.
+    expect(globalThis.document.querySelectorAll(".stat-ring svg text")).toHaveLength(0);
+    // Und keine Zeile führt sie zusätzlich als Spur.
+    expect(line("Ballbesitz")).toBeUndefined();
+    expect(line("Passquote")).toBeUndefined();
+  });
+
+  it("teilt den Ballbesitz der direkten Duelle in einen Ring", async () => {
+    const user = userEvent.setup();
+    const { panel } = panels();
+    await user.click(screen.getByRole("button", { name: "Direkte Duelle" }));
+
+    expect(panel("Match-Statistiken").getByText("Ø letzte 5 direkte Duelle")).toBeInTheDocument();
+    // Beide Seiten mitteln über dieselben Duelle, der Ballbesitz teilt sich also auf 100 %.
+    const split = rings("Ballbesitz").querySelector(".stat-ring-split")!;
+    expect([...split.querySelectorAll(".stat-ring-value")].map((item) => item.textContent))
+      .toEqual(["52 %", "48 %"]);
+    // Der Heimanteil läuft gegen den Uhrzeigersinn und liegt damit links, wie sein Wert.
+    expect(split.querySelector(".stat-ring-fill.home")).toHaveAttribute("transform", expect.stringContaining("scale(-1 1)"));
+  });
+
+  it("stellt Heimform gegen Auswärtsform", async () => {
+    const user = userEvent.setup();
+    const { panel } = panels();
+    const view = panel("Match-Statistiken");
+    await user.click(view.getByRole("checkbox", { name: "Heim / Auswärts" }));
+
+    // Heim FC nur zuhause: 8,0 statt 6,0 Ecken. Gast FC hat ohnehin nur ein Auswärtsspiel.
+    expect(values("Ecken")).toEqual(["8,0", "3,0"]);
+    expect(view.getByText("1 Partie · nur Heimspiele")).toBeInTheDocument();
+    expect(view.getByText("1 Partie · nur Auswärtsspiele")).toBeInTheDocument();
+    // Der Ballbesitz der Heimspiele steht ohne das Auswärtsspiel bei 60 %.
+    expect([...rings("Ballbesitz").querySelectorAll(".stat-ring-number")].map((item) => item.textContent))
+      .toEqual(["60 %", "48 %"]);
+  });
+
+  it("behält im Duellmodus nur die Duelle im Stadion des Heimteams", async () => {
+    const user = userEvent.setup();
+    const { panel } = panels();
+    const view = panel("Match-Statistiken");
+    await user.click(screen.getByRole("button", { name: "Direkte Duelle" }));
+    await user.click(view.getByRole("checkbox", { name: "Heim / Auswärts" }));
+
+    // Das Rückspiel im Stadion von Gast FC fällt heraus.
+    expect(values("Ecken")).toEqual(["6,0", "2,0"]);
+    // Beide Seiten mitteln weiter über dieselben Duelle, der Ballbesitz teilt sich auf 100 %.
+    const split = rings("Ballbesitz").querySelector(".stat-ring-split")!;
+    expect([...split.querySelectorAll(".stat-ring-value")].map((item) => item.textContent))
+      .toEqual(["56 %", "44 %"]);
+  });
+
+  it("fällt auf zwei Ringe zurück, wenn die Anteile kein Ganzes ergeben", async () => {
+    const user = userEvent.setup();
+    const data = insights();
+    // Das zweite Duell führt den Ballbesitz nur für eine Seite: Heim mittelt über zwei
+    // Partien, Auswärts über eine - zusammen ergibt das nicht 100.
+    panels({
+      ...data,
+      h2h: [
+        match({ fixtureId: 4, stats: { home: stats({ possession: 60 }), away: stats({ possession: 40 }) } }),
+        match({ fixtureId: 5, stats: { home: stats({ possession: 50 }), away: null } })
+      ]
+    });
+    await user.click(screen.getByRole("button", { name: "Direkte Duelle" }));
+
+    const group = rings("Ballbesitz");
+    expect(group.querySelector(".stat-ring-split")).toBeNull();
+    expect([...group.querySelectorAll(".stat-ring-number")].map((item) => item.textContent))
+      .toEqual(["55 %", "40 %"]);
+  });
+
+  it("nennt fehlende direkte Duelle beim Namen, statt es API-Football anzulasten", async () => {
+    const user = userEvent.setup();
+    panels({ ...insights(), h2h: [] });
+    await user.click(screen.getByRole("button", { name: "Direkte Duelle" }));
+
+    expect(screen.getByText("Für diese Partie sind keine direkten Duelle hinterlegt.")).toBeInTheDocument();
+  });
+
+  it("begrenzt die Anzahl der Partien und schreibt sie in die Überschrift", async () => {
+    const user = userEvent.setup();
+    const { panel } = panels();
+    await user.selectOptions(screen.getByRole("combobox", { name: "Anzahl betrachteter Spiele" }), "1");
+
+    expect(panel("Match-Statistiken").getByText("Ø letztes Spiel")).toBeInTheDocument();
+    // Nur noch die jüngste Partie je Team.
+    expect(values("Ecken")).toEqual(["8,0", "3,0"]);
+  });
+
+  it("weist eine Auswahl ganz ohne Statistiken aus", async () => {
+    const user = userEvent.setup();
+    const data = insights();
+    panels({ ...data, h2h: data.h2h.map((item) => ({ ...item, stats: { home: null, away: null } })) });
+    await user.click(screen.getByRole("button", { name: "Direkte Duelle" }));
+
+    expect(screen.getByText("Für diese Partien führt API-Football keine Statistikwerte.")).toBeInTheDocument();
+    expect(globalThis.document.querySelectorAll(".match-stat")).toHaveLength(0);
+    expect(globalThis.document.querySelectorAll(".stat-ring-group")).toHaveLength(0);
   });
 });
 

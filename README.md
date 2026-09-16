@@ -42,6 +42,27 @@ erscheinen dort erst, wenn die Option **Laufende / beendete Partien** gesetzt is
 sind in der Tabelle mit `angepfiffen` gekennzeichnet. In der Live-Ansicht erscheinen sie
 unabhängig davon.
 
+### Detailansicht einer Partie
+
+Klappt die Übersicht eine Partie auf, öffnet sich ein Seitenpanel mit Torphasen je
+Viertelstunde, den direkten Duellen, **Match-Statistiken** und den Trends der letzten
+Spiele. Die Match-Statistiken stellen die Durchschnittswerte beider Teams je Kennzahl als
+zwei Balken untereinander gegenüber — Ballbesitz, Schüsse und ihre Aufschlüsselung, Ecken,
+Fouls, Abseits, Karten, Paraden, Pässe und die daraus gerechnete Passquote. Im Panelkopf
+wird zwischen **Letzte Spiele** und **Direkte Duelle** umgeschaltet und die Anzahl der
+betrachteten Partien zwischen 1 und 5 gewählt.
+
+Die Werte reichen nur so weit, wie API-Football zu den historischen Partien überhaupt
+Statistiken führt: Die Abdeckung schwankt stark je Liga, eine fehlende Kennzahl erscheint
+als `–` und geht nie als `0` in einen Mittelwert ein. Die Datenbasis-Zeile nennt deshalb
+je Team, über wie viele Partien tatsächlich gemittelt wurde. Ballbesitz summiert sich nur
+im Modus **Direkte Duelle** auf 100 %, weil dort beide Seiten über dieselben Partien
+gemittelt werden; bei **Letzte Spiele** stammen die Werte aus verschiedenen Begegnungen
+und werden bewusst nicht auf 100 % normiert.
+
+Alle Umschalter im Panel rechnen auf dem bereits geladenen Bestand und lösen keinen
+weiteren API-Aufruf aus.
+
 ### Live-Ansicht
 
 Oben in der Seitenleiste wird zwischen **Pre-Match** und **Live** umgeschaltet. Die

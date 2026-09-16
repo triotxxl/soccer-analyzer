@@ -1,19 +1,24 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import {
   H2H_COUNT_OPTIONS,
+  MATCH_STAT_COUNT_OPTIONS,
   SCORING_PERIOD_LABELS,
   TREND_MATCH_COUNT,
   inLeague,
+  matchStats,
   outcomeOf,
   scoringPeriods,
   selectH2h,
+  statBaselines,
   trends,
   useFixtureInsights,
   type InsightsLoadState,
   type LeagueScope,
+  type MatchStatRow,
   type ScoringPeriods,
   type TrendSummary
 } from "./insights";
+import { TeamCrest } from "./TeamCrest";
 import type { FixtureInsights as FixtureInsightsData, InsightMatch } from "./types";
 
 /** Tore je Viertelstunde, ab denen eine Zelle voll ausgefärbt ist. */
@@ -47,15 +52,6 @@ function periodStyle(value: number, peak: number, tone: "scored" | "conceded") {
   return { background: tone === "scored" ? `rgba(137,209,133,${alpha})` : `rgba(241,76,76,${alpha})` };
 }
 
-/** Wappen des Teams; fehlt die URL oder lädt sie nicht, treten die Initialen an ihre Stelle. */
-function TeamCrest({ team }: { team: PeriodTeam }) {
-  const [failed, setFailed] = useState(false);
-  if (!team.logo || failed) {
-    return <span className="period-crest fallback" aria-hidden>{team.name.slice(0, 2).toUpperCase()}</span>;
-  }
-  return <img className="period-crest" src={team.logo} alt="" loading="lazy" onError={() => setFailed(true)} />;
-}
-
 function PeriodRow({ team, label, values, total, tone, peak, matches, venue }: {
   team: PeriodTeam;
   label: string;
@@ -70,7 +66,7 @@ function PeriodRow({ team, label, values, total, tone, peak, matches, venue }: {
     className={`period-row ${tone}`}
     title={`${team.name} · ${label === "erzielt" ? "erzielte" : "kassierte"} Tore · ${matchLabel(matches)}${venue ? ` (nur ${venue})` : ""}`}
   >
-    <TeamCrest team={team} />
+    <TeamCrest name={team.name} logo={team.logo} />
     <span className="period-label">{label}</span>
     <strong className="period-total">{total}</strong>
     {values.map((value, index) => <span
@@ -163,7 +159,7 @@ function H2hRow({ match, homeTeamId, timezone }: { match: InsightMatch; homeTeam
   const outcome = outcomeOf(match, homeTeamId);
   const hasHalfTime = match.halfTimeHomeGoals !== null && match.halfTimeAwayGoals !== null;
   const winner = match.homeGoals === match.awayGoals ? null : match.homeGoals > match.awayGoals ? "home" : "away";
-  return <li className={`h2h-row ${outcome}`}>
+  return <li className="h2h-row">
     <span className="h2h-row-date">{new Intl.DateTimeFormat("de-DE", {
       timeZone: timezone, day: "2-digit", month: "2-digit", year: "2-digit"
     }).format(new Date(match.date))}</span>
@@ -195,8 +191,10 @@ function H2hPanel({ insights, scope, timezone }: {
   const [limit, setLimit] = useState<number>(6);
   const [asShare, setAsShare] = useState(false);
 
+  // Ohne Saison: Duelle laufen über Spielzeiten hinweg, "Diese Liga" meint hier alle
+  // Begegnungen in diesem Wettbewerb - nicht nur die der laufenden Saison.
   const selection = useMemo(() => selectH2h(insights.h2h, insights.home.id, {
-    homeOnly, scope: leagueOnly ? scope : null, limit
+    homeOnly, scope: leagueOnly ? { id: scope.id } : null, limit
   }), [insights, homeOnly, leagueOnly, scope, limit]);
   const { summary } = selection;
 
@@ -250,6 +248,351 @@ function H2hPanel({ insights, scope, timezone }: {
             match={match} homeTeamId={insights.home.id} timezone={timezone} key={match.fixtureId}
           />)}</ul>
         </div>)}
+  </section>;
+}
+
+type StatSide = "home" | "away";
+type StatView = "share" | "dev";
+
+/** Ab dieser relativen Differenz gilt eine Seite als leicht, ab der zweiten als klar überlegen. */
+const SUPERIOR_SLIGHT = 0.08;
+const SUPERIOR_CLEAR = 0.25;
+/**
+ * Kennzahlen mit kleinerem Ø-Gesamtwert bleiben unbewertet: 0,2 gegen 0,0 rote Karten über
+ * fünf Spiele ist eine einzige Karte und keine Überlegenheit - relativ gerechnet aber 100 %.
+ */
+const SUPERIORITY_FLOOR = 1;
+/** Die Abweichungsskala endet bei ±60 %; darüber liegende Werte werden gekappt. */
+const DEVIATION_CAP = 0.6;
+
+const VIEW_HINTS: Record<StatView, string> = {
+  share: "Spurlänge ist der Ø-Gesamtwert beider Teams, beide Anteile laufen von links.",
+  dev: "Mittellinie ist der Vergleichsschnitt, nach rechts darüber, nach links darunter. Skala bis ±60 %."
+};
+
+const STAT_GROUPS: Array<{ id: MatchStatRow["group"]; title: string }> = [
+  { id: "off", title: "Offensiv" },
+  { id: "def", title: "Defensiv" }
+];
+
+function statValue(row: MatchStatRow, side: StatSide): string {
+  const value = side === "home" ? row.home : row.away;
+  if (value === null) return "–";
+  return `${decimal(value, row.digits)}${row.unit ? ` ${row.unit}` : ""}`;
+}
+
+interface Superiority {
+  leader: StatSide | null;
+  level: "slight" | "clear" | null;
+}
+
+/**
+ * Welche Seite als überlegen gilt. Bewertet wird nur, wo die bessere Richtung eindeutig ist
+ * und der Ø-Gesamtwert groß genug, dass eine relative Differenz überhaupt etwas bedeutet.
+ * Die 8-%-Schwelle fängt nebenbei ab, was sich erst hinter der angezeigten Genauigkeit
+ * unterscheidet: 10,4 gegen 10,44 bekommt keinen Sieger.
+ */
+function superiority(row: MatchStatRow): Superiority {
+  const none: Superiority = { leader: null, level: null };
+  if (row.better === null || row.home === null || row.away === null) return none;
+  const peak = Math.max(row.home, row.away);
+  if (row.home + row.away < SUPERIORITY_FLOOR || peak <= 0) return none;
+  const difference = Math.abs(row.home - row.away) / peak;
+  if (difference < SUPERIOR_SLIGHT) return none;
+  const higher: StatSide = row.home > row.away ? "home" : "away";
+  return {
+    leader: row.better === "higher" ? higher : higher === "home" ? "away" : "home",
+    level: difference >= SUPERIOR_CLEAR ? "clear" : "slight"
+  };
+}
+
+/** Abweichung vom Vergleichsschnitt, auf die Skala gekappt. `null`, wenn sie nicht zu bilden ist. */
+function deviation(value: number | null, baseline: number | null): number | null {
+  if (value === null || baseline === null || baseline <= 0) return null;
+  return Math.max(-DEVIATION_CAP, Math.min(DEVIATION_CAP, (value - baseline) / baseline));
+}
+
+/** Vorzeichenbehaftet mit echtem Minuszeichen (U+2212), damit es auf Höhe des Pluszeichens sitzt. */
+function deviationLabel(value: number | null, baseline: number | null): string {
+  const change = deviation(value, baseline);
+  if (change === null) return "–";
+  const percent = Math.round(change * 100);
+  if (percent === 0) return "±0 %";
+  return `${percent > 0 ? "+" : "−"}${Math.abs(percent)} %`;
+}
+
+/**
+ * Länge und Lage eines Balkens. Im Anteilsmodus ist die Spur der Ø-Gesamtwert beider Teams
+ * und beide Anteile starten links - gleichgerichtete Längen auf gemeinsamer Grundlinie sind
+ * der Vergleich, den Menschen am genauesten lesen. Im Abweichungsmodus liegt die Nulllinie
+ * mittig, nach rechts heißt über dem Vergleichsschnitt, nach links darunter.
+ */
+function barGeometry(
+  row: MatchStatRow,
+  side: StatSide,
+  view: StatView,
+  baseline: number | null
+): { width: number; offset: number } {
+  const value = side === "home" ? row.home : row.away;
+  if (value === null) return { width: 0, offset: 0 };
+  if (view === "share") {
+    const total = (row.home ?? 0) + (row.away ?? 0);
+    return { width: total > 0 ? Math.min(100, (value / total) * 100) : 0, offset: 0 };
+  }
+  const change = deviation(value, baseline);
+  if (change === null) return { width: 0, offset: 0 };
+  const width = (Math.abs(change) / DEVIATION_CAP) * 50;
+  return { width, offset: change >= 0 ? 50 : 50 - width };
+}
+
+function MatchStatBar({ row, side, view, baseline, mark }: {
+  row: MatchStatRow;
+  side: StatSide;
+  view: StatView;
+  baseline: number | null;
+  mark: Superiority;
+}) {
+  const { width, offset } = barGeometry(row, side, view, baseline);
+  const value = side === "home" ? row.home : row.away;
+  const lead = mark.leader === side;
+  // Der unterlegene Balken wird gedämpft, der klar führende zusätzlich dicker.
+  const emphasis = mark.leader === null ? "" : lead ? (mark.level === "clear" ? " strong" : "") : " dim";
+  return <div className={`match-stat-bar ${side}${emphasis}`}>
+    <span className="match-stat-track">
+      <span className="match-stat-fill" style={{ width: `${width}%`, marginLeft: `${offset}%` }} />
+    </span>
+    <span className={`match-stat-number ${side}${lead ? " lead" : ""}`}>
+      {view === "dev" ? deviationLabel(value, baseline) : statValue(row, side)}
+    </span>
+  </div>;
+}
+
+function MatchStatLine({ row, view, baseline }: {
+  row: MatchStatRow;
+  view: StatView;
+  baseline: number | null;
+}) {
+  const mark = superiority(row);
+  const total = (row.home ?? 0) + (row.away ?? 0);
+  const basis = view === "dev"
+    ? `Ø Vergleich ${baseline === null ? "–" : decimal(baseline, row.digits)}`
+    : `Ø ${row.home === null && row.away === null ? "–" : decimal(total, row.digits)}`;
+  return <div className="match-stat">
+    <div className="match-stat-head">
+      <span className="match-stat-label">{row.label}</span>
+      <span className="match-stat-basis">{basis}</span>
+    </div>
+    <MatchStatBar row={row} side="home" view={view} baseline={baseline} mark={mark} />
+    <MatchStatBar row={row} side="away" view={view} baseline={baseline} mark={mark} />
+  </div>;
+}
+
+const RING_SIZE = 54;
+const RING_RADIUS = 24;
+const RING_CENTRE = RING_SIZE / 2;
+const RING_LENGTH = 2 * Math.PI * RING_RADIUS;
+/** Ein Ring füllt sich vom Scheitel im Uhrzeigersinn. */
+const RING_CLOCKWISE = `rotate(-90 ${RING_CENTRE} ${RING_CENTRE})`;
+/**
+ * Gegen den Uhrzeigersinn: Damit liegt der Heimanteil des geteilten Rings links und passt
+ * zum Heimwert, der links daneben steht.
+ */
+const RING_ANTICLOCKWISE = `translate(${RING_SIZE} 0) scale(-1 1) ${RING_CLOCKWISE}`;
+
+function ringArc(share: number, after = 0) {
+  return {
+    strokeDasharray: `${Math.max(0, Math.min(1, share)) * RING_LENGTH} ${RING_LENGTH}`,
+    strokeDashoffset: -after * RING_LENGTH
+  };
+}
+
+function ringLabel(value: number | null, digits: number): string {
+  return value === null ? "–" : `${decimal(value, digits)} %`;
+}
+
+function RingTrack({ children }: { children: ReactNode }) {
+  return <svg viewBox={`0 0 ${RING_SIZE} ${RING_SIZE}`} width={RING_SIZE} height={RING_SIZE} aria-hidden>
+    <circle className="stat-ring-track" cx={RING_CENTRE} cy={RING_CENTRE} r={RING_RADIUS} />
+    {children}
+  </svg>;
+}
+
+/**
+ * Ein Ring je Seite. Die Zahl liegt als absolut positioniertes HTML über dem SVG - als
+ * Text im SVG würde sie mit dem Ring skalieren und aus der Schriftgrößenordnung fallen.
+ */
+function StatRing({ value, digits, tone }: { value: number | null; digits: number; tone: StatSide }) {
+  return <div className="stat-ring">
+    <RingTrack>
+      {value !== null && <circle
+        className={`stat-ring-fill ${tone}`}
+        cx={RING_CENTRE} cy={RING_CENTRE} r={RING_RADIUS}
+        transform={RING_CLOCKWISE}
+        {...ringArc(value / 100)}
+      />}
+    </RingTrack>
+    <span className={`stat-ring-number ${tone}`}>{ringLabel(value, digits)}</span>
+  </div>;
+}
+
+/**
+ * Ein geteilter Ring für die direkten Duelle: Beide Seiten mitteln dort über dieselben
+ * Partien, die beiden Werte summieren sich also auf 100 und gehören in einen Ring.
+ */
+function SplitRing({ home, away, digits }: { home: number | null; away: number | null; digits: number }) {
+  const share = (value: number | null) => (value === null ? 0 : value / 100);
+  return <div className="stat-ring-split">
+    <span className="stat-ring-value home">{ringLabel(home, digits)}</span>
+    <RingTrack>
+      <circle
+        className="stat-ring-fill home" cx={RING_CENTRE} cy={RING_CENTRE} r={RING_RADIUS}
+        transform={RING_ANTICLOCKWISE} {...ringArc(share(home))}
+      />
+      <circle
+        className="stat-ring-fill away" cx={RING_CENTRE} cy={RING_CENTRE} r={RING_RADIUS}
+        transform={RING_ANTICLOCKWISE} {...ringArc(share(away), share(home))}
+      />
+    </RingTrack>
+    <span className="stat-ring-value away">{ringLabel(away, digits)}</span>
+  </div>;
+}
+
+/**
+ * Ein geteilter Ring behauptet ein Ganzes, und das darf er nur, wenn die beiden Anteile
+ * zusammen auch 100 ergeben. Im Duellmodus ist das der Regelfall - aber nur, solange beide
+ * Seiten über dieselben Partien mitteln. Führt ein Duell den Ballbesitz für eine Mannschaft
+ * nicht, laufen die Teilmengen auseinander: Über 100 liefe der Auswärtsbogen über den
+ * Heimbogen hinweg, darunter bliebe eine Lücke, die wie ein fehlender Wert aussieht.
+ */
+function splitsWhole(row: MatchStatRow): boolean {
+  return row.home !== null && row.away !== null && Math.abs(row.home + row.away - 100) < 0.5;
+}
+
+/**
+ * Prozentkennzahlen stehen als Ringe über der Liste: Ihre Bezugsgröße ist 100 und nicht der
+ * Ø-Gesamtwert beider Teams, eine Spur würde also etwas anderes messen als die Zeilen darunter.
+ * Im Modus "Letzte Spiele" stammen die Ballbesitzwerte aus verschiedenen Partien - deshalb
+ * zwei getrennte Ringe mit den echten Mittelwerten statt einer Aufteilung auf 100.
+ */
+function MatchStatRings({ rows, source }: { rows: MatchStatRow[]; source: "recent" | "h2h" }) {
+  const possession = rows.find((row) => row.key === "possession");
+  const accuracy = rows.find((row) => row.key === "passAccuracy");
+  return <div className="match-stat-rings">
+    {possession && <figure className="stat-ring-group">
+      {source === "h2h" && splitsWhole(possession)
+        ? <SplitRing home={possession.home} away={possession.away} digits={possession.digits} />
+        : <div className="stat-ring-pair">
+            <StatRing value={possession.home} digits={possession.digits} tone="home" />
+            <StatRing value={possession.away} digits={possession.digits} tone="away" />
+          </div>}
+      <figcaption>{possession.label}</figcaption>
+    </figure>}
+    {accuracy && <figure className="stat-ring-group">
+      <div className="stat-ring-pair">
+        <StatRing value={accuracy.home} digits={accuracy.digits} tone="home" />
+        <StatRing value={accuracy.away} digits={accuracy.digits} tone="away" />
+      </div>
+      <figcaption>{accuracy.label}</figcaption>
+    </figure>}
+  </div>;
+}
+
+function MatchStatsPanel({ insights, scope }: { insights: FixtureInsightsData; scope: LeagueScope }) {
+  const [source, setSource] = useState<"recent" | "h2h">("recent");
+  const [limit, setLimit] = useState<number>(5);
+  const [view, setView] = useState<StatView>("share");
+  const [venueOnly, setVenueOnly] = useState(false);
+
+  // Bewusst ohne "Diese Liga"-Schalter: die Überschrift verspricht die letzten N Spiele,
+  // nicht die letzten N Ligaspiele. `matchStats` kann eine Ligaeinschränkung wie die
+  // übrigen Panels abbilden, dieses Panel aktiviert sie nur nicht.
+  void scope;
+  const rows = useMemo(
+    () => matchStats(insights, { source, limit, venueOnly }),
+    [insights, source, limit, venueOnly]
+  );
+  // Der Vergleichsschnitt hängt bewusst nicht an der Auswahl: Verschöbe er sich mit ihr,
+  // liefe die Abweichung teils gegen sich selbst. Beide Umschalter rechnen auf dem bereits
+  // geladenen Bestand und lösen keinen weiteren Abruf aus.
+  const baselines = useMemo(() => statBaselines(insights), [insights]);
+
+  const noun = source === "h2h"
+    ? limit === 1 ? "letztes direktes Duell" : `letzte ${limit} direkte Duelle`
+    : limit === 1 ? "letztes Spiel" : `letzte ${limit} Spiele`;
+  const homeMatches = Math.max(...rows.map((row) => row.homeMatches));
+  const awayMatches = Math.max(...rows.map((row) => row.awayMatches));
+  const empty = rows.every((row) => row.home === null && row.away === null);
+  // Ohne ein einziges Duell hat API-Football nichts, worüber es Werte führen könnte - der
+  // Hinweis auf fehlende Statistiken ginge an der Sache vorbei.
+  const notice = source === "h2h" && insights.h2h.length === 0
+    ? "Für diese Partie sind keine direkten Duelle hinterlegt."
+    : venueOnly
+      ? "Für diese Auswahl liegt keine Partie mit Statistikwerten vor - ohne den Heim-/Auswärtsfilter sind es mehr."
+      : "Für diese Partien führt API-Football keine Statistikwerte.";
+
+  return <section className="insight-panel" aria-label="Match-Statistiken">
+    <h3>Match-Statistiken <span className="insight-scope">Ø {noun}</span></h3>
+    <div className="insight-controls stats">
+      <label className="insight-toggle">
+        <input type="checkbox" checked={venueOnly} onChange={(event) => setVenueOnly(event.target.checked)} />
+        Heim / Auswärts
+      </label>
+      <select
+        className="insight-select"
+        aria-label="Anzahl betrachteter Spiele"
+        value={limit}
+        onChange={(event) => setLimit(Number(event.target.value))}
+      >{MATCH_STAT_COUNT_OPTIONS.map((option) => <option value={option} key={option}>{option}</option>)}</select>
+      <div className="segmented mini" role="group" aria-label="Grundlage der Durchschnittswerte">
+        <button
+          className={source === "recent" ? "active" : ""}
+          aria-pressed={source === "recent"}
+          onClick={() => setSource("recent")}
+        >Letzte Spiele</button>
+        <button
+          className={source === "h2h" ? "active" : ""}
+          aria-pressed={source === "h2h"}
+          onClick={() => setSource("h2h")}
+        >Direkte Duelle</button>
+      </div>
+      <div className="segmented mini" role="group" aria-label="Darstellung der Kennzahlen">
+        <button
+          className={view === "share" ? "active" : ""}
+          aria-pressed={view === "share"}
+          onClick={() => setView("share")}
+        >Anteile</button>
+        <button
+          className={view === "dev" ? "active" : ""}
+          aria-pressed={view === "dev"}
+          onClick={() => setView("dev")}
+        >Abweichung</button>
+      </div>
+    </div>
+    <p className="match-stat-hint">{VIEW_HINTS[view]}</p>
+    <div className="match-stat-legend">
+      <span className="match-stat-key home">{insights.home.name}
+        <small>{matchLabel(homeMatches)}{venueOnly ? " · nur Heimspiele" : ""}</small>
+      </span>
+      <span className="match-stat-key away">{insights.away.name}
+        <small>{matchLabel(awayMatches)}{venueOnly ? " · nur Auswärtsspiele" : ""}</small>
+      </span>
+    </div>
+    {empty
+      ? <p>{notice}</p>
+      : <>
+          <MatchStatRings rows={rows} source={source} />
+          <div className={`match-stats ${view}`}>{STAT_GROUPS.map((group) => <div
+            className="match-stat-group"
+            key={group.id}
+          >
+            <h4>{group.title}</h4>
+            {rows
+              .filter((row) => row.scale === null && row.group === group.id)
+              .map((row) => <MatchStatLine
+                row={row} view={view} baseline={baselines[row.key] ?? null} key={row.key}
+              />)}
+          </div>)}</div>
+        </>}
   </section>;
 }
 
@@ -351,6 +694,7 @@ export function FixtureInsightPanels({ insights, timezone }: {
   return <>
     <ScoringPeriodsPanel insights={insights} scope={scope} />
     <H2hPanel insights={insights} scope={scope} timezone={timezone} />
+    <MatchStatsPanel insights={insights} scope={scope} />
     <TrendsPanel insights={insights} scope={scope} />
   </>;
 }

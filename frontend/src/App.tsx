@@ -12,6 +12,7 @@ import { LiveView } from "./LiveView";
 import { edgeOf, loadKellyAuto, loadKellySettings, loadKellyVisible, saveKellyAuto, saveKellySettings, saveKellyVisible, type KellySettings } from "./kelly";
 import { KellyButton, KellyDialog } from "./KellyUI";
 import { MarketProfileView } from "./MarketProfileUI";
+import { TeamCrest } from "./TeamCrest";
 import { useMarketProfile } from "./marketProfile";
 import type { ClassGap, DashboardDocument, DashboardFixture, DashboardMarket, DashboardMarketKey, FormResult, LeagueStats, RecommendationLevel } from "./types";
 
@@ -1152,8 +1153,8 @@ function Dashboard({ document }: { document: DashboardDocument }) {
             <button className={`${fixtureGridClass} fixture-row`} style={gridStyle} onClick={() => setOpenFixture((value) => value === fixture.fixtureId ? null : fixture.fixtureId)} aria-expanded={openFixture === fixture.fixtureId}>
               <span className="fixture-summary-cell">
                 <span className="teams-cell">
-                  <span className="team-name"><strong>{fixture.homeTeam}</strong><DefenseShield profile={fixture.defense?.home} team={fixture.homeTeam} /></span>
-                  <span className="team-name"><strong>{fixture.awayTeam}</strong><DefenseShield profile={fixture.defense?.away} team={fixture.awayTeam} /></span>
+                  <span className="team-name"><TeamCrest name={fixture.homeTeam} logo={fixture.homeCrest} /><strong>{fixture.homeTeam}</strong><DefenseShield profile={fixture.defense?.home} team={fixture.homeTeam} /></span>
+                  <span className="team-name"><TeamCrest name={fixture.awayTeam} logo={fixture.awayCrest} /><strong>{fixture.awayTeam}</strong><DefenseShield profile={fixture.defense?.away} team={fixture.awayTeam} /></span>
                 </span>
                 <span className="fixture-meta"><strong>{time.clock}{isPast && <em> angepfiffen</em>}</strong><small>{time.day} · <CountryFlag country={fixture.country} /> {fixture.country} · {fixture.league}</small>{(fixture.h2hNotice || fixture.warnings.length > 0) && <i>{fixture.h2hNotice ? "H2H" : "Daten"}</i>}{fixture.classGap && <ClassGapBadge gap={fixture.classGap} homeTeam={fixture.homeTeam} awayTeam={fixture.awayTeam} />}</span>
               </span>

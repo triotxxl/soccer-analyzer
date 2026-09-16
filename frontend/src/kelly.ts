@@ -65,6 +65,52 @@ export const DEFAULT_KELLY_SETTINGS: KellySettings = {
   maxBets: null
 };
 
+/**
+ * Wie viele Wetten in den Einsatzrahmen passen.
+ *
+ * Die Zahl, die in der Praxis bindet, ist `plaetze`: Am Höchsteinsatz kostet jede Wette
+ * `maxStakePercent · budget`, der Rahmen ist `maxExposurePercent · budget` - das Budget
+ * kürzt sich weg, es bleibt allein das Verhältnis der beiden Prozentsätze. Bei 2 % je Wette
+ * und 25 % Rahmen sind das 12 Wetten, unabhängig davon, ob 100 oder 10.000 Euro im Spiel
+ * sind. Genau das macht den Einsatzrahmen zu einer Stückzahlgrenze und nicht nur zu einer
+ * Risikobremse.
+ *
+ * `hoechstens` ist die optimistische Gegengrenze für den Fall, dass alle Einsätze auf dem
+ * Mindesteinsatz landen. Sie wurde früher allein angezeigt und führt in die Irre, weil die
+ * meisten Auswahlen am Höchsteinsatz sitzen, nicht am Mindesteinsatz.
+ */
+export function stakeSlots(settings: KellySettings): { plaetze: number; hoechstens: number } {
+  const cap = settings.maxStakePercent > 0
+    ? Math.floor(settings.maxExposurePercent / settings.maxStakePercent)
+    : Number.POSITIVE_INFINITY;
+  const floor = settings.minStake > 0
+    ? Math.floor(settings.budget * settings.maxExposurePercent / settings.minStake)
+    : Number.POSITIVE_INFINITY;
+  return { plaetze: Math.min(cap, floor), hoechstens: floor };
+}
+
+/**
+ * Einstellungen für den Testbetrieb ohne Geldeinsatz (ab 16.09.2026, siehe
+ * `docs/kelly-testbetrieb.md`).
+ *
+ * Sie stehen hier und nicht nur in einem Dokument, weil genau eine still abweichende
+ * Einstellung die Messung der alten Kette verhagelt hat: Der Einsatzrahmen lag über Wochen
+ * unbemerkt auf 100 % statt auf der Vorgabe. Ein Knopf, der alles in einem Zug setzt, kann
+ * nicht halb angewendet werden.
+ *
+ * Der Rahmen ist mit 70 % bewusst weit: Er soll die Auswahl der Regel **nicht** abschneiden
+ * (0,70 / 0,02 = 35 Plätze bei rund 30 Kandidaten je Lauf). Im Papierbetrieb schützt ein
+ * enger Rahmen kein Kapital, er wirft nur Messdaten weg. Für Echtgeld gilt das Gegenteil.
+ */
+export const TEST_RUN_SETTINGS = {
+  budget: 100,
+  kellyFraction: 0.25,
+  maxStakePercent: 0.02,
+  maxExposurePercent: 0.7,
+  minStake: 1,
+  maxBets: null
+} as const;
+
 export interface KellyCandidate {
   fixtureId: number;
   homeTeam: string;
@@ -214,7 +260,14 @@ function marketCandidates(
     const candidate = candidateOf(fixture, market, settings, profile);
     if (candidate === null) continue;
     if (settings.allowMultipleMarketsPerGame) { candidates.push(candidate); continue; }
-    if (best === null || candidate.edge > best.edge) best = candidate;
+    // Verglichen wird über den vollen Kelly-Wert, aus demselben Grund wie in
+    // `withoutOpposites` und `applyStakeFloor`: Er wiegt Trefferchance und Quote gegeneinander
+    // ab, und nach ihm bemisst sich anschließend auch der Einsatz. Der rohe Vorteil taugt
+    // dafür gerade nicht - je größer er ist, desto schlechter fällt er gemessen aus (deshalb
+    // deckelt ihn `AUTO_RULE.maxRawEdge`); als Auswahlkriterium hätte er bevorzugt, wovor die
+    // Obergrenze schützt. In der Automatik steckt im vollen Kelly-Wert ohnehin schon die
+    // korrigierte Wahrscheinlichkeit, ein Zweig je Modus ist also nicht nötig.
+    if (best === null || candidate.fullKelly > best.fullKelly) best = candidate;
   }
   if (settings.allowMultipleMarketsPerGame) return withoutOpposites(candidates);
   return best === null ? [] : [best];
@@ -568,10 +621,23 @@ const AUTO_STORAGE_KEY = "football-analyzer:kelly-auto";
 /**
  * Die Einstellungen, mit denen die Automatik arbeitet.
  *
- * Budget, Fraktion und die drei Risiko-Deckel bleiben beim Nutzer - sie sind eine Frage des
+ * Budget, Fraktion und die Risiko-Deckel bleiben beim Nutzer - sie sind eine Frage des
  * Geldbeutels, keine Messgroesse. Alles, was die Auswahl betrifft, wird hier abgeraeumt:
  * Diese Entscheidungen trifft in der Automatik `autoDecide` anhand der Historie, und ein
  * zusaetzlicher Regler wuerde nur unbemerkt gegen die Korrektur arbeiten.
+ *
+ * `allowMultipleMarketsPerGame` gehoert zur zweiten Gruppe, auch wenn es wie ein Risikoregler
+ * aussieht: Ob mehrere Maerkte derselben Partie zugleich gespielt werden, ist eine Frage der
+ * Auswahl. Mehrere Positionen auf eine Partie sind korreliert - ueber die vier Laeufe bis zum
+ * 15.09.2026 lagen 73 von 158 Wetten auf nur 35 Partien, und in 12 davon gingen alle Wetten
+ * gleichzeitig verloren. Am Erwartungswert aendert das nichts, an den Ausschlaegen sehr wohl,
+ * und die Automatik hat keine Moeglichkeit, die Korrelation in ihre Einzelentscheidung
+ * aufzunehmen.
+ *
+ * Bewusst *nicht* festgenagelt ist `maxExposurePercent`: Wie viel Kapital je Lauf im Feuer
+ * steht, ist die Entscheidung des Nutzers. Der Fehler war, dass der geerbte Wert in der
+ * Automatik unsichtbar blieb - dagegen hilft die Anzeige in `settingsSummary`, nicht ein
+ * Ueberschreiben.
  */
 export function recommendedSettings(base: KellySettings): KellySettings {
   return {
@@ -581,7 +647,8 @@ export function recommendedSettings(base: KellySettings): KellySettings {
     maxEdge: null,
     minConfidence: 0,
     disabledMarkets: [],
-    excludeCrossLeague: true
+    excludeCrossLeague: true,
+    allowMultipleMarketsPerGame: false
   };
 }
 

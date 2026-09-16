@@ -293,7 +293,13 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .fixture-row > span { min-width: 0; }
 .fixture-summary-cell { display: grid; gap: 8px; }
 .teams-cell { display: grid; gap: 6px; }
+/* Wappen der Übersicht und der Torphasen-Zeilen; dort hält das Raster eine 16px-Spalte. */
+.team-crest { width: 16px; height: 16px; flex: 0 0 auto; object-fit: contain; }
+.team-crest.fallback { display: grid; place-items: center; border-radius: 4px; background: rgba(255,255,255,.07); color: #8a8a8a; font-size: 7px; font-weight: 700; }
+
 .team-name { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.team-name .team-crest { width: 18px; height: 18px; }
+.team-name .team-crest.fallback { font-size: 8px; }
 .team-name strong { overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
 .team-name:first-child strong { color: var(--home); }
 .team-name:last-child strong { color: var(--away); }
@@ -369,7 +375,10 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .fixture-detail-close:hover { color: var(--text); }
 .insight-panel { min-width: 0; padding: 13px 14px 14px; border: 1px solid #383838; border-radius: 10px; background: #1f1f20; }
 .insight-scope { margin-left: 8px; color: var(--dim); font-size: 8px; font-weight: 400; letter-spacing: .04em; text-transform: none; }
-.insight-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; margin-bottom: 10px; }
+.insight-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; min-width: 0; margin-bottom: 10px; }
+/* Drei Steuerelemente passen nur umbrechend und linksbündig in die Breite der Detailspalte. */
+.insight-controls.stats { gap: 6px 8px; }
+.insight-controls.stats .segmented.mini { margin-left: 0; }
 .insight-toggle { display: inline-flex; align-items: center; gap: 6px; color: #b3b3b3; font-size: 9px; cursor: pointer; }
 .insight-toggle input { width: 13px; height: 13px; flex: 0 0 auto; accent-color: var(--accent); cursor: pointer; }
 .insight-toggle:has(input:disabled) { cursor: default; opacity: .4; }
@@ -387,8 +396,6 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .period-head strong { overflow: hidden; color: #cccccc; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
 .period-head small { flex: 0 0 auto; color: var(--dim); font-size: 8px; }
 .period-row, .period-axis { display: grid; grid-template-columns: 16px 40px 19px repeat(6, minmax(0, 1fr)); align-items: center; gap: 3px; }
-.period-crest { width: 16px; height: 16px; flex: 0 0 auto; object-fit: contain; }
-.period-crest.fallback { display: grid; place-items: center; border-radius: 4px; background: rgba(255,255,255,.07); color: #8a8a8a; font-size: 7px; font-weight: 700; }
 .period-label { color: var(--dim); font-size: 8px; }
 .period-total { font-size: 12px; font-weight: 800; text-align: right; }
 .period-row.scored .period-total { color: var(--green); }
@@ -404,6 +411,9 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .h2h-tally.draw { background: rgba(255,255,255,.07); color: #b3b3b3; }
 .h2h-tally.loss { background: rgba(241,76,76,.16); color: var(--red); }
 .h2h-rate { padding: 3px 8px; border-radius: 999px; background: rgba(255,255,255,.05); color: #b3b3b3; font-size: 9px; }
+.kelly-preset { margin-left: 8px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; background: #1b1b1b; color: #b3b3b3; font-size: 9px; }
+.kelly-preset:hover:not(:disabled) { border-color: var(--accent); color: var(--text); }
+.kelly-preset:disabled { border-style: dashed; color: var(--green); }
 .segmented.mini { margin-left: auto; padding: 2px; }
 .segmented.mini button { padding: 4px 8px; font-size: 8px; }
 .h2h-group + .h2h-group { margin-top: 9px; }
@@ -430,10 +440,61 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .trend-table thead th.away { color: var(--away); }
 .trend-table tbody th { padding: 5px 6px; border-top: 1px solid var(--line-soft); color: #969696; font-size: 9px; font-weight: 400; text-align: left; }
 .trend-table td { padding: 5px 6px; border-top: 1px solid var(--line-soft); color: #cccccc; text-align: center; }
-.trend-table .trend-better { display: inline-block; padding: 2px 8px; border-radius: 6px; color: #10151b; font-weight: 800; }
-.trend-table .trend-better.home { background: var(--home); }
-.trend-table .trend-better.away { background: var(--away); }
+.trend-better { display: inline-block; padding: 2px 8px; border-radius: 6px; color: #10151b; font-weight: 800; }
+.trend-better.home { background: var(--home); }
+.trend-better.away { background: var(--away); }
 .trend-basis th, .trend-basis td { color: #6b6b6b; font-size: 8px; }
+
+.match-stat-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-bottom: 10px; }
+.match-stat-key { display: inline-flex; align-items: baseline; gap: 6px; min-width: 0; font-size: 9px; font-weight: 700; }
+.match-stat-key::before { width: 9px; height: 9px; flex: 0 0 auto; border-radius: 3px; content: ""; }
+.match-stat-key.home { color: var(--home); }
+.match-stat-key.home::before { background: var(--home); }
+.match-stat-key.away { color: var(--away); }
+.match-stat-key.away::before { background: var(--away); }
+.match-stat-key small { color: var(--dim); font-size: 8px; font-weight: 400; }
+.fixture-detail-panel .match-stat-hint { margin: -4px 0 9px; color: #7d7d7d; font-size: 8px; line-height: 1.45; }
+.match-stat-rings { display: flex; flex-wrap: wrap; gap: 10px 20px; margin-bottom: 12px; }
+.stat-ring-group { display: grid; justify-items: center; gap: 5px; margin: 0; }
+.stat-ring-group figcaption { color: #969696; font-size: 9px; }
+.stat-ring-pair { display: flex; gap: 10px; }
+.stat-ring-split { display: flex; align-items: center; gap: 9px; }
+.stat-ring { position: relative; display: grid; place-items: center; }
+.stat-ring-track { fill: none; stroke: rgba(255,255,255,.07); stroke-width: 6; }
+.stat-ring-fill { fill: none; stroke-width: 6; stroke-linecap: butt; transition: stroke-dasharray .18s ease; }
+.stat-ring-fill.home { stroke: var(--home); }
+.stat-ring-fill.away { stroke: var(--away); }
+.stat-ring-number { position: absolute; font-size: 10px; font-variant-numeric: tabular-nums; font-weight: 700; }
+.stat-ring-value { font-size: 11px; font-variant-numeric: tabular-nums; font-weight: 700; }
+.stat-ring-number.home, .stat-ring-value.home { color: var(--home); }
+.stat-ring-number.away, .stat-ring-value.away { color: var(--away); }
+.match-stats { display: grid; gap: 12px; }
+.match-stat-group { display: grid; gap: 8px; min-width: 0; }
+.match-stat-group h4 { margin: 0; color: #8a8a8a; font-size: 9.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.match-stat { display: grid; gap: 3px; min-width: 0; }
+.match-stat-head { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.match-stat-label { overflow: hidden; flex: 1; color: #969696; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.match-stat-basis { flex: 0 0 auto; color: #6b6b6b; font-size: 8px; font-variant-numeric: tabular-nums; }
+.match-stat-bar { display: grid; grid-template-columns: minmax(0, 1fr) 42px; align-items: center; gap: 8px; }
+.match-stat-track { height: 7px; border-radius: 999px; background: rgba(255,255,255,.05); }
+.match-stat-fill { display: block; height: 100%; border-radius: 999px; transition: width .18s ease, margin-left .18s ease; }
+.match-stat-bar.home .match-stat-fill { background: var(--home); }
+.match-stat-bar.away .match-stat-fill { background: var(--away); }
+.match-stat-bar.strong .match-stat-track { height: 9px; }
+.match-stat-bar.dim .match-stat-fill { opacity: .5; }
+/* Die Nulllinie des Abweichungsmodus liegt im Hintergrund der Spur, nicht als eigenes Element. */
+.match-stats.dev .match-stat-track {
+  background:
+    linear-gradient(to right, transparent calc(50% - 1px), rgba(255,255,255,.28) calc(50% - 1px),
+    rgba(255,255,255,.28) calc(50% + 1px), transparent calc(50% + 1px)), rgba(255,255,255,.05);
+}
+/* Deckend statt gedimmt: bei 11px fiele die Teamfarbe mit opacity unter 4,5:1 Kontrast. */
+.match-stat-number { font-size: 11px; font-variant-numeric: tabular-nums; text-align: right; }
+.match-stat-number.home { color: #a9d1f2; }
+.match-stat-number.away { color: #dfb49f; }
+.match-stat-number.lead { font-weight: 800; }
+.match-stat-number.home.lead { color: var(--home); }
+.match-stat-number.away.lead { color: var(--away); }
 .standings-table { width: 100%; border-collapse: collapse; font-size: 9px; }
 .standings-table th { padding: 3px 6px; color: #8a8a8a; font-size: 8px; font-weight: 700; letter-spacing: .04em; text-align: left; text-transform: uppercase; }
 .standings-table th:nth-child(1), .standings-table td:nth-child(1) { text-align: center; }

@@ -18,7 +18,12 @@
 import fs from "node:fs";
 import path from "node:path";
 import { buildObservations, type EdgeObservation as Observation } from "../src/market-profile-service.ts";
-import { autoDecide, buildMarketProfile } from "../src/market-profile.ts";
+import {
+  MINIMUM_MARKET_SAMPLE,
+  autoDecide,
+  buildMarketProfile,
+  type MarketProfile
+} from "../src/market-profile.ts";
 
 interface Metrics {
   n: number;
@@ -131,6 +136,111 @@ if (jsonIndex !== -1 && process.argv[jsonIndex + 1] !== undefined) {
 }
 
 /**
+ * Flat-ROI mit Standardfehler.
+ *
+ * Ohne die Streuung ist ein ROI auf diesen Stichproben nicht lesbar: Bei 557 Prüfwetten liegt
+ * der Standardfehler bei rund 5 Prozentpunkten, ein Abstand von 8 PP zwischen zwei Regeln ist
+ * also etwa ein Sigma und trägt keine Entscheidung. Gerechnet wird über die empirische
+ * Streuung der Einzelergebnisse statt über eine Näherung aus der mittleren Quote, weil die
+ * Quoten innerhalb einer Auswahl weit auseinanderliegen.
+ */
+function flatRoiOf(entries: Observation[]): { n: number; roi: number; se: number } | null {
+  const n = entries.length;
+  if (n === 0) return null;
+  const profits = entries.map((entry) => (entry.hit ? entry.odds - 1 : -1));
+  const roi = profits.reduce((sum, value) => sum + value, 0) / n;
+  if (n < 2) return { n, roi, se: Number.POSITIVE_INFINITY };
+  const variance = profits.reduce((sum, value) => sum + (value - roi) ** 2, 0) / (n - 1);
+  return { n, roi, se: Math.sqrt(variance / n) };
+}
+
+const signedPercent = (value: number) =>
+  `${value >= 0 ? "+" : "−"}${(Math.abs(value) * 100).toFixed(1).replace(".", ",")}`;
+
+/** "+3,2 ± 4,8 %" - der ROI immer zusammen mit dem, was er aushält. */
+const roiWithError = (entries: Observation[]): string => {
+  const stats = flatRoiOf(entries);
+  if (stats === null) return "-";
+  const error = Number.isFinite(stats.se) ? (stats.se * 100).toFixed(1).replace(".", ",") : "∞";
+  return `${signedPercent(stats.roi)} ± ${error} %`;
+};
+
+/**
+ * Vergleicht zwei Auswahlregeln nur auf den Zeilen, in denen sie sich unterscheiden.
+ *
+ * Zwei unabhängig verrauschte Gesamt-ROIs gegeneinanderzustellen verschenkt Genauigkeit: Die
+ * Zeilen, die beide Regeln nehmen, tragen zu beiden Seiten dasselbe Rauschen bei und sagen
+ * über den Unterschied nichts. Übrig bleibt die symmetrische Differenz - und erst deren
+ * Abstand, gemessen am gemeinsamen Standardfehler, beantwortet die Frage, ob eine
+ * Regeländerung etwas bewirkt hat.
+ */
+function printPairedComparison(
+  holdout: Observation[],
+  left: { name: string; rule: (entry: Observation) => boolean },
+  right: { name: string; rule: (entry: Observation) => boolean }
+): void {
+  const shared = holdout.filter((entry) => left.rule(entry) && right.rule(entry));
+  const onlyLeft = holdout.filter((entry) => left.rule(entry) && !right.rule(entry));
+  const onlyRight = holdout.filter((entry) => right.rule(entry) && !left.rule(entry));
+
+  console.log(`\n  Gepaarter Vergleich ${left.name} gegen ${right.name}:`);
+  console.log(`  ${"gemeinsame Zeilen".padEnd(30)}${String(shared.length).padStart(7)}`
+    + `${roiWithError(shared).padStart(18)}   (zählt für den Unterschied nicht)`);
+  console.log(`  ${`nur ${left.name}`.padEnd(30)}${String(onlyLeft.length).padStart(7)}${roiWithError(onlyLeft).padStart(18)}`);
+  console.log(`  ${`nur ${right.name}`.padEnd(30)}${String(onlyRight.length).padStart(7)}${roiWithError(onlyRight).padStart(18)}`);
+
+  const a = flatRoiOf(onlyLeft);
+  const b = flatRoiOf(onlyRight);
+  if (a === null || b === null || !Number.isFinite(a.se) || !Number.isFinite(b.se)) {
+    console.log("  Unterschied: nicht bestimmbar, eine Seite ist leer oder hat nur eine Zeile.");
+    return;
+  }
+  const difference = b.roi - a.roi;
+  const combined = Math.sqrt(a.se ** 2 + b.se ** 2);
+  const sigma = combined === 0 ? 0 : difference / combined;
+  console.log(`  Unterschied ${signedPercent(difference)} ± ${(combined * 100).toFixed(1).replace(".", ",")} %`
+    + ` = ${sigma.toFixed(2).replace(".", ",")} Sigma`
+    + (Math.abs(sigma) < 1 ? "  → im Rauschen, kein messbarer Effekt" : ""));
+}
+
+/**
+ * Das Ablehnungsregister: jede Zelle aus Markt und Vorteilsband, wie das Profil sie sieht.
+ *
+ * Es beantwortet die Frage, ob eine Ablehnung nach Bandverdikt eine Regel ist oder eine
+ * umständlich geschriebene Marktsperre: Sind die "meiden"-Zellen genau zwei Märkte, ist es
+ * letzteres. Und es zeigt, wie viele Zellen überhaupt genug Fälle in beiden Zeithälften
+ * haben, um je ein Verdikt tragen zu können.
+ */
+function printCellLedger(profile: MarketProfile): void {
+  console.log("\n  Ablehnungsregister des Trainingsprofils (Markt × Vorteilsband):");
+  console.log(`  ${"Markt".padEnd(16)}${"Band".padEnd(11)}${"n".padStart(6)}${"ROI".padStart(10)}`
+    + `${"1. H".padStart(10)}${"2. H".padStart(10)}  Verdikt`);
+  let decidable = 0;
+  let avoid = 0;
+  const avoidedMarkets = new Set<string>();
+  for (const market of profile.markets) {
+    for (const bandEntry of market.bands) {
+      const { n, roi, roiFirstHalf: first, roiSecondHalf: second } = bandEntry.metrics;
+      if (n >= MINIMUM_MARKET_SAMPLE && first !== null && second !== null) decidable += 1;
+      if (bandEntry.verdict === "meiden") { avoid += 1; avoidedMarkets.add(market.marketLabel); }
+      console.log(`  ${market.marketLabel.padEnd(16)}${bandEntry.label.padEnd(11)}${String(n).padStart(6)}`
+        + `${(roi === null ? "-" : signedPercent(roi)).padStart(10)}`
+        + `${(first === null ? "-" : signedPercent(first)).padStart(10)}`
+        + `${(second === null ? "-" : signedPercent(second)).padStart(10)}  ${bandEntry.verdict}`);
+    }
+  }
+  console.log(`\n  Zellen, die überhaupt ein Verdikt tragen können (n >= ${MINIMUM_MARKET_SAMPLE},`
+    + ` beide Hälften belegt): ${decidable}`);
+  console.log(`  Davon "meiden": ${avoid} in ${avoidedMarkets.size} Märkten`
+    + (avoidedMarkets.size === 0 ? "" : ` (${[...avoidedMarkets].join(", ")})`));
+
+  const derived = profile.markets.filter((market) => market.derivedFrom !== undefined);
+  console.log(`  Noch gespiegelte Märkte im Trainingsprofil: ${derived.length === 0
+    ? "keine - alle tragen eigene Messwerte"
+    : derived.map((market) => `${market.marketLabel} ← ${market.derivedFrom}`).join(", ")}`);
+}
+
+/**
  * Rückrechnung der Automatik: Trägt die korrigierte Auswahl auf Daten, die sie nie gesehen hat?
  *
  * Die Kalibrierung wird ausschließlich aus der ersten Zeithälfte gebildet und auf die zweite
@@ -146,9 +256,6 @@ if (process.argv.includes("--simulate")) {
   const holdout = playable.filter((entry) => entry.kickoff >= splitAt);
   const profile = buildMarketProfile(training);
 
-  const flatRoi = (entries: Observation[]): string => entries.length === 0
-    ? "  -"
-    : percent(entries.reduce((sum, entry) => sum + (entry.hit ? entry.odds - 1 : -1), 0) / entries.length);
   const hitRate = (entries: Observation[]): string => entries.length === 0
     ? "  -"
     : percent(entries.reduce((sum, entry) => sum + entry.hit, 0) / entries.length);
@@ -169,23 +276,71 @@ if (process.argv.includes("--simulate")) {
   console.log("\n\nRückrechnung der Automatik");
   console.log(`  Kalibriert auf ${training.length} Zeilen vor ${splitAt.slice(0, 10)},`
     + ` geprüft auf ${holdout.length} Zeilen danach.`);
-  console.log(`  ${"Regel".padEnd(24)}${"Wetten".padStart(8)}${"Treffer".padStart(10)}${"flat-ROI".padStart(11)}`);
+  console.log(`  ${"Regel".padEnd(24)}${"Wetten".padStart(8)}${"Treffer".padStart(10)}${"flat-ROI".padStart(18)}`);
   for (const [name, rule] of [["heutige Vorgabe", currentRule], ["Automatik", autoRule]] as const) {
     const chosen = holdout.filter(rule);
-    console.log(`  ${name.padEnd(24)}${String(chosen.length).padStart(8)}${hitRate(chosen).padStart(10)}${flatRoi(chosen).padStart(11)}`);
+    console.log(`  ${name.padEnd(24)}${String(chosen.length).padStart(8)}${hitRate(chosen).padStart(10)}${roiWithError(chosen).padStart(18)}`);
   }
+
+  printPairedComparison(holdout,
+    { name: "Vorgabe", rule: currentRule },
+    { name: "Automatik", rule: autoRule });
 
   console.log("\n  Zum Vergleich dieselben Regeln auf der Trainingshälfte - hier hat die Automatik");
   console.log("  die Antworten gekannt, diese Zeilen sind also kein Beleg:");
   for (const [name, rule] of [["heutige Vorgabe", currentRule], ["Automatik", autoRule]] as const) {
     const chosen = training.filter(rule);
-    console.log(`  ${name.padEnd(24)}${String(chosen.length).padStart(8)}${hitRate(chosen).padStart(10)}${flatRoi(chosen).padStart(11)}`);
+    console.log(`  ${name.padEnd(24)}${String(chosen.length).padStart(8)}${hitRate(chosen).padStart(10)}${roiWithError(chosen).padStart(18)}`);
   }
 
+  const accepted = holdout.filter(autoRule);
   console.log("\n  Automatik-Auswahl der Prüfhälfte nach Markt:");
-  for (const [label, group] of groupBy(holdout.filter(autoRule), (entry) => entry.marketLabel)) {
-    console.log(`  ${label.padEnd(24)}${String(group.length).padStart(8)}${hitRate(group).padStart(10)}${flatRoi(group).padStart(11)}`);
+  console.log(`  ${"Markt".padEnd(24)}${"Wetten".padStart(8)}${"Treffer".padStart(10)}${"flat-ROI".padStart(18)}${"davon Edge <= 0".padStart(17)}`);
+  for (const [label, group] of groupBy(accepted, (entry) => entry.marketLabel)) {
+    const withoutEdge = group.filter((entry) => entry.edge <= 0).length;
+    console.log(`  ${label.padEnd(24)}${String(group.length).padStart(8)}${hitRate(group).padStart(10)}`
+      + `${roiWithError(group).padStart(18)}${String(withoutEdge).padStart(17)}`);
   }
+
+  // Was eine Untergrenze beim rohen Vorteil kosten würde: Diese Zeilen entstehen heute allein
+  // aus der Korrektur, das Modell selbst sieht dort keinen Vorteil.
+  const withoutRawEdge = accepted.filter((entry) => entry.edge <= 0);
+  console.log(`\n  Angenommene Zeilen ohne eigenen Modellvorteil: ${withoutRawEdge.length}`
+    + ` von ${accepted.length}${withoutRawEdge.length === 0 ? "" : ` · ${roiWithError(withoutRawEdge)}`}`);
+
+  // Eine Wette je Partie - so arbeitet die Automatik seit dem 15.09.2026. Die Frage ist, nach
+  // welchem Maßstab die eine ausgewählt wird. Der Backtest kann das messen, weil er die
+  // Partie-ID kennt; die Einsatzhöhe kann er nicht, er rechnet flach.
+  const perFixture = new Map<number, Observation[]>();
+  for (const entry of accepted) {
+    const group = perFixture.get(entry.fixtureId) ?? [];
+    group.push(entry);
+    perFixture.set(entry.fixtureId, group);
+  }
+  const multi = [...perFixture.values()].filter((group) => group.length > 1);
+  const pickBy = (score: (entry: Observation) => number): Observation[] =>
+    [...perFixture.values()].map((group) =>
+      group.reduce((best, entry) => (score(entry) > score(best) ? entry : best)));
+  const fullKellyOf = (entry: Observation): number => {
+    const calibration = autoDecide(profile, {
+      marketKey: entry.marketKey,
+      probability: entry.probability,
+      odds: entry.odds,
+      crossLeague: entry.crossLeague
+    }).calibration;
+    const probability = calibration?.probability ?? entry.probability;
+    return (probability * entry.odds - 1) / (entry.odds - 1);
+  };
+
+  console.log(`\n  Eine Wette je Partie: ${perFixture.size} Partien, davon ${multi.length}`
+    + " mit mehr als einem angenommenen Markt.");
+  console.log(`  ${"Maßstab".padEnd(30)}${"Wetten".padStart(7)}${"flat-ROI".padStart(18)}`);
+  console.log(`  ${"höchster roher Vorteil".padEnd(30)}${String(perFixture.size).padStart(7)}`
+    + `${roiWithError(pickBy((entry) => entry.edge)).padStart(18)}`);
+  console.log(`  ${"höchster voller Kelly-Wert".padEnd(30)}${String(perFixture.size).padStart(7)}`
+    + `${roiWithError(pickBy(fullKellyOf)).padStart(18)}`);
+
+  printCellLedger(profile);
 }
 
 /**
@@ -198,13 +353,9 @@ if (process.argv.includes("--simulate")) {
   const playable = observations.filter((entry) => entry.edge > 0);
   const kickoffs = playable.map((entry) => entry.kickoff).sort();
 
-  const roiOf = (entries: Observation[]): number | null => entries.length === 0
-    ? null
-    : entries.reduce((sum, entry) => sum + (entry.hit ? entry.odds - 1 : -1), 0) / entries.length;
-  const show = (value: number | null) => value === null ? "  -" : percent(value);
-
   console.log("\n  Dieselbe Prüfung an mehreren Trennstellen:");
-  console.log(`  ${"Schnitt".padEnd(14)}${"Training".padStart(10)}${"Prüfung".padStart(9)}${"Wetten".padStart(8)}${"ROI".padStart(9)}${"ohne Remis".padStart(12)}${"Vorgabe".padStart(10)}`);
+  console.log(`  ${"Schnitt".padEnd(12)}${"Training".padStart(9)}${"Prüfung".padStart(8)}${"Wetten".padStart(7)}`
+    + `${"ROI".padStart(18)}${"ohne Remis".padStart(18)}${"Vorgabe".padStart(18)}`);
   for (const share of [0.4, 0.5, 0.6]) {
     const splitAt = kickoffs[Math.floor(kickoffs.length * share)]!;
     const training = playable.filter((entry) => entry.kickoff < splitAt);
@@ -218,12 +369,13 @@ if (process.argv.includes("--simulate")) {
     }).accepted);
     const baseline = holdout.filter((entry) => entry.odds >= 1.5 && entry.edge >= 0.02
       && entry.edge <= 0.12 && entry.marketKey !== "1x2" && !entry.crossLeague);
-    console.log(`  ${splitAt.slice(0, 10).padEnd(14)}${String(training.length).padStart(10)}${String(holdout.length).padStart(9)}`
-      + `${String(chosen.length).padStart(8)}${show(roiOf(chosen)).padStart(9)}`
-      + `${show(roiOf(chosen.filter((entry) => entry.marketKey !== "draw"))).padStart(12)}`
-      + `${show(roiOf(baseline)).padStart(10)}`);
+    console.log(`  ${splitAt.slice(0, 10).padEnd(12)}${String(training.length).padStart(9)}${String(holdout.length).padStart(8)}`
+      + `${String(chosen.length).padStart(7)}${roiWithError(chosen).padStart(18)}`
+      + `${roiWithError(chosen.filter((entry) => entry.marketKey !== "draw")).padStart(18)}`
+      + `${roiWithError(baseline).padStart(18)}`);
   }
   console.log("\n  Lesehinweis: Wechselt der ROI zwischen den Trennstellen das Vorzeichen oder hängt er");
   console.log("  ganz am Remis, ist die Automatik nicht belegt - dann ist sie bestenfalls die weniger");
-  console.log("  verlustreiche Auswahl, nicht eine gewinnbringende.");
+  console.log("  verlustreiche Auswahl, nicht eine gewinnbringende. Die Spalte \"ohne Remis\" ist die");
+  console.log("  eigentliche Frage; liegt ein Unterschied innerhalb des ±-Bereichs, ist er keiner.");
 }

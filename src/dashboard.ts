@@ -70,6 +70,12 @@ export interface DashboardFixture {
   league: string;
   homeTeam: string;
   awayTeam: string;
+  /**
+   * Wappen-URLs von API-Football. Sie fehlen, wenn die Fixture-Antwort sie nicht führt, und
+   * in jedem Snapshot vor dieser Ergänzung; die App zeigt dann die Initialen des Teams.
+   */
+  homeCrest?: string;
+  awayCrest?: string;
   modelVersion: string;
   crossLeague: boolean;
   classGap?: ClassGap;
@@ -370,6 +376,8 @@ export function buildDashboardDocument(input: DashboardInput): DashboardDocument
     return {
       fixtureId: row.fixtureId, kickoff: row.kickoff, country: row.country, league: row.league,
       homeTeam: row.homeTeam, awayTeam: row.awayTeam, modelVersion: row.modelVersion, crossLeague,
+      ...(row.homeCrest ? { homeCrest: row.homeCrest } : {}),
+      ...(row.awayCrest ? { awayCrest: row.awayCrest } : {}),
       ...(classGap ? { classGap } : {}),
       dataConfidence: row.dataConfidence, warnings, h2hNotice,
       form: {

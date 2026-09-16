@@ -5,13 +5,58 @@ const COMPLETED_STATUSES = new Set(["FT", "AET", "PEN"]);
 /** Die sechs Viertelstunden der regulären Spielzeit, wie sie die Torphasen-Ansicht zeigt. */
 export const SCORING_PERIOD_COUNT = 6;
 
+/**
+ * Der Statistikkatalog einer Partie je Mannschaft. Die Feldnamen sind dieselben wie in
+ * `teamSnapshot` (`src/live.ts`), damit Live-Board und Detailansicht dieselbe Kennzahl
+ * gleich nennen.
+ *
+ * Die Passquote führt API-Football als eigene Zeile "Passes %", die `normalizedType` zu
+ * `passes` verkürzt - zu nah an `totalpasses`, um sie verlässlich auseinanderzuhalten.
+ * Sie wird deshalb nicht übernommen, sondern in der Ansicht aus `passesAccurate` und
+ * `totalPasses` gerechnet.
+ */
 export interface InsightTeamStats {
   /** Ballbesitz in Prozent. */
   possession: number | null;
   /** Torschüsse gesamt. */
   shots: number | null;
   shotsOnGoal: number | null;
+  shotsOffGoal: number | null;
+  blockedShots: number | null;
+  shotsInsideBox: number | null;
+  shotsOutsideBox: number | null;
+  corners: number | null;
+  fouls: number | null;
+  offsides: number | null;
+  yellowCards: number | null;
+  redCards: number | null;
+  goalkeeperSaves: number | null;
+  totalPasses: number | null;
+  passesAccurate: number | null;
 }
+
+/**
+ * Feld der Ansicht zu Statistiktyp von API-Football, bereits normalisiert. Eine einzige
+ * Liste, damit ein neues Feld nicht an zwei Stellen nachgetragen werden muss - besonders
+ * nicht in der Bedingung, die eine Mannschaft ganz ohne Statistik erkennt.
+ */
+const STAT_TYPES: Record<keyof InsightTeamStats, string> = {
+  possession: "ballpossession",
+  shots: "totalshots",
+  shotsOnGoal: "shotsongoal",
+  shotsOffGoal: "shotsoffgoal",
+  blockedShots: "blockedshots",
+  shotsInsideBox: "shotsinsidebox",
+  shotsOutsideBox: "shotsoutsidebox",
+  corners: "cornerkicks",
+  fouls: "fouls",
+  offsides: "offsides",
+  yellowCards: "yellowcards",
+  redCards: "redcards",
+  goalkeeperSaves: "goalkeepersaves",
+  totalPasses: "totalpasses",
+  passesAccurate: "passesaccurate"
+};
 
 export interface InsightMatch {
   fixtureId: number;
@@ -113,12 +158,13 @@ export function teamMatchStats(
   if (!entry) return null;
   const value = (type: string) => numericStat(entry.statistics
     .find((item) => normalizedType(item.type) === type)?.value);
-  const stats: InsightTeamStats = {
-    possession: value("ballpossession"),
-    shots: value("totalshots"),
-    shotsOnGoal: value("shotsongoal")
-  };
-  return stats.possession === null && stats.shots === null && stats.shotsOnGoal === null ? null : stats;
+  const stats = {} as InsightTeamStats;
+  for (const field of Object.keys(STAT_TYPES) as Array<keyof InsightTeamStats>) {
+    stats[field] = value(STAT_TYPES[field]);
+  }
+  // Erst wenn der ganze Katalog leer ist, führt die Antwort zu dieser Mannschaft nichts.
+  // Ein einzelner fehlender Wert bleibt null und darf nie als 0 in einen Mittelwert gehen.
+  return Object.values(stats).every((item) => item === null) ? null : stats;
 }
 
 /**
@@ -160,6 +206,15 @@ export function toInsightMatch(fixture: ApiFixture, detail?: ApiFixture): Insigh
 }
 
 /**
+ * Testspiele bleiben aus beiden Auswahlen heraus. Als gemeinsames Prädikat notiert, damit
+ * Teamhistorie und direkte Duelle nicht wieder auseinanderlaufen: Ein Testspiel nur in den
+ * Duellen hieße, dass die beiden Modi desselben Panels verschiedene Historien meinen.
+ */
+function competitive(match: ApiFixture): boolean {
+  return !/friendl/i.test(match.league.name);
+}
+
+/**
  * Die Partien, die in die Detailansicht eingehen: abgeschlossen, keine Freundschaftsspiele,
  * vor dem Anpfiff der analysierten Partie, neueste zuerst. Dieselbe Abgrenzung wie in der
  * Formbewertung, damit Punkte und Ansicht dieselbe Historie meinen.
@@ -173,15 +228,21 @@ export function selectHistory(
   return [...new Map(fixtures.map((match) => [match.fixture.id, match])).values()]
     .filter((match) => match.fixture.timestamp < cutoff)
     .filter((match) => match.teams.home.id === teamId || match.teams.away.id === teamId)
-    .filter((match) => !/friendl/i.test(match.league.name))
+    .filter(competitive)
     .filter((match) => completedScore(match) !== null)
     .sort((left, right) => right.fixture.timestamp - left.fixture.timestamp)
     .slice(0, limit);
 }
 
+/**
+ * Die direkten Duelle. `/fixtures/headtohead` liefert ohne `last` die komplette Historie
+ * über alle Wettbewerbe - Testspiele eingeschlossen, die hier dieselbe Abgrenzung wie in
+ * `selectHistory` erfahren.
+ */
 export function selectH2h(fixtures: ApiFixture[], cutoff: number, limit: number): ApiFixture[] {
   return [...new Map(fixtures.map((match) => [match.fixture.id, match])).values()]
     .filter((match) => match.fixture.timestamp < cutoff)
+    .filter(competitive)
     .filter((match) => completedScore(match) !== null)
     .sort((left, right) => right.fixture.timestamp - left.fixture.timestamp)
     .slice(0, limit);

@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
-import type { FixtureInsights, InsightMatch } from "./types";
+import type { FixtureInsights, InsightMatch, InsightTeamStats } from "./types";
 
 export const SCORING_PERIOD_LABELS = ["0'", "15'", "30'", "45'", "60'", "75'", "90'"];
 export const H2H_COUNT_OPTIONS = [3, 5, 6, 10] as const;
 export const TREND_MATCH_COUNT = 10;
+export const MATCH_STAT_COUNT_OPTIONS = [1, 2, 3, 4, 5] as const;
 
 const MESSAGES: Record<string, string> = {
   dashboard_missing: "Noch keine Analyse vorhanden. Starte zuerst einen Dashboard-Lauf im Chat.",
@@ -77,11 +78,18 @@ export function useFixtureInsights(fixtureId: number | null): InsightsLoadState 
 
 export interface LeagueScope {
   id: number;
-  season: number;
+  /**
+   * Ohne Saison zählt allein die Liga. Für Torphasen und Trends gehört sie dazu - dort geht
+   * es um die laufende Spielzeit. Direkte Duelle laufen dagegen über mehrere Spielzeiten:
+   * Mit Saison bliebe dort höchstens das Rückspiel übrig, vor der Winterpause gar nichts.
+   */
+  season?: number;
 }
 
 export function inLeague(match: InsightMatch, scope: LeagueScope | null): boolean {
-  return scope === null || (match.leagueId === scope.id && match.season === scope.season);
+  if (scope === null) return true;
+  if (match.leagueId !== scope.id) return false;
+  return scope.season === undefined || match.season === scope.season;
 }
 
 export function venueOf(match: InsightMatch, teamId: number): "home" | "away" {
@@ -163,11 +171,19 @@ export function summarize(matches: InsightMatch[], teamId: number): RecordSummar
   return summary;
 }
 
+/**
+ * Die numerischen Kennzahlen einer Mannschaft, abgeleitet statt aufgezählt: Ein neues Feld
+ * in `InsightTeamStats` ist damit sofort über `averageStat` nutzbar.
+ */
+export type InsightStatKey = {
+  [Key in keyof InsightTeamStats]-?: NonNullable<InsightTeamStats[Key]> extends number ? Key : never
+}[keyof InsightTeamStats];
+
 /** Mittelwert über die Partien, die den Wert überhaupt führen. `null`, wenn keine ihn führt. */
 export function averageStat(
   matches: InsightMatch[],
   teamId: number,
-  key: "possession" | "shots" | "shotsOnGoal"
+  key: InsightStatKey
 ): { value: number | null; matches: number } {
   const values = matches
     .map((match) => match.stats[venueOf(match, teamId)]?.[key])
@@ -198,6 +214,192 @@ export function trends(
   };
 }
 
+/** Offensive und defensive Kennzahlen stehen im Panel in getrennten Blöcken. */
+export type StatGroup = "off" | "def";
+
+/**
+ * Welche Richtung als überlegen gilt. `null` bei Kennzahlen, bei denen weder hoch noch
+ * niedrig eindeutig besser ist - dort bleibt die Zeile ohne Bewertung.
+ */
+export type StatBetter = "higher" | "lower" | null;
+
+export interface MatchStatRow {
+  key: string;
+  label: string;
+  /** 100 bei Prozentkennzahlen; sie stehen als Ring über der Liste statt als Spur. */
+  scale: number | null;
+  digits: number;
+  unit?: string;
+  group: StatGroup;
+  better: StatBetter;
+  home: number | null;
+  away: number | null;
+  /** Partien, die den Wert führen - Heim und Auswärts getrennt. */
+  homeMatches: number;
+  awayMatches: number;
+}
+
+interface MatchStatDefinition {
+  key: InsightStatKey;
+  label: string;
+  scale: number | null;
+  digits: number;
+  unit?: string;
+  group: StatGroup;
+  better: StatBetter;
+}
+
+/**
+ * Beschriftung wie im Live-Board, damit dieselbe Kennzahl gleich heißt. Die Reihenfolge ist
+ * zugleich die Anzeigereihenfolge innerhalb der beiden Blöcke - das Panel filtert nur auf
+ * `group` und behält die Folge bei.
+ */
+const MATCH_STAT_DEFINITIONS: MatchStatDefinition[] = [
+  { key: "possession", label: "Ballbesitz", scale: 100, digits: 0, unit: "%", group: "off", better: null },
+  { key: "shots", label: "Schüsse insgesamt", scale: null, digits: 1, group: "off", better: "higher" },
+  { key: "shotsOnGoal", label: "Schüsse aufs Tor", scale: null, digits: 1, group: "off", better: "higher" },
+  { key: "shotsOffGoal", label: "Schüsse daneben", scale: null, digits: 1, group: "off", better: "lower" },
+  { key: "shotsInsideBox", label: "Schüsse im Strafraum", scale: null, digits: 1, group: "off", better: "higher" },
+  { key: "shotsOutsideBox", label: "Schüsse außerhalb", scale: null, digits: 1, group: "off", better: null },
+  { key: "corners", label: "Ecken", scale: null, digits: 1, group: "off", better: "higher" },
+  { key: "offsides", label: "Abseits", scale: null, digits: 1, group: "off", better: "lower" },
+  { key: "totalPasses", label: "Pässe", scale: null, digits: 0, group: "off", better: "higher" },
+  { key: "passesAccurate", label: "Erfolgreiche Pässe", scale: null, digits: 0, group: "off", better: "higher" },
+  { key: "blockedShots", label: "Geblockte Schüsse", scale: null, digits: 1, group: "def", better: "higher" },
+  { key: "goalkeeperSaves", label: "Torwartparaden", scale: null, digits: 1, group: "def", better: null },
+  { key: "fouls", label: "Fouls", scale: null, digits: 1, group: "def", better: "lower" },
+  { key: "yellowCards", label: "Gelbe Karten", scale: null, digits: 1, group: "def", better: "lower" },
+  { key: "redCards", label: "Rote Karten", scale: null, digits: 2, group: "def", better: "lower" }
+];
+
+/**
+ * Passquote aus den beiden Rohwerten statt aus der API-Zeile "Passes %": deren Typ
+ * normalisiert zu `passes` und liegt damit zu nah an `totalpasses`.
+ *
+ * Gerechnet wird über die Summen der Partien, die **beide** Werte führen. Eine Partie mit
+ * nur einem der beiden Werte würde sonst entweder als 0 einfließen oder Zähler und Nenner
+ * über verschiedene Partienmengen bilden.
+ */
+function passAccuracy(
+  matches: InsightMatch[],
+  teamId: number
+): { value: number | null; matches: number } {
+  let accurate = 0;
+  let total = 0;
+  let used = 0;
+  for (const match of matches) {
+    const stats = match.stats[venueOf(match, teamId)];
+    if (typeof stats?.passesAccurate !== "number" || typeof stats.totalPasses !== "number") continue;
+    if (stats.totalPasses <= 0) continue;
+    accurate += stats.passesAccurate;
+    total += stats.totalPasses;
+    used += 1;
+  }
+  return { value: total === 0 ? null : (accurate / total) * 100, matches: used };
+}
+
+/**
+ * Die Durchschnittswerte beider Teams als Zeilen für die Gegenüberstellung.
+ *
+ * `h2h` legt **beiden** Seiten dieselbe Partienmenge zugrunde; welche Seite ein Team darin
+ * hatte, entscheidet `venueOf` in `averageStat`. Nur deshalb summiert sich der Ballbesitz
+ * in diesem Modus auf 100 %. Bei `recent` stammen die Werte aus verschiedenen Partien gegen
+ * verschiedene Gegner - die Summe ist dann nicht 100 und wird bewusst nicht normiert.
+ *
+ * venueOnly stellt Heimform gegen Auswärtsform: das Heimteam nur zuhause, das Auswärtsteam
+ * nur auswärts. Im Duellmodus bleibt damit genau ein Filter übrig - die Duelle im Stadion des
+ * Heimteams -, und weil beide Seiten weiter dieselbe Partienmenge mitteln, bleibt auch die
+ * Aufteilung des Ballbesitzes vollständig.
+ */
+export function matchStats(
+  insights: FixtureInsights,
+  options: { source: "recent" | "h2h"; limit: number; scope?: LeagueScope | null; venueOnly?: boolean }
+): MatchStatRow[] {
+  const scope = options.scope ?? null;
+  // Der Ortsfilter greift vor der Begrenzung: Sonst wären es die Heimspiele unter den letzten
+  // N Partien statt der letzten N Heimspiele - bei limit 5 oft nur zwei oder drei.
+  const select = (matches: InsightMatch[], teamId: number, venue: "home" | "away") => matches
+    .filter((match) => inLeague(match, scope))
+    .filter((match) => !options.venueOnly || venueOf(match, teamId) === venue)
+    .slice(0, options.limit);
+  const duels = select(insights.h2h, insights.home.id, "home");
+  const homeMatches = options.source === "h2h" ? duels : select(insights.homeMatches, insights.home.id, "home");
+  const awayMatches = options.source === "h2h" ? duels : select(insights.awayMatches, insights.away.id, "away");
+
+  const rows: MatchStatRow[] = MATCH_STAT_DEFINITIONS.map((definition) => {
+    const home = averageStat(homeMatches, insights.home.id, definition.key);
+    const away = averageStat(awayMatches, insights.away.id, definition.key);
+    return {
+      key: definition.key,
+      label: definition.label,
+      scale: definition.scale,
+      digits: definition.digits,
+      ...(definition.unit === undefined ? {} : { unit: definition.unit }),
+      group: definition.group,
+      better: definition.better,
+      home: home.value,
+      away: away.value,
+      homeMatches: home.matches,
+      awayMatches: away.matches
+    };
+  });
+
+  const homeAccuracy = passAccuracy(homeMatches, insights.home.id);
+  const awayAccuracy = passAccuracy(awayMatches, insights.away.id);
+  rows.push({
+    key: "passAccuracy",
+    label: "Passquote",
+    scale: 100,
+    digits: 1,
+    unit: "%",
+    group: "off",
+    better: null,
+    home: homeAccuracy.value,
+    away: awayAccuracy.value,
+    homeMatches: homeAccuracy.matches,
+    awayMatches: awayAccuracy.matches
+  });
+  return rows;
+}
+
+/**
+ * Vergleichsschnitt je Kennzahl, gebildet aus dem bereits geladenen Bestand: Mittelwert über
+ * **beide** Seiten aller Partien beider Teams und aller direkten Duelle, also einschließlich
+ * der Gegner. Fehlende Werte bleiben außen vor und zählen nie als 0.
+ *
+ * Das ist kein Ligaschnitt, sondern der Schnitt des betrachteten Umfelds - die Ansicht
+ * beschriftet ihn deshalb als "Ø Vergleich". Liefert das Backend später echte
+ * Ligadurchschnitte, tauscht nur diese Funktion ihre Quelle; die Ansicht bleibt gleich.
+ */
+export function statBaselines(insights: FixtureInsights): Record<string, number | null> {
+  // Ein Ligaduell der beiden Teams steht in allen drei Listen. Ohne Deduplizierung ginge es
+  // dreifach ein und zöge den Schnitt ausgerechnet zu den Mannschaften, gegen die er misst.
+  // Dieselbe Vereinigung dedupliziert `coverageOf` im Backend genauso.
+  const sides = [...new Map([...insights.homeMatches, ...insights.awayMatches, ...insights.h2h]
+    .map((match) => [match.fixtureId, match])).values()]
+    .flatMap((match) => [match.stats.home, match.stats.away]);
+  const baselines: Record<string, number | null> = {};
+  for (const definition of MATCH_STAT_DEFINITIONS) {
+    const values = sides
+      .map((side) => side?.[definition.key])
+      .filter((value): value is number => typeof value === "number");
+    baselines[definition.key] = values.length === 0
+      ? null
+      : values.reduce((sum, value) => sum + value, 0) / values.length;
+  }
+  // Die Passquote ist auch hier die Quote der Summen, nicht der Mittelwert der Einzelquoten.
+  let accurate = 0;
+  let total = 0;
+  for (const side of sides) {
+    if (typeof side?.passesAccurate !== "number" || typeof side.totalPasses !== "number") continue;
+    if (side.totalPasses <= 0) continue;
+    accurate += side.passesAccurate;
+    total += side.totalPasses;
+  }
+  baselines.passAccuracy = total === 0 ? null : (accurate / total) * 100;
+  return baselines;
+}
+
 export interface H2hSelection {
   matches: InsightMatch[];
   summary: RecordSummary;
@@ -216,7 +418,7 @@ export function selectH2h(
 ): H2hSelection {
   const selected = matches
     .filter((match) => inLeague(match, options.scope ?? null))
-    .filter((match) => !options.homeOnly || match.home.id === homeTeamId)
+    .filter((match) => !options.homeOnly || venueOf(match, homeTeamId) === "home")
     .slice(0, options.limit ?? matches.length);
   const summary = summarize(selected, homeTeamId);
   return {

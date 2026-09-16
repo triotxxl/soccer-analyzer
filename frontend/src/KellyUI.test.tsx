@@ -176,12 +176,40 @@ describe("Automatik-Modus", () => {
     })));
   }
 
-  it("nennt in der Zusammenfassung nur Budget und Fraktion", () => {
+  it("setzt mit einem Klick alle Einstellungen des Testbetriebs", async () => {
+    // Genau die Konstellation, die die alte Kette verhagelt hat: Rahmen auf 100 %, Budget
+    // aus einem früheren Lauf, volle Kelly-Fraktion.
+    let latest: KellySettings | null = null;
+    render(<Harness auto profile={profileFor("btts")} onChange={(next) => { latest = next; }}
+      initial={{ budget: 126.26, kellyFraction: 1, maxExposurePercent: 1, maxStakePercent: 0.03 }} />);
+
+    await userEvent.click(screen.getByRole("button", { name: "Testbetrieb übernehmen" }));
+
+    expect(latest).toMatchObject({
+      budget: 100, kellyFraction: 0.25, maxStakePercent: 0.02, maxExposurePercent: 0.7,
+      minStake: 1, maxBets: null
+    });
+    // Danach meldet der Knopf den Zustand, statt ihn erneut anzubieten.
+    expect(screen.getByRole("button", { name: "Testbetrieb aktiv" })).toBeDisabled();
+  });
+
+  it("nennt die Stückzahl, die der Einsatzrahmen zulässt", () => {
+    render(<Harness auto profile={profileFor("btts")}
+      initial={{ maxExposurePercent: 0.7, maxStakePercent: 0.02 }} />);
+    // 0,70 / 0,02 = 35 - die Zahl, die tatsächlich bindet, nicht die 70 zum Mindesteinsatz.
+    expect(screen.getByRole("button", { name: /^Einstellungen/ })).toHaveTextContent("35 Plätze");
+  });
+
+  it("nennt in der Zusammenfassung Budget, Fraktion und den geerbten Einsatzrahmen", () => {
     render(<Harness profile={profileFor("btts")} auto />);
     const head = screen.getByRole("button", { name: /^Einstellungen/ });
     expect(head).toHaveTextContent("1/4 Kelly");
     // Die Auswahlregler gehören in der Automatik nicht dem Nutzer, also stehen sie auch nicht da.
     expect(head).not.toHaveTextContent("Quote ab");
+    // Der Einsatzrahmen dagegen bleibt seiner - und muss deshalb sichtbar sein. Er wird aus
+    // der manuellen Einstellung geerbt und stand in den Läufen bis zum 15.09.2026 unbemerkt
+    // auf 100 % statt auf der Vorgabe 25 %.
+    expect(head).toHaveTextContent("Einsatzrahmen");
   });
 
   it("zeigt aufgeklappt nur Budget und Fraktion, nicht die Auswahlregler", async () => {

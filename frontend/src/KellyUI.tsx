@@ -1,7 +1,7 @@
 import { CaretDown, CaretRight, Calculator, DownloadSimple, X } from "@phosphor-icons/react";
 import { useState, type ReactNode } from "react";
 import { formatOdd, formatPercent, sortStateLabel } from "./App";
-import { buildKellyExport, computeKellyCandidates, expectedValueOf, kellyExportFileName, recommendedSettings, type KellyCandidate, type KellySettings } from "./kelly";
+import { TEST_RUN_SETTINGS, buildKellyExport, computeKellyCandidates, expectedValueOf, kellyExportFileName, recommendedSettings, stakeSlots, type KellyCandidate, type KellySettings } from "./kelly";
 import { formatPoints, formatRoi } from "./marketProfile";
 import type { DashboardFixture, DashboardMarketKey, MarketProfile } from "./types";
 
@@ -130,6 +130,20 @@ function NumberField({ label, hint, value, scale = 1, min, max, step, disabled, 
 }
 
 /** Die drei Zahlen, wegen derer der Dialog geöffnet wird - lesbar statt im Fließtext. */
+/**
+ * Erklärt den Einsatzrahmen über das, was er tatsächlich bewirkt. Der Prozentsatz allein
+ * verrät nicht, dass er zusammen mit dem Höchsteinsatz die Stückzahl festlegt - und genau
+ * diese Wirkung blieb in den Läufen bis zum 15.09.2026 unbemerkt.
+ */
+function stakeSlotHint(settings: KellySettings): string {
+  const { plaetze, hoechstens } = stakeSlots(settings);
+  if (!Number.isFinite(plaetze)) return "Ohne Höchsteinsatz und Mindesteinsatz gibt es keine Stückzahlgrenze.";
+  return `Einsatzrahmen geteilt durch Höchsteinsatz ergibt die Stückzahl: rund ${plaetze} Wetten`
+    + ` passen hinein${hoechstens > plaetze ? `, höchstens ${hoechstens} zum Mindesteinsatz` : ""}.`
+    + " Das Budget kürzt sich dabei heraus - für die Stückzahl zählt allein das Verhältnis"
+    + " der beiden Prozentsätze.";
+}
+
 function MetricCard({ label, value, note, tone, title }: {
   label: string;
   value: string;
@@ -195,10 +209,12 @@ function AutoSummary({ profile, candidates }: { profile: MarketProfile; candidat
     <Disclosure open={showDetail} onToggle={() => setShowDetail((value) => !value)}
       label="Wie die Korrektur zustande kommt" openLabel="Weniger anzeigen" />
     {showDetail && <p className="kelly-auto-detail">
-      In der Rückrechnung auf Ergebnisse, die die Korrektur nicht kannte, lag diese Auswahl bei
-      −0,4 bis +3,3 % gegenüber −4,5 bis −4,9 % der früheren Vorgabe. Sie ist damit messbar
-      besser als vorher, aber sie ist nicht als gewinnbringend nachgewiesen – und ihr Vorteil
-      hängt fast vollständig am Remis-Markt.
+      In der Rückrechnung auf Ergebnisse, die die Korrektur nicht kannte, lag diese Auswahl an
+      drei Trennstellen bei −0,2 bis +2,6 %, die frühere Vorgabe bei −5,1 bis −7,2 %. Die
+      Streuung beträgt dabei rund ±5 Prozentpunkte – der Abstand ist also etwa ein Sigma.
+      Ohne den Remis-Markt steht die Auswahl bei −2,5 bis −4,0 %, ihr ganzer Vorsprung hängt
+      an diesem einen Markt, und der steht in der Prüfhälfte auf 24 Wetten. Sie ist damit
+      messbar weniger verlustreich als vorher, aber nicht als gewinnbringend nachgewiesen.
     </p>}
   </div>;
 }
@@ -255,18 +271,36 @@ export function KellyDialog({ fixtures, marketFilter, marketLabel, settings, pro
       { marketFilter, marketLabel, settings: effectiveSettings })
   );
 
+  // Der Einsatzrahmen steht auch in der Automatik in der Kopfzeile, obwohl sie ihn nicht
+  // setzt: Er wird aus der manuellen Einstellung geerbt und blieb dadurch unsichtbar - in den
+  // Läufen bis zum 15.09.2026 stand er auf 100 % statt der Vorgabe 25 %, ohne dass es
+  // irgendwo aufgefallen wäre. Dazu die Zahl der Plätze, weil der Prozentsatz allein seine
+  // Wirkung als Stückzahlgrenze nicht verrät.
+  const slots = stakeSlots(settings);
+  const slotLabel = Number.isFinite(slots.plaetze) ? `≈ ${slots.plaetze} Plätze` : "ohne Grenze";
+  const isTestRun = (Object.keys(TEST_RUN_SETTINGS) as Array<keyof typeof TEST_RUN_SETTINGS>)
+    .every((key) => settings[key] === TEST_RUN_SETTINGS[key]);
   const settingsSummary = automatic
     ? `Budget ${formatEuro(settings.budget)} · ${fractionLabel(settings.kellyFraction)}`
+      + ` · ${formatPercent(settings.maxExposurePercent)} Einsatzrahmen (${slotLabel})`
+      + (settings.maxBets === null ? "" : ` · höchstens ${settings.maxBets} Wetten`)
     : `Budget ${formatEuro(settings.budget)} · Quote ab ${formatOdd(settings.minOdds)}`
-      + ` · max. ${formatPercent(settings.maxStakePercent)} je Wette · ${formatPercent(settings.maxExposurePercent)} gesamt`;
+      + ` · max. ${formatPercent(settings.maxStakePercent)} je Wette`
+      + ` · ${formatPercent(settings.maxExposurePercent)} gesamt (${slotLabel})`;
 
   const notices: string[] = [];
   if (filtered.crossLeague > 0) notices.push(`${filtered.crossLeague} Cross-League-Partien aussortiert`);
   if (filtered.overMaxEdge > 0) notices.push(`${filtered.overMaxEdge} Kandidaten über dem Edge-Deckel aussortiert`);
   if (filtered.belowMinStake > 0) {
+    // Maßgeblich ist die Zahl der Plätze am Höchsteinsatz, nicht am Mindesteinsatz: Die
+    // meisten Auswahlen sitzen am Deckel. Die frühere Anzeige nannte allein die optimistische
+    // Grenze und war damit rund doppelt so groß wie die, die tatsächlich bindet.
     notices.push(`${filtered.belowMinStake} weitere Auswahlen mit Value passten nicht mehr in den Einsatzrahmen`
-      + ` – bei ${formatEuro(settings.minStake)} Mindesteinsatz sind daraus höchstens`
-      + ` ${Math.floor(settings.budget * settings.maxExposurePercent / Math.max(settings.minStake, 0.01))} Wetten finanzierbar`);
+      + ` – bei ${formatPercent(settings.maxStakePercent)} je Wette und ${formatPercent(settings.maxExposurePercent)}`
+      + ` Rahmen passen rund ${slots.plaetze} Wetten hinein`
+      + (slots.hoechstens > slots.plaetze
+        ? `, höchstens ${slots.hoechstens} zum Mindesteinsatz von ${formatEuro(settings.minStake)}`
+        : ""));
   }
   if (scaleFactor < 1) notices.push(`Gesamtrisiko-Limit erreicht – alle Einsätze auf ${(scaleFactor * 100).toFixed(0)} % skaliert`);
   if (limitedGames.length > 0) {
@@ -299,6 +333,18 @@ export function KellyDialog({ fixtures, marketFilter, marketLabel, settings, pro
           {auto && profile === null && <small className="kelly-mode-note">
             Für die Automatik fehlen abgerechnete Partien – es gilt die manuelle Einstellung.
           </small>}
+          {/*
+            Ein Knopf statt einer Liste in einem Dokument: Die Messung der alten Kette ist
+            daran gescheitert, dass eine einzelne Einstellung im Browser still abwich.
+          */}
+          <button className="kelly-preset" disabled={isTestRun}
+            title={isTestRun
+              ? "Die Einstellungen entsprechen bereits dem Testbetrieb."
+              : "Budget 100 €, 1/4 Kelly, 2 % je Wette, 70 % Einsatzrahmen, 1 € Mindesteinsatz"
+                + " – der Rahmen ist bewusst weit, damit er die Auswahl nicht abschneidet."}
+            onClick={() => onSettingsChange({ ...settings, ...TEST_RUN_SETTINGS })}>
+            {isTestRun ? "Testbetrieb aktiv" : "Testbetrieb übernehmen"}
+          </button>
         </div>
 
         <div className="kelly-metrics">
@@ -339,11 +385,17 @@ export function KellyDialog({ fixtures, marketFilter, marketLabel, settings, pro
                     <option value={0.125}>1/8 Kelly</option>
                   </select>
                 </SettingField>
+                <NumberField label="Max. Einsatz/Wette (%)" value={settings.maxStakePercent} scale={100} min={0} max={100} step={0.5}
+                  hint={stakeSlotHint(settings)}
+                  onCommit={(value) => set("maxStakePercent", value)} />
+                <NumberField label="Einsatzrahmen (%)" value={settings.maxExposurePercent} scale={100} min={0} max={100} step={5}
+                  hint={stakeSlotHint(settings)}
+                  onCommit={(value) => set("maxExposurePercent", value)} />
                 <NumberField label="Mindesteinsatz (€)" value={settings.minStake} min={0} step={0.5}
-                  hint="Der kleinste Betrag, den ein Wettanbieter annimmt. Er bestimmt zugleich, wie viele Wetten überhaupt in den Einsatzrahmen passen."
+                  hint="Der kleinste Betrag, den ein Wettanbieter annimmt. Liegt der rechnerische Einsatz darunter, wird er angehoben."
                   onCommit={(value) => set("minStake", value)} />
                 <NumberField label="Höchstens … Wetten" value={settings.maxBets ?? 0} min={0} step={1}
-                  hint="0 = keine eigene Grenze; dann zählt nur, wie viele Wetten zum Mindesteinsatz in den Einsatzrahmen passen."
+                  hint="0 = keine eigene Grenze; dann zählt allein, wie viele Wetten in den Einsatzrahmen passen."
                   onCommit={(value) => set("maxBets", value <= 0 ? null : Math.round(value))} />
               </div>
             : <div className="kelly-settings-grid">
