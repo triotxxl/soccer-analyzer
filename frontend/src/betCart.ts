@@ -58,6 +58,42 @@ export function toCartEntry(fixture: DashboardFixture, market: DashboardMarket):
   };
 }
 
+/**
+ * Ein Wettschein-Eintrag für die Seite, die der Quickpicker stützt. Nötig, weil die
+ * Voreinstellung „Underdog" auch die Seite stützen kann, die das Modell **nicht** tippt -
+ * `toCartEntry` würde dort den Gegner eintragen.
+ *
+ * Die Marktkennung bleibt `1x2`, damit `cartEntryId` weiterhin höchstens eine 1X2-Wette je
+ * Partie zulässt: Ein Außenseiter ersetzt einen zuvor gelegten Modelltipp derselben Partie,
+ * statt beide Seiten gleichzeitig im Schein zu haben.
+ */
+export function toQuickpickCartEntry(
+  fixture: DashboardFixture,
+  side: "1" | "2",
+  odds: number | null,
+  probability: number | null
+): CartEntry {
+  const team = side === "1" ? fixture.homeTeam : fixture.awayTeam;
+  return {
+    id: cartEntryId(fixture.fixtureId, "1x2"),
+    fixtureId: fixture.fixtureId,
+    homeTeam: fixture.homeTeam,
+    awayTeam: fixture.awayTeam,
+    league: fixture.league,
+    country: fixture.country,
+    kickoff: fixture.kickoff,
+    marketKey: "1x2",
+    marketLabel: "1X2",
+    selection: side === "1" ? `Heimsieg ${team}` : `Auswärtssieg ${team}`,
+    pick: side,
+    selectionTone: side === "1" ? "home" : "away",
+    odds,
+    probability: probability ?? 0,
+    recommendationLevel: "none",
+    addedAt: Date.now()
+  };
+}
+
 function isCartEntry(value: unknown): value is CartEntry {
   if (!value || typeof value !== "object") return false;
   const candidate = value as Partial<CartEntry>;

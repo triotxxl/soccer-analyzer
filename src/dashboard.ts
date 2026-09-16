@@ -45,6 +45,15 @@ export interface DashboardMarket {
    * Snapshots vor dieser Änderung und gilt dort als belastbar.
    */
   probabilityReliable?: boolean;
+  /**
+   * Nur im 1X2-Markt: beide Seitenquoten von Tipico. `odds` bleibt die Quote des getippten
+   * Weges - diese beiden kommen dazu, damit sich auch die Gegenseite bewerten lässt, ohne
+   * dass ein zusätzlicher Aufruf nötig wäre; der Preis ist beim Bau ohnehin in der Hand.
+   * Snapshots vor `schemaVersion: 5` führen die Felder nicht; dort lässt sich die Gegenquote
+   * nur schätzen (siehe `counterOddsOf` in `src/quickpick-core.ts`).
+   */
+  oddsHome?: number | null;
+  oddsAway?: number | null;
   recommendation: { level: RecommendationLevel; label: string };
   details: string[];
 }
@@ -110,7 +119,7 @@ export interface DashboardFixture {
 }
 
 export interface DashboardDocument {
-  schemaVersion: 1 | 2 | 3 | 4;
+  schemaVersion: 1 | 2 | 3 | 4 | 5;
   meta: {
     createdAt: string;
     timezone: string;
@@ -289,6 +298,7 @@ export function buildDashboardDocument(input: DashboardInput): DashboardDocument
         selection: selection === "1" ? `Heimsieg ${row.homeTeam}` : `Auswärtssieg ${row.awayTeam}`,
         pick: selection, selectionTone: selection === "1" ? "home" : "away",
         probability: selectionProbability, odds: (selection === "1" ? tipico?.home : tipico?.away) ?? null,
+        oddsHome: tipico?.home ?? null, oddsAway: tipico?.away ?? null,
         confidence: Math.min(row.dataConfidence, favorite?.confidence ?? row.dataConfidence), score: favorite?.score ?? null,
         crossLeague,
         ...(outcomeUnreliable ? { probabilityReliable: false } : {}),
@@ -417,7 +427,7 @@ export function buildDashboardDocument(input: DashboardInput): DashboardDocument
   const createdAt = Date.parse(input.createdAt);
   const latestKickoff = fixtures.reduce((latest, fixture) => Math.max(latest, Date.parse(fixture.kickoff)), createdAt);
   return {
-    schemaVersion: 4,
+    schemaVersion: 5,
     meta: {
       createdAt: input.createdAt, timezone: config.timezone, sourceFile: input.sourceFile,
       totalTipicoEvents: input.totalTipicoEvents, selectedTipicoEvents: input.selectedTipicoEvents,

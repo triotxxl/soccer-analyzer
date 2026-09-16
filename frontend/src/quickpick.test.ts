@@ -7,16 +7,25 @@ import {
   applyQuickpick,
   evaluateFixture,
   levelOf,
+  loadQuickpickStore,
+  saveQuickpickStore,
+  settingsOf,
+  withSettings,
+  DEFAULT_UNDERDOG_SETTINGS,
   h2hDominance,
   h2hStreak,
   loadQuickpickSettings,
   superiorityOf,
   venueFormPercent,
-  type QuickpickSettings
+  counterOddsOf,
+  UNDERDOG_LEVELS,
+  QUICKPICK_PRESETS,
+  type DavesQuickpickSettings,
+  type UnderdogQuickpickSettings
 } from "./quickpick";
 import type { DashboardFixture, FormResult } from "./types";
 
-function settings(overrides: Partial<QuickpickSettings> = {}): QuickpickSettings {
+function settings(overrides: Partial<DavesQuickpickSettings> = {}): DavesQuickpickSettings {
   return { ...DEFAULT_QUICKPICK_SETTINGS, ...overrides };
 }
 
@@ -365,13 +374,38 @@ describe("Strengestufen", () => {
   });
 });
 
-describe("loadQuickpickSettings", () => {
-  it("erbt bei einem Teilobjekt aus einer älteren Fassung die Vorgaben", () => {
+describe("Speicherung je Voreinstellung", () => {
+  /**
+   * Der Altbestand ist ein flaches Objekt aus der Zeit mit nur einer Voreinstellung. Er
+   * beschreibt Daves Regler und muss dorthin wandern, statt verworfen zu werden.
+   */
+  it("migriert einen flachen Altbestand in den Daves-Zweig", () => {
     window.localStorage.setItem("football-analyzer:quickpick-settings", JSON.stringify({ minOdds: 1.8 }));
-    const loaded = loadQuickpickSettings();
-    expect(loaded.minOdds).toBe(1.8);
-    expect(loaded.strongMinimum).toBe(DEFAULT_QUICKPICK_SETTINGS.strongMinimum);
-    expect(loaded.minPointsPerGame).toBe(DEFAULT_QUICKPICK_SETTINGS.minPointsPerGame);
+    const store = loadQuickpickStore();
+    expect(store.aktiv).toBe("daves1x2");
+    expect(store.daves1x2.minOdds).toBe(1.8);
+    expect(store.daves1x2.strongMinimum).toBe(DEFAULT_QUICKPICK_SETTINGS.strongMinimum);
+    expect(store.underdog).toEqual(DEFAULT_UNDERDOG_SETTINGS);
+    window.localStorage.clear();
+  });
+
+  it("erbt bei einem Teilzweig die Vorgaben", () => {
+    window.localStorage.setItem("football-analyzer:quickpick-settings",
+      JSON.stringify({ aktiv: "underdog", underdog: { maxOdds: 6 } }));
+    const store = loadQuickpickStore();
+    expect(store.aktiv).toBe("underdog");
+    expect(store.underdog.maxOdds).toBe(6);
+    expect(store.underdog.minOdds).toBe(DEFAULT_UNDERDOG_SETTINGS.minOdds);
+    window.localStorage.clear();
+  });
+
+  /** Eine unbekannte Kennung darf nur die Auswahl zurücksetzen, nicht die Regler. */
+  it("verwirft bei unbekannter Voreinstellung nur die Auswahl", () => {
+    window.localStorage.setItem("football-analyzer:quickpick-settings",
+      JSON.stringify({ aktiv: "gibtesnicht", daves1x2: { minOdds: 2.2 } }));
+    const store = loadQuickpickStore();
+    expect(store.aktiv).toBe("daves1x2");
+    expect(store.daves1x2.minOdds).toBe(2.2);
     window.localStorage.clear();
   });
 
@@ -379,5 +413,176 @@ describe("loadQuickpickSettings", () => {
     window.localStorage.setItem("football-analyzer:quickpick-settings", "kein json");
     expect(loadQuickpickSettings()).toEqual(DEFAULT_QUICKPICK_SETTINGS);
     window.localStorage.clear();
+  });
+
+  /** Der Kern der Trennung: Ein Wechsel darf die Regler der anderen nicht anfassen. */
+  it("lässt beim Schreiben den anderen Zweig unberührt", () => {
+    const store = withSettings(loadQuickpickStore(), settings({ minOdds: 1.9 }));
+    saveQuickpickStore({ ...store, aktiv: "underdog" });
+    const wieder = loadQuickpickStore();
+    expect(wieder.daves1x2.minOdds).toBe(1.9);
+    expect(settingsOf(wieder).preset).toBe("underdog");
+    window.localStorage.clear();
+  });
+});
+
+describe("Gegenquote", () => {
+  /** Ab schemaVersion 5 stehen beide Preise im Lauf - dann wird nicht gerechnet. */
+  it("nimmt den gespeicherten Preis, wenn er vorliegt", () => {
+    const withBoth = fixture({ markets: market({ pick: "1", odds: 1.5, oddsHome: 1.5, oddsAway: 6 }) });
+    expect(counterOddsOf(withBoth, withBoth.markets[0])).toEqual({ odds: 6, source: "snapshot" });
+  });
+
+  /**
+   * Ältere Läufe führen nur die getippte Seite. Der Rest wird über den Buchmacherschnitt
+   * gerechnet - die Seite stimmt dann zu 97,6 %, der Preis liegt im Median 7,1 % daneben.
+   */
+  it("rechnet sie aus Tipp- und Remisquote, wenn sie fehlt", () => {
+    const withDraw = fixture({
+      markets: [
+        { ...fixture().markets[0]!, pick: "1", odds: 1.5 },
+        { ...fixture().markets[0]!, key: "draw", pick: null, odds: 4 }
+      ]
+    });
+    const counter = counterOddsOf(withDraw, withDraw.markets[0]);
+    expect(counter?.source).toBe("geschätzt");
+    // 1 / (1,1068 - 1/1,5 - 1/4) = rund 5,2
+    expect(counter!.odds).toBeCloseTo(1 / (1.1068 - 1 / 1.5 - 1 / 4), 6);
+  });
+
+  it("liefert null, wenn die Remisquote fehlt", () => {
+    const withoutDraw = fixture({ markets: market({ pick: "1", odds: 1.5 }) });
+    expect(counterOddsOf(withoutDraw, withoutDraw.markets[0])).toBeNull();
+  });
+
+  /** Ein Rest nahe null hieße eine astronomische Quote - dann wird nicht geraten. */
+  it("liefert null, wenn der Buchmacherschnitt für diese Partie nicht aufgeht", () => {
+    const impossible = fixture({
+      markets: [
+        { ...fixture().markets[0]!, pick: "1", odds: 1.05 },
+        { ...fixture().markets[0]!, key: "draw", pick: null, odds: 1.05 }
+      ]
+    });
+    expect(counterOddsOf(impossible, impossible.markets[0])).toBeNull();
+  });
+});
+
+describe("Underdog", () => {
+  function under(overrides: Partial<UnderdogQuickpickSettings> = {}): UnderdogQuickpickSettings {
+    return { ...DEFAULT_UNDERDOG_SETTINGS, ...overrides };
+  }
+
+  /**
+   * Das Modell tippt Heim zu 1,50, der Markt bezahlt Auswärts mit 3,20. Die Form spricht für
+   * Auswärts (87 gegen 7 Prozent), die Duelle ebenfalls.
+   */
+  function dogFixture(overrides: Partial<DashboardFixture> = {}): DashboardFixture {
+    const base = fixture();
+    return {
+      ...base,
+      form: {
+        scope: "venue",
+        home: ["loss", "loss", "loss", "draw", "loss"],
+        away: ["win", "win", "win", "win", "draw"],
+        homeMatches: [], awayMatches: []
+      },
+      h2h: { outcomes: ["loss", "loss", "win"], btts: [], draws: 0, consecutiveDraws: 0, matches: [] },
+      markets: [
+        { ...base.markets[0]!, pick: "1", odds: 1.5, oddsHome: 1.5, oddsAway: 3.2, probability: 0.55 },
+        { ...base.markets[0]!, key: "draw", pick: null, odds: 4, probability: 0.25 }
+      ],
+      ...overrides
+    };
+  }
+
+  it("stützt die teurere Seite, auch gegen den Modelltipp", () => {
+    const evaluation = evaluateFixture(dogFixture(), under());
+    expect(evaluation.passes).toBe(true);
+    expect(evaluation.side).toBe("2");
+    expect(evaluation.pick).toBe("1");
+    expect(evaluation.underdog?.modelAgrees).toBe(false);
+    expect(evaluation.odds).toBe(3.2);
+  });
+
+  /** Die Wahrscheinlichkeit der Gegenseite ist exakt rekonstruierbar: 1 − p(Tipp) − p(Remis). */
+  it("rechnet die Modellwahrscheinlichkeit der Gegenseite aus dem Rest", () => {
+    expect(evaluateFixture(dogFixture(), under()).underdog?.probability).toBeCloseTo(0.2, 10);
+  });
+
+  it("lehnt ein ausgeglichenes Quotenbild ab", () => {
+    const even = dogFixture({
+      markets: [
+        { ...fixture().markets[0]!, pick: "1", odds: 2.5, oddsHome: 2.5, oddsAway: 2.7 },
+        { ...fixture().markets[0]!, key: "draw", pick: null, odds: 3.4 }
+      ]
+    });
+    expect(evaluateFixture(even, under()).rejectedBy).toBe("keinAussenseiter");
+  });
+
+  it("hält sich an das Quotenband", () => {
+    expect(evaluateFixture(dogFixture(), under({ maxOdds: 3 })).rejectedBy).toBe("quote");
+    expect(evaluateFixture(dogFixture(), under({ minOdds: 3.5 })).rejectedBy).toBe("quote");
+  });
+
+  it("verlangt den Formvorsprung des Außenseiters", () => {
+    const flat = dogFixture({
+      form: {
+        scope: "venue",
+        home: ["win", "win", "win", "win", "draw"],
+        away: ["win", "win", "win", "win", "draw"],
+        homeMatches: [], awayMatches: []
+      }
+    });
+    expect(evaluateFixture(flat, under()).rejectedBy).toBe("formGegen");
+  });
+
+  /**
+   * Das H2H-Tor ist auf der Vorgabe **aus**: Es kostete gemessen rund 19 Punkte Ertrag je
+   * Bein, und für kurze Kombis multipliziert sich genau dieser Wert. Auf der strengen Stufe
+   * greift es weiterhin.
+   */
+  it("prüft die Duelle nur auf der strengen Stufe", () => {
+    // Aus Heimsicht drei Siege - für den Außenseiter auswärts also drei Niederlagen.
+    const against = dogFixture({ h2h: h2h(["win", "win", "win"]) });
+    expect(evaluateFixture(against, under()).passes).toBe(true);
+    expect(evaluateFixture(against, applyLevel(DEFAULT_UNDERDOG_SETTINGS, "streng")).rejectedBy)
+      .toBe("h2hDagegen");
+  });
+
+  it("lässt eine Partie ohne Duelle zu, verlangt sie aber auf Wunsch", () => {
+    const none = dogFixture({ h2h: h2h([]) });
+    expect(evaluateFixture(none, under()).passes).toBe(true);
+    expect(evaluateFixture(none, under({ minDuels: 3 })).rejectedBy).toBe("keineDuelle");
+  });
+
+  it("prüft die Tabelle nur, wenn das Tor eingeschaltet ist", () => {
+    // Alpha steht vorne, der Außenseiter ist Beta - der Tabellenvorsprung fehlt ihm also.
+    expect(evaluateFixture(dogFixture(), under()).passes).toBe(true);
+    expect(evaluateFixture(dogFixture(), under({ minPositionGap: 3 })).rejectedBy).toBe("tabelle");
+  });
+
+  it("kann auf die Zustimmung des Modells bestehen", () => {
+    expect(evaluateFixture(dogFixture(), under({ requireModelSide: true })).rejectedBy)
+      .toBe("modellDagegen");
+  });
+
+  it("lehnt ohne brauchbare Quote ab", () => {
+    const noOdds = dogFixture({ markets: market({ pick: "1", odds: null }) });
+    expect(evaluateFixture(noOdds, under()).rejectedBy).toBe("keineQuote");
+  });
+
+  /** Die Stufen müssen von streng nach weit durchlässiger werden. */
+  it("wird von streng nach weit durchlässiger", () => {
+    const fixtures = [dogFixture({ fixtureId: 1 }), dogFixture({ fixtureId: 2, h2h: h2h(["win", "win", "win"]) })];
+    const counts = UNDERDOG_LEVELS.map((level) =>
+      applyQuickpick(fixtures, applyLevel(DEFAULT_UNDERDOG_SETTINGS, level.id)).report.passed);
+    expect(counts).toEqual([...counts].sort((left, right) => left - right));
+  });
+
+  /** Der Ertrag steht auf dem Knopf, nicht die Trefferquote - es ist eine Einzelwette. */
+  it("beschriftet die Stufen mit dem Ertrag", () => {
+    expect(UNDERDOG_LEVELS.every((level) => level.measured !== null)).toBe(true);
+    const streng = UNDERDOG_LEVELS.find((level) => level.id === "streng")!;
+    expect(QUICKPICK_PRESETS.underdog.noteOf(streng.measured)).toMatch(/ROI$/);
   });
 });

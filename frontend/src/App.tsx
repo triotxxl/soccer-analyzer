@@ -3,7 +3,7 @@ import {
 } from "@phosphor-icons/react";
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { BetBuilderDrawer, CartAddRadial, CartBadge } from "./BetCartUI";
-import { toCartEntry, useBetCart } from "./betCart";
+import { toCartEntry, toQuickpickCartEntry, useBetCart } from "./betCart";
 import { countryFlagCode } from "./countryFlags";
 import { FixtureInsightPanels, InsightsNotice, useFixtureInsights } from "./FixtureInsights";
 import { useDashboardData } from "./data";
@@ -13,7 +13,7 @@ import { edgeOf, loadKellyAuto, loadKellySettings, loadKellyVisible, saveKellyAu
 import { KellyButton, KellyDialog } from "./KellyUI";
 import { MarketProfileView } from "./MarketProfileUI";
 import { QuickpickButton, QuickpickChip, QuickpickDialog } from "./QuickpickUI";
-import { applyQuickpick, loadQuickpickSettings, saveQuickpickSettings, QUICKPICK_PRESETS, REJECTION_LABELS, type QuickpickFilterReport, type QuickpickRejection, type QuickpickSettings } from "./quickpick";
+import { applyQuickpick, loadQuickpickStore, saveQuickpickStore, settingsOf, withSettings, QUICKPICK_PRESETS, REJECTION_LABELS, presetOf, type QuickpickFilterReport, type QuickpickPresetId, type QuickpickRejection, type QuickpickStore } from "./quickpick";
 import { TeamCrest } from "./TeamCrest";
 import { useMarketProfile } from "./marketProfile";
 import type { ClassGap, DashboardDocument, DashboardFixture, DashboardMarket, DashboardMarketKey, FormResult, LeagueStats, RecommendationLevel } from "./types";
@@ -710,7 +710,9 @@ function Dashboard({ document }: { document: DashboardDocument }) {
   // Neuladen unbemerkt fast alle Zeilen ausblendet, wäre dieselbe Falle wie der geerbte
   // Einsatzrahmen der Kelly-Automatik, der wochenlang unentdeckt auf 100 % stand.
   const [quickpickActive, setQuickpickActive] = useState(false);
-  const [quickpickSettings, setQuickpickSettings] = useState<QuickpickSettings>(() => loadQuickpickSettings());
+  // Beide Voreinstellungen behalten ihre eigenen Regler; gewechselt wird nur, welche aktiv ist.
+  const [quickpickStore, setQuickpickStore] = useState<QuickpickStore>(loadQuickpickStore);
+  const quickpickSettings = settingsOf(quickpickStore);
   const { cart, addEntry, removeEntry, clear: clearCart } = useBetCart();
   const watchedFixtureIds = useMemo(() => document.fixtures
     .filter((fixture) => !deselectedLeagues.has(leagueKey(fixture.country, fixture.league)))
@@ -837,7 +839,7 @@ function Dashboard({ document }: { document: DashboardDocument }) {
 
   useEffect(() => { saveView(view); }, [view]);
   useEffect(() => { saveKellySettings(kellySettings); }, [kellySettings]);
-  useEffect(() => { saveQuickpickSettings(quickpickSettings); }, [quickpickSettings]);
+  useEffect(() => { saveQuickpickStore(quickpickStore); }, [quickpickStore]);
   useEffect(() => { saveKellyVisible(showKelly); }, [showKelly]);
   useEffect(() => { saveKellyAuto(kellyAuto); }, [kellyAuto]);
 
@@ -897,8 +899,7 @@ function Dashboard({ document }: { document: DashboardDocument }) {
   // eigene Regel mit eigener Rückrechnung und darf von einem Tabellenfilter nicht
   // beschnitten werden.
   const quickpick = applyQuickpick(quickpickActive ? scopedFixtures : [], quickpickSettings);
-  const quickpickLabel = QUICKPICK_PRESETS.find((entry) => entry.id === quickpickSettings.preset)?.label
-    ?? "Quickpick";
+  const quickpickLabel = presetOf(quickpickSettings).label;
   const filtered = scopedFixtures.filter((fixture) => {
     if (quickpickActive && !quickpick.passing.has(fixture.fixtureId)) return false;
     if (classGapFilter === "only" && !fixture.classGap) return false;
@@ -1325,7 +1326,8 @@ function Dashboard({ document }: { document: DashboardDocument }) {
     fixtures={scopedFixtures}
     settings={quickpickSettings}
     active={quickpickActive}
-    onSettingsChange={setQuickpickSettings}
+    onSettingsChange={(next) => setQuickpickStore((store) => withSettings(store, next))}
+    onPresetChange={(preset: QuickpickPresetId) => setQuickpickStore((store) => ({ ...store, aktiv: preset }))}
     onActiveChange={setQuickpickActive}
     onAddAll={(hits) => {
       // Der Weg, für den der Filter gedacht ist: Treffer in den Wettschein, dort Kombis
@@ -1336,6 +1338,17 @@ function Dashboard({ document }: { document: DashboardDocument }) {
       }
       setQuickpickOpen(false);
       setBuilderOpen(true);
+    }}
+    onAddOne={(row) => {
+      // Einzeln statt gesammelt: Beim Außenseiter-Sucher würde eine Kombi den gemessenen
+      // Verlust je Bein multiplizieren. Der Schein bleibt offen, damit weitere folgen können.
+      if (row.evaluation.side === null) return;
+      addEntry(toQuickpickCartEntry(
+        row.fixture,
+        row.evaluation.side,
+        row.evaluation.odds,
+        row.evaluation.underdog?.probability ?? null
+      ));
     }}
     onClose={() => setQuickpickOpen(false)}
   />}

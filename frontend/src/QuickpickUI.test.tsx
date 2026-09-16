@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { QuickpickButton, QuickpickChip, QuickpickDialog } from "./QuickpickUI";
-import { DEFAULT_QUICKPICK_SETTINGS, type QuickpickSettings } from "./quickpick";
+import { DEFAULT_QUICKPICK_SETTINGS, DEFAULT_UNDERDOG_SETTINGS, type DavesQuickpickSettings, type QuickpickPresetId, type QuickpickSettings } from "./quickpick";
 import type { DashboardFixture } from "./types";
 
 afterEach(cleanup);
@@ -41,22 +41,27 @@ function balanced(id: number): DashboardFixture {
 }
 
 /** Der Dialog ist kontrolliert - für Eingabetests braucht er einen Halter. */
-function Harness({ fixtures, initial, active = false, onActiveChange, onAddAll }: {
+function Harness({ fixtures, initial, preset = "daves1x2", active = false, onActiveChange, onAddAll, onAddOne }: {
   fixtures: DashboardFixture[];
-  initial?: Partial<QuickpickSettings>;
+  initial?: Partial<DavesQuickpickSettings>;
+  preset?: QuickpickPresetId;
   active?: boolean;
   onActiveChange?(active: boolean): void;
   onAddAll?(hits: DashboardFixture[]): void;
+  onAddOne?(row: { evaluation: { side: "1" | "2" | null } }): void;
 }) {
-  const [settings, setSettings] = useState<QuickpickSettings>({ ...DEFAULT_QUICKPICK_SETTINGS, ...initial });
+  const [settings, setSettings] = useState<QuickpickSettings>(
+    preset === "underdog" ? DEFAULT_UNDERDOG_SETTINGS : { ...DEFAULT_QUICKPICK_SETTINGS, ...initial });
   const [isActive, setActive] = useState(active);
   return <QuickpickDialog
     fixtures={fixtures}
     settings={settings}
     active={isActive}
     onSettingsChange={setSettings}
+    onPresetChange={(next) => setSettings(next === "underdog" ? DEFAULT_UNDERDOG_SETTINGS : DEFAULT_QUICKPICK_SETTINGS)}
     onActiveChange={(next) => { setActive(next); onActiveChange?.(next); }}
     onAddAll={(hits) => onAddAll?.(hits)}
+    onAddOne={(row) => onAddOne?.(row)}
     onClose={() => undefined}
   />;
 }
@@ -104,7 +109,8 @@ describe("QuickpickChip", () => {
 describe("QuickpickDialog", () => {
   it("nennt die Voreinstellung mit allen Kriterien", () => {
     render(<Harness fixtures={[fixture(1, "Alpha", "Beta", 75)]} />);
-    expect(screen.getByText("Daves 1x2-Filter")).toBeInTheDocument();
+    // Der Name steht zweimal: einmal im Auswahlknopf, einmal in der Karte darunter.
+    expect(screen.getByRole("button", { name: "Daves 1x2-Filter" })).toBeInTheDocument();
     expect(screen.getByText(/Tabelle: Vorsprung bei Platz/)).toBeInTheDocument();
     expect(screen.getByText(/Remis zählen als kein Verlust/)).toBeInTheDocument();
     expect(screen.getByText(/keine Niederlagenserie/)).toBeInTheDocument();
@@ -206,5 +212,85 @@ describe("QuickpickDialog", () => {
   it("sagt es, wenn keine Partie klar überlegen ist", () => {
     render(<Harness fixtures={[balanced(1)]} />);
     expect(screen.getByText("Keine Partie ist nach diesen Kriterien klar überlegen.")).toBeInTheDocument();
+  });
+});
+
+describe("Zwei Voreinstellungen", () => {
+  /** Eine Partie, bei der der Markt die Auswärtsseite deutlich schlechter sieht. */
+  function dog(id: number): DashboardFixture {
+    const base = fixture(id, "Alpha", "Beta", 40);
+    return {
+      ...base,
+      form: {
+        scope: "venue",
+        home: ["loss", "loss", "loss", "draw", "loss"],
+        away: ["win", "win", "win", "win", "draw"],
+        homeMatches: [], awayMatches: []
+      },
+      h2h: { outcomes: ["loss", "loss", "win"], btts: [], draws: 0, consecutiveDraws: 0, matches: [] },
+      markets: [
+        { ...base.markets[0]!, pick: "1", odds: 1.5, oddsHome: 1.5, oddsAway: 3.2, probability: 0.55 },
+        { ...base.markets[0]!, key: "draw", pick: null, odds: 4, probability: 0.25 }
+      ]
+    };
+  }
+
+  /** Dieselbe Partie, aber ohne gespeicherte Gegenquote - der Preis wird dann gerechnet. */
+  function dogEstimated(id: number): DashboardFixture {
+    const base = dog(id);
+    // Tippquote 1,84 gegen Remis 4,00 ergibt über den Buchmacherschnitt rund 3,2 - also
+    // innerhalb des Quotenbands, damit die Zeile den Filter überhaupt erreicht.
+    const markets = base.markets.map((m) => m.key === "1x2"
+      ? { ...m, odds: 1.84, oddsHome: undefined, oddsAway: undefined }
+      : m);
+    return { ...base, markets };
+  }
+
+  it("lässt zwischen den Voreinstellungen wechseln", async () => {
+    render(<Harness fixtures={[dog(1)]} />);
+    expect(screen.getByRole("button", { name: "Daves 1x2-Filter" })).toHaveAttribute("aria-pressed", "true");
+
+    await userEvent.click(screen.getByRole("button", { name: "Underdog" }));
+
+    expect(screen.getByRole("button", { name: "Underdog" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByText(/Sucher, keine Tippregel/)).toBeInTheDocument();
+  });
+
+  it("zeigt für den Außenseiter eigene Spalten", () => {
+    render(<Harness fixtures={[dog(1)]} preset="underdog" />);
+    expect(screen.getByRole("button", { name: /^Formvorsprung/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Modell/ })).toBeInTheDocument();
+    // Favoritenpunkte gehören der Modellseite - beim Widerspruch gibt es sie nicht.
+    expect(screen.queryByRole("button", { name: /^Favoritenpunkte/ })).not.toBeInTheDocument();
+  });
+
+  it("markiert eine Zeile, die gegen den Modelltipp steht", () => {
+    render(<Harness fixtures={[dog(1)]} preset="underdog" />);
+    expect(screen.getByText("Modell dagegen")).toBeInTheDocument();
+    expect(screen.getByText("Beta")).toBeInTheDocument();
+  });
+
+  /**
+   * Kurze Kombis sind der Zweck - deshalb gibt es auch hier den Sammelknopf. Was er kostet,
+   * steht in der Kombi-Tabelle darunter.
+   */
+  it("zeigt beim Außenseiter die Kombi-Tabelle", () => {
+    render(<Harness fixtures={[dog(1)]} preset="underdog" />);
+    expect(screen.getByText(/Was kurze Kombis aus dieser Stufe gebracht hätten/)).toBeInTheDocument();
+    // Die Spalte "erwartet" ist der Kern: Eine Kombi multipliziert den Ertrag je Bein.
+    expect(screen.getByRole("columnheader", { name: "erwartet" })).toBeInTheDocument();
+  });
+
+  /** Eine gerechnete Quote ist kein Preis - solche Zeilen bleiben aus dem Schein draußen. */
+  it("nimmt geschätzte Quoten nicht in den Wettschein", () => {
+    render(<Harness fixtures={[dogEstimated(1)]} preset="underdog" />);
+    expect(screen.getByRole("button", { name: /Keine Treffer/ })).toBeDisabled();
+    expect(screen.getByText(/gerechnete Quote, kein Preis/)).toBeInTheDocument();
+  });
+
+  it("nennt beim Außenseiter den Ertrag statt der Trefferquote", () => {
+    render(<Harness fixtures={[dog(1)]} preset="underdog" />);
+    expect(screen.getByText("Ertrag je Wette")).toBeInTheDocument();
+    expect(screen.queryByText("Treffer je Bein")).not.toBeInTheDocument();
   });
 });

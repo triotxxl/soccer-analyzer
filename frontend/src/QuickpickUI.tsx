@@ -1,23 +1,31 @@
-import { CaretDown, CaretRight, Funnel, ShoppingCartSimple, X } from "@phosphor-icons/react";
+import { CaretDown, CaretRight, Funnel, Plus, ShoppingCartSimple, X } from "@phosphor-icons/react";
 import { useState } from "react";
 import { formatOdd, sortStateLabel } from "./App";
 import { NumberField, SettingField } from "./KellyUI";
 import {
-  QUICKPICK_LEVELS,
-  QUICKPICK_PRESETS,
+  QUICKPICK_PRESET_LIST,
   REJECTION_LABELS,
   applyLevel,
   applyQuickpick,
   levelOf,
-  type QuickpickEvaluation,
+  presetOf,
+  type DavesQuickpickSettings,
+  type QuickpickPresetId,
   type QuickpickRejection,
-  type QuickpickSettings
+  type QuickpickSettings,
+  type UnderdogQuickpickSettings
 } from "./quickpick";
+import { QUICKPICK_COLUMNS, type QuickpickRow } from "./quickpickColumns";
 import type { DashboardFixture } from "./types";
+
+const formatPercent = (value: number) => `${(value * 100).toFixed(1).replace(".", ",")} %`;
+const formatSigned = (value: number) =>
+  `${value >= 0 ? "+" : "−"}${Math.abs(value * 100).toFixed(1).replace(".", ",")} %`;
+
 
 export function QuickpickButton({ active, onOpen }: { active: boolean; onOpen(): void }) {
   return <button className="kelly-trigger quickpick-trigger" aria-pressed={active}
-    aria-label="Quickpicker öffnen" title="Quickpicker: klar überlegene Mannschaften filtern"
+    aria-label="Quickpicker öffnen" title="Quickpicker: Partien nach einer Voreinstellung filtern"
     onClick={onOpen}>
     <Funnel size={15} weight="bold" /> Quickpick
   </button>;
@@ -42,61 +50,44 @@ export function QuickpickChip({ label, passed, evaluated, onOpen, onClear }: {
   </span>;
 }
 
-type QuickpickSortKey = "team" | "tabelle" | "form" | "duelle" | "punkte" | "quote";
-
-interface Row {
-  fixture: DashboardFixture;
-  evaluation: QuickpickEvaluation;
-}
-
-/** Der Formwert der Seite, die der Filter stützt. */
-function strongPercent(evaluation: QuickpickEvaluation): number {
-  return evaluation.side === "1" ? evaluation.homePercent : evaluation.awayPercent;
-}
-
-function sortValue(row: Row, key: QuickpickSortKey): number | string {
-  if (key === "team") return `${row.fixture.homeTeam} ${row.fixture.awayTeam}`;
-  if (key === "tabelle") return row.evaluation.superiority?.pointsPerGame ?? -9;
-  if (key === "form") return strongPercent(row.evaluation);
-  if (key === "duelle") return row.evaluation.dominance?.rate ?? -2;
-  if (key === "punkte") return row.evaluation.points ?? -1;
-  return row.evaluation.odds ?? -1;
-}
-
-function formatVenuePercent(value: number): string {
-  return `${Math.round(value)} %`;
-}
-
-function formatSigned(value: number, digits = 2): string {
-  return `${value >= 0 ? "+" : "−"}${Math.abs(value).toFixed(digits).replace(".", ",")}`;
-}
-
-export function QuickpickDialog({ fixtures, settings, active, onSettingsChange, onActiveChange, onAddAll, onClose }: {
+export function QuickpickDialog({
+  fixtures, settings, active, onSettingsChange, onPresetChange, onActiveChange, onAddAll, onAddOne, onClose
+}: {
   fixtures: DashboardFixture[];
   settings: QuickpickSettings;
   active: boolean;
   onSettingsChange(settings: QuickpickSettings): void;
+  onPresetChange(preset: QuickpickPresetId): void;
   onActiveChange(active: boolean): void;
   onAddAll(fixtures: DashboardFixture[]): void;
+  onAddOne(row: QuickpickRow): void;
   onClose(): void;
 }) {
-  const [sortKey, setSortKey] = useState<QuickpickSortKey>("tabelle");
+  const preset = presetOf(settings);
+  const columns = QUICKPICK_COLUMNS[preset.id];
+  const [sortKey, setSortKey] = useState<string>(preset.defaultSort);
   const [sortDirection, setSortDirection] = useState<1 | -1>(-1);
   const [showSettings, setShowSettings] = useState(false);
 
-  const preset = QUICKPICK_PRESETS.find((entry) => entry.id === settings.preset) ?? QUICKPICK_PRESETS[0]!;
   const activeLevel = levelOf(settings);
+  const measured = preset.levels.find((entry) => entry.id === activeLevel)?.measured ?? null;
+  const kennzahl = preset.kennzahlOf(measured);
+  // Ein Schlüssel aus der anderen Voreinstellung darf nicht stehen bleiben.
+  const sorter = columns.find((column) => column.key === sortKey)
+    ?? columns.find((column) => column.key === preset.defaultSort)
+    ?? columns[0]!;
+
   // Wie im Kelly-Dialog: bei jedem Render neu gerechnet, kein Zwischenspeicher. Die Liste
   // kann dadurch nicht von dem abweichen, was die Tabelle zeigt.
   const { evaluations, report } = applyQuickpick(fixtures, settings);
 
-  const rows: Row[] = fixtures
+  const rows: QuickpickRow[] = fixtures
     .map((fixture) => ({ fixture, evaluation: evaluations.get(fixture.fixtureId)! }))
     .filter((row) => row.evaluation.passes);
 
   const sorted = [...rows].sort((left, right) => {
-    const a = sortValue(left, sortKey);
-    const b = sortValue(right, sortKey);
+    const a = sorter.value?.(left) ?? 0;
+    const b = sorter.value?.(right) ?? 0;
     const comparison = typeof a === "string" && typeof b === "string"
       ? a.localeCompare(b, "de")
       : Number(a) - Number(b);
@@ -104,16 +95,23 @@ export function QuickpickDialog({ fixtures, settings, active, onSettingsChange, 
       || Date.parse(left.fixture.kickoff) - Date.parse(right.fixture.kickoff);
   });
 
-  const sort = (key: QuickpickSortKey) => {
+  const sort = (key: string) => {
     if (key === sortKey) setSortDirection((value) => (value === 1 ? -1 : 1));
     else {
       setSortKey(key);
       setSortDirection(key === "team" ? 1 : -1);
     }
   };
-  const arrow = (key: QuickpickSortKey) => (sortKey === key ? (sortDirection === 1 ? "▲" : "▼") : "");
+  const arrow = (key: string) => (sortKey === key ? (sortDirection === 1 ? "▲" : "▼") : "");
 
-  const set = <K extends keyof QuickpickSettings>(key: K, value: QuickpickSettings[K]) => {
+  // Zwei Setzer statt einem: Auf einer Union ist nur der Durchschnitt der Felder erlaubt,
+  // und genau das soll so sein - keine Voreinstellung darf einen Regler der anderen schreiben.
+  const setDaves = <K extends keyof DavesQuickpickSettings>(key: K, value: DavesQuickpickSettings[K]) => {
+    if (settings.preset !== "daves1x2") return;
+    onSettingsChange({ ...settings, [key]: value });
+  };
+  const setUnderdog = <K extends keyof UnderdogQuickpickSettings>(key: K, value: UnderdogQuickpickSettings[K]) => {
+    if (settings.preset !== "underdog") return;
     onSettingsChange({ ...settings, [key]: value });
   };
 
@@ -121,10 +119,17 @@ export function QuickpickDialog({ fixtures, settings, active, onSettingsChange, 
     .filter(([, count]) => count > 0)
     .sort((left, right) => right[1] - left[1]);
 
-  // Was eine Kombi aus allen Treffern zahlen würde. Die Trefferquote je Bein multipliziert
-  // sich dabei mit - deshalb steht sie daneben.
   const withOdds = sorted.filter((row) => row.evaluation.odds !== null);
   const comboOdds = withOdds.reduce((product, row) => product * (row.evaluation.odds ?? 1), 1);
+  const averageOdds = withOdds.length === 0 ? null
+    : withOdds.reduce((sum, row) => sum + (row.evaluation.odds ?? 0), 0) / withOdds.length;
+
+  /** Eine geschätzte Quote darf nicht in den Wettschein - sie ist kein Preis. */
+  const estimated = (row: QuickpickRow) => row.evaluation.underdog?.counterSource === "geschätzt"
+    && row.evaluation.underdog.counterOdds === row.evaluation.odds;
+  const spielbar = sorted.filter((row) => !estimated(row));
+  const uebersprungen = sorted.length - spielbar.length;
+  const kombis = measured?.kombis ?? [];
 
   return <div className="overlay-backdrop" onClick={onClose}>
     <div className="kelly-dialog quickpick-dialog" role="dialog" aria-label="Quickpicker"
@@ -137,6 +142,21 @@ export function QuickpickDialog({ fixtures, settings, active, onSettingsChange, 
       </div>
 
       <div className="kelly-body">
+        <div className="quickpick-presets" role="group" aria-label="Voreinstellung">
+          {QUICKPICK_PRESET_LIST.map((entry) => <button key={entry.id}
+            className={entry.id === preset.id ? "active" : ""}
+            aria-pressed={entry.id === preset.id}
+            title={entry.description}
+            onClick={() => {
+              onPresetChange(entry.id);
+              setSortKey(entry.defaultSort);
+              setSortDirection(-1);
+              setShowSettings(false);
+            }}>
+            <strong>{entry.label}</strong>
+          </button>)}
+        </div>
+
         <section className="quickpick-preset" aria-label="Voreinstellung">
           <div className="quickpick-preset-head">
             <div>
@@ -159,35 +179,73 @@ export function QuickpickDialog({ fixtures, settings, active, onSettingsChange, 
             <strong className="kelly-metric-value">{report.passed}</strong>
             <span className="kelly-metric-note">von {report.evaluated} geprüften Partien</span>
           </div>
-          <div className="kelly-metric" title="Über 4.543 abgerechnete Partien vom 16.08. bis 15.09.2026 traf diese Torfolge in 70,5 % der Fälle (±5,8). Bei einer Kombi multipliziert sich das: vier Beine 24,7 %, sechs Beine 12,3 %.">
-            <span className="kelly-metric-label">Treffer je Bein</span>
-            <strong className="kelly-metric-value">70,5 %</strong>
-            <span className="kelly-metric-note">zurückgerechnet, ±5,8 – kein Beleg</span>
+          <div className="kelly-metric" title={kennzahl.titel}>
+            <span className="kelly-metric-label">{kennzahl.label}</span>
+            <strong className="kelly-metric-value">{kennzahl.wert}</strong>
+            <span className="kelly-metric-note">{kennzahl.notiz}</span>
           </div>
-          <div className="kelly-metric" title="Das Produkt aller Quoten in dieser Liste - also die Kombi über sämtliche Treffer.">
-            <span className="kelly-metric-label">Kombi aus allen</span>
-            <strong className="kelly-metric-value">
-              {withOdds.length === 0 ? "–" : formatOdd(comboOdds)}
-            </strong>
-            <span className="kelly-metric-note">{withOdds.length} Beine</span>
-          </div>
+          {preset.wettschein.modus === "kombi"
+            ? <div className="kelly-metric" title="Das Produkt aller Quoten in dieser Liste - also die Kombi über sämtliche Treffer.">
+                <span className="kelly-metric-label">Kombi aus allen</span>
+                <strong className="kelly-metric-value">{withOdds.length === 0 ? "–" : formatOdd(comboOdds)}</strong>
+                <span className="kelly-metric-note">{withOdds.length} Beine</span>
+              </div>
+            : <div className="kelly-metric" title="Durchschnitt der Quoten in dieser Liste.">
+                <span className="kelly-metric-label">Quote Ø</span>
+                <strong className="kelly-metric-value">{averageOdds === null ? "–" : formatOdd(averageOdds)}</strong>
+                <span className="kelly-metric-note">{withOdds.length} Partien</span>
+              </div>}
         </div>
 
         <div className="quickpick-actions">
-          <button className="quickpick-cart" disabled={sorted.length === 0}
-            title="Legt den 1X2-Tipp jeder Treffer-Partie in den Wettschein. Dort lassen sich daraus Kombis bauen."
-            onClick={() => onAddAll(sorted.map((row) => row.fixture))}>
-            <ShoppingCartSimple size={14} weight="bold" aria-hidden />
-            {sorted.length === 0 ? "Keine Treffer" : `Alle ${sorted.length} in den Wettschein`}
-          </button>
+          {preset.wettschein.modus === "kombi"
+            ? <button className="quickpick-cart" disabled={spielbar.length === 0}
+                title={preset.wettschein.hinweis}
+                onClick={() => onAddAll(spielbar.map((row) => row.fixture))}>
+                <ShoppingCartSimple size={14} weight="bold" aria-hidden />
+                {spielbar.length === 0 ? "Keine Treffer" : `Alle ${spielbar.length} in den Wettschein`}
+              </button>
+            : <p className="quickpick-cart-note">{preset.wettschein.hinweis}</p>}
+          {uebersprungen > 0 && <small className="quickpick-cart-note">
+            {uebersprungen} {uebersprungen === 1 ? "Zeile bleibt" : "Zeilen bleiben"} draußen –
+            {" "}gerechnete Quote, kein Preis. Nach dem nächsten Dashboard-Lauf fällt das weg.
+          </small>}
         </div>
 
-        <p className="quickpick-honesty">
-          <strong>Hinweis, kein Beleg.</strong> Über die archivierten Läufe traf diese Torfolge
-          in 70,5 % der Fälle (61 Tipps, ±5,8) – gut ein halbes Sigma über null, und die
-          Punktegrenze 70 stammt aus einem Durchprobieren an genau diesen Daten. Eine Kombi
-          multipliziert den Vorteil je Bein, im Guten wie im Schlechten.
-        </p>
+        {/*
+          Die Kombi-Tabelle steht bewusst vor dem Ehrlichkeitsabsatz: Sie ist die Antwort auf
+          die Frage, die eine hohe Quote aufwirft - und die Spalte „erwartet" zeigt, dass eine
+          Kombi den Ertrag je Bein multipliziert, nicht die Quote.
+        */}
+        {kombis.length > 0 && <section className="quickpick-kombis" aria-label="Kurze Kombis">
+          <strong>Was kurze Kombis aus dieser Stufe gebracht hätten</strong>
+          <table>
+            <thead>
+              <tr>
+                <th>Beine</th><th>Quote Ø</th><th>Treffer</th><th>Ertrag</th>
+                <th title="Was der Ertrag je Bein verspricht: (1 + Ertrag)^Beine − 1.">erwartet</th>
+              </tr>
+            </thead>
+            <tbody>
+              {kombis.map((kombi) => <tr key={kombi.beine}>
+                <td>{kombi.beine}</td>
+                <td>{kombi.quote.toFixed(1).replace(".", ",")}</td>
+                <td>{formatPercent(kombi.trefferquote)}</td>
+                <td className={kombi.roi >= 0 ? "gut" : "schlecht"}>{formatSigned(kombi.roi)}</td>
+                <td className="erwartet">{formatSigned(kombi.erwartung)}</td>
+              </tr>)}
+            </tbody>
+          </table>
+          <small>
+            Je Spieltag aus den Treffern gezogen, über die archivierten Läufe.
+            {" "}Weichen „Ertrag" und „erwartet" weit voneinander ab, ist nicht die Rechnung
+            falsch, sondern die Stichprobe zu dünn: Bei {formatPercent(measured?.trefferquote ?? 0)}
+            {" "}Treffern je Bein gewinnt eine Viererkombi nur selten, und ein Treffer mehr oder
+            weniger verschiebt den Ertrag um Dutzende Punkte.
+          </small>
+        </section>}
+
+        <p className="quickpick-honesty">{preset.honesty}</p>
 
         <section className="kelly-panel">
           <button className="kelly-panel-head" aria-expanded={showSettings}
@@ -197,53 +255,83 @@ export function QuickpickDialog({ fixtures, settings, active, onSettingsChange, 
             <span className="kelly-panel-summary">
               {activeLevel === null
                 ? "Eigene Werte"
-                : QUICKPICK_LEVELS.find((entry) => entry.id === activeLevel)!.label}
-              {" · "}Form {settings.strongMinimum}/{settings.weakMaximum} · Punkte ab {settings.minPoints}
+                : preset.levels.find((entry) => entry.id === activeLevel)!.label}
+              {settings.preset === "daves1x2"
+                ? ` · Form ${settings.strongMinimum}/${settings.weakMaximum} · Punkte ab ${settings.minPoints}`
+                : ` · Quote ${formatOdd(settings.minOdds)}–${formatOdd(settings.maxOdds)}`}
             </span>
           </button>
 
           {showSettings && <div className="quickpick-levels" role="group" aria-label="Strenge">
-            {QUICKPICK_LEVELS.map((level) => <button key={level.id}
+            {preset.levels.map((level) => <button key={level.id}
               className={activeLevel === level.id ? "active" : ""}
               aria-pressed={activeLevel === level.id}
               title={level.hint}
               onClick={() => onSettingsChange(applyLevel(settings, level.id))}>
               <strong>{level.label}</strong>
-              <small>{level.note}</small>
+              <small>{preset.noteOf(level.measured)}</small>
             </button>)}
             <p className="quickpick-levels-note">
-              Tipps je Tag und Trefferquote je Bein sind über die archivierten Läufe
-              zurückgerechnet. Eine Kombi multipliziert die Trefferquote je Bein – vier Beine
-              zu 68,7 % gehen in 22 % der Fälle durch, zu 59,4 % nur noch in 12 %.
+              {preset.massstab === "roi"
+                ? "Tipps je Tag und Ertrag je Wette sind über die archivierten Läufe zurückgerechnet, zum echten Tipico-Preis des Außenseiters. Ein Ertrag unter null heißt: Auf Dauer kostet diese Auswahl Geld."
+                : "Tipps je Tag und Trefferquote je Bein sind über die archivierten Läufe zurückgerechnet. Eine Kombi multipliziert die Trefferquote je Bein – vier Beine zu 68,7 % gehen in 22 % der Fälle durch, zu 58,3 % nur noch in 12 %."}
             </p>
           </div>}
 
-          {showSettings && <div className="kelly-settings-grid">
+          {showSettings && settings.preset === "daves1x2" && <div className="kelly-settings-grid">
             <NumberField label="Punkte je Spiel voraus" value={settings.minPointsPerGame} min={0} step={0.1}
               hint="Vorsprung in der Ligatabelle. Gesetzt, nicht gemessen: Das Tor soll verhindern, dass zwei gleich starke Mannschaften als überlegen gelten."
-              onCommit={(value) => set("minPointsPerGame", value)} />
+              onCommit={(value) => setDaves("minPointsPerGame", value)} />
             <NumberField label="Tordifferenz voraus" value={settings.minGoalDifference} min={0} step={0.1}
               hint="Vorsprung in der Tordifferenz je Spiel, ebenfalls aus der Ligatabelle."
-              onCommit={(value) => set("minGoalDifference", value)} />
+              onCommit={(value) => setDaves("minGoalDifference", value)} />
             <NumberField label="Plätze voraus" value={settings.minPositionGap} min={0} step={1}
               hint="Abstand in der Ligatabelle. Zusammen mit den beiden anderen Toren bildet er „klar überlegen“ ab."
-              onCommit={(value) => set("minPositionGap", value)} />
+              onCommit={(value) => setDaves("minPositionGap", value)} />
             <NumberField label="Starke Seite (%)" value={settings.strongMinimum} min={0} max={100} step={5}
               hint="Formwert der getippten Seite aus Sieg 3, Remis 1, Niederlage 0 über die letzten fünf Spiele. 70 stammt aus npm run venue-form, dort über zehn Spiele gemessen. Mit 0 hier und 100 nebenan ist das Formtor aus."
-              onCommit={(value) => set("strongMinimum", value)} />
+              onCommit={(value) => setDaves("strongMinimum", value)} />
             <NumberField label="Schwache Seite (%)" value={settings.weakMaximum} min={0} max={100} step={5}
               hint="Höchstwert der Gegenseite. 50 stammt aus npm run venue-form. 100 schaltet diese Hälfte des Tores ab."
-              onCommit={(value) => set("weakMaximum", value)} />
+              onCommit={(value) => setDaves("weakMaximum", value)} />
             <NumberField label="Mindestquote" value={settings.minOdds} min={1} step={0.05}
               hint="Untergrenze, kein Ziel: Für eine Kombi zählt, dass das Bein durchkommt."
-              onCommit={(value) => set("minOdds", value)} />
+              onCommit={(value) => setDaves("minOdds", value)} />
             <NumberField label="Mindestpunkte" value={settings.minPoints} min={0} max={100} step={5}
               hint="Favoritenpunkte des Modells (0-100). Bänder: 50 schwach, 60 interessant, 70 stark, 80 sehr stark. Das stärkste einzelne Tor der Rückrechnung – 61,4 % Treffer allein gegenüber 47,2 % ohne jeden Filter."
-              onCommit={(value) => set("minPoints", value)} />
+              onCommit={(value) => setDaves("minPoints", value)} />
             <SettingField label="Nur mit Siegesserie"
               hint="Verlangt mindestens zwei gewonnene direkte Duelle in Folge. In der Rückrechnung trug die Serie nichts bei (58,3 % gegen 55,6 % ohne sie), deshalb ist sie aus."
               children={<input type="checkbox" checked={settings.requireStreak}
-                onChange={(event) => set("requireStreak", event.target.checked)} />} />
+                onChange={(event) => setDaves("requireStreak", event.target.checked)} />} />
+          </div>}
+
+          {showSettings && settings.preset === "underdog" && <div className="kelly-settings-grid">
+            <NumberField label="Quotenverhältnis" value={settings.minPriceRatio} min={1} step={0.05}
+              hint="Wie viel teurer der Außenseiter mindestens sein muss. Unter 1,25 ist weder von „deutlich schlechter eingeschätzt“ die Rede, noch ist die aus Tipp- und Remisquote rekonstruierte Seite sicher genug."
+              onCommit={(value) => setUnderdog("minPriceRatio", value)} />
+            <NumberField label="Quote ab" value={settings.minOdds} min={1} step={0.1}
+              hint="Untergrenze des Quotenbands."
+              onCommit={(value) => setUnderdog("minOdds", value)} />
+            <NumberField label="Quote bis" value={settings.maxOdds} min={1} step={0.5}
+              hint="Obergrenze des Quotenbands. Gemessener Favorite-Longshot-Bias: Außenseiter über 4,00 liefern −20,2 % Ertrag, das Band 2,50–4,00 nur −9,8 %. Das Band ist kein Vorteil, sondern das kleinere Übel."
+              onCommit={(value) => setUnderdog("maxOdds", value)} />
+            <NumberField label="Formvorsprung (PP)" value={settings.minFormGap} min={-100} max={100} step={5}
+              hint="Wie viele Prozentpunkte der Außenseiter in der Form vor dem Favoriten liegen muss. −100 schaltet das Tor ab."
+              onCommit={(value) => setUnderdog("minFormGap", value)} />
+            <NumberField label="H2H-Rate über" value={settings.minH2hRate} min={-2} max={1} step={0.1}
+              hint="(Siege − Niederlagen) geteilt durch die Duelle, aus Sicht des Außenseiters. −2 schaltet das Tor ab. Achtung: In der Rückrechnung ist das die teuerste Bedingung – sie kostet rund 20 Punkte Ertrag."
+              onCommit={(value) => setUnderdog("minH2hRate", value)} />
+            <NumberField label="Mindestens … Duelle" value={settings.minDuels} min={0} max={5} step={1}
+              hint="0 heißt: auch Partien ohne jedes direkte Duell. Fehlende Duelle sind keine Grundlage, aber auch kein Gegenargument."
+              onCommit={(value) => setUnderdog("minDuels", value)} />
+            <NumberField label="Plätze voraus" value={settings.minPositionGap ?? 0} min={0} step={1}
+              hint="Tabellenvorsprung des Außenseiters. 0 schaltet das Tor ab; Cross-League-Partien fallen damit ohnehin weg, weil ihnen die Tabelle fehlt."
+              onCommit={(value) => setUnderdog("minPositionGap", value <= 0 ? null : value)} />
+            <SettingField label="Nur wenn das Modell zustimmt"
+              hint="Verlangt, dass auch das Modell den Außenseiter tippt. Gemessen ohne Nutzen: Die Einschränkung ließ nur 268 Partien in 30 Tagen übrig, bei −13,3 % Ertrag."
+              children={<input type="checkbox" checked={settings.requireModelSide}
+                onChange={(event) => setUnderdog("requireModelSide", event.target.checked)} />} />
           </div>}
         </section>
 
@@ -251,61 +339,39 @@ export function QuickpickDialog({ fixtures, settings, active, onSettingsChange, 
           <table className="kelly-table quickpick-table">
             <thead>
               <tr>
-                <th><button onClick={() => sort("team")} aria-label={sortStateLabel("Partie", sortKey === "team", sortDirection)}>Partie {arrow("team")}</button></th>
-                <th>Tipp</th>
-                <th><button onClick={() => sort("tabelle")} aria-label={sortStateLabel("Tabellenvorsprung", sortKey === "tabelle", sortDirection)}>Tabelle {arrow("tabelle")}</button></th>
-                <th><button onClick={() => sort("form")} aria-label={sortStateLabel("Form", sortKey === "form", sortDirection)}>Form {arrow("form")}</button></th>
-                <th><button onClick={() => sort("duelle")} aria-label={sortStateLabel("Direkte Duelle", sortKey === "duelle", sortDirection)}>Duelle {arrow("duelle")}</button></th>
-                <th><button onClick={() => sort("punkte")} aria-label={sortStateLabel("Punkte", sortKey === "punkte", sortDirection)}>Punkte {arrow("punkte")}</button></th>
-                <th><button onClick={() => sort("quote")} aria-label={sortStateLabel("Quote", sortKey === "quote", sortDirection)}>Quote {arrow("quote")}</button></th>
+                {columns.map((column) => <th key={column.key}>
+                  {column.sortable
+                    ? <button onClick={() => sort(column.key)}
+                        aria-label={sortStateLabel(column.ariaLabel ?? column.label, sortKey === column.key, sortDirection)}>
+                        {column.label} {arrow(column.key)}
+                      </button>
+                    : column.label}
+                </th>)}
+                {preset.wettschein.modus === "einzel" && <th aria-label="In den Wettschein" />}
               </tr>
             </thead>
             <tbody>
-              {sorted.map(({ fixture, evaluation }) => {
-                const team = evaluation.side === "1" ? fixture.homeTeam : fixture.awayTeam;
-                const dominance = evaluation.dominance;
-                const superiority = evaluation.superiority;
-                return <tr key={fixture.fixtureId}>
-                  <td>
-                    <strong>{fixture.homeTeam} – {fixture.awayTeam}</strong>
-                    <small>{fixture.country} · {fixture.league}</small>
-                  </td>
-                  <td className="quickpick-side"><strong>{team}</strong></td>
-                  <td>
-                    <strong title="Vorsprung in Punkten je Spiel und in der Tordifferenz je Spiel.">
-                      {superiority === null ? "–" : `${formatSigned(superiority.pointsPerGame)} P`}
-                    </strong>
-                    <small>
-                      {superiority === null ? "keine Tabelle"
-                        : `${superiority.position}. gegen ${superiority.opponentPosition}. · ${formatSigned(superiority.goalDifference, 1)} Tore`}
-                    </small>
-                  </td>
-                  <td>
-                    <strong>{formatVenuePercent(strongPercent(evaluation))}</strong>
-                    <small title={evaluation.venueScope === "venue"
-                      ? "Heimform gegen Auswärtsform aus den letzten fünf Spielen am jeweiligen Ort."
-                      : "Gesamtform: Für diese Partie trennt der Lauf Heim und Auswärts nicht."}>
-                      gegen {formatVenuePercent(evaluation.side === "1" ? evaluation.awayPercent : evaluation.homePercent)}
-                    </small>
-                  </td>
-                  <td>
-                    <strong title={dominance === null
-                      ? "Der Lauf führt für diese Partie kein einziges direktes Duell."
-                      : "Siege / Remis / Niederlagen aus Sicht der getippten Seite. Testspiele sind darin nicht herausgefiltert."}>
-                      {dominance === null ? "–" : `${dominance.wins}/${dominance.draws}/${dominance.losses}`}
-                    </strong>
-                    <small>
-                      {dominance === null ? "keine Grundlage"
-                        : dominance.streakFor >= 2 ? `Serie ${dominance.streakFor}`
-                        : `${dominance.sample} ${dominance.sample === 1 ? "Duell" : "Duelle"}`}
-                    </small>
-                  </td>
-                  <td><strong>{evaluation.points ?? "–"}</strong></td>
-                  <td><strong>{evaluation.odds === null ? "–" : formatOdd(evaluation.odds)}</strong></td>
-                </tr>;
-              })}
+              {sorted.map((row) => <tr key={row.fixture.fixtureId}>
+                {columns.map((column) => {
+                  const cell = column.cell(row);
+                  return <td key={column.key} className={column.className}>
+                    <strong title={cell.mainTitle}>{cell.main}</strong>
+                    {cell.note === undefined ? null : <small title={cell.title}>{cell.note}</small>}
+                  </td>;
+                })}
+                {preset.wettschein.modus === "einzel" && <td className="quickpick-add">
+                  <button aria-label={`In den Wettschein: ${row.fixture.homeTeam} – ${row.fixture.awayTeam}`}
+                    disabled={estimated(row)}
+                    title={estimated(row)
+                      ? "Die Quote ist gerechnet, nicht gespeichert – nach dem nächsten Dashboard-Lauf steht sie exakt im Snapshot."
+                      : "Diese Wette in den Wettschein legen"}
+                    onClick={() => onAddOne(row)}><Plus size={13} weight="bold" /></button>
+                </td>}
+              </tr>)}
               {sorted.length === 0 && <tr>
-                <td className="kelly-empty" colSpan={7}>Keine Partie ist nach diesen Kriterien klar überlegen.</td>
+                <td className="kelly-empty" colSpan={columns.length + (preset.wettschein.modus === "einzel" ? 1 : 0)}>
+                  {preset.leerSatz}
+                </td>
               </tr>}
             </tbody>
           </table>

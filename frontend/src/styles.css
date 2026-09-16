@@ -199,7 +199,16 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .quickpick-honesty { margin: 12px 0 0; padding: 9px 12px; border: 1px solid #3a3730; border-radius: 9px; background: #211f1a; color: #c8a978; font-size: 11px; line-height: 1.6; }
 .quickpick-honesty strong { color: #e0bf87; }
 .quickpick-honesty code { color: #cfcfcf; font-size: 10px; }
-.quickpick-table td.quickpick-side small.quickpick-badge { display: inline-block; margin-top: 4px; padding: 1px 6px; border-radius: 5px; background: #3a2f22; color: #d9a05b; font-weight: 700; }
+.quickpick-badge { display: inline-block; margin-top: 4px; padding: 1px 6px; border-radius: 5px; background: #3a2f22; color: #d9a05b; font-weight: 700; }
+.quickpick-presets { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 8px; margin-top: 14px; }
+.quickpick-presets button { padding: 10px 12px; border: 1px solid var(--line); border-radius: 9px; background: #1a1a1a; color: #b8b8b8; font-size: 12px; font-weight: 700; text-align: left; }
+.quickpick-presets button:hover { border-color: #5a5a5a; }
+.quickpick-presets button.active { border-color: var(--accent); background: #26312b; color: var(--accent); }
+.quickpick-cart-note { margin: 0; color: #8f8f8f; font-size: 11px; line-height: 1.6; }
+.quickpick-table td.quickpick-add { width: 34px; padding-right: 8px; text-align: right; }
+.quickpick-table td.quickpick-add button { display: grid; place-items: center; width: 24px; height: 24px; border: 1px solid var(--line); border-radius: 7px; background: #1a1a1a; color: #b8b8b8; }
+.quickpick-table td.quickpick-add button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.quickpick-table td.quickpick-add button:disabled { opacity: .35; }
 .quickpick-levels { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; padding: 14px 2px 0; }
 .quickpick-levels button { display: flex; flex-direction: column; gap: 3px; padding: 9px 11px; border: 1px solid var(--line); border-radius: 9px; background: #1a1a1a; color: #b8b8b8; text-align: left; }
 .quickpick-levels button:hover { border-color: #5a5a5a; }
@@ -802,3 +811,13 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .profile-derived { display: block; margin-top: 2px; padding-left: 17px; color: var(--dim); font-size: 9px; }
 .profile-expand:disabled { color: inherit; }
 .profile-expand-spacer { display: inline-block; width: 11px; }
+.quickpick-kombis { margin-top: 14px; padding: 12px 14px; border: 1px solid #333; border-radius: 10px; background: #1a1a1a; }
+.quickpick-kombis > strong { color: var(--text); font-size: 12px; }
+.quickpick-kombis table { width: 100%; margin-top: 8px; border-collapse: collapse; font-size: 11px; font-variant-numeric: tabular-nums; }
+.quickpick-kombis th { padding: 4px 6px; color: #8f8f8f; font-size: 10px; font-weight: 700; letter-spacing: .05em; text-align: right; text-transform: uppercase; }
+.quickpick-kombis th:first-child, .quickpick-kombis td:first-child { text-align: left; }
+.quickpick-kombis td { padding: 4px 6px; color: #d0d0d0; border-top: 1px solid var(--line-soft); text-align: right; }
+.quickpick-kombis td.gut { color: #89d185; font-weight: 700; }
+.quickpick-kombis td.schlecht { color: #f14c4c; font-weight: 700; }
+.quickpick-kombis td.erwartet { color: #8f8f8f; }
+.quickpick-kombis > small { display: block; margin-top: 8px; color: #8f8f8f; font-size: 10px; line-height: 1.6; }

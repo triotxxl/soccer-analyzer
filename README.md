@@ -100,6 +100,49 @@ Nachgerechnet wird mit `npm run quickpick-report`: Der Report misst jede Stufe n
 sie mit den Zahlen auf den Knöpfen und meldet, wenn sie auseinanderlaufen. Fällig ist das alle
 2.000 neu abgerechneten Partien; er sagt selbst, wie viele seither dazugekommen sind.
 
+#### Voreinstellung „Underdog"
+
+Oben im Panel lässt sich auf **Underdog** umschalten. Der sucht das Gegenteil: Partien, in
+denen der Markt eine Mannschaft deutlich schlechter einschätzt, obwohl Form und direkte Duelle
+für sie sprechen. Gestützt wird die teurere Seite — auch dann, wenn das Modell die andere
+tippt; solche Zeilen tragen das Abzeichen **Modell dagegen**.
+
+**Das ist ein Sucher, keine Tippregel.** Über 4.397 abgerechnete Partien schlug keine Variante
+dieser Kriterien das blinde Wetten auf Außenseiter:
+
+| Variante | Wetten | Treffer | Ertrag |
+|---|---|---|---|
+| jeder Außenseiter | 4.397 | 23,0 % | −14,1 % |
+| nur Formvorsprung | 649 | 26,7 % | −10,6 % |
+| nur direkte Duelle | 1.041 | 24,2 % | −17,2 % |
+| **beides zusammen** | 143 | 25,9 % | **−18,8 %** |
+
+Form und Duelle heben die Trefferquote durchaus — sie wählen aber die kürzer bezahlten
+Außenseiter aus, und der Preis fällt stärker, als die Trefferquote steigt. Auf den Stufen steht
+deshalb der **Ertrag je Bein** statt der Trefferquote.
+
+**Für kurze Kombis ist genau dieser Wert entscheidend**, denn eine Kombi multipliziert den
+Ertrag je Bein — nicht die Quote. Eine hohe Gesamtquote macht den Gewinn seltener, nicht
+größer. Das Panel zeigt deshalb unter den Treffern, was Kombis über 2 bis 5 Beine historisch
+gebracht hätten, mit der erwarteten Zahl daneben:
+
+| Beine | Quote Ø | Treffer | Ertrag | erwartet |
+|---|---|---|---|---|
+| 2 | 11,0 | 9,6 % | −0,6 % | +7,1 % |
+| 3 | 36,3 | 2,3 % | −24,1 % | +10,9 % |
+| 4 | 119,9 | 0,7 % | −26,4 % | +14,8 % |
+| 5 | 397,4 | 0,2 % | −49,9 % | +18,8 % |
+
+Weichen „Ertrag" und „erwartet" so weit voneinander ab, ist nicht die Rechnung falsch, sondern
+die Stichprobe zu dünn: Bei rund 32 % Treffern je Bein geht eine Viererkombi nur in 0,7 % der
+Fälle durch. Beim Favoritenfilter decken sich beide Spalten dagegen (Zweier +5,5 %, Dreier
++9,4 %, Vierer +13,2 %), weil dort jedes Bein zu 69 % durchkommt.
+
+Solange der Lauf nur die Quote des Modellwegs speichert, ist die Außenseiterquote gerechnet und
+mit `≈` gekennzeichnet — die Seite stimmt zu 97,6 %, der Preis liegt im Median 7,1 % daneben.
+Solche Zeilen lassen sich nicht in den Wettschein legen. Nach dem nächsten `npm run dashboard`
+steht die Quote exakt im Snapshot, und die Einschränkung fällt von selbst weg.
+
 Ein Streifen neben dem Knopf nennt, wie viele Partien übrig bleiben, und hebt den Filter mit
 einem Klick wieder auf. Escape schließt nur das Panel. Die Regler bleiben über Sitzungen
 erhalten, der aktive Filter **nicht** — nach dem Neuladen ist die Tabelle wieder vollständig.
