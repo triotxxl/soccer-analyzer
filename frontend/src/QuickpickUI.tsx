@@ -1,4 +1,4 @@
-import { CaretDown, CaretRight, Funnel, Plus, ShoppingCartSimple, X } from "@phosphor-icons/react";
+import { CaretDown, CaretRight, Funnel, ShoppingCartSimple, X } from "@phosphor-icons/react";
 import { useState } from "react";
 import { formatOdd, sortStateLabel } from "./App";
 import { NumberField, SettingField } from "./KellyUI";
@@ -13,7 +13,7 @@ import {
   type QuickpickPresetId,
   type QuickpickRejection,
   type QuickpickSettings,
-  type UnderdogQuickpickSettings
+  type DominanzQuickpickSettings
 } from "./quickpick";
 import { QUICKPICK_COLUMNS, type QuickpickRow } from "./quickpickColumns";
 import type { DashboardFixture } from "./types";
@@ -51,7 +51,7 @@ export function QuickpickChip({ label, passed, evaluated, onOpen, onClear }: {
 }
 
 export function QuickpickDialog({
-  fixtures, settings, active, onSettingsChange, onPresetChange, onActiveChange, onAddAll, onAddOne, onClose
+  fixtures, settings, active, onSettingsChange, onPresetChange, onActiveChange, onAddAll, onClose
 }: {
   fixtures: DashboardFixture[];
   settings: QuickpickSettings;
@@ -59,8 +59,7 @@ export function QuickpickDialog({
   onSettingsChange(settings: QuickpickSettings): void;
   onPresetChange(preset: QuickpickPresetId): void;
   onActiveChange(active: boolean): void;
-  onAddAll(fixtures: DashboardFixture[]): void;
-  onAddOne(row: QuickpickRow): void;
+  onAddAll(rows: QuickpickRow[]): void;
   onClose(): void;
 }) {
   const preset = presetOf(settings);
@@ -110,8 +109,8 @@ export function QuickpickDialog({
     if (settings.preset !== "daves1x2") return;
     onSettingsChange({ ...settings, [key]: value });
   };
-  const setUnderdog = <K extends keyof UnderdogQuickpickSettings>(key: K, value: UnderdogQuickpickSettings[K]) => {
-    if (settings.preset !== "underdog") return;
+  const setDominanz = <K extends keyof DominanzQuickpickSettings>(key: K, value: DominanzQuickpickSettings[K]) => {
+    if (settings.preset !== "dominanz") return;
     onSettingsChange({ ...settings, [key]: value });
   };
 
@@ -125,8 +124,8 @@ export function QuickpickDialog({
     : withOdds.reduce((sum, row) => sum + (row.evaluation.odds ?? 0), 0) / withOdds.length;
 
   /** Eine geschätzte Quote darf nicht in den Wettschein - sie ist kein Preis. */
-  const estimated = (row: QuickpickRow) => row.evaluation.underdog?.counterSource === "geschätzt"
-    && row.evaluation.underdog.counterOdds === row.evaluation.odds;
+  /** Eine gerechnete Quote ist kein Preis und darf nicht in den Wettschein. */
+  const estimated = (row: QuickpickRow) => row.evaluation.dominanz?.oddsSource === "geschätzt";
   const spielbar = sorted.filter((row) => !estimated(row));
   const uebersprungen = sorted.length - spielbar.length;
   const kombis = measured?.kombis ?? [];
@@ -184,28 +183,20 @@ export function QuickpickDialog({
             <strong className="kelly-metric-value">{kennzahl.wert}</strong>
             <span className="kelly-metric-note">{kennzahl.notiz}</span>
           </div>
-          {preset.wettschein.modus === "kombi"
-            ? <div className="kelly-metric" title="Das Produkt aller Quoten in dieser Liste - also die Kombi über sämtliche Treffer.">
-                <span className="kelly-metric-label">Kombi aus allen</span>
-                <strong className="kelly-metric-value">{withOdds.length === 0 ? "–" : formatOdd(comboOdds)}</strong>
-                <span className="kelly-metric-note">{withOdds.length} Beine</span>
-              </div>
-            : <div className="kelly-metric" title="Durchschnitt der Quoten in dieser Liste.">
-                <span className="kelly-metric-label">Quote Ø</span>
-                <strong className="kelly-metric-value">{averageOdds === null ? "–" : formatOdd(averageOdds)}</strong>
-                <span className="kelly-metric-note">{withOdds.length} Partien</span>
-              </div>}
+          <div className="kelly-metric" title="Das Produkt aller Quoten in dieser Liste - also die Kombi über sämtliche Treffer.">
+            <span className="kelly-metric-label">Kombi aus allen</span>
+            <strong className="kelly-metric-value">{withOdds.length === 0 ? "–" : formatOdd(comboOdds)}</strong>
+            <span className="kelly-metric-note">{withOdds.length} Beine · Ø {averageOdds === null ? "–" : formatOdd(averageOdds)}</span>
+          </div>
         </div>
 
         <div className="quickpick-actions">
-          {preset.wettschein.modus === "kombi"
-            ? <button className="quickpick-cart" disabled={spielbar.length === 0}
-                title={preset.wettschein.hinweis}
-                onClick={() => onAddAll(spielbar.map((row) => row.fixture))}>
-                <ShoppingCartSimple size={14} weight="bold" aria-hidden />
-                {spielbar.length === 0 ? "Keine Treffer" : `Alle ${spielbar.length} in den Wettschein`}
-              </button>
-            : <p className="quickpick-cart-note">{preset.wettschein.hinweis}</p>}
+          <button className="quickpick-cart" disabled={spielbar.length === 0}
+            title={preset.wettschein.hinweis}
+            onClick={() => onAddAll(spielbar)}>
+            <ShoppingCartSimple size={14} weight="bold" aria-hidden />
+            {spielbar.length === 0 ? "Keine Treffer" : `Alle ${spielbar.length} in den Wettschein`}
+          </button>
           {uebersprungen > 0 && <small className="quickpick-cart-note">
             {uebersprungen} {uebersprungen === 1 ? "Zeile bleibt" : "Zeilen bleiben"} draußen –
             {" "}gerechnete Quote, kein Preis. Nach dem nächsten Dashboard-Lauf fällt das weg.
@@ -306,32 +297,29 @@ export function QuickpickDialog({
                 onChange={(event) => setDaves("requireStreak", event.target.checked)} />} />
           </div>}
 
-          {showSettings && settings.preset === "underdog" && <div className="kelly-settings-grid">
-            <NumberField label="Quotenverhältnis" value={settings.minPriceRatio} min={1} step={0.05}
-              hint="Wie viel teurer der Außenseiter mindestens sein muss. Unter 1,25 ist weder von „deutlich schlechter eingeschätzt“ die Rede, noch ist die aus Tipp- und Remisquote rekonstruierte Seite sicher genug."
-              onCommit={(value) => setUnderdog("minPriceRatio", value)} />
+          {showSettings && settings.preset === "dominanz" && <div className="kelly-settings-grid">
             <NumberField label="Quote ab" value={settings.minOdds} min={1} step={0.1}
-              hint="Untergrenze des Quotenbands."
-              onCommit={(value) => setUnderdog("minOdds", value)} />
+              hint="Untergrenze des Quotenbands. Der Zweck ist die Kombi: Erst ab etwa 1,80 lohnt ein Bein die Mitnahme."
+              onCommit={(value) => setDominanz("minOdds", value)} />
             <NumberField label="Quote bis" value={settings.maxOdds} min={1} step={0.5}
-              hint="Obergrenze des Quotenbands. Gemessener Favorite-Longshot-Bias: Außenseiter über 4,00 liefern −20,2 % Ertrag, das Band 2,50–4,00 nur −9,8 %. Das Band ist kein Vorteil, sondern das kleinere Übel."
-              onCommit={(value) => setUnderdog("maxOdds", value)} />
-            <NumberField label="Formvorsprung (PP)" value={settings.minFormGap} min={-100} max={100} step={5}
-              hint="Wie viele Prozentpunkte der Außenseiter in der Form vor dem Favoriten liegen muss. −100 schaltet das Tor ab."
-              onCommit={(value) => setUnderdog("minFormGap", value)} />
-            <NumberField label="H2H-Rate über" value={settings.minH2hRate} min={-2} max={1} step={0.1}
-              hint="(Siege − Niederlagen) geteilt durch die Duelle, aus Sicht des Außenseiters. −2 schaltet das Tor ab. Achtung: In der Rückrechnung ist das die teuerste Bedingung – sie kostet rund 20 Punkte Ertrag."
-              onCommit={(value) => setUnderdog("minH2hRate", value)} />
-            <NumberField label="Mindestens … Duelle" value={settings.minDuels} min={0} max={5} step={1}
-              hint="0 heißt: auch Partien ohne jedes direkte Duell. Fehlende Duelle sind keine Grundlage, aber auch kein Gegenargument."
-              onCommit={(value) => setUnderdog("minDuels", value)} />
-            <NumberField label="Plätze voraus" value={settings.minPositionGap ?? 0} min={0} step={1}
-              hint="Tabellenvorsprung des Außenseiters. 0 schaltet das Tor ab; Cross-League-Partien fallen damit ohnehin weg, weil ihnen die Tabelle fehlt."
-              onCommit={(value) => setUnderdog("minPositionGap", value <= 0 ? null : value)} />
+              hint="Obergrenze. 99 heißt: kein Deckel. Gemessen fällt die Trefferquote mit der Quote fast exakt mit – über 3,00 traf der Kern nur noch 17,3 % bei −42 % Ertrag."
+              onCommit={(value) => setDominanz("maxOdds", value)} />
+            <NumberField label="Punkte je Spiel voraus" value={settings.minPointsPerGame} min={0} step={0.1}
+              hint="Vorsprung in der Ligatabelle. Eines der drei Kerntore – sie gehören zur Voreinstellung und werden von den Strengestufen nicht angefasst."
+              onCommit={(value) => setDominanz("minPointsPerGame", value)} />
+            <NumberField label="Plätze voraus" value={settings.minPositionGap} min={0} step={1}
+              hint="Abstand in der Ligatabelle. Cross-League- und Pokalpartien fallen ohnehin weg, weil ihnen die Tabelle fehlt."
+              onCommit={(value) => setDominanz("minPositionGap", value)} />
+            <NumberField label="Bilanz voraus (PP)" value={settings.minNonLossGap} min={0} max={100} step={5}
+              hint="Vorsprung im Anteil der Spiele ohne Niederlage, aus der Saisontabelle – nicht aus den letzten fünf Spielen. Genau das ist der Unterschied, an dem die Vorgängerversion scheiterte."
+              onCommit={(value) => setDominanz("minNonLossGap", value)} />
+            <NumberField label="Duelle in Folge" value={settings.minStreak} min={0} max={5} step={1}
+              hint="Gewonnene direkte Duelle in Folge. 0 schaltet das Tor ab. Gemessen trägt es rund vier Punkte Ertrag je Bein – ohne die Serie fällt dieselbe Zelle von −4,1 auf −7,8 %."
+              onCommit={(value) => setDominanz("minStreak", value)} />
             <SettingField label="Nur wenn das Modell zustimmt"
-              hint="Verlangt, dass auch das Modell den Außenseiter tippt. Gemessen ohne Nutzen: Die Einschränkung ließ nur 268 Partien in 30 Tagen übrig, bei −13,3 % Ertrag."
+              hint="Verlangt, dass auch das Modell diese Seite tippt. Gemessen der stärkste einzelne Hebel: mit dieser Bedingung −4,1 %, ohne sie −9,3 %, und die Zeilen gegen das Modell allein liegen bei −24,4 %."
               children={<input type="checkbox" checked={settings.requireModelSide}
-                onChange={(event) => setUnderdog("requireModelSide", event.target.checked)} />} />
+                onChange={(event) => setDominanz("requireModelSide", event.target.checked)} />} />
           </div>}
         </section>
 
@@ -347,7 +335,6 @@ export function QuickpickDialog({
                       </button>
                     : column.label}
                 </th>)}
-                {preset.wettschein.modus === "einzel" && <th aria-label="In den Wettschein" />}
               </tr>
             </thead>
             <tbody>
@@ -359,17 +346,9 @@ export function QuickpickDialog({
                     {cell.note === undefined ? null : <small title={cell.title}>{cell.note}</small>}
                   </td>;
                 })}
-                {preset.wettschein.modus === "einzel" && <td className="quickpick-add">
-                  <button aria-label={`In den Wettschein: ${row.fixture.homeTeam} – ${row.fixture.awayTeam}`}
-                    disabled={estimated(row)}
-                    title={estimated(row)
-                      ? "Die Quote ist gerechnet, nicht gespeichert – nach dem nächsten Dashboard-Lauf steht sie exakt im Snapshot."
-                      : "Diese Wette in den Wettschein legen"}
-                    onClick={() => onAddOne(row)}><Plus size={13} weight="bold" /></button>
-                </td>}
               </tr>)}
               {sorted.length === 0 && <tr>
-                <td className="kelly-empty" colSpan={columns.length + (preset.wettschein.modus === "einzel" ? 1 : 0)}>
+                <td className="kelly-empty" colSpan={columns.length}>
                   {preset.leerSatz}
                 </td>
               </tr>}

@@ -116,64 +116,73 @@ const DAVES_COLUMNS: QuickpickColumn[] = [
     cell: (row) => ({ main: row.evaluation.odds === null ? "–" : formatOdd(row.evaluation.odds) })
   }
 ];
-
-const UNDERDOG_COLUMNS: QuickpickColumn[] = [
+const DOMINANZ_COLUMNS: QuickpickColumn[] = [
   partie,
   {
     key: "tipp", label: "Tipp", sortable: false, className: "quickpick-side",
     cell: (row) => ({
       main: teamOf(row),
-      note: row.evaluation.underdog?.modelAgrees === false
-        ? <span className="quickpick-badge" title="Das Modell tippt die andere Seite. Gestützt wird hier der Außenseiter des Marktes.">Modell dagegen</span>
+      note: row.evaluation.dominanz?.modelAgrees === false
+        ? <span className="quickpick-badge" title="Das Modell tippt die andere Seite. Diese Klasse lag in der Rückrechnung bei −24,4 % Ertrag je Bein – deutlich schlechter als die Zeilen, bei denen das Modell zustimmt.">Modell dagegen</span>
         : "auch der Modelltipp"
+    })
+  },
+  {
+    key: "serie", label: "Serie", ariaLabel: "Serie in den direkten Duellen", sortable: true,
+    value: (row) => row.evaluation.dominance?.streakFor ?? -1,
+    cell: (row) => {
+      const dominance = row.evaluation.dominance;
+      return {
+        main: dominance === null ? "–" : `Serie ${dominance.streakFor}`,
+        mainTitle: "Gewonnene direkte Duelle in Folge, jüngstes zuerst. Achtung: Der Lauf führt"
+          + " höchstens fünf Duelle, und anders als die Form sind sie nicht von Testspielen"
+          + " bereinigt – eine Serie kann auf einem Testspiel stehen.",
+        note: dominance === null ? "keine Duelle im Lauf"
+          : `${dominance.wins}/${dominance.draws}/${dominance.losses} aus ${dominance.sample}`
+      };
+    }
+  },
+  tabelle,
+  {
+    key: "bilanz", label: "Bilanz", ariaLabel: "Siege plus Remis", sortable: true,
+    value: (row) => row.evaluation.superiority?.nonLossGap ?? -999,
+    cell: (row) => {
+      const superiority = row.evaluation.superiority;
+      return {
+        main: superiority === null ? "–" : `${formatSigned(superiority.nonLossGap, 0)} PP`,
+        mainTitle: "Anteil der Spiele ohne Niederlage in der laufenden Saison, aus der"
+          + " Ligatabelle – nicht aus den letzten fünf Spielen. Genau darin liegt der"
+          + " Unterschied zum Formvergleich.",
+        note: superiority === null ? "keine Tabelle"
+          : `${formatVenuePercent(superiority.nonLossRate * 100)} gegen`
+            + ` ${formatVenuePercent(superiority.opponentNonLossRate * 100)} ohne Niederlage`
+      };
+    }
+  },
+  {
+    key: "form", label: "Form", sortable: true,
+    value: (row) => strongPercent(row.evaluation),
+    cell: (row) => ({
+      main: formatVenuePercent(strongPercent(row.evaluation)),
+      title: "Nur zur Einordnung. Die Form ist hier kein Tor: Ein Formvergleich schließt"
+        + " genau die Partien aus, um die es geht, weil die auswärts spielende Seite in der"
+        + " Venue-Form strukturell schlechter dasteht.",
+      note: `gegen ${formatVenuePercent(row.evaluation.side === "1" ? row.evaluation.awayPercent : row.evaluation.homePercent)}`
     })
   },
   {
     key: "quote", label: "Quote", sortable: true,
     value: (row) => row.evaluation.odds ?? -1,
     cell: (row) => {
-      const detail = row.evaluation.underdog;
-      const geschaetzt = detail?.counterSource === "geschätzt" && detail.counterOdds === row.evaluation.odds;
-      const favourite = detail?.priceRatio && row.evaluation.odds
-        ? row.evaluation.odds / detail.priceRatio
-        : null;
+      const odds = row.evaluation.odds;
+      const geschaetzt = row.evaluation.dominanz?.oddsSource === "geschätzt";
       return {
-        main: row.evaluation.odds === null ? "–"
-          : `${geschaetzt ? "≈ " : ""}${formatOdd(row.evaluation.odds)}`,
+        main: odds === null ? "–" : `${geschaetzt ? "≈ " : ""}${formatOdd(odds)}`,
         mainTitle: geschaetzt
-          ? "Aus Tipp- und Remisquote gerechnet, weil der Lauf nur die Quote des Modellwegs"
-            + " speichert. Die Seite stimmt zu 97,6 %, der Preis liegt im Median 7,1 % daneben."
-            + " Nach dem nächsten Dashboard-Lauf steht sie exakt im Snapshot."
-          : "Quote aus dem Lauf.",
-        note: favourite === null ? undefined : `gegen ${formatOdd(favourite)}`
-      };
-    }
-  },
-  {
-    key: "formgap", label: "Form", ariaLabel: "Formvorsprung", sortable: true,
-    value: (row) => row.evaluation.underdog?.formGap ?? -999,
-    cell: (row) => ({
-      main: `${formatSigned(row.evaluation.underdog?.formGap ?? 0, 0)} PP`,
-      mainTitle: "Formvorsprung des Außenseiters in Prozentpunkten, über die letzten fünf Spiele.",
-      note: `${formatVenuePercent(strongPercent(row.evaluation))} gegen`
-        + ` ${formatVenuePercent(row.evaluation.side === "1" ? row.evaluation.awayPercent : row.evaluation.homePercent)}`
-    })
-  },
-  duelle,
-  tabelle,
-  {
-    key: "modell", label: "Modell", sortable: true,
-    value: (row) => row.evaluation.underdog?.probability ?? -1,
-    cell: (row) => {
-      const detail = row.evaluation.underdog;
-      const model = detail?.probability ?? null;
-      const implied = detail?.implied ?? null;
-      return {
-        main: model === null ? "–" : `${(model * 100).toFixed(0)} %`,
-        mainTitle: "Modellwahrscheinlichkeit für den Außenseiter gegen die Wahrscheinlichkeit"
-          + " aus der Quote. Nur zur Einordnung - als Bedingung gemessen zeigt dieses Signal in"
-          + " die falsche Richtung und ist deshalb bewusst kein Tor.",
-        note: implied === null ? undefined : `Markt ${(implied * 100).toFixed(0)} %`
+          ? "Aus Tipp- und Remisquote gerechnet, weil dieser Lauf noch nicht beide Seitenquoten"
+            + " speichert. Im Median 7,1 % daneben; nach dem nächsten Dashboard-Lauf steht sie exakt."
+          : "Quote der gestützten Seite aus dem Lauf.",
+        note: odds === null ? undefined : `braucht ${(100 / odds).toFixed(0)} %`
       };
     }
   }
@@ -181,5 +190,5 @@ const UNDERDOG_COLUMNS: QuickpickColumn[] = [
 
 export const QUICKPICK_COLUMNS: Record<QuickpickPresetId, QuickpickColumn[]> = {
   daves1x2: DAVES_COLUMNS,
-  underdog: UNDERDOG_COLUMNS
+  dominanz: DOMINANZ_COLUMNS
 };

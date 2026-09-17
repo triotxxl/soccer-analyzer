@@ -87,10 +87,10 @@ In den Einstellungen stehen vier **Strengestufen**. Auf jedem Knopf steht, was e
 
 | Stufe | Tipps je Tag | Treffer je Bein | 4er-Kombi |
 |---|---|---|---|
-| Streng | 2,4 | 70,5 % | 24,7 % |
-| **Ausgewogen** (Vorgabe) | 5,0 | 68,7 % | 22,2 % |
-| Locker | 6,7 | 63,0 % | 15,7 % |
-| Weit | 9,5 | 58,3 % | 11,6 % |
+| Streng | 2,4 | 71,0 % | 25,4 % |
+| **Ausgewogen** (Vorgabe) | 4,9 | 69,1 % | 22,8 % |
+| Locker | 6,6 | 63,8 % | 16,6 % |
+| Weit | 9,4 | 59,1 % | 12,2 % |
 
 Die Zahlen sind über die archivierten Läufe zurückgerechnet. Wer einen einzelnen Regler
 verstellt, steht auf „Eigene Werte“. Die Mindestpunkte sind dabei die empfindlichste
@@ -100,48 +100,66 @@ Nachgerechnet wird mit `npm run quickpick-report`: Der Report misst jede Stufe n
 sie mit den Zahlen auf den Knöpfen und meldet, wenn sie auseinanderlaufen. Fällig ist das alle
 2.000 neu abgerechneten Partien; er sagt selbst, wie viele seither dazugekommen sind.
 
-#### Voreinstellung „Underdog"
+#### Voreinstellung „Dominanz zum Kombipreis"
 
-Oben im Panel lässt sich auf **Underdog** umschalten. Der sucht das Gegenteil: Partien, in
-denen der Markt eine Mannschaft deutlich schlechter einschätzt, obwohl Form und direkte Duelle
-für sie sprechen. Gestützt wird die teurere Seite — auch dann, wenn das Modell die andere
-tippt; solche Zeilen tragen das Abzeichen **Modell dagegen**.
+Oben im Panel lässt sich auf **Dominanz zum Kombipreis** umschalten. Der sucht Partien wie
+Nacional Potosí – Always Ready: eine Mannschaft, die die letzten direkten Duelle gewann, in der
+Tabelle klar vorn steht und die bessere Siege-plus-Remis-Bilanz hat — und die **trotzdem 1,80
+oder mehr** bezahlt. Genau daraus lassen sich kurze Kombis über fünf bis sieben Beine bauen.
 
-**Das ist ein Sucher, keine Tippregel.** Über 4.397 abgerechnete Partien schlug keine Variante
-dieser Kriterien das blinde Wetten auf Außenseiter:
+Welche Seite gestützt wird, entscheiden die Kriterien, nicht der Modelltipp. Weicht das Modell
+ab, erscheint die Zeile trotzdem — mit dem Abzeichen **Modell dagegen**. Die Stufe „Streng"
+lässt nur Partien durch, bei denen beide übereinstimmen.
 
-| Variante | Wetten | Treffer | Ertrag |
+**Die Form kommt hier aus der Saisontabelle, nicht aus den letzten fünf Spielen.** Ein
+Formvergleich am Ort würde genau die gesuchten Partien aussortieren: Die auswärts spielende
+Seite steht dort fast immer schlechter da — Always Ready mit 66,7 % gegen 80 %, Tolima mit 40 %
+gegen 60 %. Die Venue-Form bleibt deshalb eine Spalte und ist bewusst kein Tor.
+
+**Die Kriterien sagen den Sieger gut vorher — aber der Markt preist sie ein.** Über 56
+archivierte Läufe und 5.754 Kandidaten:
+
+| Kern-Kriterien im Quotenband | Wetten | Treffer | Ertrag |
 |---|---|---|---|
-| jeder Außenseiter | 4.397 | 23,0 % | −14,1 % |
-| nur Formvorsprung | 649 | 26,7 % | −10,6 % |
-| nur direkte Duelle | 1.041 | 24,2 % | −17,2 % |
-| **beides zusammen** | 143 | 25,9 % | **−18,8 %** |
+| ohne jeden Filter | 5.754 | 37,2 % | −10,6 % |
+| 1,00–1,50 | 363 | **73,8 %** | −3,2 % |
+| 1,50–1,80 | 318 | 57,5 % | −6,8 % |
+| ab 3,00 | 75 | 17,3 % | −42,0 % |
 
-Form und Duelle heben die Trefferquote durchaus — sie wählen aber die kürzer bezahlten
-Außenseiter aus, und der Preis fällt stärker, als die Trefferquote steigt. Auf den Stufen steht
-deshalb der **Ertrag je Bein** statt der Trefferquote.
+Die Trefferquote folgt der Quote fast exakt. Auf den Stufen steht deshalb der **Ertrag je
+Bein** statt der Trefferquote — und er ist auf allen vier negativ:
+
+| Stufe | Tipps je Tag | Treffer je Bein | Ertrag je Bein |
+|---|---|---|---|
+| Streng | 3,4 | 44,2 % | −11,7 % |
+| **Ausgewogen** (Vorgabe) | 5,0 | 40,3 % | −11,4 % |
+| Locker | 9,4 | 47,2 % | −10,6 % |
+| Weit | 40,1 | 42,7 % | −12,1 % |
+
+Die Streuung beträgt je Stufe rund zehn Punkte — die vier Zahlen sind untereinander nicht
+trennbar. „Ausgewogen" ist die Vorgabe, weil es bei gleichem gemessenem Ertrag anderthalbmal so
+viele Partien zeigt.
 
 **Für kurze Kombis ist genau dieser Wert entscheidend**, denn eine Kombi multipliziert den
 Ertrag je Bein — nicht die Quote. Eine hohe Gesamtquote macht den Gewinn seltener, nicht
-größer. Das Panel zeigt deshalb unter den Treffern, was Kombis über 2 bis 5 Beine historisch
-gebracht hätten, mit der erwarteten Zahl daneben:
+größer. Das Panel zeigt unter den Treffern, was Kombis aus der gewählten Stufe gebracht hätten,
+gezogen über je zwei Spieltage (der Umfang eines üblichen Laufs):
 
 | Beine | Quote Ø | Treffer | Ertrag | erwartet |
 |---|---|---|---|---|
-| 2 | 11,0 | 9,6 % | −0,6 % | +7,1 % |
-| 3 | 36,3 | 2,3 % | −24,1 % | +10,9 % |
-| 4 | 119,9 | 0,7 % | −26,4 % | +14,8 % |
-| 5 | 397,4 | 0,2 % | −49,9 % | +18,8 % |
+| 2 | 5,2 | 16,2 % | −21,1 % | −21,5 % |
+| 3 | 11,9 | 6,4 % | −34,5 % | −30,5 % |
+| 4 | 27,4 | 2,5 % | −48,6 % | −38,4 % |
+| 5 | 60,5 | 0,9 % | **−60,1 %** | −45,4 % |
+| 7 | 321,9 | 0,0 % | −100 % | −57,2 % |
 
-Weichen „Ertrag" und „erwartet" so weit voneinander ab, ist nicht die Rechnung falsch, sondern
-die Stichprobe zu dünn: Bei rund 32 % Treffern je Bein geht eine Viererkombi nur in 0,7 % der
-Fälle durch. Beim Favoritenfilter decken sich beide Spalten dagegen (Zweier +5,5 %, Dreier
-+9,4 %, Vierer +13,2 %), weil dort jedes Bein zu 69 % durchkommt.
+Die Fünferkombi, um die es geht, gab im Erwartungswert 40 % des Einsatzes zurück; über 600
+gezogene Siebenerkombis kam keine einzige durch. Weichen „Ertrag" und „erwartet" weit
+voneinander ab, ist nicht die Rechnung falsch, sondern die Stichprobe zu dünn.
 
-Solange der Lauf nur die Quote des Modellwegs speichert, ist die Außenseiterquote gerechnet und
-mit `≈` gekennzeichnet — die Seite stimmt zu 97,6 %, der Preis liegt im Median 7,1 % daneben.
-Solche Zeilen lassen sich nicht in den Wettschein legen. Nach dem nächsten `npm run dashboard`
-steht die Quote exakt im Snapshot, und die Einschränkung fällt von selbst weg.
+Die Quote der gestützten Seite steht seit `schemaVersion: 5` für beide Seiten im Snapshot. In
+älteren Läufen wird die Gegenquote gerechnet und mit `≈` gekennzeichnet.
+
 
 Ein Streifen neben dem Knopf nennt, wie viele Partien übrig bleiben, und hebt den Filter mit
 einem Klick wieder auf. Escape schließt nur das Panel. Die Regler bleiben über Sitzungen

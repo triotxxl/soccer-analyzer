@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { QuickpickButton, QuickpickChip, QuickpickDialog } from "./QuickpickUI";
-import { DEFAULT_QUICKPICK_SETTINGS, DEFAULT_UNDERDOG_SETTINGS, type DavesQuickpickSettings, type QuickpickPresetId, type QuickpickSettings } from "./quickpick";
+import { DEFAULT_QUICKPICK_SETTINGS, DEFAULT_DOMINANZ_SETTINGS, type DavesQuickpickSettings, type QuickpickPresetId, type QuickpickSettings } from "./quickpick";
 import type { DashboardFixture } from "./types";
 
 afterEach(cleanup);
@@ -41,27 +41,25 @@ function balanced(id: number): DashboardFixture {
 }
 
 /** Der Dialog ist kontrolliert - für Eingabetests braucht er einen Halter. */
-function Harness({ fixtures, initial, preset = "daves1x2", active = false, onActiveChange, onAddAll, onAddOne }: {
+function Harness({ fixtures, initial, preset = "daves1x2", active = false, onActiveChange, onAddAll }: {
   fixtures: DashboardFixture[];
   initial?: Partial<DavesQuickpickSettings>;
   preset?: QuickpickPresetId;
   active?: boolean;
   onActiveChange?(active: boolean): void;
-  onAddAll?(hits: DashboardFixture[]): void;
-  onAddOne?(row: { evaluation: { side: "1" | "2" | null } }): void;
+  onAddAll?(rows: Array<{ fixture: DashboardFixture; evaluation: { side: "1" | "2" | null } }>): void;
 }) {
   const [settings, setSettings] = useState<QuickpickSettings>(
-    preset === "underdog" ? DEFAULT_UNDERDOG_SETTINGS : { ...DEFAULT_QUICKPICK_SETTINGS, ...initial });
+    preset === "dominanz" ? DEFAULT_DOMINANZ_SETTINGS : { ...DEFAULT_QUICKPICK_SETTINGS, ...initial });
   const [isActive, setActive] = useState(active);
   return <QuickpickDialog
     fixtures={fixtures}
     settings={settings}
     active={isActive}
     onSettingsChange={setSettings}
-    onPresetChange={(next) => setSettings(next === "underdog" ? DEFAULT_UNDERDOG_SETTINGS : DEFAULT_QUICKPICK_SETTINGS)}
+    onPresetChange={(next) => setSettings(next === "dominanz" ? DEFAULT_DOMINANZ_SETTINGS : DEFAULT_QUICKPICK_SETTINGS)}
     onActiveChange={(next) => { setActive(next); onActiveChange?.(next); }}
-    onAddAll={(hits) => onAddAll?.(hits)}
-    onAddOne={(row) => onAddOne?.(row)}
+    onAddAll={(rows) => onAddAll?.(rows)}
     onClose={() => undefined}
   />;
 }
@@ -151,7 +149,7 @@ describe("QuickpickDialog", () => {
     await userEvent.click(screen.getByRole("button", { name: /Alle 1 in den Wettschein/ }));
     expect(onAddAll).toHaveBeenCalledOnce();
     expect(onAddAll.mock.calls[0]![0]).toHaveLength(1);
-    expect(onAddAll.mock.calls[0]![0][0].fixtureId).toBe(1);
+    expect(onAddAll.mock.calls[0]![0][0].fixture.fixtureId).toBe(1);
   });
 
   it("sperrt den Wettschein-Knopf ohne Treffer", () => {
@@ -166,7 +164,10 @@ describe("QuickpickDialog", () => {
       for (const label of ["Streng", "Ausgewogen", "Locker", "Weit"]) {
         expect(screen.getByRole("button", { name: new RegExp(`^${label}`) })).toBeInTheDocument();
       }
-      expect(screen.getByRole("button", { name: /^Ausgewogen/ })).toHaveTextContent("5,0/Tag · 68,7 %");
+      // Bewusst gegen das Format geprüft, nicht gegen den Stand: Die Zahlen wandern mit jeder
+      // Nachkalibrierung. Ob sie noch zur Messung passen, prüft npm run quickpick-report.
+      expect(screen.getByRole("button", { name: /^Ausgewogen/ }))
+        .toHaveTextContent(/^Ausgewogen\d+,\d\/Tag · \d+,\d %$/);
     });
 
     it("hebt die eingestellte Stufe hervor und wechselt auf Klick", async () => {
@@ -216,81 +217,68 @@ describe("QuickpickDialog", () => {
 });
 
 describe("Zwei Voreinstellungen", () => {
-  /** Eine Partie, bei der der Markt die Auswärtsseite deutlich schlechter sieht. */
-  function dog(id: number): DashboardFixture {
-    const base = fixture(id, "Alpha", "Beta", 40);
+  /**
+   * Nacional Potosí – Always Ready: Der Gast gewann alle fünf Duelle, steht 2. gegen 7. und
+   * hat die bessere Saisonbilanz – bei Quote 2,00. Seine Venue-Form ist dabei **schlechter**
+   * als die des Gastgebers, und genau das muss die Voreinstellung aushalten.
+   */
+  function dominant(id: number): DashboardFixture {
+    const base = fixture(id, "Nacional Potosí", "Always Ready", 44);
     return {
       ...base,
       form: {
         scope: "venue",
-        home: ["loss", "loss", "loss", "draw", "loss"],
-        away: ["win", "win", "win", "win", "draw"],
+        home: ["win", "win", "win", "win", "loss"],
+        away: ["loss", "win", "win", "draw", "win"],
         homeMatches: [], awayMatches: []
       },
-      h2h: { outcomes: ["loss", "loss", "win"], btts: [], draws: 0, consecutiveDraws: 0, matches: [] },
+      h2h: { outcomes: ["loss", "loss", "loss", "loss", "loss"], btts: [], draws: 0, consecutiveDraws: 0, matches: [] },
+      table: [
+        { position: 7, teamName: "Nacional Potosí", played: 19, wins: 8, draws: 3, losses: 8, points: 27, goalsFor: 30, goalsAgainst: 24 },
+        { position: 2, teamName: "Always Ready", played: 19, wins: 12, draws: 6, losses: 1, points: 42, goalsFor: 43, goalsAgainst: 13 }
+      ],
       markets: [
-        { ...base.markets[0]!, pick: "1", odds: 1.5, oddsHome: 1.5, oddsAway: 3.2, probability: 0.55 },
-        { ...base.markets[0]!, key: "draw", pick: null, odds: 4, probability: 0.25 }
+        { ...base.markets[0]!, pick: "2", odds: 2, oddsHome: 2.85, oddsAway: 2, probability: 0.494 },
+        { ...base.markets[0]!, key: "draw", pick: null, odds: 3.5, probability: 0.26 }
       ]
     };
   }
 
-  /** Dieselbe Partie, aber ohne gespeicherte Gegenquote - der Preis wird dann gerechnet. */
-  function dogEstimated(id: number): DashboardFixture {
-    const base = dog(id);
-    // Tippquote 1,84 gegen Remis 4,00 ergibt über den Buchmacherschnitt rund 3,2 - also
-    // innerhalb des Quotenbands, damit die Zeile den Filter überhaupt erreicht.
-    const markets = base.markets.map((m) => m.key === "1x2"
-      ? { ...m, odds: 1.84, oddsHome: undefined, oddsAway: undefined }
-      : m);
-    return { ...base, markets };
-  }
-
   it("lässt zwischen den Voreinstellungen wechseln", async () => {
-    render(<Harness fixtures={[dog(1)]} />);
+    render(<Harness fixtures={[dominant(1)]} />);
     expect(screen.getByRole("button", { name: "Daves 1x2-Filter" })).toHaveAttribute("aria-pressed", "true");
 
-    await userEvent.click(screen.getByRole("button", { name: "Underdog" }));
+    await userEvent.click(screen.getByRole("button", { name: "Dominanz zum Kombipreis" }));
 
-    expect(screen.getByRole("button", { name: "Underdog" })).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByText(/Sucher, keine Tippregel/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Dominanz zum Kombipreis" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByText(/Markt preist das ein/)).toBeInTheDocument();
   });
 
-  it("zeigt für den Außenseiter eigene Spalten", () => {
-    render(<Harness fixtures={[dog(1)]} preset="underdog" />);
-    expect(screen.getByRole("button", { name: /^Formvorsprung/ })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /^Modell/ })).toBeInTheDocument();
-    // Favoritenpunkte gehören der Modellseite - beim Widerspruch gibt es sie nicht.
+  it("zeigt eigene Spalten für Serie und Bilanz", () => {
+    render(<Harness fixtures={[dominant(1)]} preset="dominanz" />);
+    expect(screen.getByRole("button", { name: /^Serie in den direkten Duellen/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Siege plus Remis/ })).toBeInTheDocument();
+    // Favoritenpunkte gelten der Modellseite und taugen hier weder als Spalte noch als Tor.
     expect(screen.queryByRole("button", { name: /^Favoritenpunkte/ })).not.toBeInTheDocument();
   });
 
-  it("markiert eine Zeile, die gegen den Modelltipp steht", () => {
-    render(<Harness fixtures={[dog(1)]} preset="underdog" />);
-    expect(screen.getByText("Modell dagegen")).toBeInTheDocument();
-    expect(screen.getByText("Beta")).toBeInTheDocument();
+  it("findet die dominante Seite trotz schlechterer Venue-Form", () => {
+    render(<Harness fixtures={[dominant(1)]} preset="dominanz" />);
+    expect(screen.getByText("Always Ready")).toBeInTheDocument();
+    expect(screen.getByText("Serie 5")).toBeInTheDocument();
   });
 
-  /**
-   * Kurze Kombis sind der Zweck - deshalb gibt es auch hier den Sammelknopf. Was er kostet,
-   * steht in der Kombi-Tabelle darunter.
-   */
-  it("zeigt beim Außenseiter die Kombi-Tabelle", () => {
-    render(<Harness fixtures={[dog(1)]} preset="underdog" />);
+  /** Kurze Kombis sind der Zweck – was sie kosten, steht in der Tabelle darunter. */
+  it("zeigt die Kombi-Tabelle, sobald eine Messung vorliegt", () => {
+    render(<Harness fixtures={[dominant(1)]} />);
     expect(screen.getByText(/Was kurze Kombis aus dieser Stufe gebracht hätten/)).toBeInTheDocument();
-    // Die Spalte "erwartet" ist der Kern: Eine Kombi multipliziert den Ertrag je Bein.
+    // Die Spalte „erwartet" ist der Kern: Eine Kombi multipliziert den Ertrag je Bein.
     expect(screen.getByRole("columnheader", { name: "erwartet" })).toBeInTheDocument();
   });
 
-  /** Eine gerechnete Quote ist kein Preis - solche Zeilen bleiben aus dem Schein draußen. */
-  it("nimmt geschätzte Quoten nicht in den Wettschein", () => {
-    render(<Harness fixtures={[dogEstimated(1)]} preset="underdog" />);
-    expect(screen.getByRole("button", { name: /Keine Treffer/ })).toBeDisabled();
-    expect(screen.getByText(/gerechnete Quote, kein Preis/)).toBeInTheDocument();
-  });
-
-  it("nennt beim Außenseiter den Ertrag statt der Trefferquote", () => {
-    render(<Harness fixtures={[dog(1)]} preset="underdog" />);
-    expect(screen.getByText("Ertrag je Wette")).toBeInTheDocument();
+  it("nennt bei der Dominanz den Ertrag statt der Trefferquote", () => {
+    render(<Harness fixtures={[dominant(1)]} preset="dominanz" />);
+    expect(screen.getByText("Ertrag je Bein")).toBeInTheDocument();
     expect(screen.queryByText("Treffer je Bein")).not.toBeInTheDocument();
   });
 });

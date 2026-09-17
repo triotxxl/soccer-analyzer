@@ -16,17 +16,17 @@ import {
   type QuickpickPresetId
 } from "./quickpick-core.ts";
 import { DAVES_PRESET, evaluateDaves, type DavesQuickpickSettings } from "./quickpick-daves.ts";
-import { UNDERDOG_PRESET, evaluateUnderdog, type UnderdogQuickpickSettings } from "./quickpick-underdog.ts";
+import { DOMINANZ_PRESET, evaluateDominanz, type DominanzQuickpickSettings } from "./quickpick-dominanz.ts";
 
 export * from "./quickpick-core.ts";
 export * from "./quickpick-daves.ts";
-export * from "./quickpick-underdog.ts";
+export * from "./quickpick-dominanz.ts";
 
 /**
  * Die Einstellungen der **gerade gewählten** Voreinstellung. Eine diskriminierte Union über
  * `preset`: So kann keine Voreinstellung versehentlich eine Schwelle der anderen lesen.
  */
-export type QuickpickSettings = DavesQuickpickSettings | UnderdogQuickpickSettings;
+export type QuickpickSettings = DavesQuickpickSettings | DominanzQuickpickSettings;
 
 /** Die Einstellungen zu einer bestimmten Voreinstellung. */
 export type SettingsOf<I extends QuickpickPresetId> = Extract<QuickpickSettings, { preset: I }>;
@@ -36,13 +36,13 @@ export type AnyQuickpickPreset = QuickpickPreset<QuickpickSettings>;
 
 export const QUICKPICK_PRESETS: Record<QuickpickPresetId, AnyQuickpickPreset> = {
   daves1x2: DAVES_PRESET as unknown as AnyQuickpickPreset,
-  underdog: UNDERDOG_PRESET as unknown as AnyQuickpickPreset
+  dominanz: DOMINANZ_PRESET as unknown as AnyQuickpickPreset
 };
 
 /** Stabile Reihenfolge für die Auswahl in der Oberfläche. */
 export const QUICKPICK_PRESET_LIST: AnyQuickpickPreset[] = [
   QUICKPICK_PRESETS.daves1x2,
-  QUICKPICK_PRESETS.underdog
+  QUICKPICK_PRESETS.dominanz
 ];
 
 /** Der Deskriptor zu einer Einstellung. */
@@ -59,8 +59,8 @@ export function evaluateFixture(
   fixture: DashboardFixture,
   settings: QuickpickSettings
 ): QuickpickEvaluation {
-  return settings.preset === "underdog"
-    ? evaluateUnderdog(fixture, settings)
+  return settings.preset === "dominanz"
+    ? evaluateDominanz(fixture, settings)
     : evaluateDaves(fixture, settings);
 }
 

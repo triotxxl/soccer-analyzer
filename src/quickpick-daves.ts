@@ -100,12 +100,14 @@ export const QUICKPICK_LEVELS: Array<QuickpickLevel<QuickpickLevelValues>> = [
   {
     id: "streng", label: "Streng",
     measured: {
-      n: 61, proTag: 2.4, trefferquote: 0.705, roi: 0.027,
+      n: 62, proTag: 2.4, trefferquote: 0.71, roi: 0.031,
       kombis: [
-        { beine: 2, n: 1000, trefferquote: 0.49, quote: 2.2, roi: 0.049, erwartung: 0.054 },
-        { beine: 3, n: 480, trefferquote: 0.413, quote: 3.39, roi: 0.365, erwartung: 0.082 },
-        { beine: 4, n: 320, trefferquote: 0.275, quote: 5.17, roi: 0.41, erwartung: 0.111 },
-        { beine: 5, n: 160, trefferquote: 0, quote: 8.14, roi: -1, erwartung: 0.14 }
+        { beine: 2, n: 1120, trefferquote: 0.497, quote: 3.77, roi: 0.045, erwartung: 0.063 },
+        { beine: 3, n: 640, trefferquote: 0.35, quote: 6.3, roi: 0.072, erwartung: 0.096 },
+        { beine: 4, n: 440, trefferquote: 0.293, quote: 13.96, roi: 0.275, erwartung: 0.13 },
+        { beine: 5, n: 320, trefferquote: 0.188, quote: 31.32, roi: 0.11, erwartung: 0.165 },
+        { beine: 6, n: 160, trefferquote: 0.05, quote: 11.13, roi: -0.464, erwartung: 0.201 },
+        { beine: 7, n: 120, trefferquote: 0.025, quote: 18, roi: -0.561, erwartung: 0.238 }
       ]
     },
     hint: "Die höchste gemessene Zuverlässigkeit: 70,5 % je Bein über 61 Tipps, ROI +2,7 %."
@@ -115,12 +117,14 @@ export const QUICKPICK_LEVELS: Array<QuickpickLevel<QuickpickLevelValues>> = [
   {
     id: "ausgewogen", label: "Ausgewogen",
     measured: {
-      n: 134, proTag: 5, trefferquote: 0.687, roi: 0.022,
+      n: 136, proTag: 4.9, trefferquote: 0.691, roi: 0.027,
       kombis: [
-        { beine: 2, n: 2400, trefferquote: 0.47, quote: 2.3, roi: 0.055, erwartung: 0.045 },
-        { beine: 3, n: 1440, trefferquote: 0.315, quote: 3.5, roi: 0.094, erwartung: 0.068 },
-        { beine: 4, n: 1080, trefferquote: 0.216, quote: 5.31, roi: 0.132, erwartung: 0.091 },
-        { beine: 5, n: 640, trefferquote: 0.213, quote: 8.19, roi: 0.649, erwartung: 0.115 }
+        { beine: 2, n: 2600, trefferquote: 0.461, quote: 2.83, roi: 0.024, erwartung: 0.055 },
+        { beine: 3, n: 1640, trefferquote: 0.313, quote: 4.38, roi: 0.063, erwartung: 0.083 },
+        { beine: 4, n: 1160, trefferquote: 0.2, quote: 8.07, roi: -0.006, erwartung: 0.112 },
+        { beine: 5, n: 920, trefferquote: 0.128, quote: 13.43, roi: 0.008, erwartung: 0.142 },
+        { beine: 6, n: 680, trefferquote: 0.09, quote: 12.13, roi: 0.059, erwartung: 0.173 },
+        { beine: 7, n: 600, trefferquote: 0.045, quote: 19.55, roi: -0.152, erwartung: 0.204 }
       ]
     },
     hint: "Verdoppelt die Liste und kostet nur 1,8 Punkte Trefferquote: 68,7 % über 134 Tipps,"
@@ -130,12 +134,14 @@ export const QUICKPICK_LEVELS: Array<QuickpickLevel<QuickpickLevelValues>> = [
   {
     id: "locker", label: "Locker",
     measured: {
-      n: 181, proTag: 6.7, trefferquote: 0.63, roi: -0.064,
+      n: 185, proTag: 6.6, trefferquote: 0.638, roi: -0.053,
       kombis: [
-        { beine: 2, n: 3240, trefferquote: 0.426, quote: 2.3, roi: -0.056, erwartung: -0.124 },
-        { beine: 3, n: 2040, trefferquote: 0.264, quote: 3.5, roi: -0.12, erwartung: -0.18 },
-        { beine: 4, n: 1360, trefferquote: 0.204, quote: 5.39, roi: 0.025, erwartung: -0.232 },
-        { beine: 5, n: 1160, trefferquote: 0.161, quote: 8.18, roi: 0.238, erwartung: -0.281 }
+        { beine: 2, n: 3560, trefferquote: 0.422, quote: 2.94, roi: -0.074, erwartung: -0.103 },
+        { beine: 3, n: 2440, trefferquote: 0.275, quote: 4.96, roi: -0.123, erwartung: -0.151 },
+        { beine: 4, n: 1560, trefferquote: 0.217, quote: 8.65, roi: 0.034, erwartung: -0.195 },
+        { beine: 5, n: 1240, trefferquote: 0.139, quote: 14.54, roi: -0.052, erwartung: -0.238 },
+        { beine: 6, n: 1080, trefferquote: 0.126, quote: 27.87, roi: 0.298, erwartung: -0.278 },
+        { beine: 7, n: 800, trefferquote: 0.069, quote: 43.95, roi: 0.084, erwartung: -0.317 }
       ]
     },
     hint: "Mehr Auswahl, aber der Ertrag kippt: 63,0 % über 181 Tipps, ROI -6,4 %."
@@ -147,12 +153,14 @@ export const QUICKPICK_LEVELS: Array<QuickpickLevel<QuickpickLevelValues>> = [
   {
     id: "weit", label: "Weit",
     measured: {
-      n: 259, proTag: 9.5, trefferquote: 0.583, roi: -0.11,
+      n: 264, proTag: 9.4, trefferquote: 0.591, roi: -0.1,
       kombis: [
-        { beine: 2, n: 4880, trefferquote: 0.335, quote: 2.98, roi: -0.225, erwartung: -0.209 },
-        { beine: 3, n: 3000, trefferquote: 0.197, quote: 4.83, roi: -0.306, erwartung: -0.296 },
-        { beine: 4, n: 2200, trefferquote: 0.128, quote: 8.71, roi: -0.318, erwartung: -0.374 },
-        { beine: 5, n: 1640, trefferquote: 0.08, quote: 13.43, roi: -0.376, erwartung: -0.443 }
+        { beine: 2, n: 5160, trefferquote: 0.354, quote: 3.29, roi: -0.184, erwartung: -0.191 },
+        { beine: 3, n: 3320, trefferquote: 0.211, quote: 5.94, roi: -0.272, erwartung: -0.272 },
+        { beine: 4, n: 2480, trefferquote: 0.134, quote: 10.83, roi: -0.333, erwartung: -0.345 },
+        { beine: 5, n: 1800, trefferquote: 0.082, quote: 17.82, roi: -0.358, erwartung: -0.411 },
+        { beine: 6, n: 1520, trefferquote: 0.045, quote: 32.85, roi: -0.459, erwartung: -0.47 },
+        { beine: 7, n: 1200, trefferquote: 0.024, quote: 52.39, roi: -0.612, erwartung: -0.523 }
       ]
     },
     hint: "Nur für einen Überblick, nicht zum Spielen: 58,3 % über 259 Tipps, ROI -11,0 %."
@@ -206,7 +214,6 @@ export const DAVES_PRESET: QuickpickPreset<DavesQuickpickSettings> = {
     + " die Punktegrenze 70 stammt aus einem Durchprobieren an genau diesen Daten. Eine Kombi"
     + " multipliziert den Vorteil je Bein, im Guten wie im Schlechten.",
   wettschein: {
-    modus: "kombi",
     hinweis: "Legt den 1X2-Tipp jeder Treffer-Partie in den Wettschein. Dort lassen sich"
       + " daraus Kombis bauen."
   },

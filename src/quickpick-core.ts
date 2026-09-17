@@ -3,12 +3,12 @@ import type { DashboardFixture, DashboardMarket, FormResult } from "./dashboard.
 /**
  * Gemeinsames Gerüst des Quickpickers: Typen und Messgrößen, die sich alle Voreinstellungen
  * teilen. Die einzelnen Torfolgen stehen daneben in `quickpick-daves.ts` und
- * `quickpick-underdog.ts`, zusammengeführt werden sie in `quickpick.ts`.
+ * `quickpick-dominanz.ts`, zusammengeführt werden sie in `quickpick.ts`.
  *
  * Hier steht bewusst keine Regel - nur das, woraus Regeln gebaut werden.
  */
 
-export type QuickpickPresetId = "daves1x2" | "underdog";
+export type QuickpickPresetId = "daves1x2" | "dominanz";
 
 export type QuickpickLevelId = "streng" | "ausgewogen" | "locker" | "weit";
 
@@ -81,8 +81,8 @@ export interface QuickpickPreset<S> {
   };
   /** Der Ehrlichkeitsabsatz. Muss zur Messung passen, sonst wirbt die Oberfläche falsch. */
   honesty: string;
-  /** Wie Treffer in den Wettschein dürfen. */
-  wettschein: { modus: "kombi" | "einzel"; hinweis: string };
+  /** Hinweistext am Sammelknopf. Beide Voreinstellungen liefern Beine für Kombis. */
+  wettschein: { hinweis: string };
   /** Satz für die leere Trefferliste. */
   leerSatz: string;
   defaults: S;
@@ -103,11 +103,10 @@ export type QuickpickRejection =
   | "keineTabelle"
   | "tabelle"
   | "serie"
-  // Gründe der Voreinstellung "Underdog". Eine gemeinsame Liste, weil die Bilanz im Panel
-  // ohnehin nur Gründe mit einem Zähler über null anzeigt.
+  // Gründe der Voreinstellung "Dominanz". Eine gemeinsame Liste, weil das Panel ohnehin nur
+  // Gründe mit einem Zähler über null anzeigt.
   | "keineQuote"
-  | "keinAussenseiter"
-  | "formGegen"
+  | "bilanz"
   | "keineDuelle"
   | "modellDagegen";
 
@@ -122,8 +121,7 @@ export const REJECTION_LABELS: Record<QuickpickRejection, string> = {
   tabelle: "die Tabelle zeigt keinen klaren Vorsprung",
   serie: "keine Siegesserie auf der gestützten Seite",
   keineQuote: "keine brauchbare Quote im Lauf",
-  keinAussenseiter: "der Markt sieht keine Seite klar schlechter",
-  formGegen: "die Form stützt den Außenseiter nicht",
+  bilanz: "Sieg-plus-Remis-Verhältnis nicht deutlich überlegen",
   keineDuelle: "zu wenige direkte Duelle",
   modellDagegen: "das Modell tippt die andere Seite"
 };
@@ -148,35 +146,38 @@ export interface QuickpickSuperiority {
   positionGap: number;
   position: number;
   opponentPosition: number;
+  /**
+   * Anteil der Spiele ohne Niederlage, `(Siege + Remis) / Spiele`, über die laufende Saison.
+   * Das ist die „Form" im Sinne einer Saisonbilanz - **nicht** die letzten fünf Spiele am Ort.
+   * Der Unterschied ist entscheidend: Die auswärts spielende Seite steht in der Venue-Form
+   * strukturell schlechter da, und genau daran scheitern die Partien, um die es hier geht.
+   */
+  nonLossRate: number;
+  opponentNonLossRate: number;
+  /** Vorsprung darin in **Prozentpunkten** (0-100), passend zu den übrigen PP-Größen. */
+  nonLossGap: number;
 }
 
-/** Was nur die Voreinstellung „Underdog" braucht. */
-export interface UnderdogDetail {
-  /** Quote der Gegenseite zur gestützten. */
-  counterOdds: number | null;
-  /**
-   * `snapshot` heißt: Beide Preise stehen im Lauf (ab schemaVersion 5). `geschätzt` heißt:
-   * aus Tipp- und Remisquote gerechnet - die Seite stimmt dann zu 97,6 %, der Preis liegt
-   * im Median 7,1 % daneben.
-   */
-  counterSource: "snapshot" | "geschätzt" | null;
-  /** Quote der gestützten Seite geteilt durch die des Favoriten. */
-  priceRatio: number | null;
-  /** Formvorsprung der gestützten Seite in Prozentpunkten. */
-  formGap: number;
-  /** Modellwahrscheinlichkeit der gestützten Seite - für die Gegenseite `1 − p(Tipp) − p(Remis)`. */
-  probability: number | null;
-  /** Marktwahrscheinlichkeit aus der Quote, ohne Bereinigung um den Buchmacherschnitt. */
-  implied: number | null;
-  /** Ob das Modell dieselbe Seite tippt. Nur Anzeige - als Tor gemessen ohne Nutzen. */
+/** Was nur die Voreinstellung „Dominanz" braucht. */
+export interface DominanzDetail {
+  /** Gewonnene direkte Duelle in Folge auf der gestützten Seite. */
+  streak: number;
+  /** Vorsprung im Anteil der Spiele ohne Niederlage, in Prozentpunkten. */
+  nonLossGap: number;
+  /** Ob das Modell dieselbe Seite tippt. Nur Anzeige - als Tor ist es eine eigene Stufe. */
   modelAgrees: boolean;
+  /**
+   * `snapshot` heißt: Der Preis steht im Lauf (ab schemaVersion 5 stehen beide Seiten drin).
+   * `geschätzt` heißt: aus Tipp- und Remisquote gerechnet, im Median 7,1 % daneben.
+   */
+  oddsSource: "snapshot" | "geschätzt";
 }
 
 export interface QuickpickEvaluation {
   fixtureId: number;
   /**
-   * Die Seite, die der Filter stützt. Bei „daves1x2" immer der Modelltipp; bei „underdog"
-   * auch die Gegenseite, denn dort ist der Widerspruch zum Markt der Zweck.
+   * Die Seite, die der Filter stützt. Bei „daves1x2" immer der Modelltipp; bei „dominanz"
+   * die Seite mit dem Tabellen- und Serienvorsprung - das kann auch die Gegenseite sein.
    */
   side: "1" | "2" | null;
   /** Die Seite, auf die die Venue-Form zeigt. */
@@ -191,8 +192,8 @@ export interface QuickpickEvaluation {
   odds: number | null;
   dominance: QuickpickDominance | null;
   superiority: QuickpickSuperiority | null;
-  /** Nur bei „underdog" gesetzt. */
-  underdog?: UnderdogDetail | null;
+  /** Nur bei „dominanz" gesetzt. */
+  dominanz?: DominanzDetail | null;
   passes: boolean;
   rejectedBy: QuickpickRejection | null;
 }
@@ -207,7 +208,7 @@ export function emptyRejections(): Record<QuickpickRejection, number> {
   return {
     keinTipp: 0, venueForm: 0, seitenkonflikt: 0, quote: 0, punkte: 0,
     h2hDagegen: 0, keineTabelle: 0, tabelle: 0, serie: 0,
-    keineQuote: 0, keinAussenseiter: 0, formGegen: 0, keineDuelle: 0, modellDagegen: 0
+    keineQuote: 0, bilanz: 0, keineDuelle: 0, modellDagegen: 0
   };
 }
 
@@ -286,7 +287,12 @@ export function superiorityOf(fixture: DashboardFixture, side: "1" | "2"): Quick
   if (!home || !away || home.played === 0 || away.played === 0) return null;
   const backed = side === "1" ? home : away;
   const other = side === "1" ? away : home;
+  const nonLossRate = (backed.wins + backed.draws) / backed.played;
+  const opponentNonLossRate = (other.wins + other.draws) / other.played;
   return {
+    nonLossRate,
+    opponentNonLossRate,
+    nonLossGap: (nonLossRate - opponentNonLossRate) * 100,
     pointsPerGame: backed.points / backed.played - other.points / other.played,
     goalDifference: (backed.goalsFor - backed.goalsAgainst) / backed.played
       - (other.goalsFor - other.goalsAgainst) / other.played,

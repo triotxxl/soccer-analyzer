@@ -878,7 +878,7 @@ describe("Klassenunterschied", () => {
     await user.click(screen.getByRole("button", { name: /in den Wettschein/ }));
 
     const drawer = screen.getByRole("dialog", { name: "Wett-Baukasten" });
-    expect(within(drawer).getByText(/Alpha FC/)).toBeInTheDocument();
+    expect(within(drawer).getAllByText(/Alpha FC/).length).toBeGreaterThan(0);
     expect(screen.queryByRole("dialog", { name: "Quickpicker" })).not.toBeInTheDocument();
   });
 

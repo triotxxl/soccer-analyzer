@@ -7,8 +7,9 @@
  * Ausgewertet wird `evaluateFixture` aus `src/quickpick.ts`, also genau die Fassung, die auch
  * die App benutzt; eine zweite Fassung hier würde die Rückrechnung wertlos machen.
  *
- * Jede Voreinstellung hat ihren eigenen Maßstab: „daves1x2" sucht Kombi-Beine, dort zählt die
- * Trefferquote je Bein. „underdog" ist eine Einzelwette, dort zählt der Ertrag.
+ * Jede Voreinstellung hat ihren eigenen Maßstab: „daves1x2" zählt die Trefferquote je Bein,
+ * „dominanz" den Ertrag je Bein. Beide liefern Beine für Kombis - nur der Maßstab unterscheidet
+ * sich, weil bei „dominanz" die Trefferquote fast exakt der Quote folgt.
  *
  * **Grenze der Abrechnung:** `tipico_fixtures` speichert je Partie nur den *letzten* Preis vor
  * Anpfiff. Die Außenseiterquote, zu der hier abgerechnet wird, ist also nicht zwingend die,
@@ -16,7 +17,8 @@
  *
  * Aufruf:
  *   npm run quickpick-report                       alle Voreinstellungen
- *   npm run quickpick-report -- --preset underdog  nur eine
+ *   npm run quickpick-report -- --preset dominanz  nur eine
+ *   npm run quickpick-report -- --kombi-tage 3     Kombis über drei Spieltage ziehen
  *   npm run quickpick-report -- --write            Stand als Kalibrierpunkt festhalten
  */
 import fs from "node:fs";
@@ -147,18 +149,20 @@ function betsFor(
     const winner = outcome.home > outcome.away ? "1" : outcome.home < outcome.away ? "2" : "X";
     const triple = prices.get(fixture.fixtureId);
 
-    // Datenqualität: Hat die aus dem Snapshot rekonstruierte Seite denselben Außenseiter
-    // gefunden wie das archivierte Tripel?
-    if (preset.id === "underdog" && triple) {
+    // Datenqualität: Deckt sich der Preis aus dem Snapshot mit dem archivierten Tripel? Wo
+    // die Regel die Gegenseite stützt, stand im Snapshot vor schemaVersion 5 nur eine
+    // Schätzung - abgerechnet wird deshalb immer zum echten archivierten Preis.
+    const echterPreis = triple ? (evaluation.side === "1" ? triple.home : triple.away) : null;
+    if (echterPreis !== null && evaluation.odds !== null) {
       result.seiteGesamt += 1;
-      if ((triple.home > triple.away ? "1" : "2") === evaluation.side) result.seiteRichtig += 1;
+      if (Math.abs(echterPreis - evaluation.odds) / echterPreis <= 0.05) result.seiteRichtig += 1;
     }
 
-    // Daves stützt immer die Modellseite, deren Preis im Snapshot steht. Der Außenseiter wird
-    // zum echten archivierten Preis abgerechnet - die Schätzung taugt dafür nicht.
-    const odds = preset.id === "underdog"
-      ? (triple ? (evaluation.side === "1" ? triple.home : triple.away) : null)
-      : evaluation.odds;
+    // Abgerechnet wird zu dem Preis, den die App gezeigt hätte: dem aus dem Snapshot. Nur wo
+    // der Lauf für die gestützte Seite keinen führt und die Regel ihn schätzen musste, tritt
+    // der archivierte Preis an seine Stelle - eine Schätzung taugt nicht als Abrechnungskurs.
+    const geschaetzt = evaluation.dominanz?.oddsSource === "geschätzt";
+    const odds = geschaetzt ? echterPreis : (evaluation.odds ?? echterPreis);
     if (odds === null) { result.ohnePreis += 1; continue; }
 
     result.bets.push({ kickoff: fixture.kickoff, odds, hit: winner === evaluation.side });
@@ -224,15 +228,26 @@ function shuffle<T>(values: T[]): T[] {
  * wirklich zusammenstellen würde. Über mehrere Runden, weil ein einzelner Schnitt zu sehr vom
  * Zufall der Reihenfolge abhinge.
  */
-function comboMetrics(bets: Bet[], beine: number, runden = 40): QuickpickComboMeasurement | null {
-  const byDay = new Map<string, Bet[]>();
+function comboMetrics(
+  bets: Bet[],
+  beine: number,
+  fensterTage: number,
+  runden = 40
+): QuickpickComboMeasurement | null {
+  // Ein Fenster entspricht dem Zeitraum, den ein Lauf abdeckt - nicht einem Kalendertag. Bei
+  // wenigen Treffern am Tag käme sonst nie eine Fünfer- oder Siebenerkombi zustande, und
+  // genau danach wird gefragt. Die Fenster überlappen nicht, damit dieselbe Wette nicht in
+  // einer Runde mehrfach zählt.
+  const byWindow = new Map<number, Bet[]>();
+  const ersterTag = bets.length === 0 ? 0 : Date.parse(bets[0]!.kickoff.slice(0, 10));
   for (const bet of bets) {
-    const day = bet.kickoff.slice(0, 10);
-    byDay.set(day, [...(byDay.get(day) ?? []), bet]);
+    const tag = Date.parse(bet.kickoff.slice(0, 10));
+    const fenster = Math.floor((tag - ersterTag) / 86_400_000 / fensterTage);
+    byWindow.set(fenster, [...(byWindow.get(fenster) ?? []), bet]);
   }
   let n = 0, hits = 0, returned = 0, oddsSum = 0;
   for (let runde = 0; runde < runden; runde += 1) {
-    for (const day of byDay.values()) {
+    for (const day of byWindow.values()) {
       if (day.length < beine) continue;
       const pool = shuffle(day);
       for (let start = 0; start + beine <= pool.length; start += beine) {
@@ -282,6 +297,10 @@ function readState(): CalibrationState | null {
 
 function main(): void {
   const write = process.argv.includes("--write");
+  // Wie lang der analysierte Zeitraum ist, aus dem eine Kombi gebaut wird. Zwei Tage sind der
+  // Umfang eines typischen next48- oder tomorrow2-Laufs.
+  const fensterArg = process.argv.indexOf("--kombi-tage");
+  const fensterTage = fensterArg >= 0 ? Math.max(1, Number(process.argv[fensterArg + 1]) || 2) : 2;
   const wanted = process.argv.indexOf("--preset");
   const only = wanted >= 0 ? process.argv[wanted + 1] as QuickpickPresetId | undefined : undefined;
   if (only !== undefined && !(only in QUICKPICK_PRESETS)) {
@@ -300,7 +319,14 @@ function main(): void {
 
   const state = readState();
   const abweichungen: string[] = [];
-  const recorded: Record<string, PresetStand> = { ...(state?.presets ?? {}) };
+  // Nur bekannte Voreinstellungen werden übernommen: Eine abgeschaffte - wie die frühere
+  // „underdog" - verschwindet damit beim nächsten --write von selbst aus dem Kalibrierstand,
+  // statt dort für immer eine Regel zu beschreiben, die es nicht mehr gibt.
+  const recorded: Record<string, PresetStand> = {};
+  for (const id of Object.keys(QUICKPICK_PRESETS) as QuickpickPresetId[]) {
+    const vorher = state?.presets?.[id];
+    if (vorher) recorded[id] = vorher;
+  }
 
   for (const preset of presets) {
     const vorher = state?.presets?.[preset.id];
@@ -332,8 +358,8 @@ function main(): void {
         continue;
       }
       const perDay = metrics.n / spanInDays(bets);
-      const kombis = [2, 3, 4, 5]
-        .map((beine) => comboMetrics(bets, beine))
+      const kombis = [2, 3, 4, 5, 6, 7]
+        .map((beine) => comboMetrics(bets, beine, fensterTage))
         .filter((entry): entry is QuickpickComboMeasurement => entry !== null);
       stufen[level.id] = {
         kombis,
@@ -373,7 +399,7 @@ function main(): void {
     // Ertrag je Bein verspricht - läuft sie weit von "Ertrag" weg, ist die Stichprobe zu klein.
     const beste = stufen.ausgewogen?.kombis ?? Object.values(stufen)[0]?.kombis;
     if (beste && beste.length > 0) {
-      console.log(`  Kurze Kombis aus der Stufe „Ausgewogen“:`);
+      console.log(`  Kurze Kombis aus der Stufe „Ausgewogen“, gezogen über ${fensterTage} Spieltage:`);
       console.log(`    ${"Beine".padEnd(7)}${"Kombis".padStart(8)}${"Treffer".padStart(10)}${"Quote Ø".padStart(10)}${"Ertrag".padStart(10)}${"erwartet".padStart(11)}`);
       for (const kombi of beste) {
         console.log(`    ${String(kombi.beine).padEnd(7)}${String(kombi.n).padStart(8)}`
@@ -382,10 +408,10 @@ function main(): void {
       }
     }
 
-    if (preset.id === "underdog" && qualitaet.gesamt > 0) {
-      console.log(`  Datenqualität: Die Seite aus dem Snapshot stimmte in`
+    if (qualitaet.gesamt > 0 && qualitaet.richtig < qualitaet.gesamt) {
+      console.log(`  Datenqualität: Der Preis aus dem Snapshot deckte sich in`
         + ` ${percent(qualitaet.richtig / qualitaet.gesamt)} der Fälle mit dem archivierten`
-        + ` Quotentripel überein; ${qualitaet.ohnePreis} Zeilen ohne archivierten Preis.`);
+        + ` Tripel (5 % Toleranz); ${qualitaet.ohnePreis} Zeilen ohne archivierten Preis.`);
       console.log("  Abgerechnet wird zum letzten Tipico-Preis vor Anpfiff - nicht zwingend der,"
         + " den die App im Moment des Snapshots zeigte.");
     }
@@ -396,7 +422,7 @@ function main(): void {
   if (abweichungen.length > 0) {
     console.log("\nABWEICHUNG von den Zahlen im Code:");
     for (const zeile of abweichungen) console.log(`  - ${zeile}`);
-    console.log("  Die Messwerte in QUICKPICK_LEVELS bzw. UNDERDOG_LEVELS gehören auf diesen Stand gebracht.");
+    console.log("  Die Messwerte in QUICKPICK_LEVELS bzw. DOMINANZ_LEVELS gehören auf diesen Stand gebracht.");
   } else {
     console.log("\nDie Zahlen im Code decken sich mit der Messung.");
   }

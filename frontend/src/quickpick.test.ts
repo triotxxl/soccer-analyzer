@@ -11,17 +11,17 @@ import {
   saveQuickpickStore,
   settingsOf,
   withSettings,
-  DEFAULT_UNDERDOG_SETTINGS,
+  DEFAULT_DOMINANZ_SETTINGS,
   h2hDominance,
   h2hStreak,
   loadQuickpickSettings,
   superiorityOf,
   venueFormPercent,
   counterOddsOf,
-  UNDERDOG_LEVELS,
+  DOMINANZ_LEVELS,
   QUICKPICK_PRESETS,
   type DavesQuickpickSettings,
-  type UnderdogQuickpickSettings
+  type DominanzQuickpickSettings
 } from "./quickpick";
 import type { DashboardFixture, FormResult } from "./types";
 
@@ -385,24 +385,24 @@ describe("Speicherung je Voreinstellung", () => {
     expect(store.aktiv).toBe("daves1x2");
     expect(store.daves1x2.minOdds).toBe(1.8);
     expect(store.daves1x2.strongMinimum).toBe(DEFAULT_QUICKPICK_SETTINGS.strongMinimum);
-    expect(store.underdog).toEqual(DEFAULT_UNDERDOG_SETTINGS);
+    expect(store.dominanz).toEqual(DEFAULT_DOMINANZ_SETTINGS);
     window.localStorage.clear();
   });
 
   it("erbt bei einem Teilzweig die Vorgaben", () => {
     window.localStorage.setItem("football-analyzer:quickpick-settings",
-      JSON.stringify({ aktiv: "underdog", underdog: { maxOdds: 6 } }));
+      JSON.stringify({ aktiv: "dominanz", dominanz: { maxOdds: 6 } }));
     const store = loadQuickpickStore();
-    expect(store.aktiv).toBe("underdog");
-    expect(store.underdog.maxOdds).toBe(6);
-    expect(store.underdog.minOdds).toBe(DEFAULT_UNDERDOG_SETTINGS.minOdds);
+    expect(store.aktiv).toBe("dominanz");
+    expect(store.dominanz.maxOdds).toBe(6);
+    expect(store.dominanz.minOdds).toBe(DEFAULT_DOMINANZ_SETTINGS.minOdds);
     window.localStorage.clear();
   });
 
   /** Eine unbekannte Kennung darf nur die Auswahl zurücksetzen, nicht die Regler. */
   it("verwirft bei unbekannter Voreinstellung nur die Auswahl", () => {
     window.localStorage.setItem("football-analyzer:quickpick-settings",
-      JSON.stringify({ aktiv: "gibtesnicht", daves1x2: { minOdds: 2.2 } }));
+      JSON.stringify({ aktiv: "gibtesnicht", daves1x2: { minOdds: 2.2 }, dominanz: {} }));
     const store = loadQuickpickStore();
     expect(store.aktiv).toBe("daves1x2");
     expect(store.daves1x2.minOdds).toBe(2.2);
@@ -418,10 +418,10 @@ describe("Speicherung je Voreinstellung", () => {
   /** Der Kern der Trennung: Ein Wechsel darf die Regler der anderen nicht anfassen. */
   it("lässt beim Schreiben den anderen Zweig unberührt", () => {
     const store = withSettings(loadQuickpickStore(), settings({ minOdds: 1.9 }));
-    saveQuickpickStore({ ...store, aktiv: "underdog" });
+    saveQuickpickStore({ ...store, aktiv: "dominanz" });
     const wieder = loadQuickpickStore();
     expect(wieder.daves1x2.minOdds).toBe(1.9);
-    expect(settingsOf(wieder).preset).toBe("underdog");
+    expect(settingsOf(wieder).preset).toBe("dominanz");
     window.localStorage.clear();
   });
 });
@@ -467,122 +467,177 @@ describe("Gegenquote", () => {
   });
 });
 
-describe("Underdog", () => {
-  function under(overrides: Partial<UnderdogQuickpickSettings> = {}): UnderdogQuickpickSettings {
-    return { ...DEFAULT_UNDERDOG_SETTINGS, ...overrides };
+describe("Dominanz", () => {
+  function dom(overrides: Partial<DominanzQuickpickSettings> = {}): DominanzQuickpickSettings {
+    return { ...DEFAULT_DOMINANZ_SETTINGS, ...overrides };
   }
 
   /**
-   * Das Modell tippt Heim zu 1,50, der Markt bezahlt Auswärts mit 3,20. Die Form spricht für
-   * Auswärts (87 gegen 7 Prozent), die Duelle ebenfalls.
+   * Nacional Potosí – Always Ready, 17.09.2026: eines der beiden Beispiele, an denen sich
+   * diese Voreinstellung messen lassen muss. Always Ready gewann alle fünf Duelle, steht 2.
+   * gegen 7., hat 94,7 % gegen 57,9 % Spiele ohne Niederlage - und wird mit 2,00 bezahlt.
    */
-  function dogFixture(overrides: Partial<DashboardFixture> = {}): DashboardFixture {
+  function alwaysReady(overrides: Partial<DashboardFixture> = {}): DashboardFixture {
     const base = fixture();
     return {
       ...base,
+      homeTeam: "Nacional Potosí", awayTeam: "Always Ready",
       form: {
         scope: "venue",
-        home: ["loss", "loss", "loss", "draw", "loss"],
-        away: ["win", "win", "win", "win", "draw"],
+        home: ["win", "win", "win", "win", "loss"],
+        away: ["loss", "win", "win", "draw", "win"],
         homeMatches: [], awayMatches: []
       },
-      h2h: { outcomes: ["loss", "loss", "win"], btts: [], draws: 0, consecutiveDraws: 0, matches: [] },
+      // Aus Heimsicht fünf Niederlagen - also fünf Siege in Folge für Always Ready.
+      h2h: h2h(["loss", "loss", "loss", "loss", "loss"]),
+      table: [
+        { position: 7, teamName: "Nacional Potosí", played: 19, wins: 8, draws: 3, losses: 8, points: 27, goalsFor: 30, goalsAgainst: 24 },
+        { position: 2, teamName: "Always Ready", played: 19, wins: 12, draws: 6, losses: 1, points: 42, goalsFor: 43, goalsAgainst: 13 }
+      ],
+      scores: { favorite: 44, draw: 29 },
       markets: [
-        { ...base.markets[0]!, pick: "1", odds: 1.5, oddsHome: 1.5, oddsAway: 3.2, probability: 0.55 },
-        { ...base.markets[0]!, key: "draw", pick: null, odds: 4, probability: 0.25 }
+        { ...base.markets[0]!, pick: "2", odds: 2, oddsHome: 2.85, oddsAway: 2, probability: 0.494 },
+        { ...base.markets[0]!, key: "draw", pick: null, odds: 3.5, probability: 0.26 }
       ],
       ...overrides
     };
   }
 
-  it("stützt die teurere Seite, auch gegen den Modelltipp", () => {
-    const evaluation = evaluateFixture(dogFixture(), under());
+  it("findet das Beispiel Always Ready", () => {
+    const evaluation = evaluateFixture(alwaysReady(), dom());
     expect(evaluation.passes).toBe(true);
     expect(evaluation.side).toBe("2");
-    expect(evaluation.pick).toBe("1");
-    expect(evaluation.underdog?.modelAgrees).toBe(false);
-    expect(evaluation.odds).toBe(3.2);
-  });
-
-  /** Die Wahrscheinlichkeit der Gegenseite ist exakt rekonstruierbar: 1 − p(Tipp) − p(Remis). */
-  it("rechnet die Modellwahrscheinlichkeit der Gegenseite aus dem Rest", () => {
-    expect(evaluateFixture(dogFixture(), under()).underdog?.probability).toBeCloseTo(0.2, 10);
-  });
-
-  it("lehnt ein ausgeglichenes Quotenbild ab", () => {
-    const even = dogFixture({
-      markets: [
-        { ...fixture().markets[0]!, pick: "1", odds: 2.5, oddsHome: 2.5, oddsAway: 2.7 },
-        { ...fixture().markets[0]!, key: "draw", pick: null, odds: 3.4 }
-      ]
-    });
-    expect(evaluateFixture(even, under()).rejectedBy).toBe("keinAussenseiter");
-  });
-
-  it("hält sich an das Quotenband", () => {
-    expect(evaluateFixture(dogFixture(), under({ maxOdds: 3 })).rejectedBy).toBe("quote");
-    expect(evaluateFixture(dogFixture(), under({ minOdds: 3.5 })).rejectedBy).toBe("quote");
-  });
-
-  it("verlangt den Formvorsprung des Außenseiters", () => {
-    const flat = dogFixture({
-      form: {
-        scope: "venue",
-        home: ["win", "win", "win", "win", "draw"],
-        away: ["win", "win", "win", "win", "draw"],
-        homeMatches: [], awayMatches: []
-      }
-    });
-    expect(evaluateFixture(flat, under()).rejectedBy).toBe("formGegen");
+    expect(evaluation.odds).toBe(2);
+    expect(evaluation.dominanz?.streak).toBe(5);
+    expect(evaluation.dominanz?.modelAgrees).toBe(true);
   });
 
   /**
-   * Das H2H-Tor ist auf der Vorgabe **aus**: Es kostete gemessen rund 19 Punkte Ertrag je
-   * Bein, und für kurze Kombis multipliziert sich genau dieser Wert. Auf der strengen Stufe
-   * greift es weiterhin.
+   * Der Regressionstest, der den ganzen Umbau begründet: Dieselbe Partie mit einer schlechten
+   * Venue-Form der gestützten Seite passiert weiterhin. Die „Form" kommt aus der Saisonbilanz
+   * der Tabelle, nicht aus den letzten fünf Spielen am Ort - genau daran scheiterten beide
+   * Beispiele in der Vorgängerversion.
    */
-  it("prüft die Duelle nur auf der strengen Stufe", () => {
-    // Aus Heimsicht drei Siege - für den Außenseiter auswärts also drei Niederlagen.
-    const against = dogFixture({ h2h: h2h(["win", "win", "win"]) });
-    expect(evaluateFixture(against, under()).passes).toBe(true);
-    expect(evaluateFixture(against, applyLevel(DEFAULT_UNDERDOG_SETTINGS, "streng")).rejectedBy)
-      .toBe("h2hDagegen");
+  it("hält an der Saisonbilanz fest, auch wenn die Venue-Form dagegen spricht", () => {
+    const schwacheForm = alwaysReady({
+      form: {
+        scope: "venue",
+        home: ["win", "win", "win", "win", "win"],
+        away: ["loss", "loss", "loss", "loss", "loss"],
+        homeMatches: [], awayMatches: []
+      }
+    });
+    expect(evaluateFixture(schwacheForm, dom()).passes).toBe(true);
   });
 
-  it("lässt eine Partie ohne Duelle zu, verlangt sie aber auf Wunsch", () => {
-    const none = dogFixture({ h2h: h2h([]) });
-    expect(evaluateFixture(none, under()).passes).toBe(true);
-    expect(evaluateFixture(none, under({ minDuels: 3 })).rejectedBy).toBe("keineDuelle");
-  });
-
-  it("prüft die Tabelle nur, wenn das Tor eingeschaltet ist", () => {
-    // Alpha steht vorne, der Außenseiter ist Beta - der Tabellenvorsprung fehlt ihm also.
-    expect(evaluateFixture(dogFixture(), under()).passes).toBe(true);
-    expect(evaluateFixture(dogFixture(), under({ minPositionGap: 3 })).rejectedBy).toBe("tabelle");
-  });
-
-  it("kann auf die Zustimmung des Modells bestehen", () => {
-    expect(evaluateFixture(dogFixture(), under({ requireModelSide: true })).rejectedBy)
+  /** Das zweite Beispiel: Tolima ist nicht der Modelltipp und trägt deshalb das Abzeichen. */
+  it("zeigt eine Partie gegen den Modelltipp mit Abzeichen", () => {
+    const base = fixture();
+    const tolima: DashboardFixture = {
+      ...base,
+      homeTeam: "Once Caldas", awayTeam: "Deportes Tolima",
+      form: {
+        scope: "venue",
+        home: ["loss", "win", "loss", "win", "win"],
+        away: ["loss", "win", "loss", "win", "loss"],
+        homeMatches: [], awayMatches: []
+      },
+      h2h: h2h(["loss", "loss", "loss", "loss", "draw"]),
+      table: [
+        { position: 12, teamName: "Once Caldas", played: 8, wins: 2, draws: 3, losses: 3, points: 9, goalsFor: 12, goalsAgainst: 11 },
+        { position: 3, teamName: "Deportes Tolima", played: 8, wins: 5, draws: 1, losses: 2, points: 16, goalsFor: 12, goalsAgainst: 9 }
+      ],
+      scores: { favorite: 3, draw: 38 },
+      markets: [
+        { ...base.markets[0]!, pick: "1", odds: 2, oddsHome: 2, oddsAway: 3.4, probability: 0.401 },
+        { ...base.markets[0]!, key: "draw", pick: null, odds: 3.2, probability: 0.28 }
+      ]
+    };
+    const evaluation = evaluateFixture(tolima, dom());
+    expect(evaluation.passes).toBe(true);
+    expect(evaluation.side).toBe("2");
+    expect(evaluation.odds).toBe(3.4);
+    expect(evaluation.dominanz?.modelAgrees).toBe(false);
+    // Auf der strengen Stufe fällt diese Klasse weg - dort greift schon der Quotendeckel bei
+    // 2,50, und darunter stünde ohnehin das Modellseiten-Tor.
+    expect(evaluateFixture(tolima, applyLevel(DEFAULT_DOMINANZ_SETTINGS, "streng")).passes).toBe(false);
+    // Ohne den Deckel bleibt der Grund die Modellseite.
+    expect(evaluateFixture(tolima, { ...applyLevel(DEFAULT_DOMINANZ_SETTINGS, "streng"), maxOdds: 99 }).rejectedBy)
       .toBe("modellDagegen");
   });
 
-  it("lehnt ohne brauchbare Quote ab", () => {
-    const noOdds = dogFixture({ markets: market({ pick: "1", odds: null }) });
-    expect(evaluateFixture(noOdds, under()).rejectedBy).toBe("keineQuote");
+  it("lehnt eine Partie ohne 1X2-Tipp ab", () => {
+    expect(evaluateFixture(alwaysReady({ markets: market({ pick: null }) }), dom()).rejectedBy)
+      .toBe("keinTipp");
   });
 
-  /** Die Stufen müssen von streng nach weit durchlässiger werden. */
+  it("lehnt eine Partie ohne Tabelle ab", () => {
+    expect(evaluateFixture(alwaysReady({ table: undefined }), dom()).rejectedBy).toBe("keineTabelle");
+  });
+
+  it("lehnt ab, wenn keine Seite den Tabellenvorsprung hat", () => {
+    const eng = alwaysReady({
+      table: [
+        { position: 3, teamName: "Nacional Potosí", played: 19, wins: 10, draws: 4, losses: 5, points: 34, goalsFor: 30, goalsAgainst: 24 },
+        { position: 2, teamName: "Always Ready", played: 19, wins: 11, draws: 3, losses: 5, points: 36, goalsFor: 43, goalsAgainst: 13 }
+      ]
+    });
+    expect(evaluateFixture(eng, dom()).rejectedBy).toBe("tabelle");
+  });
+
+  /**
+   * Die Bilanz muss je Spiel gerechnet werden: Bei ungleicher Spielzahl käme eine Rohzahl auf
+   * das falsche Vorzeichen. Hier hat die gestützte Seite absolut mehr Siege+Remis, anteilig
+   * aber weniger.
+   */
+  it("rechnet die Bilanz je Spiel, nicht als Rohzahl", () => {
+    // Always Ready hat absolut mehr Spiele ohne Niederlage (14 gegen 9), anteilig aber
+    // weniger (60 % gegen 90 %). Punkte je Spiel und Platz reichen trotzdem für den Kandidaten.
+    const ungleich = alwaysReady({
+      table: [
+        { position: 7, teamName: "Nacional Potosí", played: 10, wins: 4, draws: 5, losses: 1, points: 17, goalsFor: 20, goalsAgainst: 18 },
+        { position: 2, teamName: "Always Ready", played: 20, wins: 14, draws: 0, losses: 6, points: 42, goalsFor: 43, goalsAgainst: 13 }
+      ]
+    });
+    const evaluation = evaluateFixture(ungleich, dom());
+    // 14 von 20 sind 70 %, 9 von 10 sind 90 % - der Vorsprung ist negativ, obwohl die
+    // Rohzahl (14 gegen 9) das Gegenteil nahelegt.
+    expect(evaluation.superiority!.nonLossGap).toBeLessThan(0);
+    expect(evaluation.rejectedBy).toBe("bilanz");
+  });
+
+  it("hält sich an das Quotenband", () => {
+    const teuer = alwaysReady({
+      markets: [
+        { ...fixture().markets[0]!, pick: "2", odds: 5, oddsHome: 1.4, oddsAway: 5 },
+        { ...fixture().markets[0]!, key: "draw", pick: null, odds: 4 }
+      ]
+    });
+    expect(evaluateFixture(teuer, dom()).rejectedBy).toBe("quote");
+    expect(evaluateFixture(alwaysReady(), dom({ minOdds: 2.5 })).rejectedBy).toBe("quote");
+  });
+
+  it("verlangt die Serie in den direkten Duellen", () => {
+    expect(evaluateFixture(alwaysReady({ h2h: h2h(["loss", "win", "loss"]) }), dom()).rejectedBy)
+      .toBe("serie");
+    expect(evaluateFixture(alwaysReady({ h2h: h2h([]) }), dom()).rejectedBy).toBe("keineDuelle");
+    // Auf der weitesten Stufe ist das Tor aus.
+    expect(evaluateFixture(alwaysReady({ h2h: h2h([]) }), applyLevel(DEFAULT_DOMINANZ_SETTINGS, "weit")).passes)
+      .toBe(true);
+  });
+
   it("wird von streng nach weit durchlässiger", () => {
-    const fixtures = [dogFixture({ fixtureId: 1 }), dogFixture({ fixtureId: 2, h2h: h2h(["win", "win", "win"]) })];
-    const counts = UNDERDOG_LEVELS.map((level) =>
-      applyQuickpick(fixtures, applyLevel(DEFAULT_UNDERDOG_SETTINGS, level.id)).report.passed);
+    const fixtures = [
+      alwaysReady({ fixtureId: 1 }),
+      alwaysReady({ fixtureId: 2, h2h: h2h(["loss", "win", "loss"]) })
+    ];
+    const counts = DOMINANZ_LEVELS.map((level) =>
+      applyQuickpick(fixtures, applyLevel(DEFAULT_DOMINANZ_SETTINGS, level.id)).report.passed);
     expect(counts).toEqual([...counts].sort((left, right) => left - right));
   });
 
-  /** Der Ertrag steht auf dem Knopf, nicht die Trefferquote - es ist eine Einzelwette. */
   it("beschriftet die Stufen mit dem Ertrag", () => {
-    expect(UNDERDOG_LEVELS.every((level) => level.measured !== null)).toBe(true);
-    const streng = UNDERDOG_LEVELS.find((level) => level.id === "streng")!;
-    expect(QUICKPICK_PRESETS.underdog.noteOf(streng.measured)).toMatch(/ROI$/);
+    const streng = DOMINANZ_LEVELS.find((level) => level.id === "streng")!;
+    expect(QUICKPICK_PRESETS.dominanz.noteOf(streng.measured)).toMatch(/ROI$|zurückgerechnet$/);
   });
 });

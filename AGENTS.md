@@ -314,7 +314,7 @@ andere ausdrücklich nicht.
 - Er liest ausschließlich den geladenen Snapshot und kostet **kein API-Budget**;
   `src/quickpick-*.ts`, `frontend/src/quickpick.ts` und `frontend/src/quickpickColumns.tsx`
   enthalten weder `fetch` noch `useEffect`.
-- Die Regeln stehen in `src/quickpick-daves.ts` und `src/quickpick-underdog.ts`, das
+- Die Regeln stehen in `src/quickpick-daves.ts` und `src/quickpick-dominanz.ts`, das
   gemeinsame Gerüst in `src/quickpick-core.ts`, zusammengeführt in `src/quickpick.ts`. Dort
   liegt auch die Weiche `evaluateFixture`. Importpfad für App, Tests und Rückrechnung bleibt
   `src/quickpick.ts` - dieselbe Begründung wie bei `autoDecide`.
@@ -373,8 +373,8 @@ andere ausdrücklich nicht.
   Punkte >= 70 allein 61,4 %, Venue-Form allein 50,8 %, H2H-Veto allein 46,7 % - letzteres
   trägt zur Trefferquote also nichts bei und steht dort, damit der Filter hält, was er zusagt.
 - Gegen die **Modellseite** wird *hier* nicht getippt: Solche Zeilen lagen in der Rückrechnung
-  bei 29,5 % Treffern. Für die Voreinstellung „Underdog" gilt das Gegenteil - dort ist der
-  Widerspruch zum Markt der Zweck.
+  bei 29,5 % Treffern. Die Voreinstellung „Dominanz" lässt sie zu, markiert sie aber - dort
+  bestimmen die Kriterien die Seite, nicht der Modelltipp.
 - Die Regel steht in `src/quickpick.ts`, nicht im Frontend - dort, wo auch der Backtest sie
   aufruft. `frontend/src/quickpick.ts` reicht sie durch und hält nur das Laden und Speichern
   der Einstellungen. Dieselbe Begründung wie bei `autoDecide`: Eine zweite Fassung im Frontend
@@ -389,55 +389,72 @@ andere ausdrücklich nicht.
 - **Nachkalibrieren mit `npm run quickpick-report`** (mit `--preset <id>` auch einzeln): Der
   Report rechnet jede Stufe **jeder** Voreinstellung zurück, vergleicht das Ergebnis mit den
   Zahlen auf den Knöpfen und meldet eine Abweichung. Die Toleranz richtet sich nach dem
-  Maßstab: 3 Punkte Trefferquote bei Daves, 5 Punkte Ertrag beim Außenseiter. Er hält seinen Stand in `docs/quickpick-kalibrierung.json` und nennt,
+  Maßstab: 3 Punkte Trefferquote bei Daves, 5 Punkte Ertrag bei der Dominanz. Er hält seinen Stand in `docs/quickpick-kalibrierung.json` und nennt,
   wie viele Partien seit dem letzten Kalibrierpunkt dazugekommen sind; fällig ist die
   Nachkalibrierung alle **2.000 abgerechneten Partien**. Mit `--write` wird ein neuer Punkt
-  festgehalten. Kostet kein API-Budget. Stand 16.09.2026: streng 2,4/Tag bei 70,5 %,
-  ausgewogen 5,0 bei 68,7 %, locker 6,7 bei 63,0 %, weit 9,5 bei 58,3 %.
-### „Underdog": ein Sucher, keine Tippregel
+  festgehalten. Kostet kein API-Budget. Stand 16.09.2026 (Daves): streng 2,4/Tag bei 71,0 %,
+  ausgewogen 4,9 bei 69,1 %, locker 6,6 bei 63,8 %, weit 9,4 bei 59,1 %.
+- **Abgerechnet wird zu dem Preis, den die App zeigte**, also zu dem aus dem Snapshot. Nur wo
+  die Regel ihn schätzen musste (Läufe vor `schemaVersion: 5` führen für die Gegenseite keinen),
+  tritt der archivierte Tipico-Preis an seine Stelle - eine Schätzung taugt nicht als
+  Abrechnungskurs. Der Report nennt in seiner Fußzeile, wie oft beide übereinstimmen: bei Daves
+  94,4 %, bei der Dominanz 83,6 %.
+- **Die Kombi-Tabelle zieht über `--kombi-tage <n>`, Vorgabe 2**, nicht über den Kalendertag.
+  Ein Analyse-Lauf umfasst üblicherweise zwei Tage, und bei drei bis fünf Treffern am Tag
+  entstehen für fünf bis sieben Beine sonst überhaupt keine Zahlen.
+### „Dominanz zum Kombipreis": die Seite folgt den Kriterien
 
-- Gesucht sind Partien, in denen der Markt eine Mannschaft deutlich schlechter einschätzt,
-  obwohl Form und direkte Duelle für sie sprechen. Gestützt wird die **teurere** Seite - hier
-  darf die Auswahl vom Modelltipp abweichen. Maßstab ist der **Ertrag je Bein**, nicht die
-  Quotenhöhe: David baut daraus kurze Kombis über zwei bis fünf Partien, und eine Kombi
-  multipliziert genau diesen Wert.
-- **Eine Kombi multipliziert den Ertrag je Bein, nicht die Quote.** Eine hohe Gesamtquote macht
-  den Gewinn seltener, nicht größer. Der Report druckt deshalb je Stufe eine Kombi-Tabelle mit
-  zwei Spalten nebeneinander: `Ertrag` (gemessen) und `erwartet` = `(1 + Ertrag je Bein)^Beine`.
-  Laufen sie auseinander, ist die Stichprobe zu dünn - bei 32 % Treffern je Bein gewinnt eine
-  Viererkombi nur jede 150. Wette. Gemessen auf der Vorgabestufe: Zweierkombi −0,6 %,
-  Dreier −24,1 %, Vierer −26,4 %, Fünfer −49,9 % gegenüber einer Erwartung von +7 bis +19 %.
-  Zum Vergleich bei „Daves 1x2-Filter": Zweier +5,5 %, Dreier +9,4 %, Vierer +13,2 % gegenüber
-  einer Erwartung von +4,5 bis +9,1 % - dort deckt sich beides, weil die Trefferquote je Bein
-  hoch genug für eine belastbare Messung ist.
-- **Die These trägt nicht, und das muss in jeder Aussage darüber stehen.** Rückrechnung über
-  4.397 abgerechnete Partien (16.08.-15.09.2026), gewettet zum echten Tipico-Preis: jeder
-  Außenseiter 23,0 % Treffer bei -14,1 % Ertrag; nur Formvorsprung 26,7 % / -10,6 %; nur H2H
-  24,2 % / -17,2 %; **beides zusammen 25,9 % über 143 Wetten bei -18,8 %**; Kontrollgruppe ohne
-  beides 21,9 % / -13,9 %. Die Kriterien heben die Trefferquote, wählen aber die **kürzer
-  bezahlten** Außenseiter - der Preis fällt stärker, als die Trefferquote steigt. **Keine
-  Variante schlug das blinde Wetten auf Außenseiter.**
-- Der einzige groß gemessene Effekt ist der **Favorite-Longshot-Bias**: Quoten über 4,00
-  liefern -20,2 %, das Band 2,50-4,00 nur -9,8 %. Daher das Quotenband - nicht als Vorteil,
-  sondern als das kleinere Übel.
-- Die Stufen der gebauten Regel (Stand 16.09.2026, eigene Messung über `quickpick-report`):
-  streng 3,8/Tag bei **-15,3 %**, ausgewogen 9,6/Tag bei **+3,5 %**, locker 58,9/Tag bei
-  -6,3 %, weit 116,4/Tag bei -13,7 %. **Die Vorgabe ist `ausgewogen`**: Das H2H-Tor der strengen
-  Stufe kostet rund 19 Punkte Ertrag je Bein, und weil eine Kombi genau diesen Wert
-  multipliziert, wiegt er hier schwerer als bei einer Einzelwette. Die strenge Stufe bleibt
-  einen Klick entfernt und trägt ihre Zahl auf dem Knopf.
-- **Nicht einbauen:** Der Modellvorteil auf den Außenseiter (Modellwahrscheinlichkeit gegen
-  Marktwahrscheinlichkeit) zeigt gemessen in die **falsche** Richtung - Zeilen mit „Value"
-  liegen bei -13,9 %, Zeilen ohne bei -11,4 %. Er gehört als Spalte in die Anzeige, nie in ein
-  Tor. Ebenso ohne Nutzen: die Einschränkung auf Partien, in denen auch das Modell den
-  Außenseiter tippt (268 Partien in 30 Tagen, -13,3 %).
-- `scores.favorite` gilt nur für die Modellseite und taugt deshalb hier weder als Spalte noch
-  als Tor. Die **Wahrscheinlichkeit** der Gegenseite ist dagegen exakt rekonstruierbar:
-  `1 − p(1X2) − p(Remis)`.
-- Die Rückrechnung des Außenseiters nutzt die vollständigen Quoten aus
-  `tipico_fixtures.odds_json`. Dort steht je Partie nur der **letzte** Preis vor Anpfiff -
-  abgerechnet wird also nicht zwingend zu dem Preis, den die App im Moment des Snapshots
-  zeigte. Der Report sagt das in seiner Kopfzeile.
+- Gesucht sind Partien wie **Nacional Potosí – Always Ready** oder **Once Caldas – Deportes
+  Tolima**: eine Mannschaft, die die letzten direkten Duelle gewann, in der Tabelle klar vorn
+  steht und die bessere Siege-plus-Remis-Bilanz hat - und die **trotzdem 1,80 oder mehr**
+  bezahlt, damit kurze Kombis über fünf bis sieben Beine daraus entstehen. Maßstab ist der
+  **Ertrag je Bein**, nicht die Quotenhöhe.
+- **Die gestützte Seite ergibt sich aus den Kriterien, nicht aus dem Modelltipp.** Punkte- und
+  Platzvorsprung sind antisymmetrisch, es kann also höchstens eine Seite bestehen. Zeilen gegen
+  den Modelltipp werden mitgezeigt und mit dem Abzeichen „Modell dagegen" markiert; die Stufe
+  `streng` schließt sie über `requireModelSide` aus.
+- **Die Venue-Form ist hier bewusst kein Tor, nur eine Spalte.** Beide Beispiele scheitern an
+  einem Formvergleich (Always Ready 66,7 % gegen 80 %, Tolima 40 % gegen 60 %), weil die
+  auswärts spielende Seite dort strukturell schlechter dasteht. Was David „Form" nennt, ist die
+  **Saisonbilanz aus der Tabelle**: `(Siege + Remis) / Spiele`, in `superiorityOf` als
+  `nonLossGap` in Prozentpunkten. Wer das Formtor wieder einbaut, entfernt genau die Partien,
+  um die es geht - der Regressionstest in `src/quickpick.test.ts` hält das fest.
+- **Die Kerntore staffeln nie**: `minPointsPerGame` 0,3, `minPositionGap` 3, `minNonLossGap` 10
+  sind die Identität der Voreinstellung. Gestaffelt werden nur Quotenband, Serienlänge und die
+  Modellseite.
+- **Die These trägt nicht, und das muss in jeder Aussage darüber stehen.** Vorabmessung über 56
+  archivierte Läufe und 5.754 Kandidatenseiten mit Tabelle und echtem Tipico-Tripel: Der Kern
+  trifft im Band 1,00-1,50 in **73,8 %** der Fälle gegenüber 37,2 % ohne jeden Filter - aber ab
+  3,00 nur noch 17,3 % bei -42,0 % Ertrag. **Die Trefferquote folgt der Quote fast exakt; der
+  Markt preist diese Kriterien ein.** Keine Variante lag über null.
+- Die Stufen der **gebauten** Regel (Stand 16.09.2026, eigene Messung über `quickpick-report`):
+  streng 3,4/Tag bei **-11,7 %**, ausgewogen 5,0 bei **-11,4 %**, locker 9,4 bei -10,6 %, weit
+  40,1 bei -12,1 %. Bei rund zehn Punkten Streuung je Stufe sind diese vier Zahlen
+  **untereinander nicht trennbar** - wer eine Stufe als „die bessere" verkauft, überliest die
+  Streuung. Vorgabe ist `ausgewogen`: gleicher gemessener Ertrag bei anderthalbmal so vielen
+  Partien.
+- **Die Zahlen der Vorabmessung dürfen nicht auf die Stufen geschrieben werden.** Die Zelle
+  „Kern + Serie >= 2 + Modellseite, 1,8-2,5" maß -4,1 %, die gebaute Stufe `streng` misst
+  -11,7 % - beides innerhalb einer Standardabweichung, aber ein anderer Schätzer: Die
+  Vorabmessung las das Quotenband aus dem archivierten Tripel, die Regel liest es aus dem
+  Snapshot, und beide decken sich nur in 83,6 % der Fälle. Verbindlich ist immer, was der
+  Report an der gebauten Regel misst.
+- **Kurze Kombis kosten mehr, nicht weniger.** Aus der Vorgabestufe, gezogen über zwei
+  Spieltage: Zweier -21,1 %, Dreier -34,5 %, Vierer -48,6 %, Fünfer **-60,1 %** bei 0,9 %
+  Trefferquote, Siebener 0 Treffer in 600 Ziehungen. Eine Kombi multipliziert den Ertrag je
+  Bein; die Spalte `erwartet` = `(1 + Ertrag je Bein)^Beine` steht im Report daneben, damit
+  auffällt, wenn die Stichprobe zu dünn ist.
+- **Nicht einbauen:** Ein Value-Tor über die Modellwahrscheinlichkeit gegen den Markt zeigte
+  schon beim Vorgänger „Underdog" in die falsche Richtung. `scores.favorite` gilt nur für die
+  Modellseite und taugt hier weder als Spalte noch als Tor; die **Wahrscheinlichkeit** der
+  Gegenseite ist dagegen exakt rekonstruierbar: `1 − p(1X2) − p(Remis)`.
+- **Die Quote der gestützten Seite kommt aus `oddsHome`/`oddsAway`** des 1X2-Marktes
+  (`schemaVersion: 5`). Ältere Läufe führen sie nicht; dort greift `counterOddsOf` mit dem
+  gemessenen Buchmacherzuschlag `TIPICO_BOOK`. `DominanzDetail.oddsSource` sagt, welcher Weg
+  gegriffen hat.
+- **`h2hSummary` filtert keine Testspiele.** Eine „Serie 3" kann auf einem Freundschaftsspiel
+  stehen. Der Spaltentitel sagt das; eine Korrektur wäre eine Backend-Änderung an
+  `src/h2h.ts` und träfe auch die Remis-Punkte.
 
 ### Verdrahtung
 

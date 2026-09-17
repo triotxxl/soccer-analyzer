@@ -1329,26 +1329,15 @@ function Dashboard({ document }: { document: DashboardDocument }) {
     onSettingsChange={(next) => setQuickpickStore((store) => withSettings(store, next))}
     onPresetChange={(preset: QuickpickPresetId) => setQuickpickStore((store) => ({ ...store, aktiv: preset }))}
     onActiveChange={setQuickpickActive}
-    onAddAll={(hits) => {
-      // Der Weg, für den der Filter gedacht ist: Treffer in den Wettschein, dort Kombis
-      // bauen. Deshalb schließt der Quickpicker sich dabei und der Wettschein geht auf.
-      for (const hit of hits) {
-        const market = marketFor(hit, "1x2");
-        if (market) addEntry(toCartEntry(hit, market));
+    onAddAll={(rows) => {
+      // Die gestützte Seite muss in den Schein, nicht der Modelltipp: Bei „Dominanz" können
+      // die beiden auseinanderfallen, und dann wäre der Eintrag schlicht die falsche Wette.
+      for (const row of rows) {
+        if (row.evaluation.side === null) continue;
+        addEntry(toQuickpickCartEntry(row.fixture, row.evaluation.side, row.evaluation.odds, null));
       }
       setQuickpickOpen(false);
       setBuilderOpen(true);
-    }}
-    onAddOne={(row) => {
-      // Einzeln statt gesammelt: Beim Außenseiter-Sucher würde eine Kombi den gemessenen
-      // Verlust je Bein multiplizieren. Der Schein bleibt offen, damit weitere folgen können.
-      if (row.evaluation.side === null) return;
-      addEntry(toQuickpickCartEntry(
-        row.fixture,
-        row.evaluation.side,
-        row.evaluation.odds,
-        row.evaluation.underdog?.probability ?? null
-      ));
     }}
     onClose={() => setQuickpickOpen(false)}
   />}

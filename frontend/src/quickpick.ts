@@ -7,12 +7,12 @@
 export * from "../../src/quickpick.ts";
 import {
   DEFAULT_QUICKPICK_SETTINGS,
-  DEFAULT_UNDERDOG_SETTINGS,
+  DEFAULT_DOMINANZ_SETTINGS,
   QUICKPICK_PRESETS,
   type DavesQuickpickSettings,
   type QuickpickPresetId,
   type QuickpickSettings,
-  type UnderdogQuickpickSettings
+  type DominanzQuickpickSettings
 } from "../../src/quickpick.ts";
 
 const STORAGE_KEY = "football-analyzer:quickpick-settings";
@@ -25,13 +25,13 @@ const STORAGE_KEY = "football-analyzer:quickpick-settings";
 export interface QuickpickStore {
   aktiv: QuickpickPresetId;
   daves1x2: DavesQuickpickSettings;
-  underdog: UnderdogQuickpickSettings;
+  dominanz: DominanzQuickpickSettings;
 }
 
 export const DEFAULT_QUICKPICK_STORE: QuickpickStore = {
   aktiv: "daves1x2",
   daves1x2: DEFAULT_QUICKPICK_SETTINGS,
-  underdog: DEFAULT_UNDERDOG_SETTINGS
+  dominanz: DEFAULT_DOMINANZ_SETTINGS
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -67,17 +67,24 @@ export function loadQuickpickStore(): QuickpickStore {
 
     // Altbestand: ein flaches Objekt aus der Zeit mit nur einer Voreinstellung. Es beschreibt
     // Daves' Regler und wandert unverändert in dessen Zweig, statt verworfen zu werden.
-    if (parsed.daves1x2 === undefined && parsed.underdog === undefined) {
+    // `underdog` muss hier mitgeprüft werden, sonst gälte ein Stand aus der Außenseiter-Zeit
+    // als flacher Altbestand und wanderte komplett in den Daves-Zweig.
+    if (parsed.daves1x2 === undefined && parsed.dominanz === undefined && parsed.underdog === undefined) {
       return { ...DEFAULT_QUICKPICK_STORE, daves1x2: mergeBranch(DEFAULT_QUICKPICK_SETTINGS, parsed) };
     }
 
-    const aktiv = typeof parsed.aktiv === "string" && parsed.aktiv in QUICKPICK_PRESETS
-      ? parsed.aktiv as QuickpickPresetId
+    // Die abgelöste Voreinstellung „underdog": Ihr Zweig wird gelesen und **verworfen**, nicht
+    // übernommen. Die Feldnamen überschneiden sich (`minOdds`, `maxOdds`), und ihr gespeichertes
+    // Quotenband 2,50-4,00 würde den Benutzer still in einen Bereich setzen, der -42 % misst.
+    // Nur die Auswahl wandert mit, damit niemand unbemerkt wieder auf Daves landet.
+    const gemerkt = parsed.aktiv === "underdog" ? "dominanz" : parsed.aktiv;
+    const aktiv = typeof gemerkt === "string" && gemerkt in QUICKPICK_PRESETS
+      ? gemerkt as QuickpickPresetId
       : "daves1x2";
     return {
       aktiv,
       daves1x2: mergeBranch(DEFAULT_QUICKPICK_SETTINGS, parsed.daves1x2),
-      underdog: mergeBranch(DEFAULT_UNDERDOG_SETTINGS, parsed.underdog)
+      dominanz: mergeBranch(DEFAULT_DOMINANZ_SETTINGS, parsed.dominanz)
     };
   } catch {
     return DEFAULT_QUICKPICK_STORE;
@@ -95,13 +102,13 @@ export function saveQuickpickStore(store: QuickpickStore): void {
 
 /** Die Einstellungen der gerade gewählten Voreinstellung. */
 export function settingsOf(store: QuickpickStore): QuickpickSettings {
-  return store.aktiv === "underdog" ? store.underdog : store.daves1x2;
+  return store.aktiv === "dominanz" ? store.dominanz : store.daves1x2;
 }
 
 /** Legt geänderte Einstellungen in ihren eigenen Zweig zurück. */
 export function withSettings(store: QuickpickStore, settings: QuickpickSettings): QuickpickStore {
-  return settings.preset === "underdog"
-    ? { ...store, underdog: settings }
+  return settings.preset === "dominanz"
+    ? { ...store, dominanz: settings }
     : { ...store, daves1x2: settings };
 }
 
