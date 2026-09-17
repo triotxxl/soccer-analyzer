@@ -404,6 +404,21 @@
     "country": "Dominican-Republic",
     "league": "Liga Mayor"
   },
+  "ecuador|ligapro primera a abstiegsrunde": {
+    "leagueId": 242,
+    "country": "Ecuador",
+    "league": "Liga Pro"
+  },
+  "ecuador|ligapro primera a meisterschaftsrunde": {
+    "leagueId": 242,
+    "country": "Ecuador",
+    "league": "Liga Pro"
+  },
+  "ecuador|ligapro primera a platzierungsrunde": {
+    "leagueId": 242,
+    "country": "Ecuador",
+    "league": "Liga Pro"
+  },
   "ecuador|ligapro primera a primera etapa": {
     "leagueId": 242,
     "country": "Ecuador",
@@ -695,6 +710,11 @@
     "league": "Premier Division"
   },
   "island|1 deild": {
+    "leagueId": 165,
+    "country": "Iceland",
+    "league": "1. Deild"
+  },
+  "island|1 deild promotion playoff": {
     "leagueId": 165,
     "country": "Iceland",
     "league": "1. Deild"

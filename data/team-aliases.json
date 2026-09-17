@@ -1409,6 +1409,11 @@
     "apiTeamId": 5217,
     "apiTeamName": "Bulawayo Chiefs"
   },
+  "buriram united fc": {
+    "tipicoName": "Buriram United FC",
+    "apiTeamId": 2780,
+    "apiTeamName": "Buriram United"
+  },
   "busan ipark fc": {
     "tipicoName": "Busan IPark FC",
     "apiTeamId": 2752,
@@ -2949,6 +2954,11 @@
     "apiTeamId": 24757,
     "apiTeamName": "Durban City"
   },
+  "dux logrono f": {
+    "tipicoName": "DUX Logrono (F)",
+    "apiTeamId": 1923,
+    "apiTeamName": "Edf Logrono W"
+  },
   "dynamo kiew": {
     "tipicoName": "Dynamo Kiew",
     "apiTeamId": 572,
@@ -3274,6 +3284,11 @@
     "apiTeamId": 8057,
     "apiTeamName": "Azam"
   },
+  "fc badalona f": {
+    "tipicoName": "FC Badalona (F)",
+    "apiTeamId": 19896,
+    "apiTeamName": "FC Levante Badalona W"
+  },
   "fc banik ostrava": {
     "tipicoName": "FC Banik Ostrava",
     "apiTeamId": 3713,
@@ -3358,6 +3373,11 @@
     "tipicoName": "FC Canberra Croatia",
     "apiTeamId": 1448,
     "apiTeamName": "Canberra FC"
+  },
+  "fc changchun yatai": {
+    "tipicoName": "FC Changchun Yatai",
+    "apiTeamId": 834,
+    "apiTeamName": "Changchun Yatai"
   },
   "fc chelsea": {
     "tipicoName": "FC Chelsea",
@@ -4158,6 +4178,11 @@
     "tipicoName": "FC Utrecht",
     "apiTeamId": 207,
     "apiTeamName": "Utrecht"
+  },
+  "fc valencia f": {
+    "tipicoName": "FC Valencia (F)",
+    "apiTeamId": 1909,
+    "apiTeamName": "Valencia W"
   },
   "fc van": {
     "tipicoName": "FC VAN",
@@ -7384,6 +7409,11 @@
     "apiTeamId": 24707,
     "apiTeamName": "Pamba Jiji"
   },
+  "panionios athen": {
+    "tipicoName": "Panionios Athen",
+    "apiTeamId": 622,
+    "apiTeamName": "Panionios"
+  },
   "panseraikos 1964": {
     "tipicoName": "Panseraikos 1964",
     "apiTeamId": 2099,
@@ -8524,6 +8554,11 @@
     "apiTeamId": 3854,
     "apiTeamName": "Shelbourne"
   },
+  "shenzhen juniors fc": {
+    "tipicoName": "Shenzhen Juniors FC",
+    "apiTeamId": 23265,
+    "apiTeamName": "Shenzhen Juniors"
+  },
   "shenzhen peng city": {
     "tipicoName": "Shenzhen Peng City",
     "apiTeamId": 5686,
@@ -9228,6 +9263,11 @@
     "tipicoName": "Tochigi City FC",
     "apiTeamId": 7145,
     "apiTeamName": "Tochigi City"
+  },
+  "tofta itrottarfelag b68": {
+    "tipicoName": "Tofta Itrottarfelag B68",
+    "apiTeamId": 4186,
+    "apiTeamName": "B68"
   },
   "tonota fc": {
     "tipicoName": "Tonota FC",
