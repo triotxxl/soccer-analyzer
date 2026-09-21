@@ -64,7 +64,7 @@ describe("Kelly-Eingabefelder", () => {
     const user = userEvent.setup();
     render(<Harness initial={{ minEdge: 0 }} />);
     await openSettings();
-    const input = field("Mindest-Edge (PP)");
+    const input = field("Mindest-Vorsprung (Edge, Punkte)");
     expect(input.value).toBe("0");
 
     await user.clear(input);
@@ -156,9 +156,9 @@ describe("Aufbau des Dialogs", () => {
 
   it("erklärt die Begriffe erst auf Nachfrage", async () => {
     render(<Harness />);
-    expect(screen.queryByText(/ungedeckelte Wert/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Wert ohne Grenzen/)).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Was bedeuten diese Zahlen?" }));
-    expect(screen.getByText(/ungedeckelte Wert/)).toBeInTheDocument();
+    expect(screen.getByText(/Wert ohne Grenzen/)).toBeInTheDocument();
   });
 });
 
@@ -217,26 +217,26 @@ describe("Automatik-Modus", () => {
     await openSettings();
     expect(field("Budget (€)")).toBeInTheDocument();
     // Das Feld traegt einen Erklaertext, der in den zugaenglichen Namen einfliesst.
-    expect(screen.getByLabelText(/Kelly-Fraktion/)).toBeInTheDocument();
-    expect(screen.queryByLabelText("Mindest-Edge (PP)")).not.toBeInTheDocument();
+    expect(screen.getByLabelText(/Kelly-Anteil/)).toBeInTheDocument();
+    expect(screen.queryByLabelText("Mindest-Vorsprung (Edge, Punkte)")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Cross-League ausschließen")).not.toBeInTheDocument();
   });
 
   it("lässt sich auf die manuelle Einstellung zurückschalten", async () => {
     render(<Harness profile={profileFor("btts")} auto />);
     await openSettings();
-    expect(screen.queryByLabelText("Mindest-Edge (PP)")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Mindest-Vorsprung (Edge, Punkte)")).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Manuell" }));
-    expect(screen.getByLabelText("Mindest-Edge (PP)")).toBeInTheDocument();
+    expect(screen.getByLabelText("Mindest-Vorsprung (Edge, Punkte)")).toBeInTheDocument();
   });
 
   it("begründet, warum die Korrektur greift", async () => {
     render(<Harness profile={profileFor("btts")} auto />);
-    expect(screen.getByText(/abgerechneten Zeilen/)).toBeInTheDocument();
+    expect(screen.getByText(/alten Wetten wirklich eingetreten/)).toBeInTheDocument();
     // Wie belastbar die Korrektur ist, steht hinter einem eigenen Aufklapper.
-    expect(screen.queryByText(/nicht als gewinnbringend nachgewiesen/)).not.toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Wie die Korrektur zustande kommt" }));
-    expect(screen.getByText(/nicht als gewinnbringend nachgewiesen/)).toBeInTheDocument();
+    expect(screen.queryByText(/dass sie gewinnt, ist/)).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Woher die Korrektur kommt" }));
+    expect(screen.getByText(/dass sie gewinnt, ist/)).toBeInTheDocument();
   });
 
   it("sperrt die Automatik, solange kein Profil vorliegt", async () => {
@@ -244,6 +244,6 @@ describe("Automatik-Modus", () => {
     expect(screen.getByRole("button", { name: "Automatik" })).toBeDisabled();
     // Ohne Messung bleibt der manuelle Modus aktiv, statt eine Empfehlung vorzutäuschen.
     await openSettings();
-    expect(screen.getByLabelText("Mindest-Edge (PP)")).toBeInTheDocument();
+    expect(screen.getByLabelText("Mindest-Vorsprung (Edge, Punkte)")).toBeInTheDocument();
   });
 });

@@ -13,7 +13,9 @@ import {
   type QuickpickPresetId,
   type QuickpickRejection,
   type QuickpickSettings,
-  type DominanzQuickpickSettings
+  type DominanzQuickpickSettings,
+  type Hz15QuickpickSettings,
+  type RemisQuickpickSettings
 } from "./quickpick";
 import { QUICKPICK_COLUMNS, type QuickpickRow } from "./quickpickColumns";
 import type { DashboardFixture } from "./types";
@@ -25,7 +27,7 @@ const formatSigned = (value: number) =>
 
 export function QuickpickButton({ active, onOpen }: { active: boolean; onOpen(): void }) {
   return <button className="kelly-trigger quickpick-trigger" aria-pressed={active}
-    aria-label="Quickpicker öffnen" title="Quickpicker: Partien nach einer Voreinstellung filtern"
+    aria-label="Quickpicker öffnen" title="Quickpicker: Spiele nach einem fertigen Filter aussuchen"
     onClick={onOpen}>
     <Funnel size={15} weight="bold" /> Quickpick
   </button>;
@@ -113,6 +115,14 @@ export function QuickpickDialog({
     if (settings.preset !== "dominanz") return;
     onSettingsChange({ ...settings, [key]: value });
   };
+  const setHz15 = <K extends keyof Hz15QuickpickSettings>(key: K, value: Hz15QuickpickSettings[K]) => {
+    if (settings.preset !== "hz15") return;
+    onSettingsChange({ ...settings, [key]: value });
+  };
+  const setRemis = <K extends keyof RemisQuickpickSettings>(key: K, value: RemisQuickpickSettings[K]) => {
+    if (settings.preset !== "remis") return;
+    onSettingsChange({ ...settings, [key]: value });
+  };
 
   const rejections = (Object.entries(report.rejected) as Array<[QuickpickRejection, number]>)
     .filter(([, count]) => count > 0)
@@ -141,7 +151,7 @@ export function QuickpickDialog({
       </div>
 
       <div className="kelly-body">
-        <div className="quickpick-presets" role="group" aria-label="Voreinstellung">
+        <div className="quickpick-presets" role="group" aria-label="Filter">
           {QUICKPICK_PRESET_LIST.map((entry) => <button key={entry.id}
             className={entry.id === preset.id ? "active" : ""}
             aria-pressed={entry.id === preset.id}
@@ -156,7 +166,7 @@ export function QuickpickDialog({
           </button>)}
         </div>
 
-        <section className="quickpick-preset" aria-label="Voreinstellung">
+        <section className="quickpick-preset" aria-label="Filter">
           <div className="quickpick-preset-head">
             <div>
               <strong>{preset.label}</strong>
@@ -176,17 +186,17 @@ export function QuickpickDialog({
           <div className="kelly-metric">
             <span className="kelly-metric-label">Treffer</span>
             <strong className="kelly-metric-value">{report.passed}</strong>
-            <span className="kelly-metric-note">von {report.evaluated} geprüften Partien</span>
+            <span className="kelly-metric-note">von {report.evaluated} geprüften Spielen</span>
           </div>
           <div className="kelly-metric" title={kennzahl.titel}>
             <span className="kelly-metric-label">{kennzahl.label}</span>
             <strong className="kelly-metric-value">{kennzahl.wert}</strong>
             <span className="kelly-metric-note">{kennzahl.notiz}</span>
           </div>
-          <div className="kelly-metric" title="Das Produkt aller Quoten in dieser Liste - also die Kombi über sämtliche Treffer.">
-            <span className="kelly-metric-label">Kombi aus allen</span>
+          <div className="kelly-metric" title="Die Quote, wenn du alle gefundenen Spiele in einen einzigen Schein legst. Alle Quoten miteinander multipliziert.">
+            <span className="kelly-metric-label">Alle in einem Schein</span>
             <strong className="kelly-metric-value">{withOdds.length === 0 ? "–" : formatOdd(comboOdds)}</strong>
-            <span className="kelly-metric-note">{withOdds.length} Beine · Ø {averageOdds === null ? "–" : formatOdd(averageOdds)}</span>
+            <span className="kelly-metric-note">{withOdds.length} Spiele · Ø {averageOdds === null ? "–" : formatOdd(averageOdds)}</span>
           </div>
         </div>
 
@@ -198,8 +208,8 @@ export function QuickpickDialog({
             {spielbar.length === 0 ? "Keine Treffer" : `Alle ${spielbar.length} in den Wettschein`}
           </button>
           {uebersprungen > 0 && <small className="quickpick-cart-note">
-            {uebersprungen} {uebersprungen === 1 ? "Zeile bleibt" : "Zeilen bleiben"} draußen –
-            {" "}gerechnete Quote, kein Preis. Nach dem nächsten Dashboard-Lauf fällt das weg.
+            {uebersprungen} {uebersprungen === 1 ? "Spiel bleibt" : "Spiele bleiben"} draußen –
+            {" "}dort ist die Quote nur geschätzt. Nach der nächsten Analyse fällt das weg.
           </small>}
         </div>
 
@@ -209,12 +219,12 @@ export function QuickpickDialog({
           Kombi den Ertrag je Bein multipliziert, nicht die Quote.
         */}
         {kombis.length > 0 && <section className="quickpick-kombis" aria-label="Kurze Kombis">
-          <strong>Was kurze Kombis aus dieser Stufe gebracht hätten</strong>
+          <strong>Was Kombis aus dieser Stufe gebracht hätten</strong>
           <table>
             <thead>
               <tr>
-                <th>Beine</th><th>Quote Ø</th><th>Treffer</th><th>Ertrag</th>
-                <th title="Was der Ertrag je Bein verspricht: (1 + Ertrag)^Beine − 1.">erwartet</th>
+                <th>Spiele</th><th>Quote Ø</th><th>geht durch</th><th>Gewinn</th>
+                <th title="Was bei diesem Gewinn je Tipp eigentlich herauskommen müsste.">erwartet</th>
               </tr>
             </thead>
             <tbody>
@@ -228,11 +238,11 @@ export function QuickpickDialog({
             </tbody>
           </table>
           <small>
-            Je Spieltag aus den Treffern gezogen, über die archivierten Läufe.
-            {" "}Weichen „Ertrag" und „erwartet" weit voneinander ab, ist nicht die Rechnung
-            falsch, sondern die Stichprobe zu dünn: Bei {formatPercent(measured?.trefferquote ?? 0)}
-            {" "}Treffern je Bein gewinnt eine Viererkombi nur selten, und ein Treffer mehr oder
-            weniger verschiebt den Ertrag um Dutzende Punkte.
+            An alten Spielen geprüft: je Spieltag zufällig Scheine aus den Treffern gebildet.
+            {" "}Liegen „Gewinn" und „erwartet" weit auseinander, waren es zu wenige Scheine –
+            {" "}bei {formatPercent(measured?.trefferquote ?? 0)} richtigen Tipps geht ein Schein
+            {" "}mit vier Spielen selten durch, und ein Treffer mehr oder weniger dreht die
+            {" "}Gewinnspalte komplett. Verlass dich auf „geht durch".
           </small>
         </section>}
 
@@ -249,6 +259,10 @@ export function QuickpickDialog({
                 : preset.levels.find((entry) => entry.id === activeLevel)!.label}
               {settings.preset === "daves1x2"
                 ? ` · Form ${settings.strongMinimum}/${settings.weakMaximum} · Punkte ab ${settings.minPoints}`
+                : settings.preset === "hz15"
+                ? ` · Quote bis ${formatOdd(settings.maxOdds)} · Tore ab ${settings.minExpectedGoals.toFixed(1).replace(".", ",")}`
+                : settings.preset === "remis"
+                ? ` · Quote bis ${formatOdd(settings.maxOdds)} · Remis ab ${(settings.minDrawProbability * 100).toFixed(0)} %`
                 : ` · Quote ${formatOdd(settings.minOdds)}–${formatOdd(settings.maxOdds)}`}
             </span>
           </button>
@@ -264,62 +278,96 @@ export function QuickpickDialog({
             </button>)}
             <p className="quickpick-levels-note">
               {preset.massstab === "roi"
-                ? "Tipps je Tag und Ertrag je Wette sind über die archivierten Läufe zurückgerechnet, zum echten Tipico-Preis des Außenseiters. Ein Ertrag unter null heißt: Auf Dauer kostet diese Auswahl Geld."
-                : "Tipps je Tag und Trefferquote je Bein sind über die archivierten Läufe zurückgerechnet. Eine Kombi multipliziert die Trefferquote je Bein – vier Beine zu 68,7 % gehen in 22 % der Fälle durch, zu 58,3 % nur noch in 12 %."}
+                ? "Alle Zahlen sind an alten Spielen geprüft. Ein Gewinn unter null heißt: Auf Dauer kostet dich diese Auswahl Geld."
+                : settings.preset === "hz15"
+                ? "Alle Zahlen sind an alten Spielen geprüft. Ohne Filter fallen nur in 35 von 100 Spielen zwei Tore bis zur Pause. In einer Kombi müssen alle Tipps stimmen: vier Spiele gehen in 9 von 100 Fällen durch, sechs Spiele in 2 von 100."
+                : settings.preset === "remis"
+                ? "Alle Zahlen sind an alten Spielen geprüft. Ohne Filter endet nur jedes vierte Spiel unentschieden. In einer Kombi müssen alle Tipps stimmen: vier Spiele gehen in 2 von 100 Fällen durch, sechs Spiele in 3 von 1.000."
+                : "Alle Zahlen sind an alten Spielen geprüft. In einer Kombi müssen alle Tipps stimmen: Bei 69 von 100 richtigen Tipps geht ein Schein mit vier Spielen in 22 von 100 Fällen durch, bei 58 von 100 nur noch in 12."}
             </p>
           </div>}
 
           {showSettings && settings.preset === "daves1x2" && <div className="kelly-settings-grid">
-            <NumberField label="Punkte je Spiel voraus" value={settings.minPointsPerGame} min={0} step={0.1}
-              hint="Vorsprung in der Ligatabelle. Gesetzt, nicht gemessen: Das Tor soll verhindern, dass zwei gleich starke Mannschaften als überlegen gelten."
+            <NumberField label="Punkte je Spiel mehr" value={settings.minPointsPerGame} min={0} step={0.1}
+              hint="Wie viele Punkte je Spiel die getippte Mannschaft mehr holt. Soll verhindern, dass zwei gleich starke Teams als überlegen gelten."
               onCommit={(value) => setDaves("minPointsPerGame", value)} />
-            <NumberField label="Tordifferenz voraus" value={settings.minGoalDifference} min={0} step={0.1}
-              hint="Vorsprung in der Tordifferenz je Spiel, ebenfalls aus der Ligatabelle."
+            <NumberField label="Torverhältnis besser" value={settings.minGoalDifference} min={0} step={0.1}
+              hint="Wie viel besser ihr Torverhältnis je Spiel ist, ebenfalls aus der Tabelle."
               onCommit={(value) => setDaves("minGoalDifference", value)} />
-            <NumberField label="Plätze voraus" value={settings.minPositionGap} min={0} step={1}
-              hint="Abstand in der Ligatabelle. Zusammen mit den beiden anderen Toren bildet er „klar überlegen“ ab."
+            <NumberField label="Plätze vorn" value={settings.minPositionGap} min={0} step={1}
+              hint="Wie viele Plätze sie in der Tabelle vorn liegt."
               onCommit={(value) => setDaves("minPositionGap", value)} />
-            <NumberField label="Starke Seite (%)" value={settings.strongMinimum} min={0} max={100} step={5}
-              hint="Formwert der getippten Seite aus Sieg 3, Remis 1, Niederlage 0 über die letzten fünf Spiele. 70 stammt aus npm run venue-form, dort über zehn Spiele gemessen. Mit 0 hier und 100 nebenan ist das Formtor aus."
+            <NumberField label="Getippte Mannschaft ab (%)" value={settings.strongMinimum} min={0} max={100} step={5}
+              hint="Wie stark die getippte Mannschaft zuletzt war, aus den letzten fünf Spielen: Sieg zählt 3, Remis 1, Niederlage 0. Mit 0 hier und 100 nebenan ist diese Bedingung aus."
               onCommit={(value) => setDaves("strongMinimum", value)} />
-            <NumberField label="Schwache Seite (%)" value={settings.weakMaximum} min={0} max={100} step={5}
-              hint="Höchstwert der Gegenseite. 50 stammt aus npm run venue-form. 100 schaltet diese Hälfte des Tores ab."
+            <NumberField label="Gegner höchstens (%)" value={settings.weakMaximum} min={0} max={100} step={5}
+              hint="Wie schwach der Gegner höchstens sein darf, gleiche Rechnung. 100 schaltet diese Hälfte ab."
               onCommit={(value) => setDaves("weakMaximum", value)} />
             <NumberField label="Mindestquote" value={settings.minOdds} min={1} step={0.05}
-              hint="Untergrenze, kein Ziel: Für eine Kombi zählt, dass das Bein durchkommt."
+              hint="Mindestquote. Eine Untergrenze, kein Ziel – für eine Kombi zählt, dass der Tipp durchkommt."
               onCommit={(value) => setDaves("minOdds", value)} />
-            <NumberField label="Mindestpunkte" value={settings.minPoints} min={0} max={100} step={5}
-              hint="Favoritenpunkte des Modells (0-100). Bänder: 50 schwach, 60 interessant, 70 stark, 80 sehr stark. Das stärkste einzelne Tor der Rückrechnung – 61,4 % Treffer allein gegenüber 47,2 % ohne jeden Filter."
+            <NumberField label="Modell sieht Favoriten ab" value={settings.minPoints} min={0} max={100} step={5}
+              hint="Wie stark das Modell den Favoriten sieht, von 0 bis 100. Grob: 50 schwach, 60 interessant, 70 stark, 80 sehr stark. Die wichtigste Bedingung – unter 70 stimmen deutlich weniger Tipps."
               onCommit={(value) => setDaves("minPoints", value)} />
             <SettingField label="Nur mit Siegesserie"
-              hint="Verlangt mindestens zwei gewonnene direkte Duelle in Folge. In der Rückrechnung trug die Serie nichts bei (58,3 % gegen 55,6 % ohne sie), deshalb ist sie aus."
+              hint="Verlangt mindestens zwei gewonnene direkte Duelle in Folge. Bringt geprüft nichts, deshalb ist es aus."
               children={<input type="checkbox" checked={settings.requireStreak}
                 onChange={(event) => setDaves("requireStreak", event.target.checked)} />} />
           </div>}
 
           {showSettings && settings.preset === "dominanz" && <div className="kelly-settings-grid">
             <NumberField label="Quote ab" value={settings.minOdds} min={1} step={0.1}
-              hint="Untergrenze des Quotenbands. Der Zweck ist die Kombi: Erst ab etwa 1,80 lohnt ein Bein die Mitnahme."
+              hint="Ab welcher Quote ein Spiel gezeigt wird. Erst ab etwa 1,80 lohnt es sich für eine Kombi."
               onCommit={(value) => setDominanz("minOdds", value)} />
             <NumberField label="Quote bis" value={settings.maxOdds} min={1} step={0.5}
-              hint="Obergrenze. 99 heißt: kein Deckel. Gemessen fällt die Trefferquote mit der Quote fast exakt mit – über 3,00 traf der Kern nur noch 17,3 % bei −42 % Ertrag."
+              hint="Bis zu welcher Quote. 99 heißt: keine Grenze. Je höher die Quote, desto seltener stimmt der Tipp – über 3,00 nur noch bei jedem sechsten Spiel."
               onCommit={(value) => setDominanz("maxOdds", value)} />
-            <NumberField label="Punkte je Spiel voraus" value={settings.minPointsPerGame} min={0} step={0.1}
-              hint="Vorsprung in der Ligatabelle. Eines der drei Kerntore – sie gehören zur Voreinstellung und werden von den Strengestufen nicht angefasst."
+            <NumberField label="Punkte je Spiel mehr" value={settings.minPointsPerGame} min={0} step={0.1}
+              hint="Wie viele Punkte je Spiel die stärkere Mannschaft mehr holt. Eine der drei festen Bedingungen – die Stufen ändern sie nicht."
               onCommit={(value) => setDominanz("minPointsPerGame", value)} />
-            <NumberField label="Plätze voraus" value={settings.minPositionGap} min={0} step={1}
-              hint="Abstand in der Ligatabelle. Cross-League- und Pokalpartien fallen ohnehin weg, weil ihnen die Tabelle fehlt."
+            <NumberField label="Plätze vorn" value={settings.minPositionGap} min={0} step={1}
+              hint="Wie viele Plätze sie in der Tabelle vorn liegt. Pokalspiele und Spiele zwischen verschiedenen Ligen fallen weg, weil es dort keine Tabelle gibt."
               onCommit={(value) => setDominanz("minPositionGap", value)} />
-            <NumberField label="Bilanz voraus (PP)" value={settings.minNonLossGap} min={0} max={100} step={5}
-              hint="Vorsprung im Anteil der Spiele ohne Niederlage, aus der Saisontabelle – nicht aus den letzten fünf Spielen. Genau das ist der Unterschied, an dem die Vorgängerversion scheiterte."
+            <NumberField label="Verliert seltener (Punkte)" value={settings.minNonLossGap} min={0} max={100} step={5}
+              hint="Um wie viel seltener sie über die ganze Saison verliert als der Gegner – nicht nur in den letzten fünf Spielen."
               onCommit={(value) => setDominanz("minNonLossGap", value)} />
-            <NumberField label="Duelle in Folge" value={settings.minStreak} min={0} max={5} step={1}
-              hint="Gewonnene direkte Duelle in Folge. 0 schaltet das Tor ab. Gemessen trägt es rund vier Punkte Ertrag je Bein – ohne die Serie fällt dieselbe Zelle von −4,1 auf −7,8 %."
+            <NumberField label="Siege in Folge im Duell" value={settings.minStreak} min={0} max={5} step={1}
+              hint="Gewonnene direkte Duelle in Folge. 0 schaltet die Bedingung aus. Sie bringt geprüft etwa vier Prozent mehr."
               onCommit={(value) => setDominanz("minStreak", value)} />
             <SettingField label="Nur wenn das Modell zustimmt"
-              hint="Verlangt, dass auch das Modell diese Seite tippt. Gemessen der stärkste einzelne Hebel: mit dieser Bedingung −4,1 %, ohne sie −9,3 %, und die Zeilen gegen das Modell allein liegen bei −24,4 %."
+              hint="Verlangt, dass auch das Modell diese Mannschaft tippt. Der stärkste einzelne Hebel dieses Filters."
               children={<input type="checkbox" checked={settings.requireModelSide}
                 onChange={(event) => setDominanz("requireModelSide", event.target.checked)} />} />
+          </div>}
+
+          {showSettings && settings.preset === "hz15" && <div className="kelly-settings-grid">
+            <NumberField label="Quote ab" value={settings.minOdds} min={1} step={0.05}
+              hint="Mindestquote. Eine Untergrenze, kein Ziel."
+              onCommit={(value) => setHz15("minOdds", value)} />
+            <NumberField label="Quote bis" value={settings.maxOdds} min={1} step={0.05}
+              hint="Höchstquote – die wirkungsvollste Bedingung. Bis 2,00 stimmt jeder zweite Tipp, über alle Quoten hinweg nur gut jeder dritte. Dieser Teil kommt vom Buchmacher, nicht vom Modell."
+              onCommit={(value) => setHz15("maxOdds", value)} />
+            <NumberField label="Erwartete Tore ab" value={settings.minExpectedGoals} min={0} step={0.1}
+              hint="Wie viele Tore im ganzen Spiel erwartet werden. Das wichtigste sportliche Merkmal: Ab 3,4 fielen in fast der Hälfte der Spiele zwei Tore bis zur Pause. Feste Bedingung, die Stufen ändern sie nicht."
+              onCommit={(value) => setHz15("minExpectedGoals", value)} />
+            <NumberField label="Unentschieden höchstens" value={settings.maxDrawProbability} min={0} max={1} step={0.01}
+              hint="Wie wahrscheinlich ein Unentschieden höchstens sein darf. Offene Spiele liefern früher Tore. 1 schaltet die Bedingung aus."
+              onCommit={(value) => setHz15("maxDrawProbability", value)} />
+            <NumberField label="Zuletzt zwei Tore bis zur Pause ab" value={settings.minFirstHalfRate} min={0} max={1} step={0.05}
+              hint="Wie oft bei beiden Mannschaften zuletzt zwei Tore bis zur Pause fielen. Bringt allein wenig, deshalb nur in der strengsten Stufe an. 0 schaltet es aus."
+              onCommit={(value) => setHz15("minFirstHalfRate", value)} />
+          </div>}
+
+          {showSettings && settings.preset === "remis" && <div className="kelly-settings-grid">
+            <NumberField label="Chance auf Unentschieden ab" value={settings.minDrawProbability} min={0} max={1} step={0.01}
+              hint="Wie hoch das Modell die Chance auf ein Unentschieden mindestens sehen muss – die einzige Bedingung. Ab 30 % endete gut jedes dritte Spiel unentschieden statt jedes vierten. Unter 29 % wird es Verlust."
+              onCommit={(value) => setRemis("minDrawProbability", value)} />
+            <NumberField label="Quote ab" value={settings.minOdds} min={1} step={0.05}
+              hint="Mindestquote. Für eine Kombi zählt, dass der Tipp durchkommt."
+              onCommit={(value) => setRemis("minOdds", value)} />
+            <NumberField label="Quote bis" value={settings.maxOdds} min={1} step={0.1}
+              hint="Höchstquote. 99 heißt: keine Grenze. Je höher die Quote, desto seltener stimmt es – über 4,00 endet nur noch jedes sechste Spiel unentschieden."
+              onCommit={(value) => setRemis("maxOdds", value)} />
           </div>}
         </section>
 

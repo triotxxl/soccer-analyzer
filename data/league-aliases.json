@@ -29,6 +29,16 @@
     "country": "Algeria",
     "league": "Ligue 1"
   },
+  "algerien|ligue 2 centre ost": {
+    "leagueId": 187,
+    "country": "Algeria",
+    "league": "Ligue 2"
+  },
+  "algerien|ligue 2 centre west": {
+    "leagueId": 187,
+    "country": "Algeria",
+    "league": "Ligue 2"
+  },
   "andorra|primera divisio": {
     "leagueId": 312,
     "country": "Andorra",
@@ -163,6 +173,11 @@
     "leagueId": 874,
     "country": "Australia",
     "league": "Australia Cup"
+  },
+  "bangladesch|premier league": {
+    "leagueId": 398,
+    "country": "Bangladesh",
+    "league": "Premier League"
   },
   "belarus|pervaya liga": {
     "leagueId": 117,
@@ -454,7 +469,17 @@
     "country": "England",
     "league": "FA WSL"
   },
+  "england|league trophy northern gruppe a": {
+    "leagueId": 46,
+    "country": "England",
+    "league": "EFL Trophy"
+  },
   "england|league trophy northern gruppe b": {
+    "leagueId": 46,
+    "country": "England",
+    "league": "EFL Trophy"
+  },
+  "england|league trophy northern gruppe c": {
     "leagueId": 46,
     "country": "England",
     "league": "EFL Trophy"
@@ -469,6 +494,16 @@
     "country": "England",
     "league": "EFL Trophy"
   },
+  "england|league trophy northern gruppe f": {
+    "leagueId": 46,
+    "country": "England",
+    "league": "EFL Trophy"
+  },
+  "england|league trophy northern gruppe g": {
+    "leagueId": 46,
+    "country": "England",
+    "league": "EFL Trophy"
+  },
   "england|league trophy northern gruppe h": {
     "leagueId": 46,
     "country": "England",
@@ -479,7 +514,22 @@
     "country": "England",
     "league": "EFL Trophy"
   },
+  "england|league trophy southern gruppe b": {
+    "leagueId": 46,
+    "country": "England",
+    "league": "EFL Trophy"
+  },
   "england|league trophy southern gruppe c": {
+    "leagueId": 46,
+    "country": "England",
+    "league": "EFL Trophy"
+  },
+  "england|league trophy southern gruppe d": {
+    "leagueId": 46,
+    "country": "England",
+    "league": "EFL Trophy"
+  },
+  "england|league trophy southern gruppe e": {
     "leagueId": 46,
     "country": "England",
     "league": "EFL Trophy"
@@ -490,6 +540,11 @@
     "league": "EFL Trophy"
   },
   "england|league trophy southern gruppe g": {
+    "leagueId": 46,
+    "country": "England",
+    "league": "EFL Trophy"
+  },
+  "england|league trophy southern gruppe h": {
     "leagueId": 46,
     "country": "England",
     "league": "EFL Trophy"
@@ -923,6 +978,11 @@
     "leagueId": 396,
     "country": "Nicaragua",
     "league": "Primera Division"
+  },
+  "niederlande|eredivisie frauen": {
+    "leagueId": 91,
+    "country": "Netherlands",
+    "league": "Eredivisie Women"
   },
   "nigeria|professional league": {
     "leagueId": 399,

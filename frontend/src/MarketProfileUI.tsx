@@ -65,7 +65,7 @@ export function MarketProfileView() {
   const { status, profile, message } = useMarketProfile(true);
 
   if (status === "loading" || status === "idle") {
-    return <div className="profile-notice">Das Marktprofil wird aus den abgerechneten Partien gerechnet …</div>;
+    return <div className="profile-notice">Das Marktprofil wird aus den abgerechneten Spielen gerechnet …</div>;
   }
   if (status === "error" || profile === null) {
     return <div className="profile-notice profile-notice-error">{message}</div>;
@@ -112,24 +112,22 @@ export function MarketProfileView() {
 
     <footer className="profile-footer">
       <p>
-        Aufklappen zeigt die Aufschlüsselung nach behauptetem Vorteil, und sie ist der Kern der
-        Sache: Beim Remis steht über alle Zeilen ein klarer Verlust, im schmalen Bereich um sieben
-        bis zehn Prozentpunkte Vorteil aber ein ebenso klarer Gewinn. Deshalb kann die Automatik
-        aus einem Markt wählen, der in der oberen Zeile als „meiden“ steht – sie entscheidet je
-        Band, nicht je Markt. Die Einschätzung der Marktzeile bezieht sich immer auf alle Zeilen
-        mit Vorteil zusammen.
+        Klappst du eine Zeile auf, siehst du sie danach aufgeteilt, wie viel Vorsprung das
+        Modell behauptet hat. Das ist der eigentliche Punkt: Beim Unentschieden steht über
+        alle Wetten ein klarer Verlust – bei genau sieben bis zehn Punkten Vorsprung aber ein
+        ebenso klarer Gewinn. Darum darf die Automatik aus einer Wettart wählen, die oben als
+        „meiden“ steht. Sie entscheidet nach Vorsprung, nicht nach Wettart.
       </p>
       <p>
-        Zeilen mit dem Vermerk „gespiegelt“ sind nicht eigenständig gemessen: Weil Unter = 1 − Über
-        und BTTS Nein = 1 − BTTS Ja gilt, sind ihre Trefferquote und ihre Abweichung exakt die
-        Gegenwerte des Basismarktes. Nur der Ertrag fehlt – dafür bräuchte es historische
-        Gegenquoten, die nie gespeichert wurden. Sobald diese Märkte eigene abgerechnete Partien
-        haben, ersetzt die eigene Messung die Spiegelung.
+        Zeilen mit dem Vermerk „gespiegelt“ wurden nicht selbst gemessen. Sie sind einfach das
+        Gegenteil ihrer Grundwette: Was bei „über 2,5 Tore“ herauskam, gilt umgekehrt für
+        „unter 2,5 Tore“. Nur der Gewinn fehlt dort – dafür hätte man die Gegenquoten von
+        damals gebraucht, und die wurden nie gespeichert.
       </p>
       <p className="profile-caveat">
-        Der Ertrag ist mit gleich hohen Einsätzen gerechnet und in beide Zeithälften geteilt.
-        Wechselt er zwischen den Hälften das Vorzeichen, ist die Gruppe zu klein für eine
-        Entscheidung – unabhängig davon, wie gut der Gesamtwert aussieht.
+        Der Gewinn ist mit überall gleichem Einsatz gerechnet und in zwei Zeiträume geteilt.
+        Dreht er dabei das Vorzeichen, sind es zu wenige Wetten für eine Entscheidung – egal,
+        wie gut der Gesamtwert aussieht.
       </p>
     </footer>
   </div>;

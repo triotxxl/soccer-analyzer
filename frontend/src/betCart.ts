@@ -27,6 +27,19 @@ export interface ComboSizeConfig {
   count: number;
 }
 
+/**
+ * Wie der Baukasten mit einem Warenkorb umgeht, der nicht glatt aufgeht.
+ *
+ * `einmalig`: Jede Wette wird höchstens einmal vergeben. Reicht der Warenkorb nicht für
+ * alle angeforderten Plätze, entsteht gar keine Kombi.
+ *
+ * `auffuellen`: Die Wetten werden der Reihe nach vergeben, jede zuerst einmal. Erst wenn
+ * der Warenkorb durch ist, wird von vorn aufgefüllt - die letzte Kombi, die sonst
+ * unvollständig bliebe, bekommt also schon verwendete Wetten dazu. **Innerhalb einer Kombi
+ * bleibt jede Wette einmalig**; dieselbe Wette zweimal im selben Schein wäre keine Kombi.
+ */
+export type ComboFillMode = "einmalig" | "auffuellen";
+
 export interface Combo {
   id: string;
   entries: CartEntry[];
@@ -159,10 +172,12 @@ export function requestedTotal(sizes: ComboSizeConfig[]): number {
   return sizes.filter((item) => item.count > 0 && item.size >= 2).reduce((sum, item) => sum + item.size * item.count, 0);
 }
 
-export function canGenerate(pool: CartEntry[], sizes: ComboSizeConfig[], withRepetition: boolean): boolean {
+export function canGenerate(pool: CartEntry[], sizes: ComboSizeConfig[], mode: ComboFillMode): boolean {
   const active = sizes.filter((item) => item.count > 0 && item.size >= 2);
   if (active.length === 0) return false;
-  if (withRepetition) return active.every((item) => item.size <= pool.length);
+  // Beim Auffüllen muss der Warenkorb nur eine einzelne Kombi mit lauter verschiedenen
+  // Wetten tragen können - die Plätze darüber hinaus kommen aus der Wiederverwendung.
+  if (mode === "auffuellen") return active.every((item) => item.size <= pool.length);
   return requestedTotal(active) <= pool.length;
 }
 
@@ -175,16 +190,35 @@ function comboId(size: number, index: number): string {
   return `${size}-${index}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-export function generateCombos(pool: CartEntry[], sizes: ComboSizeConfig[], withRepetition: boolean): Combo[] {
-  if (!canGenerate(pool, sizes, withRepetition)) return [];
+export function generateCombos(pool: CartEntry[], sizes: ComboSizeConfig[], mode: ComboFillMode): Combo[] {
+  if (!canGenerate(pool, sizes, mode)) return [];
   const active = sizes.filter((item) => item.count > 0 && item.size >= 2);
 
-  if (withRepetition) {
-    const combos = active.flatMap(({ size, count }) => Array.from({ length: count }, (_, index) => {
-      const entries = shuffle(pool).slice(0, size);
-      return { id: comboId(size, index), entries, combinedOdds: combinedOdds(entries) };
-    }));
-    return shuffle(combos);
+  if (mode === "auffuellen") {
+    const flatSizes = shuffle(active.flatMap(({ size, count }) => Array.from({ length: count }, () => size)));
+    const combos: Combo[] = [];
+    // Der Vorrat ist der noch nicht vergebene Rest des Warenkorbs. Er wird erst neu
+    // befüllt, wenn er leer ist - dadurch kommt jede Wette an die Reihe, bevor sich eine
+    // wiederholt. Genau das unterscheidet das Auffüllen vom früheren freien Ziehen.
+    let vorrat = shuffle(pool);
+    for (const size of flatSizes) {
+      const entries: CartEntry[] = [];
+      // Wetten, die in DIESE Kombi nicht passen, weil sie schon drin sind. Sie gehen
+      // nicht verloren, sondern stehen der nächsten Kombi wieder vorn zur Verfügung.
+      const zurueckgelegt: CartEntry[] = [];
+      while (entries.length < size) {
+        if (vorrat.length === 0) vorrat = shuffle(pool);
+        const naechste = vorrat.shift()!;
+        if (entries.some((taken) => taken.id === naechste.id)) zurueckgelegt.push(naechste);
+        else entries.push(naechste);
+      }
+      // Die Schleife endet immer: `canGenerate` verlangt `size <= pool.length`, ein
+      // frisch befüllter Vorrat enthält also stets eine Wette, die noch nicht in dieser
+      // Kombi steckt.
+      vorrat = [...zurueckgelegt, ...vorrat];
+      combos.push({ id: comboId(size, combos.length), entries, combinedOdds: combinedOdds(entries) });
+    }
+    return combos;
   }
 
   const flatSizes = shuffle(active.flatMap(({ size, count }) => Array.from({ length: count }, () => size)));

@@ -20,9 +20,15 @@ import {
   counterOddsOf,
   DOMINANZ_LEVELS,
   QUICKPICK_PRESETS,
+  DEFAULT_HZ15_SETTINGS,
+  DEFAULT_REMIS_SETTINGS,
+  HZ15_LEVELS,
+  REMIS_LEVELS,
+  firstHalfRateOf,
   type DavesQuickpickSettings,
   type DominanzQuickpickSettings
 } from "./quickpick";
+import { cartEntryId, toCartEntry } from "./betCart";
 import type { DashboardFixture, FormResult } from "./types";
 
 function settings(overrides: Partial<DavesQuickpickSettings> = {}): DavesQuickpickSettings {
@@ -166,6 +172,15 @@ describe("superiorityOf", () => {
     expect(value.positionGap).toBe(-7);
   });
 
+  /**
+   * Die Zahl der Spiele gehört mitgeliefert: Der Filter lässt einen Vorsprung nach vier
+   * Spieltagen durch wie einen nach dreißig, und die Spalte soll das wenigstens zeigen.
+   */
+  it("nennt, auf wie vielen Spielen der Vorsprung beruht", () => {
+    expect(superiorityOf(fixture(), "1")).toMatchObject({ played: 10, opponentPlayed: 10 });
+    expect(superiorityOf(fixture(), "2")).toMatchObject({ played: 10, opponentPlayed: 10 });
+  });
+
   /** Ohne Tabelle ist Überlegenheit nicht prüfbar - das ist etwas anderes als "kein Vorsprung". */
   it("liefert null ohne Tabelle und bei einem fehlgeschlagenen Namensabgleich", () => {
     expect(superiorityOf(fixture({ table: undefined }), "1")).toBeNull();
@@ -216,6 +231,33 @@ describe("evaluateFixture", () => {
   });
 
   /**
+   * Der Fehler, um den es hier geht: `venueFormPercent` gibt für eine leere Liste 0 zurück,
+   * damit nicht durch null geteilt wird. Im Tor las sich dieses 0 als "der Gegner ist in
+   * miserabler Form" - eine fehlende Grundlage wurde so zum stärksten Argument. Dasselbe in
+   * klein bei ein oder zwei Spielen, wo ein Sieg 100 % ergibt.
+   */
+  it("liest eine fehlende Formliste nicht als schwache Form", () => {
+    const ohneForm = fixture({
+      form: { scope: "venue", home: ["win", "win", "win", "win", "loss"], away: [], homeMatches: [], awayMatches: [] }
+    });
+    expect(evaluateFixture(ohneForm, settings()).rejectedBy).toBe("formFehlt");
+  });
+
+  it("lehnt auch eine Stichprobe unter drei Spielen ab", () => {
+    const duenn = fixture({
+      form: { scope: "venue", home: ["win", "win"], away: ["loss", "loss"], homeMatches: [], awayMatches: [] }
+    });
+    expect(evaluateFixture(duenn, settings()).rejectedBy).toBe("formFehlt");
+  });
+
+  it("prüft die Stichprobe nur, solange das Formtor eingeschaltet ist", () => {
+    const ohneForm = fixture({
+      form: { scope: "venue", home: ["win", "win", "win", "win", "loss"], away: [], homeMatches: [], awayMatches: [] }
+    });
+    expect(evaluateFixture(ohneForm, settings({ strongMinimum: 0, weakMaximum: 100 })).passes).toBe(true);
+  });
+
+  /**
    * Gestützt wird nur die Modellseite. Für die Gegenseite führt der Lauf weder Quote noch
    * Wahrscheinlichkeit - gemessen lagen solche Zeilen bei 29,5 % Treffern.
    */
@@ -255,6 +297,22 @@ describe("Veto aus den direkten Duellen", () => {
 
   it("lässt eine Partie ohne jedes Duell zu, statt sie zu bestrafen", () => {
     expect(evaluateFixture(fixture({ h2h: h2h([]) }), settings()).passes).toBe(true);
+  });
+
+  /**
+   * Ein einziges verlorenes Duell erfüllt `losses > wins` immer - das ist kein Rückstand in
+   * einer Serie, sondern ein Spiel, und weil `h2hSummary` Freundschaftsspiele mitzählt, kann
+   * es sogar ein Testspiel sein. Ab zwei Duellen greift das Veto unverändert.
+   */
+  it("kippt eine Partie nicht wegen eines einzigen verlorenen Duells", () => {
+    const evaluation = evaluateFixture(fixture({ h2h: h2h(["loss"]) }), settings());
+    expect(evaluation.dominance).toMatchObject({ wins: 0, losses: 1, sample: 1 });
+    expect(evaluation.passes).toBe(true);
+  });
+
+  it("lehnt ab, sobald zwei Duelle vorliegen", () => {
+    expect(evaluateFixture(fixture({ h2h: h2h(["loss", "loss"]) }), settings()).rejectedBy)
+      .toBe("h2hDagegen");
   });
 
   it("verlangt die Siegesserie nur, wenn sie eingeschaltet ist", () => {
@@ -638,6 +696,264 @@ describe("Dominanz", () => {
 
   it("beschriftet die Stufen mit dem Ertrag", () => {
     const streng = DOMINANZ_LEVELS.find((level) => level.id === "streng")!;
-    expect(QUICKPICK_PRESETS.dominanz.noteOf(streng.measured)).toMatch(/ROI$|zurückgerechnet$/);
+    expect(QUICKPICK_PRESETS.dominanz.noteOf(streng.measured)).toMatch(/Gewinn$|geprüft$/);
+  });
+});
+
+/**
+ * Die dritte Voreinstellung stützt **keine Seite**, sondern eine Torlinie. Das ist der
+ * strukturelle Unterschied zu den beiden anderen, und die Tests halten ihn fest: `side`
+ * bleibt null, `market` trägt den Halbzeitmarkt, und der Wettschein muss trotzdem einen
+ * Eintrag bekommen.
+ */
+describe("Erste Halbzeit: zwei Tore", () => {
+  /** Eine Partie mit Torumfeld: 3,4 erwartete Tore, Remis 20 %, HZ-Quote 1,85. */
+  function torreich(overrides: Partial<DashboardFixture> = {}): DashboardFixture {
+    return fixture({
+      expectedGoals: { home: 1.9, away: 1.5, total: 3.4 },
+      expectedFirstHalfGoals: { home: 0.8, away: 0.7, total: 1.5 },
+      markets: [
+        { ...fixture().markets[0]! },
+        {
+          key: "draw", label: "Remis", selection: "Unentschieden", pick: null, selectionTone: "draw",
+          probability: 0.2, odds: 4.2, confidence: 80, score: null,
+          recommendation: { level: "none", label: "Nicht empfehlenswert" }, details: []
+        },
+        {
+          key: "firstHalfOver15", label: "1. HZ Ü1,5", selection: "1. HZ Ü1,5", pick: null,
+          selectionTone: "neutral", probability: 0.44, odds: 1.85, confidence: 80, score: null,
+          recommendation: { level: "recommended", label: "Empfehlenswert" }, details: []
+        }
+      ],
+      ...overrides
+    });
+  }
+
+  /** Den Halbzeitmarkt gezielt verstellen, alles andere unverändert lassen. */
+  function mitQuote(odds: number | null): DashboardFixture {
+    const base = torreich();
+    return { ...base, markets: base.markets.map((entry) =>
+      entry.key === "firstHalfOver15" ? { ...entry, odds } : entry) };
+  }
+
+  it("lässt eine torreiche Partie zum Preis im Band durch", () => {
+    const evaluation = evaluateFixture(torreich(), DEFAULT_HZ15_SETTINGS);
+    expect(evaluation.passes).toBe(true);
+    expect(evaluation.rejectedBy).toBe(null);
+    expect(evaluation.hz15?.expectedGoals).toBe(3.4);
+  });
+
+  /**
+   * Das Quotenband ist die **Identität** dieser Voreinstellung: Es trägt den größeren Teil
+   * der Trefferquote (bis 2,00 traf die Auswahl in 50 % der Fälle, über alle Preise hinweg
+   * nur in 38,9 %). Wer den Deckel entfernt, entfernt die Voreinstellung.
+   */
+  it("weist dieselbe Partie über dem Quotendeckel ab", () => {
+    const evaluation = evaluateFixture(mitQuote(2.6), DEFAULT_HZ15_SETTINGS);
+    expect(evaluation.passes).toBe(false);
+    expect(evaluation.rejectedBy).toBe("quote");
+  });
+
+  it("weist ohne Preis und ohne Markt mit eigenen Gründen ab", () => {
+    expect(evaluateFixture(mitQuote(null), DEFAULT_HZ15_SETTINGS).rejectedBy).toBe("keineQuote");
+    const ohneMarkt = fixture({ expectedGoals: { home: 1.9, away: 1.5, total: 3.4 } });
+    expect(evaluateFixture(ohneMarkt, DEFAULT_HZ15_SETTINGS).rejectedBy).toBe("keinMarkt");
+  });
+
+  it("weist zu wenig erwartete Tore und ein zu remisnahes Bild ab", () => {
+    const arm = torreich({ expectedGoals: { home: 1.2, away: 1.0, total: 2.2 } });
+    expect(evaluateFixture(arm, DEFAULT_HZ15_SETTINGS).rejectedBy).toBe("torerwartung");
+
+    const base = torreich();
+    const remisnah = { ...base, markets: base.markets.map((entry) =>
+      entry.key === "draw" ? { ...entry, probability: 0.3 } : entry) };
+    expect(evaluateFixture(remisnah, DEFAULT_HZ15_SETTINGS).rejectedBy).toBe("remisbild");
+  });
+
+  /**
+   * Die Halbzeitbilanz trägt allein nur +3,9 Punkte und ist deshalb nur in der strengsten
+   * Stufe ein Tor. Auf der Vorgabestufe darf eine fehlende Historie die Partie nicht kosten.
+   */
+  it("prüft die Halbzeitbilanz nur, wenn die Stufe sie verlangt", () => {
+    const ohneHistorie = torreich();
+    expect(evaluateFixture(ohneHistorie, DEFAULT_HZ15_SETTINGS).passes).toBe(true);
+
+    const streng = applyLevel(DEFAULT_HZ15_SETTINGS, "streng");
+    expect(evaluateFixture(ohneHistorie, streng).rejectedBy).toBe("hzHistorie");
+
+    const torreicheHistorie = Array.from({ length: 5 }, (_, index) => ({
+      date: `2026-09-0${index + 1}`, homeTeam: "Alpha", awayTeam: "Gamma",
+      homeGoals: 3, awayGoals: 1, halfTimeHomeGoals: 2, halfTimeAwayGoals: 0
+    }));
+    const mitHistorie = torreich({
+      form: { ...torreich().form, homeMatches: torreicheHistorie, awayMatches: torreicheHistorie }
+    });
+    // Quote 1,85 bleibt unter dem strengen Deckel von 1,95, und die Bilanz trägt jetzt.
+    expect(evaluateFixture(mitHistorie, streng).passes).toBe(true);
+    expect(evaluateFixture(mitHistorie, streng).hz15?.firstHalfRate).toBe(1);
+  });
+
+  it("stützt keine Seite und nennt stattdessen den Markt", () => {
+    const evaluation = evaluateFixture(torreich(), DEFAULT_HZ15_SETTINGS);
+    expect(evaluation.side).toBe(null);
+    expect(evaluation.market).toBe("firstHalfOver15");
+    expect(evaluation.selection).toBe("1. HZ Ü1,5");
+  });
+
+  /**
+   * Der Wettschein darf eine Torlinie nicht als 1X2-Wette ablegen: `cartEntryId` ließe sonst
+   * nur eine der beiden Wetten derselben Partie zu, und die zweite verdrängte die erste.
+   */
+  it("legt die Torlinie neben einer 1X2-Wette derselben Partie ab", () => {
+    const partie = torreich();
+    const hzMarkt = partie.markets.find((entry) => entry.key === "firstHalfOver15")!;
+    const eintrag = toCartEntry(partie, hzMarkt);
+    expect(eintrag.marketKey).toBe("firstHalfOver15");
+    expect(eintrag.odds).toBe(1.85);
+    expect(eintrag.id).not.toBe(cartEntryId(partie.fixtureId, "1x2"));
+  });
+
+  it("wird von streng nach weit durchlässiger", () => {
+    const fixtures = [1.9, 2.05, 2.3].map((odds, index) =>
+      ({ ...mitQuote(odds), fixtureId: index + 1 }));
+    const counts = HZ15_LEVELS.map((level) =>
+      applyQuickpick(fixtures, applyLevel(DEFAULT_HZ15_SETTINGS, level.id)).report.passed);
+    expect(counts).toEqual([...counts].sort((left, right) => left - right));
+  });
+
+  it("beschriftet die Stufen mit der Trefferquote", () => {
+    const vorgabe = HZ15_LEVELS.find((level) => level.id === "ausgewogen")!;
+    expect(QUICKPICK_PRESETS.hz15.noteOf(vorgabe.measured)).toMatch(/Treffer$/);
+    expect(QUICKPICK_PRESETS.hz15.massstab).toBe("trefferquote");
+  });
+});
+
+describe("firstHalfRateOf", () => {
+  const partie = (halbzeit: number | null) => ({
+    date: "2026-09-01", homeTeam: "A", awayTeam: "B", homeGoals: 2, awayGoals: 1,
+    halfTimeHomeGoals: halbzeit, halfTimeAwayGoals: halbzeit === null ? null : 0
+  });
+
+  it("zählt nur Partien mit überliefertem Pausenstand", () => {
+    const gemischt = [partie(2), partie(2), partie(0), partie(0), partie(null)];
+    const ergebnis = firstHalfRateOf(gemischt)!;
+    expect(ergebnis.sample).toBe(4);
+    expect(ergebnis.rate).toBe(0.5);
+  });
+
+  /** Unter vier Partien schwankte der Anteil zwischen 0 und 100 %, ohne etwas zu bedeuten. */
+  it("liefert unter vier verwertbaren Partien nichts", () => {
+    expect(firstHalfRateOf([partie(2), partie(2), partie(2)])).toBe(null);
+  });
+
+  /** Snapshots vor `form.homeMatches` führen die Liste gar nicht - das darf nicht werfen. */
+  it("hält eine fehlende Historie aus", () => {
+    expect(firstHalfRateOf(undefined)).toBe(null);
+  });
+});
+
+/**
+ * Die vierte Voreinstellung. Ihr Kern ist, dass sie **ein einziges Tor** hat: Alles, was
+ * naheliegend dazugehören würde, senkt gemessen die Trefferquote. Die Tests halten genau
+ * das fest, damit niemand später ein Tor „nachrüstet".
+ */
+describe("Remis-Kandidaten", () => {
+  /** Eine Partie mit 32 % Remischance zu 2,90 – sie soll durchkommen. */
+  function remisnah(overrides: Partial<DashboardFixture> = {}): DashboardFixture {
+    return fixture({
+      expectedGoals: { home: 1.1, away: 1.0, total: 2.1 },
+      scores: { favorite: 40, draw: 55 },
+      markets: [
+        { ...fixture().markets[0]! },
+        {
+          key: "draw", label: "Remis", selection: "Unentschieden (X)", pick: null,
+          selectionTone: "draw", probability: 0.32, odds: 2.9, confidence: 80, score: 55,
+          recommendation: { level: "recommended", label: "Empfehlenswert" }, details: []
+        }
+      ],
+      ...overrides
+    });
+  }
+
+  /** Den Remismarkt gezielt verstellen, alles andere unverändert lassen. */
+  function mitMarkt(patch: Partial<DashboardFixture["markets"][number]>): DashboardFixture {
+    const base = remisnah();
+    return { ...base, markets: base.markets.map((entry) =>
+      entry.key === "draw" ? { ...entry, ...patch } : entry) };
+  }
+
+  it("lässt eine remisnahe Partie zum Preis im Band durch", () => {
+    const evaluation = evaluateFixture(remisnah(), DEFAULT_REMIS_SETTINGS);
+    expect(evaluation.passes).toBe(true);
+    expect(evaluation.rejectedBy).toBe(null);
+    expect(evaluation.remis?.probability).toBe(0.32);
+  });
+
+  it("weist eine zu geringe Remischance mit eigenem Grund ab", () => {
+    const evaluation = evaluateFixture(mitMarkt({ probability: 0.26 }), DEFAULT_REMIS_SETTINGS);
+    expect(evaluation.passes).toBe(false);
+    expect(evaluation.rejectedBy).toBe("remisChance");
+  });
+
+  it("weist über dem Quotendeckel und ohne Markt ab", () => {
+    expect(evaluateFixture(mitMarkt({ odds: 3.6 }), DEFAULT_REMIS_SETTINGS).rejectedBy).toBe("quote");
+    expect(evaluateFixture(mitMarkt({ odds: null }), DEFAULT_REMIS_SETTINGS).rejectedBy).toBe("keineQuote");
+    const ohneMarkt = fixture();
+    expect(evaluateFixture(ohneMarkt, DEFAULT_REMIS_SETTINGS).rejectedBy).toBe("keinMarkt");
+  });
+
+  /**
+   * Der wichtigste Test dieser Voreinstellung. Gemessen senkt jedes Zusatztor die
+   * Trefferquote: Remis-Punkte ab 40 auf 34,7 %, ab 50 auf 30,8 %, Datenvertrauen ab 80
+   * auf 32,2 % – gegenüber 35,7 % ohne. Wer eines davon einbaut, bricht diesen Test.
+   */
+  it("prüft weder Remis-Punkte noch direkte Duelle noch Datenvertrauen", () => {
+    const magerePunkte = remisnah({ scores: { favorite: 40, draw: 3 } });
+    expect(evaluateFixture(magerePunkte, DEFAULT_REMIS_SETTINGS).passes).toBe(true);
+
+    const ohneRemisDuelle = remisnah({ h2h: h2h(["win", "win", "loss", "win", "loss"]) });
+    expect(evaluateFixture(ohneRemisDuelle, DEFAULT_REMIS_SETTINGS).passes).toBe(true);
+
+    const schwacheDaten = { ...mitMarkt({ confidence: 35 }), dataConfidence: 35 };
+    expect(evaluateFixture(schwacheDaten, DEFAULT_REMIS_SETTINGS).passes).toBe(true);
+
+    // Auch ein torreiches Spiel darf nicht am Torumfeld scheitern - das Modell hat die
+    // Remischance bereits daraus gerechnet, ein zweites Tor darauf waere doppelt.
+    const torreich = remisnah({ expectedGoals: { home: 1.9, away: 1.8, total: 3.7 } });
+    expect(evaluateFixture(torreich, DEFAULT_REMIS_SETTINGS).passes).toBe(true);
+  });
+
+  it("stützt keine Seite und nennt stattdessen den Markt", () => {
+    const evaluation = evaluateFixture(remisnah(), DEFAULT_REMIS_SETTINGS);
+    expect(evaluation.side).toBe(null);
+    expect(evaluation.market).toBe("draw");
+    expect(evaluation.selection).toBe("Unentschieden (X)");
+  });
+
+  it("legt das Remis neben einer 1X2-Wette derselben Partie ab", () => {
+    const partie = remisnah();
+    const markt = partie.markets.find((entry) => entry.key === "draw")!;
+    const eintrag = toCartEntry(partie, markt);
+    expect(eintrag.marketKey).toBe("draw");
+    expect(eintrag.odds).toBe(2.9);
+    expect(eintrag.id).not.toBe(cartEntryId(partie.fixtureId, "1x2"));
+  });
+
+  it("wird von streng nach weit durchlässiger", () => {
+    const fixtures = [
+      { ...mitMarkt({ probability: 0.315, odds: 2.9 }), fixtureId: 1 },
+      { ...mitMarkt({ probability: 0.305, odds: 2.9 }), fixtureId: 2 },
+      { ...mitMarkt({ probability: 0.305, odds: 3.4 }), fixtureId: 3 },
+      { ...mitMarkt({ probability: 0.295, odds: 3.4 }), fixtureId: 4 }
+    ];
+    const counts = REMIS_LEVELS.map((level) =>
+      applyQuickpick(fixtures, applyLevel(DEFAULT_REMIS_SETTINGS, level.id)).report.passed);
+    expect(counts).toEqual([1, 2, 3, 4]);
+  });
+
+  it("beschriftet die Stufen mit der Trefferquote", () => {
+    const vorgabe = REMIS_LEVELS.find((level) => level.id === "ausgewogen")!;
+    expect(QUICKPICK_PRESETS.remis.noteOf(vorgabe.measured)).toMatch(/Treffer$|geprüft$/);
+    expect(QUICKPICK_PRESETS.remis.massstab).toBe("trefferquote");
   });
 });

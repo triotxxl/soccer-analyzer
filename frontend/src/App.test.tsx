@@ -221,6 +221,36 @@ describe("React-Dashboard", () => {
     expect(h2h).toHaveValue("outcome");
   });
 
+  /**
+   * Die Seitenleiste trägt keine Karten mehr: Die drei Schalter stehen zusammen unter
+   * "Optionen", und die Statuszeile über dem Ansichtswechsel zählt, was die aktuelle
+   * Filterung übrig lässt. Beide Zahlen kommen aus derselben Quelle wie die KPI-Liste.
+   */
+  it("bündelt die Schalter unter Optionen und zählt oben den gefilterten Stand", async () => {
+    vi.stubGlobal("fetch", dashboardFetch(() => document()));
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(<App />);
+    expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
+
+    const optionen = screen.getByRole("heading", { name: "Optionen" }).closest("section")!;
+    expect(within(optionen).getByRole("checkbox", { name: /Pokal \/ Cross-League/i })).toBeInTheDocument();
+    expect(within(optionen).getByRole("checkbox", { name: /Laufende \/ beendete Partien/i })).toBeInTheDocument();
+    const kelly = within(optionen).getByRole("checkbox", { name: /Vorteil & Kelly-Einsatz anzeigen/i });
+    expect(screen.getByRole("button", { name: /Kelly-Kriterium öffnen/ })).toBeInTheDocument();
+    await user.click(kelly);
+    expect(screen.queryByRole("button", { name: /Kelly-Kriterium öffnen/ })).not.toBeInTheDocument();
+
+    const status = globalThis.document.querySelector(".sidebar-status");
+    expect(status).toHaveTextContent("Partien im Zeitraum");
+    expect(status).toHaveTextContent("mit Vorteil");
+    expect(status?.querySelector("strong")).toHaveTextContent("2");
+
+    // Die erste Zahl folgt dem Tabellenfilter, die KPI-Liste dahinter bleibt beim vollen Umfang.
+    await user.click(screen.getByRole("button", { name: /Starke Tipps/i }));
+    expect(status?.querySelector("strong")).toHaveTextContent("1");
+    expect(screen.getByRole("button", { name: /Alle Partien/ })).toHaveTextContent("2");
+  });
+
   it("kennzeichnet besonders defensiv starke Teams mit einem Shield", async () => {
     const current = document();
     current.fixtures[0]!.defense = {
@@ -230,7 +260,7 @@ describe("React-Dashboard", () => {
     vi.stubGlobal("fetch", dashboardFetch(() => current));
     render(<App />);
     expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
-    expect(screen.getByRole("img", { name: /Alpha FC: durch Torhistorie belegte Top-20-%-Defensive/ })).toHaveClass("fallback");
+    expect(screen.getByRole("img", { name: /Alpha FC: starke Abwehr, aus den kassierten Toren belegt/ })).toHaveClass("fallback");
     expect(screen.queryByRole("img", { name: /Gast FC:.*Defensive/ })).not.toBeInTheDocument();
     expect(screen.getByRole("region", { name: "Legende Defensivstärke" })).toHaveTextContent("durch xGA verifiziert");
   });
@@ -246,9 +276,9 @@ describe("React-Dashboard", () => {
     };
     vi.stubGlobal("fetch", dashboardFetch(() => current));
     render(<App />);
-    const shield = await screen.findByRole("img", { name: /Alpha FC: xG-verifizierte Top-20-%-Defensive/ });
+    const shield = await screen.findByRole("img", { name: /Alpha FC: starke Abwehr, durch xG bestätigt/ });
     expect(shield).toHaveClass("verified");
-    expect(shield).toHaveAttribute("aria-label", expect.stringContaining("xG-Abdeckung 94 % gesamt/89 % Rolle"));
+    expect(shield).toHaveAttribute("aria-label", expect.stringContaining("xG-Werte liegen für 94 % der Spiele vor"));
   });
 
   it("zeigt Halbzeitmärkte aus Schema 2 mit dynamischen erwarteten Toren", async () => {
@@ -720,7 +750,7 @@ describe("MarketCard", () => {
     const { container } = render(<MarketCard market={outcomeMarket({ probabilityReliable: false })} showEdge />);
     expect(within(container).queryByText("65,0 %")).not.toBeInTheDocument();
     expect(within(container).queryByText(/PP/)).not.toBeInTheDocument();
-    expect(within(container).getByText("Ligastärke fehlt")).toBeInTheDocument();
+    expect(within(container).getByText("Ligastärke unbekannt")).toBeInTheDocument();
     expect(container.querySelector(".market-card.unreliable")).not.toBeNull();
   });
 });
@@ -893,7 +923,7 @@ describe("Klassenunterschied", () => {
     await applyQuickpick(user);
 
     expect(screen.getByText(/Daves 1x2-Filter lässt keine Partie übrig/)).toBeInTheDocument();
-    expect(screen.getByText(/keine klar stärkere Seite in der Form/)).toBeInTheDocument();
+    expect(screen.getByText(/keine Mannschaft ist in der Form klar besser/)).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Filter aufheben" }));
     expect(screen.getByText("Alpha FC")).toBeInTheDocument();
   });

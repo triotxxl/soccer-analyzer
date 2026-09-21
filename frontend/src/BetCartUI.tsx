@@ -3,7 +3,7 @@ import { Fragment, useEffect, useRef, useState, type CSSProperties } from "react
 import { formatOdd } from "./App";
 import {
   canGenerate, cartEntryId, generateCombos, requestedTotal, sizeRange,
-  type CartEntry, type Combo, type ComboSizeConfig
+  type CartEntry, type Combo, type ComboFillMode, type ComboSizeConfig
 } from "./betCart";
 import type { DashboardFixture, DashboardMarket, DashboardMarketKey } from "./types";
 
@@ -212,15 +212,21 @@ export function CartBadge({ count, onClick }: { count: number; onClick(): void }
   </button>;
 }
 
-function comboFeasibilityMessage(cart: CartEntry[], sizes: ComboSizeConfig[], withRepetition: boolean): string | null {
+function comboFeasibilityMessage(cart: CartEntry[], sizes: ComboSizeConfig[], mode: ComboFillMode): string | null {
   const active = sizes.filter((item) => item.count > 0);
   if (active.length === 0) return null;
-  if (canGenerate(cart, sizes, withRepetition)) return null;
-  if (!withRepetition) {
-    return `Benötigt ${requestedTotal(active)} Wetten, Warenkorb hat nur ${cart.length}.`;
+  if (canGenerate(cart, sizes, mode)) return null;
+  if (mode === "einmalig") {
+    return `Benötigt ${requestedTotal(active)} Wetten, Warenkorb hat nur ${cart.length}.`
+      + " Mit „Auffüllen“ reicht der Warenkorb auch für mehr Plätze.";
   }
   const maxSize = Math.max(...active.map((item) => item.size));
   return `Mindestens eine gewählte Größe (${maxSize}er) übersteigt die Anzahl deiner Wetten (${cart.length}).`;
+}
+
+/** Wie viele Plätze über den Warenkorb hinausgehen und damit aus Wiederverwendung kommen. */
+function refillCount(cart: CartEntry[], sizes: ComboSizeConfig[]): number {
+  return Math.max(0, requestedTotal(sizes.filter((item) => item.count > 0)) - cart.length);
 }
 
 export function BetBuilderDrawer({ cart, onRemove, onClear, onClose }: {
@@ -230,16 +236,17 @@ export function BetBuilderDrawer({ cart, onRemove, onClear, onClose }: {
   onClose(): void;
 }) {
   const [counts, setCounts] = useState<Record<number, number>>({});
-  const [withRepetition, setWithRepetition] = useState(false);
+  const [mode, setMode] = useState<ComboFillMode>("einmalig");
   const [combos, setCombos] = useState<Combo[]>([]);
 
   const sizes = sizeRange(cart.length);
   const sizeConfig: ComboSizeConfig[] = sizes.map((size) => ({ size, count: counts[size] ?? 0 }));
-  const message = comboFeasibilityMessage(cart, sizeConfig, withRepetition);
-  const canShuffle = canGenerate(cart, sizeConfig, withRepetition);
+  const message = comboFeasibilityMessage(cart, sizeConfig, mode);
+  const canShuffle = canGenerate(cart, sizeConfig, mode);
+  const aufgefuellt = mode === "auffuellen" ? refillCount(cart, sizeConfig) : 0;
 
   const setCount = (size: number, value: number) => setCounts((current) => ({ ...current, [size]: Math.max(0, Math.floor(value) || 0) }));
-  const shuffleCombos = () => setCombos(generateCombos(cart, sizeConfig, withRepetition));
+  const shuffleCombos = () => setCombos(generateCombos(cart, sizeConfig, mode));
   const discardCombo = (id: string) => setCombos((current) => current.filter((combo) => combo.id !== id));
 
   return <div className="overlay-backdrop" onClick={onClose}>
@@ -288,9 +295,18 @@ export function BetBuilderDrawer({ cart, onRemove, onClear, onClose }: {
                 </label>)}
               </div>
               <div className="segmented">
-                <button className={!withRepetition ? "active" : ""} aria-pressed={!withRepetition} onClick={() => setWithRepetition(false)}>Ohne Wiederholung</button>
-                <button className={withRepetition ? "active" : ""} aria-pressed={withRepetition} onClick={() => setWithRepetition(true)}>Mit Wiederholung</button>
+                <button className={mode === "einmalig" ? "active" : ""} aria-pressed={mode === "einmalig"}
+                  title="Jede Wette landet höchstens einmal. Reicht der Warenkorb nicht für alle Plätze, entsteht keine Kombi."
+                  onClick={() => setMode("einmalig")}>Ohne Wiederholung</button>
+                <button className={mode === "auffuellen" ? "active" : ""} aria-pressed={mode === "auffuellen"}
+                  title="Erst kommt jede Wette einmal an die Reihe. Erst wenn der Warenkorb durch ist, wird von vorn aufgefüllt – die letzte Kombi bekommt dann schon verwendete Wetten dazu."
+                  onClick={() => setMode("auffuellen")}>Auffüllen</button>
               </div>
+              {aufgefuellt > 0 && <p className="bet-builder-note">
+                {aufgefuellt} von {requestedTotal(sizeConfig.filter((item) => item.count > 0))} Plätzen
+                {aufgefuellt === 1 ? " wird" : " werden"} mit bereits verwendeten Wetten aufgefüllt.
+                Innerhalb einer Kombi bleibt jede Wette einmalig.
+              </p>}
               {message && <p className="bet-builder-warning">{message}</p>}
               <button className="primary-button" disabled={!canShuffle} onClick={shuffleCombos}><Shuffle size={15} weight="bold" /> Kombis mischen</button>
             </section>

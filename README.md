@@ -85,14 +85,14 @@ deshalb weg, nicht als Werturteil, sondern mangels Grundlage.
 
 In den Einstellungen stehen vier **Strengestufen**. Auf jedem Knopf steht, was er kostet:
 
-| Stufe | Tipps je Tag | Treffer je Bein | 4er-Kombi |
+| Stufe | Tipps je Tag | Treffer je Tipp | 4er-Kombi |
 |---|---|---|---|
 | Streng | 2,4 | 71,0 % | 25,4 % |
 | **Ausgewogen** (Vorgabe) | 4,9 | 69,1 % | 22,8 % |
 | Locker | 6,6 | 63,8 % | 16,6 % |
 | Weit | 9,4 | 59,1 % | 12,2 % |
 
-Die Zahlen sind über die archivierten Läufe zurückgerechnet. Wer einen einzelnen Regler
+Die Zahlen sind über die archivierten Läufe an alten Spielen geprüft. Wer einen einzelnen Regler
 verstellt, steht auf „Eigene Werte“. Die Mindestpunkte sind dabei die empfindlichste
 Schraube — unterhalb von 70 fällt die Trefferquote deutlich schneller als bei allen anderen.
 
@@ -105,7 +105,7 @@ sie mit den Zahlen auf den Knöpfen und meldet, wenn sie auseinanderlaufen. Fäl
 Oben im Panel lässt sich auf **Dominanz zum Kombipreis** umschalten. Der sucht Partien wie
 Nacional Potosí – Always Ready: eine Mannschaft, die die letzten direkten Duelle gewann, in der
 Tabelle klar vorn steht und die bessere Siege-plus-Remis-Bilanz hat — und die **trotzdem 1,80
-oder mehr** bezahlt. Genau daraus lassen sich kurze Kombis über fünf bis sieben Beine bauen.
+oder mehr** bezahlt. Genau daraus lassen sich kurze Kombis über fünf bis sieben Tipps bauen.
 
 Welche Seite gestützt wird, entscheiden die Kriterien, nicht der Modelltipp. Weicht das Modell
 ab, erscheint die Zeile trotzdem — mit dem Abzeichen **Modell dagegen**. Die Stufe „Streng"
@@ -119,7 +119,7 @@ gegen 60 %. Die Venue-Form bleibt deshalb eine Spalte und ist bewusst kein Tor.
 **Die Kriterien sagen den Sieger gut vorher — aber der Markt preist sie ein.** Über 56
 archivierte Läufe und 5.754 Kandidaten:
 
-| Kern-Kriterien im Quotenband | Wetten | Treffer | Ertrag |
+| Kern-Kriterien im Quotenbereich | Wetten | Treffer | Ertrag |
 |---|---|---|---|
 | ohne jeden Filter | 5.754 | 37,2 % | −10,6 % |
 | 1,00–1,50 | 363 | **73,8 %** | −3,2 % |
@@ -127,25 +127,25 @@ archivierte Läufe und 5.754 Kandidaten:
 | ab 3,00 | 75 | 17,3 % | −42,0 % |
 
 Die Trefferquote folgt der Quote fast exakt. Auf den Stufen steht deshalb der **Ertrag je
-Bein** statt der Trefferquote — und er ist auf allen vier negativ:
+Tipp** statt der Trefferquote — und er ist auf allen vier negativ:
 
-| Stufe | Tipps je Tag | Treffer je Bein | Ertrag je Bein |
+| Stufe | Tipps je Tag | Treffer je Tipp | Gewinn je Tipp |
 |---|---|---|---|
 | Streng | 3,4 | 44,2 % | −11,7 % |
 | **Ausgewogen** (Vorgabe) | 5,0 | 40,3 % | −11,4 % |
 | Locker | 9,4 | 47,2 % | −10,6 % |
 | Weit | 40,1 | 42,7 % | −12,1 % |
 
-Die Streuung beträgt je Stufe rund zehn Punkte — die vier Zahlen sind untereinander nicht
+Die Schwankung beträgt je Stufe rund zehn Punkte — die vier Zahlen sind untereinander nicht
 trennbar. „Ausgewogen" ist die Vorgabe, weil es bei gleichem gemessenem Ertrag anderthalbmal so
 viele Partien zeigt.
 
 **Für kurze Kombis ist genau dieser Wert entscheidend**, denn eine Kombi multipliziert den
-Ertrag je Bein — nicht die Quote. Eine hohe Gesamtquote macht den Gewinn seltener, nicht
+Gewinn je Tipp — nicht die Quote. Eine hohe Gesamtquote macht den Gewinn seltener, nicht
 größer. Das Panel zeigt unter den Treffern, was Kombis aus der gewählten Stufe gebracht hätten,
 gezogen über je zwei Spieltage (der Umfang eines üblichen Laufs):
 
-| Beine | Quote Ø | Treffer | Ertrag | erwartet |
+| Tipps | Quote Ø | Treffer | Ertrag | erwartet |
 |---|---|---|---|---|
 | 2 | 5,2 | 16,2 % | −21,1 % | −21,5 % |
 | 3 | 11,9 | 6,4 % | −34,5 % | −30,5 % |
@@ -153,7 +153,7 @@ gezogen über je zwei Spieltage (der Umfang eines üblichen Laufs):
 | 5 | 60,5 | 0,9 % | **−60,1 %** | −45,4 % |
 | 7 | 321,9 | 0,0 % | −100 % | −57,2 % |
 
-Die Fünferkombi, um die es geht, gab im Erwartungswert 40 % des Einsatzes zurück; über 600
+Die Fünferkombi, um die es geht, gab im Schnitt 40 % des Einsatzes zurück; über 600
 gezogene Siebenerkombis kam keine einzige durch. Weichen „Ertrag" und „erwartet" weit
 voneinander ab, ist nicht die Rechnung falsch, sondern die Stichprobe zu dünn.
 
@@ -161,16 +161,129 @@ Die Quote der gestützten Seite steht seit `schemaVersion: 5` für beide Seiten 
 älteren Läufen wird die Gegenquote gerechnet und mit `≈` gekennzeichnet.
 
 
+#### Voreinstellung „Erste Halbzeit: zwei Tore“
+
+Die dritte Voreinstellung sucht keine Mannschaft, sondern ein **Torumfeld**: Partien, in denen
+schon zur Pause zwei Tore fallen sollen. Die Auswahl steht fest — gespielt wird immer
+`1. HZ Ü1,5`. Ohne jeden Filter trifft das in **35,4 %** der Partien zu.
+
+Gemessen wurde vor dem Entwurf, über 6.155 abgerechnete Partien mit Pausenstand. Was trennt:
+
+| Messwert | Zelle | Treffer | Lift |
+|---|---|---|---|
+| **erwartete Gesamttore** | ab 3,4 | 48,0 % | **+12,5 pp** |
+| Stärkedifferenz zwischen den Teams | ab 0,40 | 46,2 % | +10,8 pp |
+| Remiswahrscheinlichkeit | unter 0,22 | 44,1 % | +8,7 pp |
+| Halbzeitbilanz beider Teams | ab 0,50 | 39,6 % | +3,9 pp |
+| **Abwehrleistung** | Summe ab 2,2 | 37,9 % | +2,5 pp |
+
+Zwei Dinge daran sind überraschend. Die **Abwehrleistung trägt praktisch nichts** — „beide
+Abwehren stark“ liegt bei 33,1 %, „beide schwach“ bei 36,7 %. Und das eigens gebaute
+**Halbzeitmodell trennt schlechter als die schlichte Gesamttorerwartung**, bei halb so großer
+Stichprobe. Das Tor steht deshalb auf den erwarteten Toren des ganzen Spiels.
+
+Torschüsse und Passgenauigkeit wurden eigens nachgemessen (4.602 Partien aus dem
+Antwort-Cache): Für sich genommen trennen die Schüsse aufs Tor um +6,6 Punkte — **über die
+Torerwartung hinaus bringen sie aber nichts mehr** (+2,4 Punkte bei ±3,6), und die Passquote
+dreht dort sogar ins Minus. Sie sind deshalb kein Kriterium. Ballbesitz trennt gar nicht.
+
+**Das wirksamste einzelne Tor ist der Quotendeckel.** Bis 2,00 trifft die Auswahl in 50,0 %
+der Fälle, über alle Preise hinweg nur in 38,9 %. Der größere Teil des Gewinns kommt also
+aus der Meinung des Buchmachers; das Modell trägt die letzten vier Punkte bei. Das ist kein
+Schönheitsfehler, sondern die ehrliche Beschreibung dessen, was der Filter tut.
+
+| Stufe | Tipps je Tag | Treffer je Tipp | Gewinn je Tipp | 1. / 2. Zeithälfte |
+|---|---|---|---|---|
+| Streng | 4,7 | **59,6 %** | +7,3 % | 61,8 / 57,4 % |
+| **Ausgewogen** (Vorgabe) | 9,2 | 55,6 % | +2,4 % | 57,2 / 54,0 % |
+| Locker | 12,2 | 52,7 % | −0,4 % | 54,3 / 51,1 % |
+| Weit | 20,8 | 47,7 % | −3,9 % | 50,8 / 44,6 % |
+
+**Zwei Warnzeichen gehören zu diesen Zahlen.** Die zweite Zeithälfte liegt auf allen vier
+Stufen unter der ersten — einzeln innerhalb der Schwankung, aber viermal mit demselben
+Vorzeichen. Und die Schwellen wurden auf denselben Daten gesucht, gegen die gemessen wird.
+
+**Für Kombis trägt die Messung bis vier Tipps, darüber nicht mehr.** Aus der Vorgabestufe,
+gezogen über je zwei Spieltage:
+
+| Tipps | Treffer | Ertrag | erwartet |
+|---|---|---|---|
+| 2 | 29,8 % | +0,9 % | +4,9 % |
+| 3 | 16,6 % | +3,4 % | +7,4 % |
+| 4 | 9,0 % | +1,8 % | +10,0 % |
+| 5 | 4,7 % | −1,8 % | +12,6 % |
+| 6 | 2,2 % | **−17,6 %** | +15,3 % |
+| 7 | 0,5 % | **−64,4 %** | +18,1 % |
+
+Ein Sechser geht hier in etwa jedem fünfundvierzigsten Fall durch. Zum Vergleich: Der
+1x2-Filter liefert bei 69 % je Tipp eine Sechserkombi in rund 11 % der Fälle. Wer auf diesem
+Markt sechs oder sieben Tipps spielt, spielt sie auf Verdacht.
+
+**Die Ertragsspalte dieser Tabelle schwankt stark mit der Ziehung** — bei 0,5 % Trefferchance
+hängt der Siebener an einzelnen Treffern. Belastbar ist die Treffer je Tipp, nicht der
+Kombi-Ertrag.
+
+Anders als die beiden 1X2-Voreinstellungen stützt diese **keine Seite**. Im Wettschein landet
+sie als eigener Markt und verdrängt eine 1X2-Wette derselben Partie nicht.
+
+
+#### Voreinstellung „Remis-Kandidaten"
+
+Die vierte Voreinstellung sucht Partien, die **unentschieden** enden. Ohne jeden Filter sind
+das 25,4 % aller Partien.
+
+Bemerkenswert an dieser Regel ist, wie **wenig** sie prüft: Remischance des Modells ab 30 %,
+Quote höchstens 3,00 — mehr nicht. Das ist kein Versäumnis, sondern das Messergebnis. Jedes
+naheliegende Zusatztor senkt die Trefferquote:
+
+| Auf „Remischance ab 30 %" zusätzlich verlangt | n | Trefferquote |
+|---|---|---|
+| **nichts** | 283 | **35,7 %** |
+| Remis-Punkte ab 40 | 124 | 34,7 % |
+| Remis-Punkte ab 50 | 78 | **30,8 %** |
+| Datenvertrauen ab 80 | 208 | 32,2 % |
+| ohne Cross-League-Partien | 271 | 35,4 % |
+
+Auch die direkten Duelle tragen nichts bei: Drei H2H-Remis zusammen mit der Remischance
+liefern 30,3 % und damit weniger als die Remischance allein. Und `Tore ≤ 2,5`,
+`BTTS ≤ 0,50` und `Remischance ≥ 0,28` liefern **exakt dieselben Partien** — das
+Modell rechnet die Remischance aus genau diesen Größen. Remis-Punkte und direkte Duelle
+stehen deshalb als Spalten in der Trefferliste, nicht als Bedingung.
+
+| Stufe | Tipps je Tag | Treffer je Tipp | Gewinn je Tipp | 1. / 2. Zeithälfte |
+|---|---|---|---|---|
+| Streng | 3,8 | **40,5 %** | +9,6 % | 33,3 / **47,6 %** |
+| **Ausgewogen** (Vorgabe) | 5,9 | 38,1 % | +3,5 % | 36,1 / 40,2 % |
+| Locker | 8,3 | 36,2 % | +8,4 % | 35,5 / 37,0 % |
+| Weit | 13,6 | 32,9 % | −0,4 % | 35,4 / 30,4 % |
+
+Vorgabe ist „Ausgewogen", obwohl „Streng" die höhere Trefferquote misst: Dessen Zeithälften
+laufen über nur 126 Wetten um 14 Punkte auseinander.
+
+**Für Kombis ist das der schwierigste der drei Märkte.** Ein Vierer geht in 2,1 % der Fälle
+durch, ein Sechser in 0,3 % — einer von 330. Zum Vergleich: Der 1x2-Filter liefert einen
+Vierer in 22,7 %, die Halbzeit-Voreinstellung in 9,0 %.
+
+**Die Ertragsspalte der Kombitabelle ist hier ab vier Tippsn wertlos.** In der Stufe „Streng"
+misst der Fünfer +554 % — das sind drei Treffer aus 720 Ziehungen bei einer
+Durchschnittsquote von 147. Dieselbe Fünferkombi misst in der Vorgabestufe −57 %. Zwei
+Zahlen, 600 Punkte auseinander, und beide bedeuten nichts. Verlässlich ist allein die
+Treffer je Tipp.
+
+Ein Vorbehalt gehört dazu: Die Regel ist **ein einziges Tor auf die
+Modellwahrscheinlichkeit**. Wird das Tormodell neu kalibriert, verschiebt sich diese Auswahl
+mit, ohne dass jemand an ihr dreht.
+
+
 Ein Streifen neben dem Knopf nennt, wie viele Partien übrig bleiben, und hebt den Filter mit
 einem Klick wieder auf. Escape schließt nur das Panel. Die Regler bleiben über Sitzungen
 erhalten, der aktive Filter **nicht** — nach dem Neuladen ist die Tabelle wieder vollständig.
 
 Der Quickpicker liest ausschließlich den geladenen Lauf und löst keinen API-Aufruf aus.
-Auf der Vorgabe traf die Torfolge über die archivierten Läufe vom 16.08. bis 15.09.2026 in
-**68,7 % der Fälle** (134 Tipps, ±4,0) gegenüber 47,2 % ohne jeden Filter. Das ist ein
-**Hinweis und kein Beleg**: rund ein halbes Sigma über null, gemessen an einem Ertrag von
-+2,2 %. Und Vorsicht bei langen Kombis — sie multiplizieren den Vorteil je Bein in beide
-Richtungen: Vier Beine zu 68,7 % gehen in 22 % der Fälle durch, zu 58,3 % nur noch in 12 %.
+Auf der Vorgabe stimmten die Tipps vom 16.08. bis 15.09.2026 in **68,7 % der Fälle** (134
+Tipps) gegenüber 47,2 % ohne jeden Filter. Das ist ein **Hinweis und kein Beweis** — dafür
+sind es zu wenige Spiele. Und Vorsicht bei langen Kombis: In einer Kombi müssen alle Tipps
+stimmen. Vier Tipps zu 68,7 % gehen in 22 % der Fälle durch, zu 58,3 % nur noch in 12 %.
 
 ### Live-Ansicht
 

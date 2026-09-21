@@ -109,21 +109,23 @@ describe("QuickpickDialog", () => {
     render(<Harness fixtures={[fixture(1, "Alpha", "Beta", 75)]} />);
     // Der Name steht zweimal: einmal im Auswahlknopf, einmal in der Karte darunter.
     expect(screen.getByRole("button", { name: "Daves 1x2-Filter" })).toBeInTheDocument();
-    expect(screen.getByText(/Tabelle: Vorsprung bei Platz/)).toBeInTheDocument();
-    expect(screen.getByText(/Remis zählen als kein Verlust/)).toBeInTheDocument();
-    expect(screen.getByText(/keine Niederlagenserie/)).toBeInTheDocument();
-    expect(screen.getByText(/Favoritenpunkte des Modells/)).toBeInTheDocument();
+    expect(screen.getByText(/Tabelle: mehr Punkte je Spiel/)).toBeInTheDocument();
+    expect(screen.getByText(/Ein Remis zählt nicht als Niederlage/)).toBeInTheDocument();
+    expect(screen.getByText(/keine Niederlagen in Folge/)).toBeInTheDocument();
+    expect(screen.getByText(/hält den Favoriten für stark genug/)).toBeInTheDocument();
     expect(screen.getByText(/Quote ab 1,30/)).toBeInTheDocument();
   });
 
   /**
-   * Die Ehrlichkeitszusage ist Teil der Oberfläche, nicht nur der Dokumentation: Die
-   * Rückrechnung trägt ein halbes Sigma, und das darf nicht stillschweigend verschwinden.
+   * Die Ehrlichkeitszusage ist Teil der Oberfläche, nicht nur der Dokumentation: Auf dem
+   * Stand vom 21.09.2026 misst keine Stufe einen Gewinn, und das darf nicht stillschweigend
+   * verschwinden - auch nicht, wenn die Trefferquote gut aussieht.
    */
-  it("nennt die Trefferquote je Bein als Hinweis, nicht als Beleg", () => {
+  it("warnt vor dem Ertrag, statt nur die Trefferquote zu zeigen", () => {
     render(<Harness fixtures={[fixture(1, "Alpha", "Beta", 75)]} />);
-    expect(screen.getByText(/Hinweis, kein Beleg/)).toBeInTheDocument();
-    expect(screen.getByText("Treffer je Bein")).toBeInTheDocument();
+    expect(screen.getByText(/Rechne nicht mit Gewinn/)).toBeInTheDocument();
+    expect(screen.getByText(/jede Stufe im Minus/)).toBeInTheDocument();
+    expect(screen.getByText("Treffer je Tipp")).toBeInTheDocument();
   });
 
   it("zeigt den Tabellenvorsprung der getippten Seite", () => {
@@ -179,7 +181,7 @@ describe("QuickpickDialog", () => {
 
       expect(screen.getByRole("button", { name: /^Streng/ })).toHaveAttribute("aria-pressed", "true");
       expect(screen.getByRole("button", { name: /^Ausgewogen/ })).toHaveAttribute("aria-pressed", "false");
-      expect((screen.getByLabelText(/^Starke Seite/) as HTMLInputElement).value).toBe("70");
+      expect((screen.getByLabelText(/^Getippte Mannschaft ab/) as HTMLInputElement).value).toBe("70");
     });
 
     /** Wer an einem einzelnen Regler dreht, soll nicht fälschlich auf einer Stufe stehen. */
@@ -196,7 +198,7 @@ describe("QuickpickDialog", () => {
     expect(screen.getByText("Gamma – Delta")).toBeInTheDocument();
 
     await openSettings();
-    const points = screen.getByLabelText(/^Mindestpunkte/) as HTMLInputElement;
+    const points = screen.getByLabelText(/^Modell sieht Favoriten ab/) as HTMLInputElement;
     await userEvent.clear(points);
     await userEvent.type(points, "80");
 
@@ -207,7 +209,7 @@ describe("QuickpickDialog", () => {
   it("benennt die Abweisungen mit Zahl und Grund", () => {
     render(<Harness fixtures={[fixture(1, "Alpha", "Beta", 75), balanced(2)]} />);
     expect(screen.getByText(/Woran die übrigen 1 Partien scheitern/)).toBeInTheDocument();
-    expect(screen.getByText("keine klar stärkere Seite in der Form")).toBeInTheDocument();
+    expect(screen.getByText("keine Mannschaft ist in der Form klar besser")).toBeInTheDocument();
   });
 
   it("sagt es, wenn keine Partie klar überlegen ist", () => {
@@ -251,13 +253,13 @@ describe("Zwei Voreinstellungen", () => {
     await userEvent.click(screen.getByRole("button", { name: "Dominanz zum Kombipreis" }));
 
     expect(screen.getByRole("button", { name: "Dominanz zum Kombipreis" })).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByText(/Markt preist das ein/)).toBeInTheDocument();
+    expect(screen.getByText(/rechnet es in die Quote ein/)).toBeInTheDocument();
   });
 
   it("zeigt eigene Spalten für Serie und Bilanz", () => {
     render(<Harness fixtures={[dominant(1)]} preset="dominanz" />);
     expect(screen.getByRole("button", { name: /^Serie in den direkten Duellen/ })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /^Siege plus Remis/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Verliert seltener als der Gegner/ })).toBeInTheDocument();
     // Favoritenpunkte gelten der Modellseite und taugen hier weder als Spalte noch als Tor.
     expect(screen.queryByRole("button", { name: /^Favoritenpunkte/ })).not.toBeInTheDocument();
   });
@@ -271,14 +273,14 @@ describe("Zwei Voreinstellungen", () => {
   /** Kurze Kombis sind der Zweck – was sie kosten, steht in der Tabelle darunter. */
   it("zeigt die Kombi-Tabelle, sobald eine Messung vorliegt", () => {
     render(<Harness fixtures={[dominant(1)]} />);
-    expect(screen.getByText(/Was kurze Kombis aus dieser Stufe gebracht hätten/)).toBeInTheDocument();
+    expect(screen.getByText(/Was Kombis aus dieser Stufe gebracht hätten/)).toBeInTheDocument();
     // Die Spalte „erwartet" ist der Kern: Eine Kombi multipliziert den Ertrag je Bein.
     expect(screen.getByRole("columnheader", { name: "erwartet" })).toBeInTheDocument();
   });
 
   it("nennt bei der Dominanz den Ertrag statt der Trefferquote", () => {
     render(<Harness fixtures={[dominant(1)]} preset="dominanz" />);
-    expect(screen.getByText("Ertrag je Bein")).toBeInTheDocument();
-    expect(screen.queryByText("Treffer je Bein")).not.toBeInTheDocument();
+    expect(screen.getByText("Gewinn je Tipp")).toBeInTheDocument();
+    expect(screen.queryByText("Treffer je Tipp")).not.toBeInTheDocument();
   });
 });

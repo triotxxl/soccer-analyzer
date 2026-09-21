@@ -189,6 +189,60 @@ Benutzer auf Deutsch und führe Analyseaufträge selbstständig über die vorhan
   der Auslegung mitbedacht.
 - Historische xG-Werte und bestätigte Nichtverfügbarkeit werden in SQLite gehalten; der
   xG-Erstaufbau darf pro Dashboard-Lauf höchstens 250 zusätzliche API-Anfragen auslösen.
+## Sprache der sichtbaren Texte
+
+David ist kein Statistiker und hat am 18.09.2026 ausdrücklich um einfache Sprache gebeten -
+in den Antworten im Chat **und** in der App. Das gilt für **jeden Text, den er sieht**:
+Beschriftungen, Tooltips, `aria-label`, Leerzustände und die Textfelder der Quickpick-Filter
+(`label`, `description`, `criteria`, `honesty`, `hint`, `leerSatz`, `kennzahlOf`, `noteOf`,
+`REJECTION_LABELS`).
+
+**Ausgenommen sind diese Datei und alle Code-Kommentare.** Dort begründen die Fachbegriffe
+Entscheidungen; „kann auch Zufall sein" wäre als Arbeitsanweisung wertlos.
+
+### Wörterbuch
+
+| statt | schreiben |
+|---|---|
+| Bein, je Bein | Tipp, je Tipp |
+| Trefferquote je Bein | wie oft ein einzelner Tipp stimmt |
+| Ertrag je Bein | was ein Tipp im Schnitt einbringt |
+| Rückrechnung, zurückgerechnet | an alten Spielen geprüft |
+| Streuung, Sigma, +-x Punkte | „kann auch Zufall sein" - die Zahl entfällt |
+| Kalibrierung, Bias | das Modell schätzt zu hoch / zu niedrig |
+| Quotenband | Quotenbereich |
+| Kerntor, Tor (als Bedingung) | Bedingung |
+| Erwartungswert | auf Dauer |
+| Perzentil | besser als X % der Mannschaften |
+| Cross-League | Spiele zwischen verschiedenen Ligen |
+| Voreinstellung | Filter |
+| Partie | Spiel |
+| Lauf (als Analyselauf) | Analyse |
+
+`Kombi` benutzt David selbst und bleibt. **`Kelly`, `Value`, `Edge`, `xG`/`xGA`, `BTTS` und
+`H2H` bleiben als Namen stehen** - er wollte sie behalten -, brauchen aber je Ansicht einmal
+einen Zusatz in Klartext, etwa „xGA (erwartete Gegentore)".
+
+### Warnungen kürzen, aber nicht entschärfen
+
+Warnungen sollen kurz sein. Gekürzt wird **nur die statistische Begründung**, nie die
+Aussage:
+
+- Richtung und Urteil jeder Warnung bleiben erhalten.
+- Kein `honesty`-Text wird kürzer als ein Satz, der den Haken benennt.
+- Zahlen bleiben, wo sie die Aussage **sind** („4 von 10 Tipps stimmen"), und fallen weg, wo
+  sie sie nur belegen (Stichprobengrößen, Fehlerbalken, Zeithälften).
+
+Beispiel: „Der gemessene Vorteil von rund +6 % je Bein steht auf gut 200 Wetten bei etwa
++-8 Punkten Streuung" wird zu „Rechne nicht mit Gewinn. Dafür sind es bisher zu wenige
+Spiele." Eine gekürzte Warnung, die nicht mehr warnt, ist schlimmer als der Fachbegriff.
+
+### Wenn ein Text geändert wird
+
+Es gibt keine zentrale Textdatei; die Strings stehen am Fundort. Rund 140 Zusicherungen in
+`frontend/src/*.test.tsx` prüfen konkrete Formulierungen - sie gehören im selben Schritt
+nachgezogen, nicht gesammelt am Ende.
+
 ## Märkte
 
 - Das Dashboard führt 14 Märkte, jeweils als Paar aus Basis- und Gegenrichtung: 1X2, Remis,
@@ -306,15 +360,16 @@ Benutzer auf Deutsch und führe Analyseaufträge selbstständig über die vorhan
 ## Quickpicker
 
 Der **Quickpicker** neben dem Kelly-Knopf filtert die Tabelle nach einer **Voreinstellung**.
-Es gibt zwei, und sie haben **verschiedene Maßstäbe** - was für die eine gilt, gilt für die
-andere ausdrücklich nicht.
+Es gibt drei, und sie haben **verschiedene Maßstäbe** - was für die eine gilt, gilt für die
+anderen ausdrücklich nicht.
 
 ### Gemeinsames Gerüst
 
 - Er liest ausschließlich den geladenen Snapshot und kostet **kein API-Budget**;
   `src/quickpick-*.ts`, `frontend/src/quickpick.ts` und `frontend/src/quickpickColumns.tsx`
   enthalten weder `fetch` noch `useEffect`.
-- Die Regeln stehen in `src/quickpick-daves.ts` und `src/quickpick-dominanz.ts`, das
+- Die Regeln stehen in `src/quickpick-daves.ts`, `src/quickpick-dominanz.ts` und
+  `src/quickpick-hz15.ts`, das
   gemeinsame Gerüst in `src/quickpick-core.ts`, zusammengeführt in `src/quickpick.ts`. Dort
   liegt auch die Weiche `evaluateFixture`. Importpfad für App, Tests und Rückrechnung bleibt
   `src/quickpick.ts` - dieselbe Begründung wie bei `autoDecide`.
@@ -325,11 +380,22 @@ andere ausdrücklich nicht.
 - **Die Messwerte der Stufen sind Zahlen, keine Strings.** `QuickpickLevel.measured` trägt
   `{ n, proTag, trefferquote, roi }`; den Knopftext formatiert `preset.noteOf`. Früher stand
   dort ein Text, den die Rückrechnung wieder zerlegen musste.
-- Beide Voreinstellungen haben **eigene gespeicherte Regler** (`QuickpickStore` in
+- **Nicht jede Voreinstellung stützt eine Seite.** `QuickpickEvaluation` trägt deshalb
+  `market` und `selection`: Die beiden 1X2-Voreinstellungen setzen auf eine Mannschaft,
+  „Erste Halbzeit" auf eine Torlinie, und dort bleibt `side` null. Wer eine Seite
+  voraussetzt, bricht die dritte Voreinstellung - das betraf `betsFor` in der Rückrechnung,
+  `onAddAll` in `App.tsx` und `strongPercent`/`teamOf` in den Spalten. Abgerechnet wird bei
+  1X2 weiter über den Sieger und sonst über `decideMarket`; ein fehlender Pausenstand ergibt
+  dort `null` und fällt heraus, statt als Niederlage zu zählen.
+- Jede Voreinstellung hat **eigene gespeicherte Regler** (`QuickpickStore` in
   `frontend/src/quickpick.ts`). Ein Wechsel darf die Schwellen der anderen nie überschreiben;
   ein Altbestand aus der Zeit mit nur einer Voreinstellung wandert beim Laden in den
   Daves-Zweig. Gespeichert wird zusätzlich, **welche** Voreinstellung gewählt ist - der
   **aktive Filter** bleibt weiterhin unpersistiert.
+- **Ein Quotenband als Tor ist erlaubt und widerspricht Punkt „Grenzen" nicht.** Die Auswahl
+  einer Voreinstellung steht fest, die Quote entscheidet nur, *welche* Partien in der Liste
+  landen - sie ändert weder Tipp noch Wahrscheinlichkeit. Alle drei Voreinstellungen nutzen
+  das.
 - Seit `schemaVersion: 5` trägt der 1X2-Markt **beide Seitenquoten** (`oddsHome`, `oddsAway`).
   Das kostet keinen Aufruf - die Preise liegen in `src/dashboard.ts` ohnehin in der Hand. Für
   ältere Läufe rechnet `counterOddsOf` die fehlende Quote über den Buchmacherschnitt
@@ -348,12 +414,22 @@ andere ausdrücklich nicht.
   (`src/favorite-criteria.ts`); eine zweite Gewichtung daneben wäre nach diesem Dokument
   verboten und wäre schwächer, weil die Heim-/Auswärtsspalten der Tabelle im Snapshot fehlen.
 - Die Torfolge in `evaluateFixture`, in dieser Reihenfolge: 1X2-Tipp vorhanden ->
-  **Venue-Form** (eine Seite >= 70 %, die andere <= 50 %, Formel Sieg 3 / Remis 1 /
-  Niederlage 0 aus `venueFormStats`) -> **Modellseite** (die Form muss dieselbe Seite meinen
-  wie `pick`) -> **Quote** >= 1,30 -> **Favoritenpunkte** >= 70 -> **H2H-Veto** ->
-  **Tabellenvorsprung** -> optional Siegesserie. Es gewinnt das erste greifende Tor, damit jede
-  Partie in der Bilanz genau einmal gezählt wird.
-- Das **H2H-Veto** lehnt ab, wenn die Gegenseite mehr Duelle gewonnen hat oder zwei in Folge.
+  **Formstichprobe** (beide Seiten mindestens 3 Ergebnisse) -> **Venue-Form** (eine Seite
+  >= 70 %, die andere <= 50 %, Formel Sieg 3 / Remis 1 / Niederlage 0 aus `venueFormStats`) ->
+  **Modellseite** (die Form muss dieselbe Seite meinen wie `pick`) -> **Quote** >= 1,30 ->
+  **Favoritenpunkte** >= 70 -> **H2H-Veto** -> **Tabellenvorsprung** -> optional Siegesserie.
+  Es gewinnt das erste greifende Tor, damit jede Partie in der Bilanz genau einmal gezählt wird.
+- Die **Formstichprobe** (`MIN_FORM_SAMPLE`, Grund `formFehlt`) repariert einen
+  Vorzeichenfehler in der Grundlage: `venueFormPercent` gibt für eine leere Liste 0 zurück,
+  damit nicht durch null geteilt wird, und im Tor `otherPercent <= weakMaximum` las sich dieses
+  0 als "der Gegner ist in miserabler Form". Eine fehlende Grundlage war damit das stärkste
+  Argument für den Tipp. Geprüft wird nur, solange das Formtor eingeschaltet ist: Mit
+  `strongMinimum: 0` und `weakMaximum: 100` hat der Benutzer es abgeschaltet.
+- Das **H2H-Veto** lehnt ab, wenn die Gegenseite mehr Duelle gewonnen hat oder zwei in Folge -
+  **ab zwei überlieferten Duellen**. Ein einzelnes verlorenes Duell erfüllt `losses > wins`
+  immer, ist aber kein Rückstand in einer Serie, und weil `h2hSummary` Freundschaftsspiele
+  mitzählt, kann es ein Testspiel sein. Über den archivierten Bestand ändert die Grenze keine
+  einzige Auswahl - sie schließt einen Fall, der nicht vorkommen soll, nicht einen, der vorkam.
   `h2h.outcomes[0]` ist das jüngste Duell (`h2hSummary` sortiert absteigend), und die
   Ergebnisse werden für einen Auswärtstipp gespiegelt. Die Serie ist die einzige Größe, die es
   im Backend nicht gibt - `breakdown.headToHead` zählt Siege reihenfolgeblind.
@@ -361,14 +437,26 @@ andere ausdrücklich nicht.
   3 Plätze. Ohne Tabelle ist Überlegenheit **nicht prüfbar**, die Partie fällt dann weg - das
   trifft jede Cross-League-Partie, weil der Lauf dort nie eine Tabelle führt. Einen eigenen
   Turnierschalter gibt es deshalb nicht mehr.
+- **Er kennt keine Mindestzahl an Spieltagen, und das ist eine bewusste Entscheidung.** Seit
+  dem 10.09.2026 beruhen 39 % der Treffer auf einer Seite mit höchstens sechs gespielten
+  Partien; nach vier Spieltagen ist "klar überlegen" sportlich kaum prüfbar. Gemessen sind
+  diese Tipps aber **nicht schlechter** (71,0 % gegen 64,6 % über 192 abgerechnete Treffer),
+  ein Tor darauf hätte also nur Menge gekostet. Stattdessen nennt `QuickpickSuperiority` die
+  Zahl der Spiele (`played`, `opponentPlayed`), und die Tabellenspalte schreibt sie dazu. Vor
+  dem 03.09.2026 war das ein echter Fehler: Ohne `tableScopeOf` summierte `buildTable` mehrere
+  Saisons, und eine Tabelle enthielt Mannschaften mit 43 gegen 3 Spielen (Anderlecht gegen
+  Kortrijk am 02.09.). Seither kommt das nicht mehr vor - die Messwerte aus dieser Zeit stammen
+  aber noch daraus.
 - **Warum die Tore so aussehen:** Der erste Entwurf vom 16.09.2026 prüfte H2H und Tabelle gar
   nicht - H2H war nur ein Abzeichen, die Tabelle war an `scores.favorite` delegiert. Dabei
   rutschte Inter gegen FAS durch: 2,00 zu 2,00 Punkte je Spiel, Tordifferenz +8 zu +7, und die
   letzten drei Duelle hatte der Gegner gewonnen. Ein Test hält genau diesen Fall fest.
-- **Rückrechnung** über 56 Snapshots und 4.543 abgerechnete Partien (16.08.-15.09.2026):
-  61 Tipps, **70,5 % Treffer (±5,8)**, Quote Ø 2,03, ROI +2,7 %; erste Hälfte 73,3 %, zweite
-  67,7 %. Zum Vergleich: ohne jeden Filter 47,2 %, mit dem ersten Entwurf 55,6 % bei -10,0 %
-  ROI. **Das ist ein Hinweis, kein Beleg** - ein halbes Sigma über null, und die Punktegrenze
+- **Rückrechnung, Stand 21.09.2026 über 5.628 abgerechnete Partien** (Vorgabestufe): 191
+  Tipps, **66,5 % Treffer (±3,4)**, Quote Ø 1,69, **ROI -0,8 %**; erste Hälfte 68,4 %, zweite
+  64,6 %. Zum Vergleich: ohne jeden Filter 47,2 %. **Keine der vier Stufen misst einen
+  Gewinn** (streng -5,9 %, locker -4,5 %, weit -8,2 %), und `streng` trifft mit 64,2 %
+  schlechter als die Vorgabe. Die frühere Messung (61 Tipps, 70,5 %, ROI +2,7 %) hielt nur,
+  solange die Stichprobe klein war - bei ±5,8 Punkten war sie nie ein Beleg. Die Punktegrenze
   70 stammt aus einem Durchprobieren der Regler an genau diesen Daten. Einzelne Tore gemessen:
   Punkte >= 70 allein 61,4 %, Venue-Form allein 50,8 %, H2H-Veto allein 46,7 % - letzteres
   trägt zur Trefferquote also nichts bei und steht dort, damit der Filter hält, was er zusagt.
@@ -382,8 +470,10 @@ andere ausdrücklich nicht.
 - **Vier Strengestufen** in `QUICKPICK_LEVELS` (streng, ausgewogen, locker, weit) verschieben
   Formschwellen, Tabellenschwellen und Favoritenpunkte gemeinsam. Auf jedem Knopf stehen die
   **gemessenen** Werte - Tipps je Tag und Trefferquote je Bein -, damit beim Wählen sichtbar
-  ist, was Menge kostet. Vorgabe ist **ausgewogen**: Zwei Tipps am Tag tragen keine lange
-  Kombi, und der Unterschied zur strengen Stufe ist mit 1,8 Punkten kleiner als die Streuung.
+  ist, was Menge kostet. Vorgabe ist **ausgewogen**, und zwar nicht mehr als Kompromiss: Auf
+  dem Stand vom 21.09.2026 trifft sie **besser** als `streng` (66,5 % gegen 64,2 %) bei doppelt
+  so vielen Partien. Die Staffelung ordnet die Stufen also nicht nach Zuverlässigkeit - wer das
+  auf einen Knopf schreibt, behauptet mehr, als gemessen ist.
   `minPoints` staffelt bewusst kaum mit - unterhalb von 70 bricht die Trefferquote ein
   (65 -> 59,4 %, 60 -> 54,1 %), deshalb fasst nur die weiteste Stufe es an.
 - **Nachkalibrieren mit `npm run quickpick-report`** (mit `--preset <id>` auch einzeln): Der
@@ -392,8 +482,8 @@ andere ausdrücklich nicht.
   Maßstab: 3 Punkte Trefferquote bei Daves, 5 Punkte Ertrag bei der Dominanz. Er hält seinen Stand in `docs/quickpick-kalibrierung.json` und nennt,
   wie viele Partien seit dem letzten Kalibrierpunkt dazugekommen sind; fällig ist die
   Nachkalibrierung alle **2.000 abgerechneten Partien**. Mit `--write` wird ein neuer Punkt
-  festgehalten. Kostet kein API-Budget. Stand 16.09.2026 (Daves): streng 2,4/Tag bei 71,0 %,
-  ausgewogen 4,9 bei 69,1 %, locker 6,6 bei 63,8 %, weit 9,4 bei 59,1 %.
+  festgehalten. Kostet kein API-Budget. Stand 21.09.2026 (Daves): streng 3,2/Tag bei 64,2 %,
+  ausgewogen 6,0 bei 66,5 %, locker 7,9 bei 63,8 %, weit 11,2 bei 59,9 %.
 - **Abgerechnet wird zu dem Preis, den die App zeigte**, also zu dem aus dem Snapshot. Nur wo
   die Regel ihn schätzen musste (Läufe vor `schemaVersion: 5` führen für die Gegenseite keinen),
   tritt der archivierte Tipico-Preis an seine Stelle - eine Schätzung taugt nicht als
@@ -455,6 +545,112 @@ andere ausdrücklich nicht.
 - **`h2hSummary` filtert keine Testspiele.** Eine „Serie 3" kann auf einem Freundschaftsspiel
   stehen. Der Spaltentitel sagt das; eine Korrektur wäre eine Backend-Änderung an
   `src/h2h.ts` und träfe auch die Remis-Punkte.
+
+### „Erste Halbzeit: zwei Tore": eine Torlinie statt einer Mannschaft
+
+- Zweck sind Davids 4er- bis 7er-Kombis auf `1. HZ Ü1,5`. Maßstab ist deshalb die
+  **Trefferquote je Bein**. Die Voreinstellung stützt **keine Seite**: `side` bleibt null,
+  `market` trägt `firstHalfOver15`.
+- **Gemessen wurde vor dem Entwurf**, über 6.155 abgerechnete Partien mit Pausenstand
+  (`goal_line_predictions`, je Partie der jüngste Eintrag) und 4.397 Partien mit
+  Halbzeithistorie aus den archivierten Läufen. **Basisrate 35,4 %.** Lift gegenüber dieser
+  Basis: erwartete Gesamttore >= 3,4 **+12,5 pp**, Stärkedifferenz |p(1)−p(2)| >= 0,40
+  +10,8 pp, Remiswahrscheinlichkeit < 0,22 +8,7 pp, BTTS >= 0,60 +6,7 pp, Halbzeitbilanz
+  beider Teams >= 0,50 +3,9 pp, **Abwehrprofile +2,5 pp**, Datenvertrauen kein Signal.
+- **Die Abwehrleistung trägt nicht** - „beide Abwehren stark" 33,1 %, „beide schwach" 36,7 %.
+  Sie ist deshalb weder Tor noch Spalte, obwohl `defense` im Lauf steht. Nicht wieder
+  einbauen, ohne vorher neu zu messen.
+- **Das eigens gebaute Halbzeitmodell trennt schlechter als die Gesamttorerwartung**:
+  `first_half_expected_total_goals >= 1,6` 44,5 % über n=506 gegen `expectedGoals.total >= 3,2`
+  44,8 % über n=1.126. Das Tor steht deshalb auf der **Ganzspiel**-Torerwartung. Dazu passt,
+  dass `1. HZ Ü1,5` in der Echtgeldkette der schlechteste Markt war (−48,7 %, Bias −28,2 pp).
+- **Die Liga ist der größte Einzelfaktor** (Argentinien Liga Profesional 14,9 %, Saudi Pro
+  League 48,3 %), aber es gibt **kein Liga-Tor**: Nur 11 Ligen haben n >= 60, und `evaluate`
+  sieht `DashboardDocument.leagues` gar nicht. Offener Punkt, kein Versäumnis.
+- **Das Quotenband ist hier das wirksamste einzelne Tor.** Über 3.117 archivierte
+  Tipico-Quoten war keine rein sportliche Variante positiv; die Trefferquote folgt der Quote
+  fast exakt (1,76 → 53,0 %, 2,56 → 33,4 %). Nur Quote <= 2,00 hebt allein von 38,9 auf
+  50,0 %; zusammen mit Torerwartung und Remisbild auf 54,3 %. **Der größere Teil des Gewinns
+  kommt aus der Marktmeinung, nicht aus dem Modell** - das gehört in jede Aussage darüber.
+- **Die Kerntore staffeln nie**: `minExpectedGoals` 3,2 und `maxDrawProbability` 0,23 sind die
+  Identität. Gestaffelt werden Quotenband und die Halbzeitbilanz, die allein nur +3,9 pp trägt
+  und deshalb nur in der Stufe `streng` ein Tor ist.
+- **Die gebaute Regel misst besser als die Vorabmessung** (Stand 17.09.2026, 4.704 abgerechnete
+  Partien): streng 4,7/Tag bei **59,6 %** und +7,3 % Ertrag, ausgewogen 9,2 bei **55,6 %** und
+  +2,4 %, locker 12,2 bei 52,7 % und −0,4 %, weit 20,8 bei 47,7 % und −3,9 %. Der Grund ist
+  **kein besserer Filter, sondern ein anderer Abrechnungskurs**: Der Report rechnet zum Preis
+  aus dem Lauf ab, die Vorabmessung zum letzten archivierten Tipico-Preis vor Anpfiff. Für
+  eine Torlinie gibt es keinen Ersatzpreis aus dem 1X2-Tripel.
+- **Zwei Warnzeichen gehören zu diesen Zahlen.** Die zweite Zeithälfte liegt auf **allen vier**
+  Stufen unter der ersten (−4,4 / −3,2 / −3,2 / −6,2 Punkte) - einzeln innerhalb der Streuung,
+  aber viermal dasselbe Vorzeichen. Und die Schwellen 3,2 / 0,23 / 2,00 wurden auf denselben
+  Daten gesucht, gegen die gemessen wird.
+- **Für Kombis zählt die Trefferquote je Bein, nicht der gemessene Kombi-Ertrag.** Aus der
+  Vorgabestufe über zwei Spieltage: Zweier 29,8 % Trefferchance bei +0,9 %, Dreier 16,6 % bei
+  +3,4 %, Vierer 9,0 % bei +1,8 %, Fünfer 4,7 % bei −1,8 %, Sechser 2,2 % bei **−17,6 %**,
+  Siebener 0,5 % bei **−64,4 %**. Die Spalte `erwartet` verspricht dort +12,6 bis +18,1 %.
+  **Diese Erträge schwanken stark mit der Ziehung**: Vor dem Zufallsstart je Stufe maß
+  derselbe Bestand für den Vierer +12,5 % statt +1,8 %. Bei 0,5 % Trefferchance hängt der
+  Siebener an einzelnen Treffern - die Trefferquote je Bein ist die belastbare Größe.
+- **`resetSeed` in `tools/quickpick-report.ts` setzt den Zufall je Voreinstellung und Stufe
+  zurück.** Ohne das zöge `--preset hz15` andere Kombis als ein Lauf über alle drei, weil
+  `seed` über den Lauf fortgeschrieben wird - die Zahlen im Code passten dann nur zu einem
+  der beiden Aufrufe.
+- **Torschüsse und Passgenauigkeit sind kein Tor - das wurde gemessen, nicht angenommen.**
+  Am 17.09.2026 über 46.000 Cache-Dateien ausgewertet: 8.177 Partien mit vollem
+  Statistikkatalog und Pausenstand, davon 4.602 mit Vorgeschichte für beide Mannschaften
+  (Mittelwerte streng nur aus Partien **vor** der bewerteten). Für sich genommen trennen die
+  Schüsse durchaus - unteres gegen oberes Terzil: Schüsse aufs Tor **+6,6 pp** (±1,7),
+  Schüsse im Strafraum +5,8, Ecken +4,4, Schüsse gesamt +4,2, Passquote +3,6,
+  **Ballbesitz +0,7 (nichts)**.
+  **Über die Torerwartung hinaus bringen sie aber nichts:** Innerhalb von
+  `expectedGoals.total >= 3,0` (n=747, 43,6 %) liegt die obere Hälfte nach Schüssen aufs Tor
+  bei 46,0 %, die untere bei 41,3 % - ein Abstand von 4,7 pp bei ±3,6, also rund 1,3 Sigma.
+  Die **Passquote dreht dort sogar das Vorzeichen** (obere Hälfte 42,9 %, untere 44,4 %).
+  Das vorab festgelegte Abbruchkriterium waren 3 Punkte Zugewinn gegenüber der
+  Torerwartung - erreicht wurden 2,4. **Deshalb wird nichts eingebaut und nichts dauerhaft
+  mitgeschrieben.** Dazu kommt: API-Football liefert `fixtures/statistics` **nur fürs
+  Gesamtspiel ohne Halbzeit-Aufteilung**, die Werte liegen nur im rohen Antwort-Cache
+  (`data/cache/`, sha256-Dateinamen), und zur Tippzeit kosteten sie rund vier Aufrufe je
+  Partie - der Quickpicker ist budgetfrei. Wer es erneut versuchen will, misst zuerst neu.
+
+### „Remis-Kandidaten": ein einziges Tor, und das mit Absicht
+
+- Zweck sind Davids 4er- bis 7er-Kombis auf den Remis-Markt. Maßstab ist die **Trefferquote
+  je Bein**. Wie „Erste Halbzeit" stützt die Voreinstellung **keine Seite**: `side` bleibt
+  null, `market` trägt `draw`.
+- **Gemessen vor dem Entwurf**, über 6.341 abgerechnete Partien und 4.752 Partien mit
+  Remisquote aus den archivierten Läufen. **Basisrate 25,4 %.** Lift: Modell-`p(Remis)`
+  >= 0,30 **+10,3 pp**, erwartete Gesamttore <= 2,2 +5,6 pp, BTTS <= 0,45 +4,7 pp, drei
+  H2H-Remis +4,8 pp, `scores.draw` >= 50 +4,6 pp, Stärkeparität +2,4 pp.
+- **Die naheliegenden Zusatztore sind keine.** `Tore <= 2,5`, `BTTS <= 0,50` und
+  `p(Remis) >= 0,28` liefern **exakt dieselben 871 Partien** - das Poisson-Modell rechnet
+  die Remiswahrscheinlichkeit aus genau diesen Größen.
+- **Jedes Tor obendrauf macht es schlechter.** Auf `p(Remis) >= 0,30` gemessen:
+  `scores.draw >= 40` 34,7 %, `>= 50` **30,8 %**, Datenvertrauen >= 80 32,2 %, ohne
+  Cross-League 35,4 % - gegen 35,7 % ohne jedes Zusatztor. Ein Regressionstest in
+  `frontend/src/quickpick.test.ts` hält fest, dass magere Remis-Punkte, fehlende H2H-Remis,
+  schwaches Datenvertrauen und ein torreiches Spiel die Partie **nicht** kosten dürfen.
+- **Das hauseigene 100-Punkte-System ist hier Spalte, nicht Tor.** Es ordnet monoton, feuert
+  aber kaum: 28 von 835 Partien erreichen 60 Punkte, drei erreichen 70. Eine eigene
+  Remis-Gewichtung wäre ohnehin verboten (Abschnitt „Grenzen") - der Filter liest
+  `scores.draw` unverändert und nur zur Anzeige.
+- **Die gebaute Regel** (Stand 18.09.2026, 4.887 abgerechnete Partien): streng 3,8/Tag bei
+  **40,5 %** und +9,6 %, ausgewogen 5,9 bei **38,1 %** und +3,5 %, locker 8,3 bei 36,2 % und
+  +8,4 %, weit 13,6 bei 32,9 % und −0,4 %. Vorgabe ist `ausgewogen`: die stabilste Stufe
+  (36,1 % gegen 40,2 % in den Zeithälften), während `streng` mit 33,3 % gegen 47,6 % weit
+  auseinanderläuft.
+- **Die Ertragsspalte der Kombitabelle ist ab vier Beinen wertlos.** In `streng` misst der
+  Fünfer +554 % - drei Treffer aus 720 Ziehungen bei Ø-Quote 147; in `ausgewogen` misst
+  derselbe Fünfer −57 %. Belastbar ist allein die Trefferquote je Bein. Ein Vierer geht in
+  2,1 % der Fälle durch, ein Sechser in 0,3 %.
+- **Die Regel ist ein einziges Tor auf die Modellwahrscheinlichkeit** und steht und fällt mit
+  deren Kalibrierung im Tail (heute gut: bei `p >= 0,30` traten 34,2 % ein bei 32,1 %
+  Prognose über 395 Partien). Wird `recalibrateGoals` in `src/config.ts` neu gesetzt,
+  verschiebt sich diese Voreinstellung mit, ohne dass jemand an ihr dreht - dann gehört
+  `npm run quickpick-report` gelaufen, auch ohne die 2.000er-Schwelle.
+- Eigener Abweisungsgrund `remisChance`: `remisbild` ist vergeben und meint bei „Erste
+  Halbzeit" das **Gegenteil** - dort fliegt eine Partie raus, *weil* sie remisnah ist.
 
 ### Verdrahtung
 

@@ -95,10 +95,10 @@ const LEVELS: Record<"streng" | "ausgewogen" | "locker" | "weit", DominanzLevelV
  * multipliziert.
  */
 export function dominanzNote(measured: QuickpickMeasurement | null): string {
-  if (measured === null) return "noch nicht zurückgerechnet";
+  if (measured === null) return "noch nicht geprüft";
   const proTag = measured.proTag.toFixed(1).replace(".", ",");
   const roi = `${measured.roi >= 0 ? "+" : "−"}${Math.abs(measured.roi * 100).toFixed(1).replace(".", ",")}`;
-  return `${proTag}/Tag · ${roi} % ROI`;
+  return `${proTag}/Tag · ${roi} % Gewinn`;
 }
 
 export const DOMINANZ_LEVELS: Array<QuickpickLevel<DominanzLevelValues>> = [
@@ -107,18 +107,16 @@ export const DOMINANZ_LEVELS: Array<QuickpickLevel<DominanzLevelValues>> = [
     measured: {
       n: 95, proTag: 3.4, trefferquote: 0.442, roi: -0.117,
       kombis: [
-        { beine: 2, n: 1680, trefferquote: 0.175, quote: 4.05, roi: -0.311, erwartung: -0.221 },
-        { beine: 3, n: 1040, trefferquote: 0.064, quote: 8.11, roi: -0.525, erwartung: -0.312 },
-        { beine: 4, n: 720, trefferquote: 0.026, quote: 16.41, roi: -0.631, erwartung: -0.393 },
-        { beine: 5, n: 520, trefferquote: 0.01, quote: 33.2, roi: -0.709, erwartung: -0.464 },
-        { beine: 6, n: 400, trefferquote: 0.015, quote: 64.64, roi: -0.143, erwartung: -0.527 },
-        { beine: 7, n: 360, trefferquote: 0, quote: 130.28, roi: -1, erwartung: -0.583 }
+        { beine: 2, n: 1680, trefferquote: 0.182, quote: 4.05, roi: -0.293, erwartung: -0.2 },
+        { beine: 3, n: 1040, trefferquote: 0.061, quote: 8.11, roi: -0.555, erwartung: -0.285 },
+        { beine: 4, n: 720, trefferquote: 0.036, quote: 16.47, roi: -0.482, erwartung: -0.36 },
+        { beine: 5, n: 520, trefferquote: 0.004, quote: 33.12, roi: -0.887, erwartung: -0.428 },
+        { beine: 6, n: 400, trefferquote: 0.003, quote: 64.01, roi: -0.861, erwartung: -0.489 },
+        { beine: 7, n: 360, trefferquote: 0.006, quote: 129.01, roi: -0.421, erwartung: -0.543 }
       ]
     },
-    hint: "Nur Partien, in denen auch das Modell die dominante Seite tippt, Quote 1,80 bis 2,50."
-      + " Zurückgerechnet 44,2 % Treffer über 95 Wetten bei -11,7 % Ertrag je Bein. Die"
-      + " Streuung ist mit gut zehn Punkten so breit, dass diese Stufe nicht messbar besser"
-      + " ist als die Vorgabe - sie ist nur die kleinste Liste.",
+    hint: "Nur Spiele, bei denen auch das Modell dieselbe Mannschaft tippt, Quote 1,80 bis"
+      + " 2,50. Nicht erkennbar besser als die Vorgabe – nur die kürzeste Liste.",
     values: LEVELS.streng
   },
   {
@@ -126,17 +124,16 @@ export const DOMINANZ_LEVELS: Array<QuickpickLevel<DominanzLevelValues>> = [
     measured: {
       n: 139, proTag: 5, trefferquote: 0.403, roi: -0.114,
       kombis: [
-        { beine: 2, n: 2640, trefferquote: 0.162, quote: 5.22, roi: -0.211, erwartung: -0.215 },
-        { beine: 3, n: 1600, trefferquote: 0.064, quote: 11.86, roi: -0.345, erwartung: -0.305 },
-        { beine: 4, n: 1120, trefferquote: 0.025, quote: 27.4, roi: -0.486, erwartung: -0.384 },
-        { beine: 5, n: 920, trefferquote: 0.009, quote: 60.53, roi: -0.601, erwartung: -0.454 },
-        { beine: 6, n: 680, trefferquote: 0.003, quote: 140.5, roi: -0.74, erwartung: -0.516 },
-        { beine: 7, n: 600, trefferquote: 0, quote: 321.88, roi: -1, erwartung: -0.572 }
+        { beine: 2, n: 2680, trefferquote: 0.147, quote: 5.24, roi: -0.274, erwartung: -0.212 },
+        { beine: 3, n: 1600, trefferquote: 0.073, quote: 11.86, roi: -0.199, erwartung: -0.301 },
+        { beine: 4, n: 1120, trefferquote: 0.021, quote: 26.93, roi: -0.47, erwartung: -0.379 },
+        { beine: 5, n: 920, trefferquote: 0.002, quote: 60.83, roi: -0.912, erwartung: -0.449 },
+        { beine: 6, n: 680, trefferquote: 0.001, quote: 136.85, roi: -0.766, erwartung: -0.511 },
+        { beine: 7, n: 600, trefferquote: 0, quote: 323.98, roi: -1, erwartung: -0.566 }
       ]
     },
-    hint: "Auch Partien gegen den Modelltipp, markiert mit einem Abzeichen, Quote bis 3,50."
-      + " 40,3 % über 139 Wetten bei -11,4 % Ertrag je Bein - derselbe gemessene Ertrag wie"
-      + " „Streng“ bei knapp anderthalbmal so vielen Partien. Die Vorgabe.",
+    hint: "Auch Spiele, bei denen das Modell anders tippt – die sind gekennzeichnet. Quote"
+      + " bis 3,50. Gleich gut wie „Streng“, aber deutlich mehr Auswahl. Die Vorgabe.",
     values: LEVELS.ausgewogen
   },
   {
@@ -144,17 +141,16 @@ export const DOMINANZ_LEVELS: Array<QuickpickLevel<DominanzLevelValues>> = [
     measured: {
       n: 271, proTag: 9.4, trefferquote: 0.472, roi: -0.106,
       kombis: [
-        { beine: 2, n: 5280, trefferquote: 0.219, quote: 5.07, roi: -0.216, erwartung: -0.2 },
-        { beine: 3, n: 3320, trefferquote: 0.095, quote: 11.95, roi: -0.385, erwartung: -0.285 },
-        { beine: 4, n: 2480, trefferquote: 0.043, quote: 29.65, roi: -0.503, erwartung: -0.36 },
-        { beine: 5, n: 1920, trefferquote: 0.024, quote: 60.07, roi: -0.548, erwartung: -0.428 },
-        { beine: 6, n: 1520, trefferquote: 0.004, quote: 137.01, roi: -0.847, erwartung: -0.488 },
-        { beine: 7, n: 1320, trefferquote: 0.002, quote: 397.42, roi: -0.868, erwartung: -0.542 }
+        { beine: 2, n: 5360, trefferquote: 0.225, quote: 4.82, roi: -0.209, erwartung: -0.193 },
+        { beine: 3, n: 3360, trefferquote: 0.096, quote: 11.5, roi: -0.38, erwartung: -0.275 },
+        { beine: 4, n: 2520, trefferquote: 0.047, quote: 26.06, roi: -0.427, erwartung: -0.349 },
+        { beine: 5, n: 1920, trefferquote: 0.016, quote: 63.35, roi: -0.7, erwartung: -0.415 },
+        { beine: 6, n: 1520, trefferquote: 0.005, quote: 131.28, roi: -0.835, erwartung: -0.474 },
+        { beine: 7, n: 1320, trefferquote: 0.002, quote: 399.02, roi: -0.898, erwartung: -0.528 }
       ]
     },
-    hint: "Quote ab 1,50 und ohne Deckel. Mehr Auswahl und kürzere Quoten: 47,2 % über 271"
-      + " Wetten bei -10,6 %. Die Trefferquote steigt mit dem kürzeren Band, der Ertrag je"
-      + " Bein bleibt liegen - genau das Muster, das der ganzen Voreinstellung zugrunde liegt.",
+    hint: "Quote ab 1,50, nach oben offen. Mehr Auswahl und kürzere Quoten: Es stimmen mehr"
+      + " Tipps, aber der Verlust bleibt gleich. Genau darum geht es bei diesem Filter.",
     values: LEVELS.locker
   },
   {
@@ -162,17 +158,16 @@ export const DOMINANZ_LEVELS: Array<QuickpickLevel<DominanzLevelValues>> = [
     measured: {
       n: 1153, proTag: 40.1, trefferquote: 0.427, roi: -0.121,
       kombis: [
-        { beine: 2, n: 22880, trefferquote: 0.183, quote: 5.38, roi: -0.228, erwartung: -0.227 },
-        { beine: 3, n: 15200, trefferquote: 0.079, quote: 12.5, roi: -0.302, erwartung: -0.32 },
-        { beine: 4, n: 11280, trefferquote: 0.033, quote: 29.35, roi: -0.424, erwartung: -0.402 },
-        { beine: 5, n: 9000, trefferquote: 0.015, quote: 72.39, roi: -0.458, erwartung: -0.474 },
-        { beine: 6, n: 7480, trefferquote: 0.007, quote: 179.22, roi: -0.444, erwartung: -0.538 },
-        { beine: 7, n: 6360, trefferquote: 0.003, quote: 403.36, roi: -0.587, erwartung: -0.594 }
+        { beine: 2, n: 23120, trefferquote: 0.187, quote: 5.37, roi: -0.199, erwartung: -0.215 },
+        { beine: 3, n: 15360, trefferquote: 0.083, quote: 12.5, roi: -0.27, erwartung: -0.304 },
+        { beine: 4, n: 11400, trefferquote: 0.036, quote: 29.17, roi: -0.337, erwartung: -0.384 },
+        { beine: 5, n: 9120, trefferquote: 0.014, quote: 71.84, roi: -0.472, erwartung: -0.454 },
+        { beine: 6, n: 7560, trefferquote: 0.007, quote: 174.84, roi: -0.474, erwartung: -0.516 },
+        { beine: 7, n: 6400, trefferquote: 0.004, quote: 426.61, roi: -0.235, erwartung: -0.571 }
       ]
     },
-    hint: "Ohne das Tor über die direkten Duelle: 40,1 Partien am Tag statt 5, 42,7 % über"
-      + " 1.153 Wetten bei -12,1 %. Die Serie trennt hier also nur noch 0,7 Punkte, und diese"
-      + " Stufe taugt vor allem zum Überblick, nicht zum Spielen.",
+    hint: "Ohne Bedingung an die direkten Duelle: 40 statt 5 Spiele am Tag, bei gleichem"
+      + " Verlust. Nur zum Überblick, nicht zum Spielen.",
     values: LEVELS.weit
   }
 ];
@@ -235,6 +230,11 @@ export function evaluateDominanz(
 
   const base = {
     fixtureId: fixture.fixtureId,
+    // Diese Voreinstellung stützt eine Seite des 1X2-Marktes. Markt und Auswahl stehen
+    // ausdrücklich dabei, damit Wettschein und Rückrechnung keine Seite voraussetzen müssen.
+    market: "1x2" as const,
+    selection: side === null ? ""
+      : side === "1" ? `Heimsieg ${fixture.homeTeam}` : `Auswärtssieg ${fixture.awayTeam}`,
     side,
     venueSide: null,
     pick,
@@ -275,42 +275,37 @@ export function evaluateDominanz(
 export const DOMINANZ_PRESET: QuickpickPreset<DominanzQuickpickSettings> = {
   id: "dominanz",
   label: "Dominanz zum Kombipreis",
-  description: "Eine Mannschaft, die die letzten direkten Duelle gewann, in der Tabelle klar"
-    + " vorn steht und die bessere Siege-plus-Remis-Bilanz hat - und die trotzdem ab 1,80"
-    + " bezahlt wird. Gedacht als Beine für kurze Kombis.",
+  description: "Eine Mannschaft, die die letzten direkten Duelle gewonnen hat, in der Tabelle"
+    + " klar vorn steht und seltener verliert als der Gegner – und für die es trotzdem 1,80"
+    + " oder mehr gibt. Gedacht für kurze Kombis.",
   criteria: [
-    "Direkte Duelle: mindestens zwei in Folge an die gestützte Seite",
-    "Tabelle: Vorsprung bei Punkten je Spiel und bei den Plätzen",
-    "Saisonbilanz: deutlich höherer Anteil an Spielen ohne Niederlage als beim Gegner",
-    "Quote ab 1,80 – als Bein einer Kombi über fünf bis sieben Partien",
-    "Die Form der letzten fünf Spiele ist hier bewusst kein Tor, nur Anzeige"
+    "Direkte Duelle (H2H): mindestens zwei Siege in Folge",
+    "Tabelle: Vorsprung bei Punkten je Spiel und beim Platz",
+    "Verliert über die Saison deutlich seltener als der Gegner",
+    "Quote ab 1,80 – gedacht für Kombis aus fünf bis sieben Spielen",
+    "Die letzten fünf Spiele sind hier bewusst keine Bedingung, sie werden nur angezeigt"
   ],
   massstab: "roi",
   kennzahlOf: (measured) => ({
-    label: "Ertrag je Bein",
+    label: "Gewinn je Tipp",
     wert: measured === null ? "–"
       : `${measured.roi >= 0 ? "+" : "−"}${Math.abs(measured.roi * 100).toFixed(1).replace(".", ",")} %`,
-    notiz: measured === null ? "noch nicht zurückgerechnet" : `über ${measured.n} Wetten`,
+    notiz: measured === null ? "noch nicht geprüft" : `an ${measured.n} alten Wetten geprüft`,
     titel: measured === null
-      ? "Für diese Stufe liegt noch keine Rückrechnung vor."
-      : `Flacher Einsatz auf die gestützte Seite, gerechnet zum echten Tipico-Preis:`
-        + ` ${(measured.trefferquote * 100).toFixed(1).replace(".", ",")} % Treffer über`
-        + ` ${measured.n} Wetten. Eine Kombi multipliziert diesen Ertrag je Bein - deshalb`
-        + ` steht er hier und nicht die Trefferquote.`
+      ? "Diese Stufe wurde noch nicht an alten Spielen geprüft."
+      : `Was ein einzelner Tipp im Schnitt einbringt, bei gleichem Einsatz auf jedes Spiel.`
+        + ` ${(measured.trefferquote * 100).toFixed(1).replace(".", ",")} % der Tipps stimmten`
+        + ` (an ${measured.n} alten Wetten geprüft). Hier zählt der Gewinn und nicht die`
+        + ` Trefferquote, weil bei diesem Filter beides auseinanderläuft.`
   }),
-  honesty: "Die Kriterien sagen den Sieger gut vorher – im kurzen Quotenband treffen sie in"
-    + " 73,8 % der Fälle gegenüber 37,2 % ohne jeden Filter. Aber der Markt preist das ein:"
-    + " Die Trefferquote folgt der Quote fast exakt. Zurückgerechnet über die archivierten"
-    + " Läufe verliert diese Voreinstellung auf jeder Stufe rund elf Prozent je Bein, und die"
-    + " Stufen unterscheiden sich dabei weniger, als ihre Streuung breit ist. Eine Fünferkombi"
-    + " aus der Vorgabestufe ging in 0,9 % der Fälle durch und gab im Erwartungswert 40 % des"
-    + " Einsatzes zurück, eine Siebenerkombi in keinem von 600 Fällen. Diese Voreinstellung"
-    + " liefert hohe Quoten und klare Begründungen – einen Ertrag liefert sie nicht.",
+  honesty: "Dieser Filter findet den Sieger gut – aber der Buchmacher weiß das auch und"
+    + " rechnet es in die Quote ein. Auf jeder Stufe verlierst du damit auf Dauer rund elf"
+    + " Prozent. Hohe Quoten und gute Begründungen: ja. Gewinn: nein.",
   wettschein: {
-    hinweis: "Legt jeden Treffer mit der Quote der gestützten Seite in den Wettschein. Dort"
-      + " lassen sich daraus kurze Kombis bauen – rechne vorher die Kombi-Tabelle durch."
+    hinweis: "Legt jedes gefundene Spiel mit der Quote der stärkeren Mannschaft in den"
+      + " Wettschein. Schau vorher in die Kombi-Tabelle, was daraus wird."
   },
-  leerSatz: "Keine Partie zeigt dieses Dominanzbild zum gewünschten Preis.",
+  leerSatz: "Kein Spiel zeigt eine so klar überlegene Mannschaft zu diesem Preis.",
   defaults: DEFAULT_DOMINANZ_SETTINGS,
   levels: DOMINANZ_LEVELS,
   defaultSort: "serie",

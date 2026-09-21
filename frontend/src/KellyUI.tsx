@@ -139,11 +139,11 @@ export function NumberField({ label, hint, value, scale = 1, min, max, step, dis
  */
 function stakeSlotHint(settings: KellySettings): string {
   const { plaetze, hoechstens } = stakeSlots(settings);
-  if (!Number.isFinite(plaetze)) return "Ohne Höchsteinsatz und Mindesteinsatz gibt es keine Stückzahlgrenze.";
-  return `Einsatzrahmen geteilt durch Höchsteinsatz ergibt die Stückzahl: rund ${plaetze} Wetten`
-    + ` passen hinein${hoechstens > plaetze ? `, höchstens ${hoechstens} zum Mindesteinsatz` : ""}.`
-    + " Das Budget kürzt sich dabei heraus - für die Stückzahl zählt allein das Verhältnis"
-    + " der beiden Prozentsätze.";
+  if (!Number.isFinite(plaetze)) return "Ohne Höchst- und Mindesteinsatz gibt es keine Grenze für die Zahl der Wetten.";
+  return `So viele Wetten passen in deinen Rahmen: rund ${plaetze}`
+    + `${hoechstens > plaetze ? `, höchstens ${hoechstens} beim kleinsten Einsatz` : ""}.`
+    + " Wie groß dein Budget ist, spielt dafür keine Rolle – nur das Verhältnis der beiden"
+    + " Prozentwerte.";
 }
 
 function MetricCard({ label, value, note, tone, title }: {
@@ -188,9 +188,9 @@ function AutoSummary({ profile, candidates }: { profile: MarketProfile; candidat
 
   return <div className="kelly-auto">
     <p className="kelly-auto-lead">
-      Die Auswahl rechnet nicht mit der Modellwahrscheinlichkeit, sondern mit dem, was der
-      jeweilige Markt in {profile.observations.toLocaleString("de-DE")} abgerechneten Zeilen
-      wirklich erreicht hat. Du stellst nur das Budget ein.
+      Die Auswahl rechnet nicht mit dem, was das Modell verspricht, sondern mit dem, was in
+      {" "}{profile.observations.toLocaleString("de-DE")} alten Wetten wirklich eingetreten ist.
+      Du stellst nur dein Budget ein.
     </p>
 
     {active.length > 0 && <p className="kelly-auto-chips">
@@ -203,20 +203,19 @@ function AutoSummary({ profile, candidates }: { profile: MarketProfile; candidat
     {idle.length > 0 && <p className="kelly-auto-chips">
       <span className="kelly-auto-label">Nichts gefunden in</span>
       {idle.map((entry) => <span key={entry.marketKey} className="kelly-auto-chip kelly-auto-chip-idle"
-        title={`${(entry.metrics.hitRate * 100).toFixed(1)} % eingetreten bei ${(entry.metrics.predicted * 100).toFixed(1)} % Prognose über ${entry.metrics.n} Fälle · Ertrag ${formatRoi(entry.metrics.roi)}`}>
+        title={`Eingetreten: ${(entry.metrics.hitRate * 100).toFixed(1)} %, vorhergesagt: ${(entry.metrics.predicted * 100).toFixed(1)} %, aus ${entry.metrics.n} alten Wetten · Gewinn ${formatRoi(entry.metrics.roi)}`}>
         {entry.marketLabel}
       </span>)}
     </p>}
 
     <Disclosure open={showDetail} onToggle={() => setShowDetail((value) => !value)}
-      label="Wie die Korrektur zustande kommt" openLabel="Weniger anzeigen" />
+      label="Woher die Korrektur kommt" openLabel="Weniger anzeigen" />
     {showDetail && <p className="kelly-auto-detail">
-      In der Rückrechnung auf Ergebnisse, die die Korrektur nicht kannte, lag diese Auswahl an
-      drei Trennstellen bei −0,2 bis +2,6 %, die frühere Vorgabe bei −5,1 bis −7,2 %. Die
-      Streuung beträgt dabei rund ±5 Prozentpunkte – der Abstand ist also etwa ein Sigma.
-      Ohne den Remis-Markt steht die Auswahl bei −2,5 bis −4,0 %, ihr ganzer Vorsprung hängt
-      an diesem einen Markt, und der steht in der Prüfhälfte auf 24 Wetten. Sie ist damit
-      messbar weniger verlustreich als vorher, aber nicht als gewinnbringend nachgewiesen.
+      An Spielen geprüft, die die Korrektur nicht kannte, liegt diese Auswahl etwa bei null,
+      die frühere Vorgabe bei rund −6 %. Der Abstand kann auch Zufall sein. Lässt man das
+      Unentschieden weg, ist auch diese Auswahl im Minus – ihr ganzer Vorsprung hängt an
+      diesem einen Markt. Sie verliert also weniger als vorher, aber dass sie gewinnt, ist
+      nicht belegt.
     </p>}
   </div>;
 }
@@ -378,8 +377,8 @@ export function KellyDialog({ fixtures, marketFilter, marketLabel, settings, pro
             ? <div className="kelly-settings-grid">
                 <NumberField label="Budget (€)" value={settings.budget} min={0} step={5}
                   onCommit={(value) => set("budget", value)} />
-                <SettingField label="Kelly-Fraktion"
-                  hint="Der Anteil des rechnerisch vollen Einsatzes. Ein Viertel ist die Vorgabe, weil auch die korrigierte Wahrscheinlichkeit eine Schätzung bleibt.">
+                <SettingField label="Kelly-Anteil"
+                  hint="Wie viel vom rechnerisch vollen Einsatz du tatsächlich setzt. Ein Viertel ist die Vorgabe, weil auch die korrigierte Wahrscheinlichkeit nur eine Schätzung ist.">
                   <select value={settings.kellyFraction} onChange={(event) => set("kellyFraction", Number(event.target.value))}>
                     <option value={1}>Full Kelly</option>
                     <option value={0.5}>1/2 Kelly</option>
@@ -387,17 +386,17 @@ export function KellyDialog({ fixtures, marketFilter, marketLabel, settings, pro
                     <option value={0.125}>1/8 Kelly</option>
                   </select>
                 </SettingField>
-                <NumberField label="Max. Einsatz/Wette (%)" value={settings.maxStakePercent} scale={100} min={0} max={100} step={0.5}
+                <NumberField label="Höchster Einsatz je Wette (%)" value={settings.maxStakePercent} scale={100} min={0} max={100} step={0.5}
                   hint={stakeSlotHint(settings)}
                   onCommit={(value) => set("maxStakePercent", value)} />
-                <NumberField label="Einsatzrahmen (%)" value={settings.maxExposurePercent} scale={100} min={0} max={100} step={5}
+                <NumberField label="Einsatzrahmen (% vom Budget)" value={settings.maxExposurePercent} scale={100} min={0} max={100} step={5}
                   hint={stakeSlotHint(settings)}
                   onCommit={(value) => set("maxExposurePercent", value)} />
                 <NumberField label="Mindesteinsatz (€)" value={settings.minStake} min={0} step={0.5}
-                  hint="Der kleinste Betrag, den ein Wettanbieter annimmt. Liegt der rechnerische Einsatz darunter, wird er angehoben."
+                  hint="Der kleinste Betrag, den dein Anbieter annimmt. Wäre der berechnete Einsatz kleiner, wird er auf diesen Wert angehoben."
                   onCommit={(value) => set("minStake", value)} />
                 <NumberField label="Höchstens … Wetten" value={settings.maxBets ?? 0} min={0} step={1}
-                  hint="0 = keine eigene Grenze; dann zählt allein, wie viele Wetten in den Einsatzrahmen passen."
+                  hint="0 heißt: keine eigene Grenze. Dann zählt nur, wie viele Wetten in deinen Rahmen passen."
                   onCommit={(value) => set("maxBets", value <= 0 ? null : Math.round(value))} />
               </div>
             : <div className="kelly-settings-grid">
@@ -405,7 +404,7 @@ export function KellyDialog({ fixtures, marketFilter, marketLabel, settings, pro
                   onCommit={(value) => set("budget", value)} />
                 <NumberField label="Mindestquote" value={settings.minOdds} min={1.01} step={0.05}
                   onCommit={(value) => set("minOdds", value)} />
-                <SettingField label="Kelly-Fraktion">
+                <SettingField label="Kelly-Anteil">
                   <select value={settings.kellyFraction} onChange={(event) => set("kellyFraction", Number(event.target.value))}>
                     <option value={1}>Full Kelly</option>
                     <option value={0.5}>1/2 Kelly</option>
@@ -413,31 +412,31 @@ export function KellyDialog({ fixtures, marketFilter, marketLabel, settings, pro
                     <option value={0.125}>1/8 Kelly</option>
                   </select>
                 </SettingField>
-                <NumberField label="Max. Einsatz/Wette (%)" value={settings.maxStakePercent} scale={100} min={0} max={100} step={0.5}
+                <NumberField label="Höchster Einsatz je Wette (%)" value={settings.maxStakePercent} scale={100} min={0} max={100} step={0.5}
                   onCommit={(value) => set("maxStakePercent", value)} />
-                <NumberField label="Max. Gesamtrisiko (%)" value={settings.maxExposurePercent} scale={100} min={0} max={100} step={1}
+                <NumberField label="Höchstens im Spiel (% vom Budget)" value={settings.maxExposurePercent} scale={100} min={0} max={100} step={1}
                   onCommit={(value) => set("maxExposurePercent", value)} />
-                <NumberField label="Mindest-Edge (PP)" value={settings.minEdge} scale={100} min={0} step={0.5}
+                <NumberField label="Mindest-Vorsprung (Edge, Punkte)" value={settings.minEdge} scale={100} min={0} step={0.5}
                   onCommit={(value) => set("minEdge", value)} />
-                <SettingField label="Edge-Deckel"
-                  hint="Über 13.124 abgerechneten Marktzeilen wächst die Selbstüberschätzung monoton mit dem Edge: 7–10 PP → −7,9 PP Bias, über 25 PP → −51,9 PP. Ein sehr hoher Edge ist ein Fehlersignal, kein Value.">
+                <SettingField label="Vorsprung begrenzen"
+                  hint="Begrenzt, wie viel Vorsprung (Edge) eine Wette höchstens behaupten darf. Geprüft gilt: Je größer der behauptete Vorsprung, desto stärker überschätzt sich das Modell. Ein sehr hoher Wert ist ein Warnzeichen, kein guter Fund.">
                   <input type="checkbox" checked={settings.maxEdge !== null}
-                    aria-label="Edge-Deckel aktiv"
+                    aria-label="Vorsprung begrenzen aktiv"
                     onChange={(event) => set("maxEdge", event.target.checked ? 0.12 : null)} />
                 </SettingField>
-                <NumberField label="Max. Edge (PP)" value={settings.maxEdge ?? 0.12} scale={100} min={0} step={0.5}
+                <NumberField label="Höchster Vorsprung (Edge, Punkte)" value={settings.maxEdge ?? 0.12} scale={100} min={0} step={0.5}
                   disabled={settings.maxEdge === null}
                   onCommit={(value) => set("maxEdge", value)} />
                 <NumberField label="Mindest-Datenvertrauen (%)" value={settings.minConfidence} min={0} max={100} step={5}
-                  hint="0 = aus. Das Band 70–85 % liegt in beiden Datenhälften bei rund −59 % ROI, 95 %+ ist das einzige nicht durchgehend negative Band."
+                  hint="Wie verlässlich die Daten zu einem Spiel mindestens sein müssen. 0 schaltet es aus. Nur ab 95 % war das Ergebnis nicht durchgehend negativ."
                   onCommit={(value) => set("minConfidence", value)} />
-                <SettingField label="Cross-League ausschließen"
-                  hint="Cross-League-Auswahlen liegen bei −25,9 % ROI gegen −3,7 % innerhalb einer Liga, in beiden Datenhälften negativ.">
+                <SettingField label="Spiele zwischen Ligen weglassen"
+                  hint="Spiele zwischen Mannschaften aus verschiedenen Ligen, etwa im Pokal oder in Europa. Die liefen geprüft deutlich schlechter als Spiele innerhalb einer Liga.">
                   <input type="checkbox" checked={settings.excludeCrossLeague}
                     onChange={(event) => set("excludeCrossLeague", event.target.checked)} />
                 </SettingField>
                 <SettingField label="Märkte"
-                  hint="Abgewählte Märkte werden gar nicht erst Kandidat. 1X2 liegt bei −39,3 % ROI mit Ø-Quote 6,16 bei behaupteten 50,1 % Trefferchance.">
+                  hint="Abgewählte Wettarten kommen gar nicht erst in die Auswahl. Der Sieger-Tipp (1X2) schnitt geprüft am schlechtesten ab.">
                   <span className="kelly-market-toggles">
                     {MARKET_TOGGLES.map(([key, label]) => <label key={key}>
                       <input type="checkbox" checked={!settings.disabledMarkets.includes(key)}
@@ -520,23 +519,24 @@ export function KellyDialog({ fixtures, marketFilter, marketLabel, settings, pro
         {showGlossary && <dl className="kelly-glossary">
           <div>
             <dt>Kelly</dt>
-            <dd>finaler Einsatzanteil nach Fraktion sowie Pro-Wette-, Spiel- und Gesamtrisiko-Deckel;
-              „Full" darunter ist der ungedeckelte Wert</dd>
+            <dd>ein Rechenweg, der aus Quote und Trefferchance den passenden Einsatz bestimmt.
+              Hier steht der Einsatz, der nach allen deinen Grenzen übrig bleibt; „Full"
+              darunter ist der Wert ohne Grenzen</dd>
           </div>
           <div>
             <dt>Korrigiert</dt>
-            <dd>Modellwahrscheinlichkeit abzüglich des historischen Bias dieses Marktes; gerechnet
-              wird mit diesem Wert</dd>
+            <dd>die Chance, die das Modell nennt, abzüglich dessen, worum es sich bei dieser
+              Wettart bisher verschätzt hat. Gerechnet wird mit diesem Wert</dd>
           </div>
           <div>
-            <dt>Game-Risk-Limit</dt>
-            <dd>deckelt korrelierte Märkte einer Partie gemeinsam, skaliert Einsätze proportional,
-              verändert die Kelly-Berechnung nicht</dd>
+            <dt>Spiel-Limit</dt>
+            <dd>begrenzt, wie viel Geld insgesamt auf ein einzelnes Spiel läuft, wenn du dort
+              mehrere Wetten hast. Verkleinert nur die Einsätze, ändert nichts an der Rechnung</dd>
           </div>
           <div>
             <dt>Grenzen</dt>
-            <dd>Kelly setzt kalibrierte Wahrscheinlichkeiten voraus; Modellwerte sind Schätzungen,
-              Fractional Kelly senkt das Risiko bei Fehleinschätzungen</dd>
+            <dd>die Rechnung setzt voraus, dass die Chancen stimmen. Sie sind aber nur
+              geschätzt – deshalb setzt du nur einen Teil des errechneten Einsatzes</dd>
           </div>
         </dl>}
       </div>

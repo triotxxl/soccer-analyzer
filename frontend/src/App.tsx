@@ -1,5 +1,5 @@
 import {
-  Binoculars, Broadcast, ChartBar, CalendarBlank, CaretDoubleLeft, CaretDoubleRight, CaretLeft, CaretRight, Calculator, CheckCircle, ClockCounterClockwise, Funnel, ListBullets, RocketLaunch, Shield, ShieldCheck, Star, WarningCircle, X
+  Binoculars, Broadcast, ChartBar, CaretDoubleLeft, CaretDoubleRight, CaretLeft, CaretRight, CheckCircle, ClockCounterClockwise, ListBullets, RocketLaunch, Shield, ShieldCheck, Star, WarningCircle, X
 } from "@phosphor-icons/react";
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { BetBuilderDrawer, CartAddRadial, CartBadge } from "./BetCartUI";
@@ -437,13 +437,16 @@ function FormDots({ results, h2h = false }: { results: FormResult[]; h2h?: boole
 function DefenseShield({ profile, team }: { profile: NonNullable<DashboardFixture["defense"]>["home"] | undefined; team: string }) {
   if (!profile?.strong) return null;
   const verified = profile.badge === "verified";
-  const percentile = profile.percentile == null ? "Top 20 %" : `${Math.round(profile.percentile * 100)}. Perzentil`;
-  const sample = `${profile.matches} Spiele (${profile.venueMatches} Rollen-Spiele)`;
-  const coverage = profile.xgCoverage === undefined ? "" : ` · xG-Abdeckung ${Math.round(profile.xgCoverage * 100)} % gesamt/${Math.round((profile.venueXgCoverage ?? 0) * 100)} % Rolle`;
+  const percentile = profile.percentile == null ? "Top 20 %"
+    : `besser als ${Math.round(profile.percentile * 100)} % der Mannschaften`;
+  const sample = `aus ${profile.matches} Spielen (${profile.venueMatches} davon zu Hause bzw. auswärts)`;
+  const coverage = profile.xgCoverage === undefined ? ""
+    : ` · xG-Werte liegen für ${Math.round(profile.xgCoverage * 100)} % der Spiele vor`;
   const metric = verified
-    ? `xGA ${profile.expectedGoalsAgainst?.toFixed(2).replace(".", ",") ?? "–"} · Gegentore ${profile.concededGoals.toFixed(2).replace(".", ",")}`
+    ? `xGA (erwartete Gegentore) ${profile.expectedGoalsAgainst?.toFixed(2).replace(".", ",") ?? "–"} · echte Gegentore ${profile.concededGoals.toFixed(2).replace(".", ",")}`
     : `Gegentore ${profile.concededGoals.toFixed(2).replace(".", ",")}`;
-  const label = `${team}: ${verified ? "xG-verifizierte" : "durch Torhistorie belegte"} Top-20-%-Defensive · ${percentile} · ${metric} · ${sample}${coverage}`;
+  const label = `${team}: starke Abwehr, ${verified ? "durch xG bestätigt" : "aus den kassierten Toren belegt"}`
+    + ` · ${percentile} · ${metric} · ${sample}${coverage}`;
   return <span className={`defense-shield ${verified ? "verified" : "fallback"}`} role="img" aria-label={label} title={label}>
     {verified ? <ShieldCheck size={16} weight="fill" aria-hidden /> : <Shield size={16} weight="regular" aria-hidden />}
   </span>;
@@ -593,14 +596,14 @@ export function MarketCard({ market, showEdge }: { market: DashboardMarket; show
       <span className="level-glyph">{market.recommendation.level === "strong" ? "★" : market.recommendation.level === "recommended" ? "✓" : "·"}</span>
       {market.pick && <strong className={`pick ${market.selectionTone}`}>{market.pick}</strong>}
       <strong className="odd">{formatOdd(market.odds)}</strong>
-      {edge !== null && <span className={`market-edge ${edge >= 0 ? "pos" : "neg"}`} title="Value = Modellwahrscheinlichkeit − quotenimplizierte Wahrscheinlichkeit">{edge >= 0 ? "+" : ""}{(edge * 100).toFixed(1).replace(".", ",")} PP</span>}
+      {edge !== null && <span className={`market-edge ${edge >= 0 ? "pos" : "neg"}`} title="Value: um wie viel besser das Modell die Chance sieht, als die Quote es hergibt. Angegeben in Prozentpunkten.">{edge >= 0 ? "+" : ""}{(edge * 100).toFixed(1).replace(".", ",")} PP</span>}
     </div>
     {reliable
       ? <div className="probability-line">
         <span className="probability-track"><span style={{ width: `${percentage}%` }} /></span>
         <span>{formatPercent(market.probability)}</span>
       </div>
-      : <div className="probability-line"><span className="probability-note">Ligastärke fehlt</span></div>}
+      : <div className="probability-line"><span className="probability-note">Ligastärke unbekannt</span></div>}
   </div>;
 }
 
@@ -629,8 +632,8 @@ function EmptyState({ title, text, action }: { title: string; text: string; acti
 function quickpickReason(report: QuickpickFilterReport): string {
   const top = (Object.entries(report.rejected) as Array<[QuickpickRejection, number]>)
     .sort((left, right) => right[1] - left[1])[0];
-  const scope = `Von ${report.evaluated} geprüften Partien erfüllt keine die Kriterien.`;
-  if (!top || top[1] === 0) return `${scope} Öffne den Quickpicker, um die Regler zu lockern.`;
+  const scope = `Von ${report.evaluated} geprüften Spielen passt keines.`;
+  if (!top || top[1] === 0) return `${scope} Öffne den Quickpicker und stelle den Filter lockerer.`;
   return `${scope} Häufigster Grund: ${REJECTION_LABELS[top[0]]} (${top[1]}×).`;
 }
 
@@ -983,8 +986,14 @@ function Dashboard({ document }: { document: DashboardDocument }) {
   const shownMarkets = marketFilter === "all" ? availableMarketOptions.slice(1) : availableMarketOptions.filter((option) => option.key === marketFilter);
   const showFirstHalfExpected = marketFilter === "firstHalfOver05" || marketFilter === "firstHalfOver15";
   const showScore = marketFilter === "all" || marketFilter === "1x2" || marketFilter === "draw";
-  const columnCount = 5 + (showScore ? 1 : 0) + shownMarkets.length;
-  const minimumWidth = 860 + (showScore ? 82 : 0) + shownMarkets.length * 122 + (columnCount - 1) * 12;
+  // Vier Basisspalten, dazu der Score, wenn der Markt ihn zeigt, und die Marktspalten.
+  // Die Summe muss zur Spaltenliste in styles.css passen, sonst scrollt die Tabelle
+  // entweder zu frueh oder laesst die letzte Spalte abschneiden.
+  const columnCount = 4 + (showScore ? 1 : 0) + shownMarkets.length;
+  // 730 = die vier Basisminima (280+184+134+82) plus den Innenabstand der Zeile (40+10);
+  // der Score kommt mit seinem eigenen Minimum dazu. Die Summe muss zur Spaltenliste in
+  // styles.css passen, sonst klemmen die Spalten oder die Tabelle scrollt ohne Not.
+  const minimumWidth = 730 + (showScore ? 52 : 0) + shownMarkets.length * 126 + (columnCount - 1) * 10;
   const gridStyle = {
     "--market-count": shownMarkets.length,
     "--table-min-width": `${minimumWidth}px`
@@ -997,6 +1006,9 @@ function Dashboard({ document }: { document: DashboardDocument }) {
   const isLeagueVisible = (country: string, league: string) =>
     !deselectedLeagues.has(leagueKey(country, league));
   const liveMatches = (live.board?.matches ?? []).filter((match) => isLeagueVisible(match.country, match.league));
+
+  const valueCount = filtered.filter((fixture) =>
+    fixture.markets.some((market) => (edgeOf(market) ?? 0) > 0)).length;
 
   const kpis = [
     { key: "all" as const, icon: ListBullets, value: counts.all, label: "Alle Partien", tone: "neutral" },
@@ -1012,17 +1024,26 @@ function Dashboard({ document }: { document: DashboardDocument }) {
         <div className="brand"><span className="brand-mark">FA</span>{sidebarOpen && <span><strong>Fußball-Analyzer</strong><small>Modell v3.2</small></span>}</div>
         <button className="sidebar-toggle" onClick={() => setSidebarOpen((value) => !value)} aria-controls="dashboard-sidebar" aria-expanded={sidebarOpen} aria-label={sidebarOpen ? "Sidebar einklappen" : "Sidebar ausklappen"} title={sidebarOpen ? "Sidebar einklappen" : "Sidebar ausklappen"}>{sidebarOpen ? <CaretDoubleLeft /> : <CaretDoubleRight />}</button>
       </div>
+      {sidebarOpen && <div className="sidebar-status">
+        <span><strong>{filtered.length}</strong><small>Partien im Zeitraum</small></span>
+        <span className="value"><strong>{valueCount}</strong><small>mit Vorteil</small></span>
+      </div>}
       <div className="view-switch" role="group" aria-label="Ansicht">
         {([["prematch", "Pre-Match", ListBullets], ["live", "Live", Broadcast], ["profile", "Marktprofil", ChartBar]] as const).map(([key, label, Icon]) =>
-          <button key={key} className={view === key ? "active" : ""} aria-pressed={view === key} title={label}
-            onClick={() => setView(key)}><Icon size={15} weight="duotone" aria-hidden />{sidebarOpen && <span>{label}</span>}</button>)}
+          <button key={key} className={`${key === "live" ? "live " : ""}${view === key ? "active" : ""}`} aria-pressed={view === key} title={label}
+            onClick={() => setView(key)}>{sidebarOpen ? <span>{label}</span> : <Icon size={15} weight="duotone" aria-hidden />}</button>)}
       </div>
       {sidebarOpen && <>
+        {view === "prematch" && <section className="sidebar-section kpi-section" aria-label="Filter &amp; Kennzahlen">
+          {kpis.map(({ key, icon: Icon, value, label, tone }) => <button key={key} className={`kpi ${tone} ${levelFilter === key ? "active" : ""}`} aria-pressed={levelFilter === key} onClick={() => setLevelFilter((current) => current === key ? "all" : key)}>
+            <span className="kpi-icon"><Icon size={15} weight="duotone" /></span><span className="kpi-label">{label}</span><strong className="kpi-value">{value}</strong>
+          </button>)}
+        </section>}
         {view === "prematch" && <section className="sidebar-section">
-          <h2><CalendarBlank size={14} weight="bold" aria-hidden /> Zeitraum</h2>
+          <h2>Zeitraum</h2>
           <div className="date-range-control" ref={dateControlRef}>
             <button className={`date-range-trigger ${rangeMode === "custom" ? "active" : ""}`} disabled={!document.meta.firstAvailableDate || !document.meta.lastAvailableDate} aria-label="Datumsbereich auswählen" aria-haspopup="dialog" aria-expanded={calendarOpen} onClick={() => calendarOpen ? setCalendarOpen(false) : openCalendar()}>
-              <CalendarBlank size={16} weight="duotone" /><span><strong>Datumsbereich</strong><small>{customStart && customEnd ? `${formatCalendarDate(customStart, { day: "2-digit", month: "2-digit" })} – ${formatCalendarDate(customEnd, { day: "2-digit", month: "2-digit" })}` : "Keine Tage verfügbar"}</small></span>
+              <span>{customStart && customEnd ? `${formatCalendarDate(customStart, { day: "2-digit", month: "2-digit" })} – ${formatCalendarDate(customEnd, { day: "2-digit", month: "2-digit" })}` : "Keine Tage verfügbar"}</span>
             </button>
             <button className={`quick-range ${rangeMode === "next48" ? "active" : ""}`} aria-pressed={rangeMode === "next48"} onClick={() => { setRangeMode("next48"); setCalendarOpen(false); }}>48h</button>
             {calendarOpen && document.meta.firstAvailableDate && document.meta.lastAvailableDate && <DateRangePopover
@@ -1037,12 +1058,10 @@ function Dashboard({ document }: { document: DashboardDocument }) {
               onCancel={() => setCalendarOpen(false)}
             />}
           </div>
-          <label className="check-row"><input type="checkbox" checked={showCrossLeague} onChange={(event) => setShowCrossLeague(event.target.checked)} /> Pokal- / Cross-League</label>
-          <label className="check-row"><input type="checkbox" checked={showPast} onChange={(event) => setShowPast(event.target.checked)} /> Laufende / beendete Partien</label>
-          <p>{rangeLabel}<br />{filtered.length} von {document.meta.fixtureCount} Partien</p>
+          <p>{rangeLabel} · <strong>{filtered.length}</strong> Partien</p>
         </section>}
         {view === "live" && <section className="sidebar-section live-section">
-          <h2><Broadcast size={14} weight="bold" aria-hidden /> Live-Status</h2>
+          <h2>Live-Status</h2>
           <p><strong>{liveMatches.length}</strong> laufende {liveMatches.length === 1 ? "Partie" : "Partien"}<br />
             {live.board ? `${live.board.candidates} im Zeitfenster` : "Warte auf Daten"}</p>
           {live.board && <p>API-Calls heute: {live.board.budget.usedToday} von {live.board.budget.capToday}
@@ -1055,30 +1074,27 @@ function Dashboard({ document }: { document: DashboardDocument }) {
             Abgewählte kosten keine API-Aufrufe.</p>
         </section>}
         <section className="sidebar-section">
-          <h2><ListBullets size={14} weight="bold" aria-hidden /> Wettbewerbe</h2>
+          <h2>Wettbewerbe</h2>
           <button className={`league-filter-trigger ${deselectedLeagues.size > 0 ? "active" : ""}`}
             aria-label="Wettbewerbe auswählen" aria-haspopup="dialog" aria-expanded={leagueFilterOpen}
             onClick={() => setLeagueFilterOpen(true)}>
-            <span><strong>Wettbewerbe</strong><small>{availableLeagues.length - deselectedLeagues.size} von {availableLeagues.length} ausgewählt</small></span>
+            <span>Alle Wettbewerbe</span><strong>{availableLeagues.length - deselectedLeagues.size}/{availableLeagues.length}</strong><CaretRight size={13} weight="bold" aria-hidden />
           </button>
         </section>
         <section className="sidebar-section">
-          <h2><Calculator size={14} weight="bold" aria-hidden /> Kelly-Kriterium</h2>
+          <h2>Optionen</h2>
+          {view === "prematch" && <>
+            <label className="check-row"><input type="checkbox" checked={showCrossLeague} onChange={(event) => setShowCrossLeague(event.target.checked)} /> Pokal / Cross-League</label>
+            <label className="check-row"><input type="checkbox" checked={showPast} onChange={(event) => setShowPast(event.target.checked)} /> Laufende / beendete Partien</label>
+          </>}
           <label className="check-row"><input type="checkbox" checked={showKelly} onChange={(event) => {
             setShowKelly(event.target.checked);
             if (!event.target.checked) setKellyOpen(false);
-          }} /> Value & Kelly-Ansicht anzeigen</label>
+          }} /> Vorteil & Kelly-Einsatz anzeigen</label>
         </section>
-        {view === "prematch" && <section className="sidebar-section kpi-section">
-          <h2><Funnel size={14} weight="bold" aria-hidden /> Filter & Kennzahlen</h2>
-          {kpis.map(({ key, icon: Icon, value, label, tone }) => <button key={key} className={`kpi ${tone} ${levelFilter === key ? "active" : ""}`} aria-pressed={levelFilter === key} onClick={() => setLevelFilter((current) => current === key ? "all" : key)}>
-            <span className="kpi-icon"><Icon size={16} weight="duotone" /></span><span className="kpi-label">{label}</span><strong className="kpi-value">{value}</strong>
-          </button>)}
-        </section>}
         {view === "prematch" && <section className="sidebar-section defense-legend" aria-label="Legende Defensivstärke">
-          <h2><ShieldCheck size={14} weight="bold" aria-hidden /> Defensivstärke</h2>
-          <span title="Zählt laut Expected Goals Against (xGA) zu den 20 % defensivstärksten Teams der Liga. xGA bewertet die Qualität der gegnerischen Torchancen, nicht nur die tatsächlich kassierten Tore."><ShieldCheck size={16} weight="fill" aria-hidden /> Top 20 %, durch xGA verifiziert</span>
-          <span title="Zählt zu den 20 % defensivstärksten Teams der Liga, gemessen an tatsächlich kassierten Toren. xGA-Daten waren für eine genauere Einordnung nicht verfügbar."><Shield size={16} weight="regular" aria-hidden /> Top 20 %, Torhistorie</span>
+          <span title="Gehört zu den 20 % Mannschaften mit der besten Abwehr in der Liga – gemessen an xGA (erwartete Gegentore). Das bewertet, wie gut die Chancen des Gegners waren, nicht nur, wie viele Tore wirklich fielen."><ShieldCheck size={16} weight="fill" aria-hidden /> Top 20 %, durch xGA verifiziert</span>
+          <span title="Gehört zu den 20 % Mannschaften mit der besten Abwehr in der Liga, gemessen an den wirklich kassierten Toren. Genauere Daten (xGA) lagen nicht vor."><Shield size={16} weight="regular" aria-hidden /> Top 20 %, Torhistorie</span>
         </section>}
         <div className="sidebar-footer">
           <ClockCounterClockwise size={14} weight="bold" aria-hidden />
@@ -1330,9 +1346,18 @@ function Dashboard({ document }: { document: DashboardDocument }) {
     onPresetChange={(preset: QuickpickPresetId) => setQuickpickStore((store) => ({ ...store, aktiv: preset }))}
     onActiveChange={setQuickpickActive}
     onAddAll={(rows) => {
-      // Die gestützte Seite muss in den Schein, nicht der Modelltipp: Bei „Dominanz" können
-      // die beiden auseinanderfallen, und dann wäre der Eintrag schlicht die falsche Wette.
       for (const row of rows) {
+        // Eine Voreinstellung ohne Seite stützt eine Torlinie. Dafür gibt es den allgemeinen
+        // Konstruktor: Er übernimmt Marktkennung, Beschriftung und Auswahl direkt aus dem
+        // Markt des Laufs, und `cartEntryId` lässt die Wette neben einer 1X2-Wette derselben
+        // Partie bestehen, statt sie zu verdrängen.
+        if (row.evaluation.market !== "1x2") {
+          const market = row.fixture.markets.find((entry) => entry.key === row.evaluation.market);
+          if (market) addEntry(toCartEntry(row.fixture, market));
+          continue;
+        }
+        // Die gestützte Seite muss in den Schein, nicht der Modelltipp: Bei „Dominanz" können
+        // die beiden auseinanderfallen, und dann wäre der Eintrag schlicht die falsche Wette.
         if (row.evaluation.side === null) continue;
         addEntry(toQuickpickCartEntry(row.fixture, row.evaluation.side, row.evaluation.odds, null));
       }

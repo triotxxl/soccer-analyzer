@@ -1,4 +1,5 @@
-import type { DashboardFixture, DashboardMarket, FormResult } from "./dashboard.ts";
+import type { DashboardFixture, DashboardMarket, DashboardMarketKey, FormResult } from "./dashboard.ts";
+import type { RecentMatchSummary } from "./types.ts";
 
 /**
  * Gemeinsames Gerüst des Quickpickers: Typen und Messgrößen, die sich alle Voreinstellungen
@@ -8,7 +9,7 @@ import type { DashboardFixture, DashboardMarket, FormResult } from "./dashboard.
  * Hier steht bewusst keine Regel - nur das, woraus Regeln gebaut werden.
  */
 
-export type QuickpickPresetId = "daves1x2" | "dominanz";
+export type QuickpickPresetId = "daves1x2" | "dominanz" | "hz15" | "remis";
 
 export type QuickpickLevelId = "streng" | "ausgewogen" | "locker" | "weit";
 
@@ -103,27 +104,46 @@ export type QuickpickRejection =
   | "keineTabelle"
   | "tabelle"
   | "serie"
+  // Zu wenige Formspiele, um die Formschwelle überhaupt zu prüfen. Bewusst ein eigener Grund:
+  // `venueForm` heißt "gemessen und zu schwach", dieser hier heißt "gar nicht gemessen".
+  | "formFehlt"
   // Gründe der Voreinstellung "Dominanz". Eine gemeinsame Liste, weil das Panel ohnehin nur
   // Gründe mit einem Zähler über null anzeigt.
   | "keineQuote"
   | "bilanz"
   | "keineDuelle"
-  | "modellDagegen";
+  | "modellDagegen"
+  // Gründe der Voreinstellung "Erste Halbzeit: zwei Tore". Sie stützt keine Seite, sondern
+  // einen festen Markt - ihre Tore fragen nach dem Torumfeld, nicht nach einer Mannschaft.
+  | "keinMarkt"
+  | "torerwartung"
+  | "remisbild"
+  | "hzHistorie"
+  // Grund der Voreinstellung "Remis-Kandidaten". Bewusst ein eigener Schlüssel: `remisbild`
+  // ist vergeben und meint bei "Erste Halbzeit" das Gegenteil - dort weist es eine Partie
+  // ab, weil sie zu remisnah ist.
+  | "remisChance";
 
 export const REJECTION_LABELS: Record<QuickpickRejection, string> = {
-  keinTipp: "kein 1X2-Tipp im Lauf",
-  venueForm: "keine klar stärkere Seite in der Form",
-  seitenkonflikt: "Form und Modelltipp meinen verschiedene Seiten",
-  quote: "Quote unter der Mindestquote",
-  punkte: "zu wenig Favoritenpunkte",
-  h2hDagegen: "die direkten Duelle sprechen gegen die Seite",
-  keineTabelle: "keine Ligatabelle – Überlegenheit nicht prüfbar",
+  keinTipp: "für dieses Spiel gibt es keinen Sieger-Tipp",
+  venueForm: "keine Mannschaft ist in der Form klar besser",
+  seitenkonflikt: "Form und Modell tippen verschiedene Mannschaften",
+  quote: "Quote außerhalb des eingestellten Bereichs",
+  punkte: "das Modell hält den Favoriten für zu schwach",
+  h2hDagegen: "die direkten Duelle sprechen dagegen",
+  keineTabelle: "es gibt keine Tabelle – Überlegenheit nicht prüfbar",
   tabelle: "die Tabelle zeigt keinen klaren Vorsprung",
-  serie: "keine Siegesserie auf der gestützten Seite",
-  keineQuote: "keine brauchbare Quote im Lauf",
-  bilanz: "Sieg-plus-Remis-Verhältnis nicht deutlich überlegen",
+  serie: "keine Siegesserie in den direkten Duellen",
+  formFehlt: "zu wenige Spiele, um die Form zu vergleichen",
+  keineQuote: "keine brauchbare Quote vorhanden",
+  bilanz: "verliert nicht deutlich seltener als der Gegner",
   keineDuelle: "zu wenige direkte Duelle",
-  modellDagegen: "das Modell tippt die andere Seite"
+  modellDagegen: "das Modell tippt die andere Mannschaft",
+  keinMarkt: "diese Wette wird für das Spiel nicht angeboten",
+  torerwartung: "es sind zu wenige Tore zu erwarten",
+  remisbild: "ein Unentschieden ist zu wahrscheinlich",
+  hzHistorie: "in der ersten Halbzeit fallen hier selten zwei Tore",
+  remisChance: "die Chance auf ein Unentschieden ist zu klein"
 };
 
 export interface QuickpickDominance {
@@ -146,6 +166,14 @@ export interface QuickpickSuperiority {
   positionGap: number;
   position: number;
   opponentPosition: number;
+  /**
+   * Die Zahl der Spiele, auf denen der Vorsprung beruht. Ohne sie sieht ein Vorsprung nach vier
+   * Spieltagen aus wie einer nach dreißig, und beide passieren dasselbe Tor. Gemessen beruhen
+   * 39 % der Treffer auf einer Seite mit höchstens sechs Spielen - ein Tor darauf gibt die
+   * Messung nicht her (71,0 % gegen 64,6 %), die Anzeige schon.
+   */
+  played: number;
+  opponentPlayed: number;
   /**
    * Anteil der Spiele ohne Niederlage, `(Siege + Remis) / Spiele`, über die laufende Saison.
    * Das ist die „Form" im Sinne einer Saisonbilanz - **nicht** die letzten fünf Spiele am Ort.
@@ -173,8 +201,54 @@ export interface DominanzDetail {
   oddsSource: "snapshot" | "geschätzt";
 }
 
+/** Was nur die Voreinstellung „Erste Halbzeit: zwei Tore" braucht. */
+export interface Hz15Detail {
+  /** Erwartete Tore des **ganzen** Spiels. Sie trennt besser als die Halbzeiterwartung. */
+  expectedGoals: number;
+  /** Erwartete Tore der ersten Halbzeit, falls der Lauf sie führt - nur Anzeige. */
+  expectedFirstHalfGoals: number | null;
+  /** Modellwahrscheinlichkeit für ein Remis. Je kleiner, desto offener die Partie. */
+  drawProbability: number | null;
+  /**
+   * Anteil der Partien mit mindestens zwei Halbzeittoren, gemittelt über die jüngsten
+   * Spiele beider Mannschaften. `null` heißt "nicht prüfbar" - der Lauf führt für diese
+   * Partie zu wenige Halbzeitstände -, nicht "schlecht".
+   */
+  firstHalfRate: number | null;
+  /** Wie viele Partien der Anteil trägt, je Mannschaft die kleinere Zahl. */
+  firstHalfSample: number;
+  /** Modellwahrscheinlichkeit des Marktes selbst. */
+  probability: number;
+}
+
+/** Was nur die Voreinstellung „Remis-Kandidaten" braucht. */
+export interface RemisDetail {
+  /** Modellwahrscheinlichkeit für ein Remis - das einzige Tor dieser Voreinstellung. */
+  probability: number;
+  /**
+   * Die Remis-Punkte aus `src/draw-criteria.ts`, unverändert aus `scores.draw`. **Nur
+   * Anzeige.** Ein Tor darauf senkt die Trefferquote messbar (>= 40 Punkte auf 34,7 %,
+   * >= 50 auf 30,8 % gegenüber 35,7 % ohne) - siehe Kopfkommentar der Voreinstellung.
+   */
+  punkte: number | null;
+  /** Remis unter den überlieferten direkten Duellen, und die Serie ab dem jüngsten. */
+  h2hDraws: number;
+  h2hSample: number;
+  consecutiveDraws: number;
+  /** Erwartete Tore des ganzen Spiels - nur Einordnung, kein Tor. */
+  expectedGoals: number;
+}
+
 export interface QuickpickEvaluation {
   fixtureId: number;
+  /**
+   * Der Markt, auf den die Voreinstellung setzt. Die beiden 1X2-Voreinstellungen stützen eine
+   * **Seite**, „Erste Halbzeit" stützt eine **Torlinie** - dort bleibt `side` null. Rückrechnung
+   * und Wettschein lesen dieses Feld, statt eine Seite vorauszusetzen.
+   */
+  market: DashboardMarketKey;
+  /** Die Auswahl im Klartext, so wie sie im Wettschein und in `decideMarket` steht. */
+  selection: string;
   /**
    * Die Seite, die der Filter stützt. Bei „daves1x2" immer der Modelltipp; bei „dominanz"
    * die Seite mit dem Tabellen- und Serienvorsprung - das kann auch die Gegenseite sein.
@@ -194,6 +268,10 @@ export interface QuickpickEvaluation {
   superiority: QuickpickSuperiority | null;
   /** Nur bei „dominanz" gesetzt. */
   dominanz?: DominanzDetail | null;
+  /** Nur bei „hz15" gesetzt. */
+  hz15?: Hz15Detail | null;
+  /** Nur bei „remis" gesetzt. */
+  remis?: RemisDetail | null;
   passes: boolean;
   rejectedBy: QuickpickRejection | null;
 }
@@ -207,8 +285,10 @@ export interface QuickpickFilterReport {
 export function emptyRejections(): Record<QuickpickRejection, number> {
   return {
     keinTipp: 0, venueForm: 0, seitenkonflikt: 0, quote: 0, punkte: 0,
-    h2hDagegen: 0, keineTabelle: 0, tabelle: 0, serie: 0,
-    keineQuote: 0, bilanz: 0, keineDuelle: 0, modellDagegen: 0
+    h2hDagegen: 0, keineTabelle: 0, tabelle: 0, serie: 0, formFehlt: 0,
+    keineQuote: 0, bilanz: 0, keineDuelle: 0, modellDagegen: 0,
+    keinMarkt: 0, torerwartung: 0, remisbild: 0, hzHistorie: 0,
+    remisChance: 0
   };
 }
 
@@ -298,7 +378,9 @@ export function superiorityOf(fixture: DashboardFixture, side: "1" | "2"): Quick
       - (other.goalsFor - other.goalsAgainst) / other.played,
     positionGap: other.position - backed.position,
     position: backed.position,
-    opponentPosition: other.position
+    opponentPosition: other.position,
+    played: backed.played,
+    opponentPlayed: other.played
   };
 }
 
@@ -343,4 +425,40 @@ export function counterOddsOf(
   // offensichtlich ein anderer, und geraten wird nicht.
   if (rest <= 0.01) return null;
   return { odds: 1 / rest, source: "geschätzt" };
+}
+
+/** Ein bestimmter Markt einer Partie. */
+export function marketOf(fixture: DashboardFixture, key: DashboardMarketKey): DashboardMarket | undefined {
+  return fixture.markets.find((market) => market.key === key);
+}
+
+/**
+ * Wie oft in den überlieferten Partien einer Mannschaft **zur Pause** schon zwei Tore
+ * gefallen waren, und wie viele Tore es im Mittel waren.
+ *
+ * Gezählt werden nur Partien, die beide Halbzeitstände führen: Ein fehlender Pausenstand ist
+ * keine torlose Halbzeit. Unter vier verwertbaren Partien wird nichts zurückgegeben - der
+ * Anteil schwankte dort zwischen 0 und 100 %, ohne etwas zu bedeuten.
+ *
+ * Die Liste selbst darf fehlen: Snapshots aus der Zeit vor `form.homeMatches` führen sie
+ * nicht, und die Rückrechnung liest genau solche Läufe mit. Der Typ verspricht sie zwar, ein
+ * archiviertes JSON hält sich daran aber nicht - deshalb die Prüfung zur Laufzeit.
+ *
+ * Gemessen über 4.397 abgerechnete Partien aus den archivierten Läufen: Der Anteil trennt für
+ * sich genommen nur schwach (>= 0,50 im Mittel beider Mannschaften: 39,6 % gegenüber 35,7 %
+ * Basisrate). Er steht deshalb im Filter nur als zuschaltbares Tor, nicht als Kerntor.
+ */
+export function firstHalfRateOf(
+  matches: RecentMatchSummary[] | undefined
+): { rate: number; goals: number; sample: number } | null {
+  if (!Array.isArray(matches)) return null;
+  const valid = matches.filter((match) =>
+    typeof match.halfTimeHomeGoals === "number" && typeof match.halfTimeAwayGoals === "number");
+  if (valid.length < 4) return null;
+  const totals = valid.map((match) => (match.halfTimeHomeGoals ?? 0) + (match.halfTimeAwayGoals ?? 0));
+  return {
+    rate: totals.filter((total) => total >= 2).length / totals.length,
+    goals: totals.reduce((sum, total) => sum + total, 0) / totals.length,
+    sample: valid.length
+  };
 }

@@ -266,8 +266,8 @@ const SUPERIORITY_FLOOR = 1;
 const DEVIATION_CAP = 0.6;
 
 const VIEW_HINTS: Record<StatView, string> = {
-  share: "Spurlänge ist der Ø-Gesamtwert beider Teams, beide Anteile laufen von links.",
-  dev: "Mittellinie ist der Vergleichsschnitt, nach rechts darüber, nach links darunter. Skala bis ±60 %."
+  share: "Die Länge des Balkens ist der Schnitt beider Mannschaften zusammen, beide Anteile beginnen links.",
+  dev: "Die Mittellinie ist der Durchschnitt. Nach rechts heißt darüber, nach links darunter."
 };
 
 const STAT_GROUPS: Array<{ id: MatchStatRow["group"]; title: string }> = [

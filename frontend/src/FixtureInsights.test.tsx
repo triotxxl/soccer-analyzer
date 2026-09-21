@@ -309,11 +309,11 @@ describe("Match-Statistiken", () => {
     const user = userEvent.setup();
     const { panel } = panels();
     const view = panel("Match-Statistiken");
-    expect(view.getByText(/Spurlänge ist der Ø-Gesamtwert/)).toBeInTheDocument();
+    expect(view.getByText(/Die Länge des Balkens ist der Schnitt beider Mannschaften/)).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Abweichung" }));
 
-    expect(view.getByText(/Mittellinie ist der Vergleichsschnitt/)).toBeInTheDocument();
+    expect(view.getByText(/Die Mittellinie ist der Durchschnitt/)).toBeInTheDocument();
     // Schnitt der Ecken über beide Seiten aller sieben Partien mit Werten: 35 / 7 = 5,0.
     expect(basis("Ecken")).toBe("Ø Vergleich 5,0");
     expect(values("Ecken")).toEqual(["+20 %", "−40 %"]);

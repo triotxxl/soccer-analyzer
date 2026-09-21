@@ -7,9 +7,14 @@
  * Ausgewertet wird `evaluateFixture` aus `src/quickpick.ts`, also genau die Fassung, die auch
  * die App benutzt; eine zweite Fassung hier würde die Rückrechnung wertlos machen.
  *
- * Jede Voreinstellung hat ihren eigenen Maßstab: „daves1x2" zählt die Trefferquote je Bein,
- * „dominanz" den Ertrag je Bein. Beide liefern Beine für Kombis - nur der Maßstab unterscheidet
- * sich, weil bei „dominanz" die Trefferquote fast exakt der Quote folgt.
+ * Jede Voreinstellung hat ihren eigenen Maßstab: „daves1x2" und „hz15" zählen die Trefferquote
+ * je Bein, „dominanz" den Ertrag je Bein. Alle drei liefern Beine für Kombis - nur der Maßstab
+ * unterscheidet sich, weil bei „dominanz" die Trefferquote fast exakt der Quote folgt.
+ *
+ * **Zwei Arten von Auswahl:** Die 1X2-Voreinstellungen stützen eine *Seite* und werden über
+ * den Sieger abgerechnet. „hz15" stützt eine *Torlinie*; dort entscheidet `decideMarket`
+ * anhand des Pausenstands, und eine Partie ohne überlieferten Pausenstand fällt heraus, statt
+ * als Niederlage zu zählen.
  *
  * **Grenze der Abrechnung:** `tipico_fixtures` speichert je Partie nur den *letzten* Preis vor
  * Anpfiff. Die Außenseiterquote, zu der hier abgerechnet wird, ist also nicht zwingend die,
@@ -26,6 +31,7 @@ import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { DB_FILE, ROOT_DIR } from "../src/config.ts";
 import type { DashboardFixture } from "../src/dashboard.ts";
+import { decideMarket } from "../src/market-outcome.ts";
 import {
   QUICKPICK_PRESETS,
   QUICKPICK_PRESET_LIST,
@@ -62,19 +68,31 @@ interface CalibrationState {
 interface Bet { kickoff: string; odds: number; hit: boolean }
 interface Triple { home: number; draw: number; away: number }
 
-function readOutcomes(): Map<number, { home: number; away: number }> {
+interface SettledOutcome { home: number; away: number; halfHome: number | null; halfAway: number | null }
+
+/**
+ * Die abgerechneten Ergebnisse. Der Pausenstand gehört seit „hz15" dazu: Ohne ihn ließe sich
+ * „1. HZ Ü1,5" gar nicht entscheiden.
+ */
+function readOutcomes(): Map<number, SettledOutcome> {
   if (!fs.existsSync(DB_FILE)) {
     throw new Error("Es gibt noch keine Datenbank mit abgerechneten Ergebnissen.");
   }
   const database = new DatabaseSync(DB_FILE, { readOnly: true });
-  const outcomes = new Map<number, { home: number; away: number }>();
+  const outcomes = new Map<number, SettledOutcome>();
   const rows = database.prepare(`
-    SELECT fixture_id, actual_home_goals, actual_away_goals
+    SELECT fixture_id, actual_home_goals, actual_away_goals,
+           actual_halftime_home_goals, actual_halftime_away_goals
     FROM goal_line_predictions
     WHERE settled_at IS NOT NULL AND actual_home_goals IS NOT NULL AND actual_away_goals IS NOT NULL
-  `).all() as Array<Record<string, number>>;
+  `).all() as Array<Record<string, number | null>>;
   for (const row of rows) {
-    outcomes.set(row.fixture_id, { home: row.actual_home_goals, away: row.actual_away_goals });
+    outcomes.set(row.fixture_id as number, {
+      home: row.actual_home_goals as number,
+      away: row.actual_away_goals as number,
+      halfHome: row.actual_halftime_home_goals ?? null,
+      halfAway: row.actual_halftime_away_goals ?? null
+    });
   }
   database.close();
   return outcomes;
@@ -129,30 +147,51 @@ function readFixtures(): DashboardFixture[] {
   return [...latest.values()].map((entry) => entry.fixture);
 }
 
-interface BetResult { bets: Bet[]; ohnePreis: number; seiteRichtig: number; seiteGesamt: number }
+interface BetResult {
+  bets: Bet[]; ohnePreis: number; seiteRichtig: number; seiteGesamt: number;
+  /** Partien ohne überlieferten Pausenstand. Sie zählen nicht als Niederlage, sondern gar nicht. */
+  unentscheidbar: number;
+}
 
 function betsFor(
   preset: AnyQuickpickPreset,
   level: QuickpickLevelId,
   fixtures: DashboardFixture[],
-  outcomes: Map<number, { home: number; away: number }>,
+  outcomes: Map<number, SettledOutcome>,
   prices: Map<number, Triple>
 ): BetResult {
   const settings = applyLevel(preset.defaults as QuickpickSettings, level);
-  const result: BetResult = { bets: [], ohnePreis: 0, seiteRichtig: 0, seiteGesamt: 0 };
+  const result: BetResult = { bets: [], ohnePreis: 0, seiteRichtig: 0, seiteGesamt: 0, unentscheidbar: 0 };
 
   for (const fixture of fixtures) {
     const outcome = outcomes.get(fixture.fixtureId);
     if (!outcome) continue;
     const evaluation = evaluateFixture(fixture, settings);
-    if (!evaluation.passes || evaluation.side === null) continue;
+    if (!evaluation.passes) continue;
+    // Eine Voreinstellung ohne Seite setzt auf eine Torlinie. Bei 1X2 bleibt die Abrechnung
+    // unverändert über den Sieger - die gemessenen Zahlen auf den Knöpfen der beiden älteren
+    // Voreinstellungen dürfen sich durch diese Erweiterung nicht verschieben.
+    const einXZwei = evaluation.market === "1x2";
+    if (einXZwei && evaluation.side === null) continue;
     const winner = outcome.home > outcome.away ? "1" : outcome.home < outcome.away ? "2" : "X";
+    const treffer = einXZwei
+      ? winner === evaluation.side
+      : decideMarket(evaluation.market, evaluation.selection, {
+          homeGoals: outcome.home, awayGoals: outcome.away,
+          halftimeHomeGoals: outcome.halfHome, halftimeAwayGoals: outcome.halfAway
+        });
+    // `null` heißt "nicht entscheidbar" - bei einem Halbzeitmarkt ohne überlieferten
+    // Pausenstand. Solche Partien fallen heraus, statt die Trefferquote zu drücken.
+    if (treffer === null) { result.unentscheidbar += 1; continue; }
     const triple = prices.get(fixture.fixtureId);
 
     // Datenqualität: Deckt sich der Preis aus dem Snapshot mit dem archivierten Tripel? Wo
     // die Regel die Gegenseite stützt, stand im Snapshot vor schemaVersion 5 nur eine
     // Schätzung - abgerechnet wird deshalb immer zum echten archivierten Preis.
-    const echterPreis = triple ? (evaluation.side === "1" ? triple.home : triple.away) : null;
+    // Das archivierte Tripel kennt nur 1X2. Für eine Torlinie gibt es keinen Ersatzpreis -
+    // dort gilt ausschließlich der Preis aus dem Lauf.
+    const echterPreis = !einXZwei ? null
+      : triple ? (evaluation.side === "1" ? triple.home : triple.away) : null;
     if (echterPreis !== null && evaluation.odds !== null) {
       result.seiteGesamt += 1;
       if (Math.abs(echterPreis - evaluation.odds) / echterPreis <= 0.05) result.seiteRichtig += 1;
@@ -165,7 +204,7 @@ function betsFor(
     const odds = geschaetzt ? echterPreis : (evaluation.odds ?? echterPreis);
     if (odds === null) { result.ohnePreis += 1; continue; }
 
-    result.bets.push({ kickoff: fixture.kickoff, odds, hit: winner === evaluation.side });
+    result.bets.push({ kickoff: fixture.kickoff, odds, hit: treffer });
   }
   result.bets.sort((left, right) => left.kickoff.localeCompare(right.kickoff));
   return result;
@@ -201,6 +240,21 @@ function metricsOf(bets: Bet[]): Metrics | null {
     firstRoi: halfRoi(bets.slice(0, middle)),
     secondRoi: halfRoi(bets.slice(middle))
   };
+}
+
+/**
+ * Setzt den Zufall auf einen Startwert zurück, der nur von Voreinstellung und Stufe abhängt.
+ *
+ * Nötig, weil `seed` über den ganzen Lauf fortgeschrieben wird: Ohne diesen Schnitt zöge
+ * `npm run quickpick-report -- --preset hz15` andere Kombis als ein Lauf über alle drei
+ * Voreinstellungen, weil vorher unterschiedlich viele Zahlen verbraucht wurden. Genau das
+ * soll der feste Startwert verhindern - die gemessenen Kombizahlen im Code müssen zu beiden
+ * Aufrufen passen.
+ */
+function resetSeed(presetId: string, levelId: string): void {
+  let hash = 20260916;
+  for (const char of `${presetId}:${levelId}`) hash = (hash * 31 + char.charCodeAt(0)) % 2147483648;
+  seed = hash;
 }
 
 /**
@@ -343,14 +397,16 @@ function main(): void {
       + `${"Quote".padStart(8)}${"ROI".padStart(10)}${"±".padStart(9)}${"1.H".padStart(9)}${"2.H".padStart(9)}   im Code`);
 
     const stufen: Record<string, StufenStand> = {};
-    let qualitaet = { richtig: 0, gesamt: 0, ohnePreis: 0 };
+    let qualitaet = { richtig: 0, gesamt: 0, ohnePreis: 0, unentscheidbar: 0 };
 
     for (const level of preset.levels) {
-      const { bets, ohnePreis, seiteRichtig, seiteGesamt } = betsFor(preset, level.id, fixtures, outcomes, prices);
+      const { bets, ohnePreis, seiteRichtig, seiteGesamt, unentscheidbar } =
+        betsFor(preset, level.id, fixtures, outcomes, prices);
       qualitaet = {
         richtig: qualitaet.richtig + seiteRichtig,
         gesamt: qualitaet.gesamt + seiteGesamt,
-        ohnePreis: qualitaet.ohnePreis + ohnePreis
+        ohnePreis: qualitaet.ohnePreis + ohnePreis,
+        unentscheidbar: qualitaet.unentscheidbar + unentscheidbar
       };
       const metrics = metricsOf(bets);
       if (metrics === null) {
@@ -358,6 +414,7 @@ function main(): void {
         continue;
       }
       const perDay = metrics.n / spanInDays(bets);
+      resetSeed(preset.id, level.id);
       const kombis = [2, 3, 4, 5, 6, 7]
         .map((beine) => comboMetrics(bets, beine, fensterTage))
         .filter((entry): entry is QuickpickComboMeasurement => entry !== null);
@@ -408,6 +465,10 @@ function main(): void {
       }
     }
 
+    if (qualitaet.unentscheidbar > 0) {
+      console.log(`  ${qualitaet.unentscheidbar} Zeilen ohne überlieferten Pausenstand - sie`
+        + " fallen heraus und zählen nicht als Niederlage.");
+    }
     if (qualitaet.gesamt > 0 && qualitaet.richtig < qualitaet.gesamt) {
       console.log(`  Datenqualität: Der Preis aus dem Snapshot deckte sich in`
         + ` ${percent(qualitaet.richtig / qualitaet.gesamt)} der Fälle mit dem archivierten`

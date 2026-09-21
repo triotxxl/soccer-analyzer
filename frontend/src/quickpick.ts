@@ -8,17 +8,21 @@ export * from "../../src/quickpick.ts";
 import {
   DEFAULT_QUICKPICK_SETTINGS,
   DEFAULT_DOMINANZ_SETTINGS,
+  DEFAULT_HZ15_SETTINGS,
+  DEFAULT_REMIS_SETTINGS,
   QUICKPICK_PRESETS,
   type DavesQuickpickSettings,
   type QuickpickPresetId,
   type QuickpickSettings,
-  type DominanzQuickpickSettings
+  type DominanzQuickpickSettings,
+  type Hz15QuickpickSettings,
+  type RemisQuickpickSettings
 } from "../../src/quickpick.ts";
 
 const STORAGE_KEY = "football-analyzer:quickpick-settings";
 
 /**
- * Beide Voreinstellungen behalten ihre eigenen Schwellen. Ein Wechsel darf die Regler der
+ * Jede Voreinstellung behält ihre eigenen Schwellen. Ein Wechsel darf die Regler der
  * anderen nicht überschreiben - sonst wäre jeder Blick in die zweite Liste eine stille
  * Änderung der ersten.
  */
@@ -26,12 +30,16 @@ export interface QuickpickStore {
   aktiv: QuickpickPresetId;
   daves1x2: DavesQuickpickSettings;
   dominanz: DominanzQuickpickSettings;
+  hz15: Hz15QuickpickSettings;
+  remis: RemisQuickpickSettings;
 }
 
 export const DEFAULT_QUICKPICK_STORE: QuickpickStore = {
   aktiv: "daves1x2",
   daves1x2: DEFAULT_QUICKPICK_SETTINGS,
-  dominanz: DEFAULT_DOMINANZ_SETTINGS
+  dominanz: DEFAULT_DOMINANZ_SETTINGS,
+  hz15: DEFAULT_HZ15_SETTINGS,
+  remis: DEFAULT_REMIS_SETTINGS
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -69,7 +77,9 @@ export function loadQuickpickStore(): QuickpickStore {
     // Daves' Regler und wandert unverändert in dessen Zweig, statt verworfen zu werden.
     // `underdog` muss hier mitgeprüft werden, sonst gälte ein Stand aus der Außenseiter-Zeit
     // als flacher Altbestand und wanderte komplett in den Daves-Zweig.
-    if (parsed.daves1x2 === undefined && parsed.dominanz === undefined && parsed.underdog === undefined) {
+    if (parsed.daves1x2 === undefined && parsed.dominanz === undefined
+      && parsed.underdog === undefined && parsed.hz15 === undefined
+      && parsed.remis === undefined) {
       return { ...DEFAULT_QUICKPICK_STORE, daves1x2: mergeBranch(DEFAULT_QUICKPICK_SETTINGS, parsed) };
     }
 
@@ -84,7 +94,9 @@ export function loadQuickpickStore(): QuickpickStore {
     return {
       aktiv,
       daves1x2: mergeBranch(DEFAULT_QUICKPICK_SETTINGS, parsed.daves1x2),
-      dominanz: mergeBranch(DEFAULT_DOMINANZ_SETTINGS, parsed.dominanz)
+      dominanz: mergeBranch(DEFAULT_DOMINANZ_SETTINGS, parsed.dominanz),
+      hz15: mergeBranch(DEFAULT_HZ15_SETTINGS, parsed.hz15),
+      remis: mergeBranch(DEFAULT_REMIS_SETTINGS, parsed.remis)
     };
   } catch {
     return DEFAULT_QUICKPICK_STORE;
@@ -102,13 +114,17 @@ export function saveQuickpickStore(store: QuickpickStore): void {
 
 /** Die Einstellungen der gerade gewählten Voreinstellung. */
 export function settingsOf(store: QuickpickStore): QuickpickSettings {
-  return store.aktiv === "dominanz" ? store.dominanz : store.daves1x2;
+  return store.aktiv === "dominanz" ? store.dominanz
+    : store.aktiv === "hz15" ? store.hz15
+    : store.aktiv === "remis" ? store.remis
+    : store.daves1x2;
 }
 
 /** Legt geänderte Einstellungen in ihren eigenen Zweig zurück. */
 export function withSettings(store: QuickpickStore, settings: QuickpickSettings): QuickpickStore {
-  return settings.preset === "dominanz"
-    ? { ...store, dominanz: settings }
+  return settings.preset === "dominanz" ? { ...store, dominanz: settings }
+    : settings.preset === "hz15" ? { ...store, hz15: settings }
+    : settings.preset === "remis" ? { ...store, remis: settings }
     : { ...store, daves1x2: settings };
 }
 

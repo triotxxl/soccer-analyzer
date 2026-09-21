@@ -17,16 +17,24 @@ import {
 } from "./quickpick-core.ts";
 import { DAVES_PRESET, evaluateDaves, type DavesQuickpickSettings } from "./quickpick-daves.ts";
 import { DOMINANZ_PRESET, evaluateDominanz, type DominanzQuickpickSettings } from "./quickpick-dominanz.ts";
+import { HZ15_PRESET, evaluateHz15, type Hz15QuickpickSettings } from "./quickpick-hz15.ts";
+import { REMIS_PRESET, evaluateRemis, type RemisQuickpickSettings } from "./quickpick-remis.ts";
 
 export * from "./quickpick-core.ts";
 export * from "./quickpick-daves.ts";
 export * from "./quickpick-dominanz.ts";
+export * from "./quickpick-hz15.ts";
+export * from "./quickpick-remis.ts";
 
 /**
  * Die Einstellungen der **gerade gewählten** Voreinstellung. Eine diskriminierte Union über
  * `preset`: So kann keine Voreinstellung versehentlich eine Schwelle der anderen lesen.
  */
-export type QuickpickSettings = DavesQuickpickSettings | DominanzQuickpickSettings;
+export type QuickpickSettings =
+  | DavesQuickpickSettings
+  | DominanzQuickpickSettings
+  | Hz15QuickpickSettings
+  | RemisQuickpickSettings;
 
 /** Die Einstellungen zu einer bestimmten Voreinstellung. */
 export type SettingsOf<I extends QuickpickPresetId> = Extract<QuickpickSettings, { preset: I }>;
@@ -36,13 +44,17 @@ export type AnyQuickpickPreset = QuickpickPreset<QuickpickSettings>;
 
 export const QUICKPICK_PRESETS: Record<QuickpickPresetId, AnyQuickpickPreset> = {
   daves1x2: DAVES_PRESET as unknown as AnyQuickpickPreset,
-  dominanz: DOMINANZ_PRESET as unknown as AnyQuickpickPreset
+  dominanz: DOMINANZ_PRESET as unknown as AnyQuickpickPreset,
+  hz15: HZ15_PRESET as unknown as AnyQuickpickPreset,
+  remis: REMIS_PRESET as unknown as AnyQuickpickPreset
 };
 
 /** Stabile Reihenfolge für die Auswahl in der Oberfläche. */
 export const QUICKPICK_PRESET_LIST: AnyQuickpickPreset[] = [
   QUICKPICK_PRESETS.daves1x2,
-  QUICKPICK_PRESETS.dominanz
+  QUICKPICK_PRESETS.dominanz,
+  QUICKPICK_PRESETS.hz15,
+  QUICKPICK_PRESETS.remis
 ];
 
 /** Der Deskriptor zu einer Einstellung. */
@@ -59,8 +71,9 @@ export function evaluateFixture(
   fixture: DashboardFixture,
   settings: QuickpickSettings
 ): QuickpickEvaluation {
-  return settings.preset === "dominanz"
-    ? evaluateDominanz(fixture, settings)
+  return settings.preset === "dominanz" ? evaluateDominanz(fixture, settings)
+    : settings.preset === "hz15" ? evaluateHz15(fixture, settings)
+    : settings.preset === "remis" ? evaluateRemis(fixture, settings)
     : evaluateDaves(fixture, settings);
 }
 
