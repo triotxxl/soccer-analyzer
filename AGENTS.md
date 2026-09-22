@@ -329,13 +329,44 @@ nachgezogen, nicht gesammelt am Ende.
 - Belastbarkeit prüfen: `npm run edge-report -- --simulate`. Die Kalibrierung wird dabei nur
   aus der ersten Zeithälfte gebildet und auf die zweite angewendet, zusätzlich an mehreren
   Trennstellen und einmal ohne den Remis-Markt. **Jeder ROI wird mit seinem Standardfehler
-  gedruckt** - ohne den ist eine Zahl auf diesen Stichproben nicht lesbar. Stand 15.09.2026
-  liegt die Automatik out of sample bei −0,2 bis +2,6 % gegenüber −5,1 bis −7,2 % der früheren
-  Vorgabe, bei einer Streuung von rund ±5 Punkten: Der Abstand ist damit etwa **ein Sigma und
-  belegt nichts**. Ohne den Remis-Markt steht sie bei −2,5 bis −4,0 %; ihr gesamter Vorsprung
-  hängt an diesem einen Markt, der in der Prüfhälfte auf 24 Wetten steht. **Messbar weniger
-  verlustreich als die frühere Vorgabe, nicht als gewinnbringend nachgewiesen.** Diese
-  Einordnung gehört in jede Aussage über die Automatik.
+  gedruckt** - ohne den ist eine Zahl auf diesen Stichproben nicht lesbar.
+
+  **Stand 21.09.2026** über 32.108 abgerechnete Marktzeilen, an drei Trennstellen:
+
+  | Schnitt | Automatik | ohne Remis | frühere Vorgabe |
+  |---|---|---|---|
+  | 04.09. | −6,6 ± 3,3 % | −8,6 ± 3,0 % | −8,5 ± 2,5 % |
+  | 07.09. | −8,1 ± 3,3 % | −9,8 ± 3,0 % | −11,3 ± 2,7 % |
+  | 12.09. | −6,4 ± 4,7 % | −8,5 ± 4,3 % | −11,6 ± 2,9 % |
+
+  Der gepaarte Vergleich am 07.09. ergibt +9,0 ± 6,9 %, also 1,3 Sigma. **Die Automatik ist
+  damit weder gewinnbringend noch belegt weniger verlustreich** - am Schnitt 04.09. liegt sie
+  innerhalb des Fehlerbereichs der alten Vorgabe. Ohne den Remis-Markt verliert sie an allen
+  drei Stellen deutlich. Diese Einordnung gehört in jede Aussage über die Automatik.
+
+  **Die Zahlen vom 15.09.2026 (−0,2 bis +2,6 %) haben nicht gehalten.** Sie standen auf der
+  halben Stichprobe. Wer die aktuelle Zahl für eine Regeländerung heranzieht, sollte wissen,
+  dass genau das mit der letzten passiert ist.
+- **Warum kein Umbau der Auswahl daran etwas ändert** (gemessen am 21.09.2026, gehört vor jede
+  weitere Idee zur Ertragsverbesserung gelesen):
+  - Das Modell schätzt sich **im Ganzen nicht zu hoch ein**: 1X2 über 7.990 Partien 46,5 %
+    Prognose gegen 46,5 % eingetreten, Über 2,5 54,5 gegen 54,8 %, Über 1,5 77,3 gegen 77,0 %
+    (`npm run report`). Es gibt also keinen allgemeinen Fehler, den eine Korrektur wegnehmen
+    könnte.
+  - Auf den Zeilen, die der Picker wählt, sagt dasselbe Modell 55,5 % voraus und es treten
+    40,0 % ein. Der Filter sucht über die Abweichung von der Tipico-Quote - und weil das
+    Modell im Mittel richtig liegt, ist eine große Abweichung **kein Wissen, sondern ein
+    Ausrutscher des Modells**. Das zeigt sich monoton: 7-10 PP +0,1 %, 10-15 PP −14,1 %,
+    15-25 PP −17,8 %, ab 25 PP −80,5 %.
+  - Gegenprobe über den Preis: unser Preis bei der Auswahl gegen den letzten archivierten
+    Tipico-Preis vor Anpfiff (`tipico_fixtures.odds_json`, eine Zeile je Partie). In den
+    Bändern des Pickers bewegt sich der Preis um **−0,4 %** auf unsere Seite, ab 15 PP sogar
+    +2,3 % dagegen. Gegen den Tipico-Aufschlag von rund 10 % (`TIPICO_BOOK` 1,1068) ist das
+    nichts. Wer eine Wette nimmt, deren Preis sich danach nicht bewegt, hat keine Information.
+  - Daraus folgt: Ein Plus entstünde nur aus **Informationen, die im Preis nicht stehen**
+    (Aufstellungen, Ausfälle, Livestände) oder aus einem **kleineren Aufschlag**. Beides liegt
+    außerhalb dessen, was dieses Repository tut. Weitere Runden an Schwellen, Bändern und
+    Marktlisten sind gemessen aussichtslos und erzeugen nur Überanpassung.
 - Der Report druckt außerdem einen **gepaarten Vergleich** (nur die Zeilen, in denen sich zwei
   Regeln unterscheiden - gemeinsame Zeilen tragen zu beiden Seiten dasselbe Rauschen bei), ein
   **Ablehnungsregister** je Zelle aus Markt und Band samt Verdikt, und die Zahl der

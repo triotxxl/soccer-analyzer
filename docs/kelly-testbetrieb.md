@@ -87,8 +87,22 @@ jederzeit nachrechnen — die Messung dagegen nicht reparieren.
 >    Trennstellen positiv
 
 Zur dritten Bedingung: Der gesamte bisher gemessene Vorsprung der Automatik hängt am
-Remis-Markt. Ohne ihn steht sie out of sample bei −2,5 bis −4,0 %. Solange das so bleibt, ist
-die Regel bestenfalls die weniger verlustreiche Auswahl.
+Remis-Markt. Ohne ihn steht sie out of sample bei **−8,5 bis −9,8 %** (Stand 21.09.2026, drei
+Trennstellen). Solange das so bleibt, ist die Regel bestenfalls die weniger verlustreiche
+Auswahl.
+
+**Stand 21.09.2026 ist keine der drei Bedingungen erfüllt**, und die zweite ist weiter entfernt
+als im September gedacht: Die Automatik misst out of sample −6,4 bis −8,1 % statt der am
+15.09. notierten −0,2 bis +2,6 %. Die alten Zahlen standen auf der halben Stichprobe.
+
+Dazu kommt ein Befund, der die Frage selbst betrifft (ausführlich in AGENTS.md, Abschnitt
+„Kelly-Automatik und Marktprofil"): **Das Modell schätzt sich im Ganzen nicht zu hoch ein** –
+1X2 über 7.990 Partien 46,5 % Prognose gegen 46,5 % eingetreten. Nur auf den Zeilen, die der
+Picker wählt, sagt es 55,5 % und es treten 40,0 % ein. Der Vorteil, auf den gefiltert wird, ist
+also überwiegend der eigene Fehler des Modells und kein Wissen. Der Preisvergleich bestätigt
+das: Nach unserer Auswahl bewegt sich die Tipico-Quote um −0,4 % auf unsere Seite, gegen rund
+10 % Aufschlag. **Ein Plus ist mit dem heutigen Informationsstand nicht in Sicht**, und weitere
+Runden an Schwellen und Marktlisten ändern daran nichts.
 
 ## Prüfzeitpunkte
 
