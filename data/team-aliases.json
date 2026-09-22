@@ -219,6 +219,11 @@
     "apiTeamId": 16294,
     "apiTeamName": "Sepsi II"
   },
+  "acs unir sanktanna": {
+    "tipicoName": "ACS Unir. Sanktanna",
+    "apiTeamId": 26682,
+    "apiTeamName": "Unirea Sântana"
+  },
   "acs urban titu": {
     "tipicoName": "ACS Urban Titu",
     "apiTeamId": 24379,
@@ -878,6 +883,11 @@
     "tipicoName": "AS Sariyer",
     "apiTeamId": 3605,
     "apiTeamName": "Sarıyer"
+  },
+  "as usv iasi": {
+    "tipicoName": "AS Usv Iasi",
+    "apiTeamId": 21678,
+    "apiTeamName": "USV Iaşi"
   },
   "asc unirea branistea": {
     "tipicoName": "ASC Unirea Branistea",
@@ -2459,6 +2469,11 @@
     "apiTeamId": 6762,
     "apiTeamName": "Clyde"
   },
+  "cns cetate deva": {
+    "tipicoName": "CNS Cetate Deva",
+    "apiTeamId": 6853,
+    "apiTeamName": "Cetate Deva"
+  },
   "colchagua cd": {
     "tipicoName": "Colchagua CD",
     "apiTeamId": 5633,
@@ -2619,10 +2634,30 @@
     "apiTeamId": 214,
     "apiTeamName": "Maritimo"
   },
+  "cs paulesti": {
+    "tipicoName": "CS Paulesti",
+    "apiTeamId": 6894,
+    "apiTeamName": "Păuleşti"
+  },
+  "cs sanatatea cluj": {
+    "tipicoName": "CS Sanatatea Cluj",
+    "apiTeamId": 6906,
+    "apiTeamName": "Sănătatea Cluj"
+  },
   "cs sporting liesti": {
     "tipicoName": "CS Sporting Liesti",
     "apiTeamId": 6899,
     "apiTeamName": "Sporting Lieşti"
+  },
+  "cs timisul sag": {
+    "tipicoName": "CS Timisul Sag",
+    "apiTeamId": 24842,
+    "apiTeamName": "Timişul Şag"
+  },
+  "cs univ craiova ii": {
+    "tipicoName": "CS Univ. Craiova II",
+    "apiTeamId": 16296,
+    "apiTeamName": "CS U Craiova II"
   },
   "cs universitatea craiova": {
     "tipicoName": "CS Universitatea Craiova",
@@ -2693,6 +2728,16 @@
     "tipicoName": "Csm Adjud 1946",
     "apiTeamId": 21665,
     "apiTeamName": "CSM Adjud"
+  },
+  "csm alexandria": {
+    "tipicoName": "CSM Alexandria",
+    "apiTeamId": 6842,
+    "apiTeamName": "Alexandria"
+  },
+  "csm cetatea turnu m": {
+    "tipicoName": "CSM Cetatea Turnu M",
+    "apiTeamId": 19174,
+    "apiTeamName": "Cetatea"
   },
   "csm flacara moreni": {
     "tipicoName": "CSM Flacara Moreni",
@@ -4323,6 +4368,11 @@
     "tipicoName": "FC Union Berlin (F)",
     "apiTeamId": 24133,
     "apiTeamName": "Union Berlin W"
+  },
+  "fc unirea alba iulia": {
+    "tipicoName": "FC Unirea Alba Iulia",
+    "apiTeamId": 6911,
+    "apiTeamName": "Unirea Alba Iulia"
   },
   "fc unirea slobozia": {
     "tipicoName": "FC Unirea Slobozia",
