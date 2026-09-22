@@ -269,6 +269,11 @@
     "country": "Chile",
     "league": "Copa Chile"
   },
+  "chile|copa chile playoffs": {
+    "leagueId": 267,
+    "country": "Chile",
+    "league": "Copa Chile"
+  },
   "chile|primera b": {
     "leagueId": 266,
     "country": "Chile",
@@ -734,6 +739,11 @@
     "country": "World",
     "league": "UEFA Europa League"
   },
+  "international|freundschaftsspiele": {
+    "leagueId": 10,
+    "country": "World",
+    "league": "Friendlies"
+  },
   "irak|iraqi league": {
     "leagueId": 542,
     "country": "Iraq",
@@ -863,6 +873,11 @@
     "leagueId": 306,
     "country": "Qatar",
     "league": "Second Division"
+  },
+  "katar|qsl pokal": {
+    "leagueId": 677,
+    "country": "Qatar",
+    "league": "QSL Cup"
   },
   "katar|stars league": {
     "leagueId": 305,
@@ -1414,6 +1429,11 @@
     "country": "Turkey",
     "league": "1. Lig"
   },
+  "uefa champions league frauen|champions league ligaphase frauen": {
+    "leagueId": 525,
+    "country": "World",
+    "league": "UEFA Champions League Women"
+  },
   "uefa champions league frauen|champions league qualifikationsrunde frauen": {
     "leagueId": 525,
     "country": "World",
@@ -1423,6 +1443,76 @@
     "leagueId": 1191,
     "country": "World",
     "league": "UEFA Europa Cup - Women"
+  },
+  "uefa nations league|uefa nations league a gruppe 1": {
+    "leagueId": 5,
+    "country": "World",
+    "league": "UEFA Nations League"
+  },
+  "uefa nations league|uefa nations league a gruppe 2": {
+    "leagueId": 5,
+    "country": "World",
+    "league": "UEFA Nations League"
+  },
+  "uefa nations league|uefa nations league a gruppe 3": {
+    "leagueId": 5,
+    "country": "World",
+    "league": "UEFA Nations League"
+  },
+  "uefa nations league|uefa nations league a gruppe 4": {
+    "leagueId": 5,
+    "country": "World",
+    "league": "UEFA Nations League"
+  },
+  "uefa nations league|uefa nations league b gruppe 1": {
+    "leagueId": 5,
+    "country": "World",
+    "league": "UEFA Nations League"
+  },
+  "uefa nations league|uefa nations league b gruppe 2": {
+    "leagueId": 5,
+    "country": "World",
+    "league": "UEFA Nations League"
+  },
+  "uefa nations league|uefa nations league b gruppe 3": {
+    "leagueId": 5,
+    "country": "World",
+    "league": "UEFA Nations League"
+  },
+  "uefa nations league|uefa nations league b gruppe 4": {
+    "leagueId": 5,
+    "country": "World",
+    "league": "UEFA Nations League"
+  },
+  "uefa nations league|uefa nations league c gruppe 1": {
+    "leagueId": 5,
+    "country": "World",
+    "league": "UEFA Nations League"
+  },
+  "uefa nations league|uefa nations league c gruppe 2": {
+    "leagueId": 5,
+    "country": "World",
+    "league": "UEFA Nations League"
+  },
+  "uefa nations league|uefa nations league c gruppe 3": {
+    "leagueId": 5,
+    "country": "World",
+    "league": "UEFA Nations League"
+  },
+  "uefa nations league|uefa nations league c gruppe 4": {
+    "leagueId": 5,
+    "country": "World",
+    "league": "UEFA Nations League"
+  },
+  "uefa nations league|uefa nations league d gruppe 1": {
+    "leagueId": 5,
+    "country": "World",
+    "league": "UEFA Nations League"
+  },
+  "uefa nations league|uefa nations league d gruppe 2": {
+    "leagueId": 5,
+    "country": "World",
+    "league": "UEFA Nations League"
   },
   "ungarn|magyar kupa": {
     "leagueId": 273,

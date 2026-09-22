@@ -634,6 +634,11 @@
     "apiTeamId": 722,
     "apiTeamName": "Albacete"
   },
+  "albanien": {
+    "tipicoName": "Albanien",
+    "apiTeamId": 778,
+    "apiTeamName": "Albania"
+  },
   "alebrijes oaxaca": {
     "tipicoName": "Alebrijes Oaxaca",
     "apiTeamId": 2300,
@@ -1059,6 +1064,11 @@
     "apiTeamId": 16489,
     "apiTeamName": "Austin"
   },
+  "australien": {
+    "tipicoName": "Australien",
+    "apiTeamId": 20,
+    "apiTeamName": "Australia"
+  },
   "austria wien": {
     "tipicoName": "Austria Wien",
     "apiTeamId": 601,
@@ -1359,6 +1369,11 @@
     "apiTeamId": 2442,
     "apiTeamName": "Pusamania Borneo"
   },
+  "bosnien and herzegowina": {
+    "tipicoName": "Bosnien & Herzegowina",
+    "apiTeamId": 1113,
+    "apiTeamName": "Bosnia & Herzegovina"
+  },
   "boston legacy fc f": {
     "tipicoName": "Boston Legacy FC (F)",
     "apiTeamId": 27377,
@@ -1398,6 +1413,11 @@
     "tipicoName": "Braintree Town",
     "apiTeamId": 1831,
     "apiTeamName": "Braintree"
+  },
+  "brasilien": {
+    "tipicoName": "Brasilien",
+    "apiTeamId": 6,
+    "apiTeamName": "Brazil"
   },
   "brattvaag": {
     "tipicoName": "Brattvaag",
@@ -1468,6 +1488,11 @@
     "tipicoName": "Bulawayo Chiefs FC",
     "apiTeamId": 5217,
     "apiTeamName": "Bulawayo Chiefs"
+  },
+  "bulgarien": {
+    "tipicoName": "Bulgarien",
+    "apiTeamId": 1103,
+    "apiTeamName": "Bulgaria"
   },
   "buriram united fc": {
     "tipicoName": "Buriram United FC",
@@ -2778,6 +2803,11 @@
     "tipicoName": "Dandenong City SC",
     "apiTeamId": 3800,
     "apiTeamName": "Dandenong City"
+  },
+  "danemark": {
+    "tipicoName": "Dänemark",
+    "apiTeamId": 21,
+    "apiTeamName": "Denmark"
   },
   "danubio fc": {
     "tipicoName": "Danubio FC",
@@ -4474,6 +4504,11 @@
     "apiTeamId": 3841,
     "apiTeamName": "Finn Harps"
   },
+  "finnland": {
+    "tipicoName": "Finnland",
+    "apiTeamId": 1099,
+    "apiTeamName": "Finland"
+  },
   "first vienna fc 1894": {
     "tipicoName": "First Vienna FC 1894",
     "apiTeamId": 4990,
@@ -5169,6 +5204,11 @@
     "apiTeamId": 495,
     "apiTeamName": "Genoa"
   },
+  "georgien": {
+    "tipicoName": "Georgien",
+    "apiTeamId": 1104,
+    "apiTeamName": "Georgia"
+  },
   "geylang": {
     "tipicoName": "Geylang",
     "apiTeamId": 4203,
@@ -5829,6 +5869,11 @@
     "apiTeamId": 28237,
     "apiTeamName": "Sidi Benali"
   },
+  "irland": {
+    "tipicoName": "Irland",
+    "apiTeamId": 776,
+    "apiTeamName": "Rep. Of Ireland"
+  },
   "ironi modiin": {
     "tipicoName": "Ironi Modiin",
     "apiTeamId": 6179,
@@ -6214,6 +6259,11 @@
     "apiTeamId": 7129,
     "apiTeamName": "Kochi United"
   },
+  "kolumbien": {
+    "tipicoName": "Kolumbien",
+    "apiTeamId": 8,
+    "apiTeamName": "Colombia"
+  },
   "komarom vse": {
     "tipicoName": "Komarom VSE",
     "apiTeamId": 5113,
@@ -6253,6 +6303,11 @@
     "tipicoName": "Kristianstads Dff (F)",
     "apiTeamId": 11079,
     "apiTeamName": "Kristianstad W"
+  },
+  "kroatien": {
+    "tipicoName": "Kroatien",
+    "apiTeamId": 3,
+    "apiTeamName": "Croatia"
   },
   "kryvbas kryvyi rih": {
     "tipicoName": "Kryvbas Kryvyi Rih",
@@ -6499,6 +6554,11 @@
     "apiTeamId": 10217,
     "apiTeamName": "Lions"
   },
+  "litauen": {
+    "tipicoName": "Litauen",
+    "apiTeamId": 1097,
+    "apiTeamName": "Lithuania"
+  },
   "liverpool lfc f": {
     "tipicoName": "Liverpool LFC (F)",
     "apiTeamId": 1847,
@@ -6613,6 +6673,11 @@
     "tipicoName": "Luton Town",
     "apiTeamId": 1359,
     "apiTeamName": "Luton"
+  },
+  "luxemburg": {
+    "tipicoName": "Luxemburg",
+    "apiTeamId": 1102,
+    "apiTeamName": "Luxembourg"
   },
   "lyn f": {
     "tipicoName": "Lyn (F)",
@@ -6838,6 +6903,11 @@
     "tipicoName": "Metropolitanos",
     "apiTeamId": 2825,
     "apiTeamName": "Metropolitanos FC"
+  },
+  "mexiko": {
+    "tipicoName": "Mexiko",
+    "apiTeamId": 16,
+    "apiTeamName": "Mexico"
   },
   "mfk chrudim": {
     "tipicoName": "MFK Chrudim",
@@ -7274,6 +7344,11 @@
     "apiTeamId": 3678,
     "apiTeamName": "Song Lam Nghe An"
   },
+  "niederlande": {
+    "tipicoName": "Niederlande",
+    "apiTeamId": 1118,
+    "apiTeamName": "Netherlands"
+  },
   "niigata albirex": {
     "tipicoName": "Niigata Albirex",
     "apiTeamId": 311,
@@ -7454,6 +7529,11 @@
     "apiTeamId": 5731,
     "apiTeamName": "Zagora"
   },
+  "nordirland": {
+    "tipicoName": "Nordirland",
+    "apiTeamId": 771,
+    "apiTeamName": "Northern Ireland"
+  },
   "north sunshine eagles fc": {
     "tipicoName": "North Sunshine Eagles FC",
     "apiTeamId": 25418,
@@ -7463,6 +7543,11 @@
     "tipicoName": "Northampton Town",
     "apiTeamId": 1337,
     "apiTeamName": "Northampton"
+  },
+  "norwegen": {
+    "tipicoName": "Norwegen",
+    "apiTeamId": 1090,
+    "apiTeamName": "Norway"
   },
   "norwich city": {
     "tipicoName": "Norwich City",
@@ -8009,6 +8094,11 @@
     "apiTeamId": 7332,
     "apiTeamName": "Polanka nad Odrou"
   },
+  "polen": {
+    "tipicoName": "Polen",
+    "apiTeamId": 24,
+    "apiTeamName": "Poland"
+  },
   "police fc": {
     "tipicoName": "Police FC",
     "apiTeamId": 12461,
@@ -8519,6 +8609,11 @@
     "apiTeamId": 6962,
     "apiTeamName": "Widzew Łódź"
   },
+  "rumanien": {
+    "tipicoName": "Rumänien",
+    "apiTeamId": 774,
+    "apiTeamName": "Romania"
+  },
   "runavik": {
     "tipicoName": "Runavik",
     "apiTeamId": 682,
@@ -8784,6 +8879,16 @@
     "apiTeamId": 550,
     "apiTeamName": "Shakhtar Donetsk"
   },
+  "schottland": {
+    "tipicoName": "Schottland",
+    "apiTeamId": 1108,
+    "apiTeamName": "Scotland"
+  },
+  "schweden": {
+    "tipicoName": "Schweden",
+    "apiTeamId": 5,
+    "apiTeamName": "Sweden"
+  },
   "scm ramnicu valcea": {
     "tipicoName": "SCM Ramnicu Valcea",
     "apiTeamId": 2616,
@@ -8844,6 +8949,11 @@
     "apiTeamId": 2585,
     "apiTeamName": "Sepsi OSK Sfantu Gheorghe"
   },
+  "serbien": {
+    "tipicoName": "Serbien",
+    "apiTeamId": 14,
+    "apiTeamName": "Serbia"
+  },
   "servette chenois f": {
     "tipicoName": "Servette Chenois (F)",
     "apiTeamId": 15548,
@@ -8858,6 +8968,11 @@
     "tipicoName": "SFK Vrchovina",
     "apiTeamId": 7376,
     "apiTeamName": "Vrchovina"
+  },
+  "sg austria wien f": {
+    "tipicoName": "SG Austria Wien (F)",
+    "apiTeamId": 17575,
+    "apiTeamName": "Austria Wien W"
   },
   "shaanxi union fc": {
     "tipicoName": "Shaanxi Union FC",
@@ -9134,6 +9249,11 @@
     "apiTeamId": 229,
     "apiTeamName": "Benfica B"
   },
+  "sl benfica f": {
+    "tipicoName": "SL Benfica (F)",
+    "apiTeamId": 15495,
+    "apiTeamName": "SL Benfica W"
+  },
   "slask wroclaw ii": {
     "tipicoName": "Slask Wroclaw II",
     "apiTeamId": 12900,
@@ -9158,6 +9278,11 @@
     "tipicoName": "Slovan Bratislava B",
     "apiTeamId": 10544,
     "apiTeamName": "Slovan Bratislava II"
+  },
+  "slowenien": {
+    "tipicoName": "Slowenien",
+    "apiTeamId": 1091,
+    "apiTeamName": "Slovenia"
   },
   "sm caen": {
     "tipicoName": "SM Caen",
@@ -9233,6 +9358,11 @@
     "tipicoName": "SP Tre Fiori",
     "apiTeamId": 2260,
     "apiTeamName": "Tre Fiori"
+  },
+  "spanien": {
+    "tipicoName": "Spanien",
+    "apiTeamId": 9,
+    "apiTeamName": "Spain"
   },
   "spartak velka bites": {
     "tipicoName": "Spartak Velka Bites",
@@ -9418,6 +9548,11 @@
     "tipicoName": "Stranraer FC",
     "apiTeamId": 6785,
     "apiTeamName": "Stranraer"
+  },
+  "sudkorea": {
+    "tipicoName": "Südkorea",
+    "apiTeamId": 17,
+    "apiTeamName": "South Korea"
   },
   "sunderland afc": {
     "tipicoName": "Sunderland AFC",
@@ -9759,6 +9894,11 @@
     "apiTeamId": 3489,
     "apiTeamName": "Podbeskidzie"
   },
+  "tschechien": {
+    "tipicoName": "Tschechien",
+    "apiTeamId": 770,
+    "apiTeamName": "Czechia"
+  },
   "tsg hoffenheim": {
     "tipicoName": "TSG Hoffenheim",
     "apiTeamId": 167,
@@ -9893,6 +10033,16 @@
     "tipicoName": "UMF Njardvik",
     "apiTeamId": 2123,
     "apiTeamName": "Njardvik"
+  },
+  "umm salal sc": {
+    "tipicoName": "Umm-Salal SC",
+    "apiTeamId": 2899,
+    "apiTeamName": "UMM Salal"
+  },
+  "ungarn": {
+    "tipicoName": "Ungarn",
+    "apiTeamId": 769,
+    "apiTeamName": "Hungary"
   },
   "uni of pretoria": {
     "tipicoName": "Uni. of Pretoria",
