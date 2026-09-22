@@ -40,7 +40,7 @@ export interface InsightTeamStats {
  * Liste, damit ein neues Feld nicht an zwei Stellen nachgetragen werden muss - besonders
  * nicht in der Bedingung, die eine Mannschaft ganz ohne Statistik erkennt.
  */
-const STAT_TYPES: Record<keyof InsightTeamStats, string> = {
+export const STAT_TYPES: Record<keyof InsightTeamStats, string> = {
   possession: "ballpossession",
   shots: "totalshots",
   shotsOnGoal: "shotsongoal",
@@ -126,18 +126,59 @@ export function goalEvents(
   homeTeamId: number,
   awayTeamId: number
 ): Array<{ teamId: number; minute: number }> {
+  return goalEventsDetailed(events, homeTeamId, awayTeamId)
+    .map((goal) => ({ teamId: goal.teamId, minute: goal.minute ?? 0 }));
+}
+
+export interface DetailedGoal {
+  /** Die Mannschaft, der das Tor zählt - bei einem Eigentor also der Gegner des Schützen. */
+  teamId: number;
+  /** Die Mannschaft, in deren Reihen der Schütze steht. */
+  scorerTeamId: number;
+  /** Spielminute. null heißt unbekannt und darf nicht als Minute 0 gelesen werden. */
+  minute: number | null;
+  /** Nachspielzeit, falls die Antwort sie führt: 45+2 kommt als minute 45, extra 2. */
+  extra: number | null;
+  ownGoal: boolean;
+  detail: string;
+  player: string | null;
+  assist: string | null;
+}
+
+/**
+ * Dieselben Tore wie `goalEvents`, nur ohne die Verluste: Nachspielzeit, Eigentor-Kennzeichen
+ * und Namen bleiben erhalten. `goalEvents` ruft diese Funktion auf, damit die Regel zu
+ * Eigentoren und verschossenen Elfmetern nur an einer Stelle steht.
+ *
+ * Unbekannte Minuten sortieren ans Ende statt als Minute 0 an den Anfang.
+ */
+export function goalEventsDetailed(
+  events: ApiFixtureEvent[] | undefined,
+  homeTeamId: number,
+  awayTeamId: number
+): DetailedGoal[] {
   return (events ?? [])
     .filter((event) => event.type?.toLowerCase() === "goal")
     .filter((event) => !/missed/i.test(event.detail ?? ""))
     .map((event) => {
       const ownGoal = /own goal/i.test(event.detail ?? "");
-      const scoredBy = event.team.id;
+      const scorerTeamId = event.team.id;
       const teamId = !ownGoal
-        ? scoredBy
-        : scoredBy === homeTeamId ? awayTeamId : homeTeamId;
-      return { teamId, minute: event.time.elapsed ?? 0 };
+        ? scorerTeamId
+        : scorerTeamId === homeTeamId ? awayTeamId : homeTeamId;
+      return {
+        teamId,
+        scorerTeamId,
+        minute: event.time.elapsed ?? null,
+        extra: event.time.extra ?? null,
+        ownGoal,
+        detail: event.detail ?? "",
+        player: event.player?.name ?? null,
+        assist: event.assist?.name ?? null
+      };
     })
-    .sort((left, right) => left.minute - right.minute);
+    .sort((left, right) =>
+      (left.minute ?? Number.MAX_SAFE_INTEGER) - (right.minute ?? Number.MAX_SAFE_INTEGER));
 }
 
 function numericStat(value: unknown): number | null {

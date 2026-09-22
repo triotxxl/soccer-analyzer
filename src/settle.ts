@@ -1,6 +1,7 @@
 import { ApiFootballClient } from "./api.ts";
 import { config } from "./config.ts";
 import { AnalyzerDatabase } from "./database.ts";
+import { toFixtureResult } from "./fixture-result.ts";
 import { parseExpectedGoals } from "./xg.ts";
 
 export interface SettleResult {
@@ -10,6 +11,10 @@ export interface SettleResult {
   checked: number;
   /** Abgerechnete Prognosezeilen. */
   settled: number;
+  /** Partien, deren Ergebnisdaten gespeichert wurden. */
+  results: number;
+  /** Davon mit Statistik je Halbzeit. */
+  halfStatistics: number;
   apiRequests: number;
   budgetReached: boolean;
 }
@@ -52,13 +57,18 @@ export async function settleFixtures(options: {
   const fixtureIds = database.unsettledFixtures(options.now ?? new Date());
   let checked = 0;
   let settled = 0;
+  let results = 0;
+  let halfStatistics = 0;
   let budgetReached = false;
 
   async function settleOne(fixtureId: number): Promise<void> {
     const fixture = (await client.getFixture(fixtureId, true))[0];
     checked += 1;
     if (!fixture || !["FT", "AET", "PEN"].includes(fixture.fixture.status.short)) return;
-    const statistics = await client.getFixtureStatistics(fixtureId, false);
+    // `half` kostet keinen zusätzlichen Aufruf: Es ist dieselbe Anfrage, die zusätzlich
+    // `statistics_1h` und `statistics_2h` mitbringt. Nur `/fixtures/statistics` kennt den
+    // Parameter, die Bündel über `ids=` weisen ihn ab.
+    const statistics = await client.getFixtureStatistics(fixtureId, false, true);
     const xg = parseExpectedGoals(statistics, fixture.teams.home.id, fixture.teams.away.id);
     database.saveFixtureExpectedGoals([{
       fixtureId,
@@ -73,6 +83,22 @@ export async function settleFixtures(options: {
       fetchedAt: new Date().toISOString()
     }]);
     settled += database.settleFixture(fixture, xg);
+
+    // Die Partie trägt Ereignisse, Aufstellungen und Spielerwerte bereits mit sich; ohne
+    // diesen Schritt wurden sie nach der Abrechnung verworfen.
+    const result = toFixtureResult(fixture, { statistics, source: "api" });
+    if (result) {
+      database.saveFixtureResults([result]);
+      results += 1;
+      database.saveHalfStatistics([{
+        fixtureId,
+        status: result.halfStatsAvailable ? "available" : "unavailable",
+        fetchedAt: result.fetchedAt,
+        home: { firstHalf: result.homeStats.firstHalf, secondHalf: result.homeStats.secondHalf },
+        away: { firstHalf: result.awayStats.firstHalf, secondHalf: result.awayStats.secondHalf }
+      }]);
+      if (result.halfStatsAvailable) halfStatistics += 1;
+    }
   }
 
   try {
@@ -104,6 +130,8 @@ export async function settleFixtures(options: {
     due: fixtureIds.length,
     checked,
     settled,
+    results,
+    halfStatistics,
     apiRequests: client.requestCount - requestStart,
     budgetReached
   };

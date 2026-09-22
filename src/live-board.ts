@@ -112,7 +112,8 @@ function boardEvents(fixture: ApiFixture): LiveBoardEvent[] {
   return (fixture.events ?? [])
     .filter((event) => RELEVANT_EVENT_TYPES.has(event.type.toLocaleLowerCase()))
     .map((event: ApiFixtureEvent): LiveBoardEvent => ({
-      minute: event.time.elapsed,
+      // Ein Ereignis ohne Minute sortiert ans Ende der Tafel, statt als Minute 0 nach oben.
+      minute: event.time.elapsed ?? 0,
       extra: event.time.extra ?? null,
       side: event.team.id === fixture.teams.home.id
         ? "home"

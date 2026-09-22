@@ -90,6 +90,13 @@ export interface ApiFixture {
   };
   events?: ApiFixtureEvent[];
   statistics?: ApiTeamStatistics[];
+  /**
+   * Aufstellungen und Einzelspielerwerte liefert API-Football bei `fixtures?id=` mit, ohne
+   * dass ein eigener Aufruf nötig wäre. Bis zum 22.09.2026 standen sie nicht im Typ und
+   * wurden deshalb aus jeder Antwort still verworfen.
+   */
+  lineups?: ApiFixtureLineup[];
+  players?: ApiFixturePlayers[];
 }
 
 export interface ApiOddsValue {
@@ -115,7 +122,10 @@ export interface ApiFixtureOdds {
 }
 
 export interface ApiFixtureEvent {
-  time: { elapsed: number; extra?: number | null };
+  // `elapsed` ist laut Dokumentation immer gesetzt, die Antwort führt aber vereinzelt null.
+  // Im Bestand vom 22.09.2026 kam das über 122.107 Ereignisse kein einziges Mal vor - der Typ
+  // lässt es trotzdem zu, damit eine unbekannte Minute nicht still als Minute 0 durchgeht.
+  time: { elapsed: number | null; extra?: number | null };
   team: { id: number; name: string };
   player?: { id: number | null; name: string | null };
   assist?: { id: number | null; name: string | null };
@@ -132,6 +142,42 @@ export interface ApiFixtureStatistic {
 export interface ApiTeamStatistics {
   team: { id: number; name: string };
   statistics: ApiFixtureStatistic[];
+  /**
+   * Nur vorhanden, wenn `/fixtures/statistics` mit `half=true` gerufen wurde. Beide Felder
+   * tragen dieselben `type`-Strings wie `statistics`, nur eben je Halbzeit. Nicht jede Liga
+   * führt sie; dann fehlen sie ganz oder alle Werte darin sind null.
+   */
+  statistics_1h?: ApiFixtureStatistic[];
+  statistics_2h?: ApiFixtureStatistic[];
+}
+
+/** Startelf, Bank, Formation und Trainer einer Mannschaft, wie `fixtures?id=` sie mitführt. */
+export interface ApiFixtureLineup {
+  team: { id: number; name: string; logo?: string; colors?: unknown };
+  coach?: { id: number | null; name: string | null; photo?: string };
+  formation?: string | null;
+  startXI?: Array<{ player: ApiLineupPlayer }>;
+  substitutes?: Array<{ player: ApiLineupPlayer }>;
+}
+
+export interface ApiLineupPlayer {
+  id: number | null;
+  name: string | null;
+  number?: number | null;
+  pos?: string | null;
+  grid?: string | null;
+}
+
+/**
+ * Einzelspielerwerte je Mannschaft. Der Katalog je Spieler bleibt bewusst ungetypt: Er ist
+ * je Liga verschieden lang, und gespeichert wird er ohnehin nur als JSON am Stück.
+ */
+export interface ApiFixturePlayers {
+  team: { id: number; name: string; logo?: string };
+  players?: Array<{
+    player: { id: number | null; name: string | null; photo?: string };
+    statistics?: unknown[];
+  }>;
 }
 
 export interface LiveMatchSelection {

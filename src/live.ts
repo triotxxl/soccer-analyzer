@@ -139,7 +139,7 @@ export async function runLiveAnalysis(
       activity: activity(home, away),
       events: events
         .filter((event) => ["Goal", "Card"].includes(event.type))
-        .sort((a, b) => a.time.elapsed - b.time.elapsed)
+        .sort((a, b) => (a.time.elapsed ?? 0) - (b.time.elapsed ?? 0))
     };
   }));
 

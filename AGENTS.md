@@ -170,6 +170,38 @@ Benutzer auf Deutsch und führe Analyseaufträge selbstständig über die vorhan
   Request fortsetzt; brich den Auftrag nicht wegen dieses temporären Limits ab.
 - Die laufende Saison wird pro manuellem Dashboard-Lauf einmal frisch abgefragt.
   Abgeschlossene Saisons werden langfristig gespeichert und nicht bei jedem Lauf neu geladen.
+- Jede Abrechnung schreibt zusätzlich eine Zeile nach `fixture_results` (eine je Partie):
+  Stände getrennt nach Halbzeit, Verlängerung und Elfmeterschießen, Torminuten, Karten und
+  Wechsel je Halbzeit, die Spielstatistik gesamt **und je Halbzeit**, Aufstellungen und
+  Einzelspielerwerte. Das kostet keinen zusätzlichen Aufruf: Die Partie trägt Ereignisse,
+  Aufstellungen und Spielerwerte ohnehin mit, und die Statistik wird nur mit `half=true`
+  geholt. Die Ableitung steht in `src/fixture-result.ts` und ist eine reine Funktion.
+- **Halbzeitwerte gibt es nur über `/fixtures/statistics?fixture=<id>&half=true`.** Die
+  Antwort trägt dann `statistics_1h` und `statistics_2h`. Geschrieben wird `half=true`,
+  nicht `half=1`; `fixtures?id=` und `fixtures?ids=` weisen den Parameter ab, ein 20er-Bündel
+  gibt es dafür also nicht.
+- `null` heißt in `fixture_results` immer „unbekannt", `0` heißt „gab es nicht". Ohne
+  Ereignisliste bleiben alle Halbzeit-Zähler `null`. `goals_complete` sagt, ob die
+  Ereignisse jedes Tor des Endstands tragen - nur dann sind die Torminuten belastbar.
+  `half_stats_status` hält fest, ob die Halbzeitwerte schon geholt wurden und ob es welche
+  gab; `unavailable` verhindert, dass derselbe leere Wettbewerb erneut abgefragt wird.
+- Rückwirkend nachtragen: `npm run backfill-results -- --scan` liest ausschließlich den
+  lokalen Cache und kostet **kein API-Budget** (das Werkzeug importiert den API-Client gar
+  nicht). `npm run backfill-half-stats -- --budget <n>` holt die Halbzeit-Statistik, ein
+  Aufruf je Partie, neueste zuerst, in Etappen wiederholbar.
+- Stand 22.09.2026 über 8.231 abgerechnete Partien: 8.114 mit Ereignissen, 7.516 mit
+  lückenlosen Torminuten, 6.619 mit Aufstellung, 3.321 mit Spielerwerten, 3.698 mit
+  Spielstatistik, davon 3.490 mit Zahlen je Halbzeit (208 Wettbewerbe führen keine). Die
+  Statistik-Abdeckung liegt also bei rund 45 %, nicht höher: Viele Ligen liefern zwar einen
+  Statistik-Block, aber mit lauter `null` darin.
+- **Die Halbzeitwerte ergeben nicht immer genau den Gesamtwert.** Bei den Schüssen aufs Tor
+  weichen 157 von 3.483 Partien ab (4,5 %), bei den Ecken 37 von 3.478 (1,1 %); in 125 der
+  157 Fälle ist es genau ±1, in beide Richtungen und überwiegend bei regulär beendeten
+  Partien. Das ist eine Unstimmigkeit in den Daten von API-Football selbst, kein Rechenfehler:
+  Gesamtwert und Halbzeitwerte werden dort getrennt gezählt. Wer Halbzeiten summiert, darf
+  sich deshalb nicht auf Gleichheit mit dem Gesamtwert verlassen. Die Torzahlen sind davon
+  nicht betroffen - sie kommen aus den Ereignissen und gehen in allen 7.516 Partien mit
+  lückenloser Liste auf.
 - Nach beendeten Spielen: `npm run settle`. Jeder Dashboard-Lauf rechnet am Ende
   automatisch fällige Prognosen ab, begrenzt durch `SETTLE_REQUEST_BUDGET` (Standard 200
   Aufrufe, 0 schaltet es ab), neueste Partien zuerst. Für einen Rückstand `npm run settle --

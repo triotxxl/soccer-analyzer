@@ -233,3 +233,40 @@ test("lädt Fixture-Statistiken in API-konformen 20er-ID-Batches", async () => {
   assert.match(requested, /fixtures\?ids=1-2-3-/);
   assert.throws(() => client.getFixturesWithStatistics(Array.from({ length: 21 }, (_, index) => index + 1)), /1 und 20/);
 });
+
+test("half=true ist ein eigener Abruf und trifft den Cache ohne Halbzeiten nicht", async () => {
+  // Der Cache-Schlüssel entsteht aus Endpunkt und sortierten Parametern. Ohne einen eigenen
+  // Eintrag käme für den Halbzeit-Abruf die alte Antwort ohne statistics_1h zurück.
+  const directory = await mkdtemp(path.join(os.tmpdir(), "football-half-"));
+  const urls: string[] = [];
+  const client = new ApiFootballClient({
+    apiKey: "test",
+    cache: new FileCache(directory),
+    fetchFn: (async (url: string) => {
+      urls.push(String(url));
+      const half = String(url).includes("half=true");
+      return new Response(JSON.stringify({
+        response: [{
+          team: { id: 1, name: "Team 1" },
+          statistics: [{ type: "Ball Possession", value: "60%" }],
+          ...(half ? { statistics_1h: [{ type: "Ball Possession", value: "71%" }] } : {})
+        }]
+      }), { status: 200 });
+    }) as unknown as typeof fetch
+  });
+
+  const ohne = await client.getFixtureStatistics(99, false);
+  assert.equal(ohne[0]?.statistics_1h, undefined);
+
+  const mit = await client.getFixtureStatistics(99, false, true);
+  assert.equal(mit[0]?.statistics_1h?.[0]?.value, "71%");
+
+  assert.equal(urls.length, 2, "beide Abrufe gehen ins Netz, keiner trifft den anderen");
+  assert.ok(urls[0]?.includes("fixture=99") && !urls[0]?.includes("half"));
+  assert.ok(urls[1]?.includes("half=true"));
+
+  // Ein zweiter Halbzeit-Abruf kommt nun aus dem Cache.
+  const nochmal = await client.getFixtureStatistics(99, false, true);
+  assert.equal(nochmal[0]?.statistics_1h?.[0]?.value, "71%");
+  assert.equal(urls.length, 2);
+});

@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   coverageOf,
   goalEvents,
+  goalEventsDetailed,
   scoringPeriodIndex,
   selectH2h,
   selectHistory,
@@ -173,4 +174,31 @@ test("zählt die Abdeckung ohne Doppelungen", () => {
   })!;
   const bare = toInsightMatch(fixture({ id: 32, timestamp: NOW - 2 * 86_400, homeId: 10, awayId: 40, homeGoals: 0, awayGoals: 0 }))!;
   assert.deepEqual(coverageOf([detailed, detailed, bare]), { matches: 2, withMinutes: 1, withStats: 1 });
+});
+
+test("goalEventsDetailed liefert dieselben Tore wie goalEvents, nur mit mehr Angaben", () => {
+  // goalEvents ruft goalEventsDetailed auf. Dieser Test hält fest, dass der Umbau die Regel
+  // zu Eigentoren und verschossenen Elfmetern nicht verändert hat.
+  const events: ApiFixtureEvent[] = [
+    { time: { elapsed: 70, extra: null }, team: { id: 2, name: "B" },
+      type: "Goal", detail: "Normal Goal" },
+    { time: { elapsed: 45, extra: 2 }, team: { id: 1, name: "A" },
+      type: "Goal", detail: "Own Goal", player: { id: 7, name: "Eigentor-Schütze" } },
+    { time: { elapsed: 30, extra: null }, team: { id: 1, name: "A" },
+      type: "Goal", detail: "Missed Penalty" }
+  ];
+
+  const schlicht = goalEvents(events, 1, 2);
+  const ausführlich = goalEventsDetailed(events, 1, 2);
+
+  assert.deepEqual(
+    ausführlich.map((goal) => ({ teamId: goal.teamId, minute: goal.minute ?? 0 })),
+    schlicht
+  );
+  assert.equal(ausführlich.length, 2, "der verschossene Elfmeter fällt in beiden heraus");
+  assert.equal(ausführlich[0]?.ownGoal, true);
+  assert.equal(ausführlich[0]?.teamId, 2, "das Eigentor zählt für den Gegner");
+  assert.equal(ausführlich[0]?.scorerTeamId, 1);
+  assert.equal(ausführlich[0]?.extra, 2, "die Nachspielzeit bleibt erhalten");
+  assert.equal(ausführlich[0]?.player, "Eigentor-Schütze");
 });

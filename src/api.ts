@@ -259,10 +259,21 @@ export class ApiFootballClient {
     return this.get<ApiFixtureEvent[]>("fixtures/events", { fixture: fixtureId }, 0, true);
   }
 
-  getFixtureStatistics(fixtureId: number, fresh = true): Promise<ApiTeamStatistics[]> {
+  /**
+   * Die Statistik einer Partie je Mannschaft. Mit `half` trägt die Antwort zusätzlich
+   * `statistics_1h` und `statistics_2h` - Ballbesitz, Schüsse, Ecken und Pässe getrennt nach
+   * Halbzeit. Das ist die einzige Stelle, an der API-Football Halbzeitwerte herausgibt:
+   * `fixtures?id=` und `fixtures?ids=` weisen den Parameter ab ("The Half field do not
+   * exist"), ein 20er-Bündel gibt es dafür also nicht. Geschrieben wird `half=true`, nicht
+   * `half=1` - Letzteres lehnt die API ab.
+   *
+   * Der Cache-Schlüssel entsteht aus den sortierten Parametern, ein Aufruf mit Halbzeiten
+   * bekommt also von selbst einen eigenen Eintrag und überschreibt den alten ohne nicht.
+   */
+  getFixtureStatistics(fixtureId: number, fresh = true, half = false): Promise<ApiTeamStatistics[]> {
     return this.get<ApiTeamStatistics[]>(
       "fixtures/statistics",
-      { fixture: fixtureId },
+      half ? { fixture: fixtureId, half: "true" } : { fixture: fixtureId },
       fresh ? 0 : config.cacheTtlMs.fixtureExpectedGoals,
       fresh
     );

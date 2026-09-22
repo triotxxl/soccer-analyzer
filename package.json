@@ -28,7 +28,9 @@
     "edge-report:simulate": "node --env-file-if-exists=.env tools/edge-report.ts --simulate",
     "kelly-tracker": "node --env-file-if-exists=.env tools/kelly-tracker.ts",
     "insights-probe": "node --env-file-if-exists=.env tools/insights-probe.ts",
-    "quickpick-report": "node --env-file-if-exists=.env tools/quickpick-report.ts"
+    "quickpick-report": "node --env-file-if-exists=.env tools/quickpick-report.ts",
+    "backfill-results": "node tools/backfill-results.ts",
+    "backfill-half-stats": "node --env-file-if-exists=.env tools/backfill-half-stats.ts"
   },
   "engines": {
     "node": ">=24.0.0"

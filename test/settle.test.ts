@@ -7,7 +7,7 @@ import type { ApiFootballClient } from "../src/api.ts";
 import { AnalyzerDatabase } from "../src/database.ts";
 import { settleFixtures } from "../src/settle.ts";
 import type { GoalLineRow } from "../src/types.ts";
-import { fixture } from "./helpers.ts";
+import { event, fixture, teamStatistics } from "./helpers.ts";
 
 function goalLineRow(fixtureId: number, kickoff: string): GoalLineRow {
   return {
@@ -107,5 +107,65 @@ test("Noch nicht beendete Partien kosten nur einen Aufruf und bleiben offen", as
   assert.equal(result.settled, 0);
   assert.equal(result.apiRequests, 1);
   assert.deepEqual(database.unsettledFixtures(new Date("2026-01-02T00:00:00.000Z")), [1001]);
+  database.close();
+});
+
+test("die Abrechnung speichert die Ergebnisdaten, ohne mehr Aufrufe zu brauchen", async () => {
+  const database = await databaseWithDueFixtures([[1101, "2026-01-01T12:00:00.000Z"]]);
+  const seen: number[] = [];
+  let halfRequested = false;
+  const client = {
+    requestCount: 0,
+    getFixture: async function (this: { requestCount: number }, id: number) {
+      this.requestCount += 1;
+      seen.push(id);
+      return [fixture({
+        id, timestamp: 1_767_222_000, homeId: 1, awayId: 2,
+        homeGoals: 2, awayGoals: 1, halfTimeHomeGoals: 1, halfTimeAwayGoals: 1,
+        events: [
+          event({ type: "Goal", minute: 20, teamId: 1 }),
+          event({ type: "Goal", minute: 44, teamId: 2 }),
+          event({ type: "Goal", minute: 75, teamId: 1 }),
+          event({ type: "Card", minute: 80, teamId: 2, detail: "Yellow Card" })
+        ],
+        lineups: [{ team: { id: 1, name: "Team 1" }, formation: "4-2-3-1" }]
+      })];
+    },
+    getFixtureStatistics: async function (
+      this: { requestCount: number }, _id: number, _fresh: boolean, half = false
+    ) {
+      this.requestCount += 1;
+      halfRequested = half;
+      return [teamStatistics({
+        teamId: 1,
+        full: { "Ball Possession": "55%", "Shots on Goal": 6 },
+        firstHalf: { "Ball Possession": "60%", "Shots on Goal": 4 },
+        secondHalf: { "Ball Possession": "50%", "Shots on Goal": 2 }
+      })];
+    }
+  } as unknown as ApiFootballClient;
+
+  const result = await settleFixtures({
+    client, database, now: new Date("2026-01-02T00:00:00.000Z")
+  });
+
+  // Der Kern: Halbzeitzahlen kosten nichts extra, es bleibt bei zwei Aufrufen je Partie.
+  assert.equal(result.apiRequests, 2);
+  assert.equal(halfRequested, true, "die Statistik wird mit Halbzeiten geholt");
+  assert.equal(result.results, 1);
+  assert.equal(result.halfStatistics, 1);
+
+  const row = database.fixtureResult(1101);
+  assert.ok(row);
+  assert.equal(row.goals_ht1_home, 1);
+  assert.equal(row.goals_ht2_home, 1);
+  assert.equal(row.goals_ht1_away, 1);
+  assert.equal(row.yellow_ht2_away, 1);
+  assert.equal(row.goals_complete, 1);
+  assert.equal(row.home_formation, "4-2-3-1");
+  assert.equal(row.home_possession_ht1, 60);
+  assert.equal(row.home_possession_ht2, 50);
+  assert.equal(row.half_stats_status, "available");
+  assert.equal(row.source, "api");
   database.close();
 });

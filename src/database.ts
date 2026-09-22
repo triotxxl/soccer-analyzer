@@ -16,6 +16,68 @@ import type {
   FixtureExpectedGoals
 } from "./types.ts";
 import type { MatchWinnerOdds } from "./draw-criteria.ts";
+import type { FixtureResult, FixtureResultStats } from "./fixture-result.ts";
+import type { InsightTeamStats } from "./fixture-insights.ts";
+
+/** Der Statistikkatalog einer Mannschaft für einen Abschnitt. */
+type TeamHalfStats = InsightTeamStats;
+
+/** true/false als 1/0, wie SQLite es speichert. */
+function flag(value: boolean): number {
+  return value ? 1 : 0;
+}
+
+/** Ein Objekt nur dann als JSON, wenn es etwas trägt - sonst bleibt die Spalte null. */
+function jsonOrNull(value: unknown): string | null {
+  if (value === null || value === undefined) return null;
+  if (Array.isArray(value) && value.length === 0) return null;
+  return JSON.stringify(value);
+}
+
+/**
+ * Der volle Katalog einer Seite als JSON, zusammen mit den Kennzahlen außerhalb des
+ * Katalogs. Fehlt die Statistik ganz, bleibt die Spalte null statt eines leeren Objekts.
+ */
+function statsJson(stats: FixtureResultStats): string | null {
+  if (!stats.full) return null;
+  return JSON.stringify({ ...stats.full, ...stats.extra });
+}
+
+/**
+ * Die Werte einer Ergebniszeile in der Reihenfolge von `RESULT_COLUMNS`. Bewusst als eigene
+ * Funktion neben der Spaltenliste, damit eine Änderung an einer der beiden Stellen sofort
+ * beim Zählen der Platzhalter auffällt.
+ */
+function resultValues(row: FixtureResult): Array<string | number | null> {
+  return [
+    row.fixtureId, row.kickoff, row.status, row.leagueId, row.country, row.league,
+    row.season, row.round,
+    row.homeTeamId, row.awayTeamId, row.homeTeam, row.awayTeam,
+    row.finalHomeGoals, row.finalAwayGoals,
+    row.htHomeGoals, row.htAwayGoals, row.ftHomeGoals, row.ftAwayGoals,
+    row.shHomeGoals, row.shAwayGoals, row.etHomeGoals, row.etAwayGoals,
+    row.penHomeGoals, row.penAwayGoals,
+    row.goalsHt1Home, row.goalsHt1Away, row.goalsHt2Home, row.goalsHt2Away,
+    row.goalsEtHome, row.goalsEtAway, flag(row.goalsComplete),
+    row.yellow.ht1Home, row.yellow.ht1Away, row.yellow.ht2Home, row.yellow.ht2Away,
+    row.red.ht1Home, row.red.ht1Away, row.red.ht2Home, row.red.ht2Away,
+    row.subs.ht1Home, row.subs.ht1Away, row.subs.ht2Home, row.subs.ht2Away,
+    row.homeStats.full?.possession ?? null, row.awayStats.full?.possession ?? null,
+    row.homeStats.full?.shots ?? null, row.awayStats.full?.shots ?? null,
+    row.homeStats.full?.shotsOnGoal ?? null, row.awayStats.full?.shotsOnGoal ?? null,
+    row.homeStats.full?.corners ?? null, row.awayStats.full?.corners ?? null,
+    row.homeXg, row.awayXg,
+    row.homeLineup?.formation ?? null, row.awayLineup?.formation ?? null,
+    row.homeLineup?.coach?.name ?? null, row.awayLineup?.coach?.name ?? null,
+    jsonOrNull(row.goals), jsonOrNull(row.cards), jsonOrNull(row.substitutions),
+    statsJson(row.homeStats), statsJson(row.awayStats),
+    jsonOrNull(row.homeLineup), jsonOrNull(row.awayLineup),
+    jsonOrNull(row.homePlayers), jsonOrNull(row.awayPlayers),
+    flag(row.eventsAvailable), flag(row.statsAvailable),
+    flag(row.lineupsAvailable), flag(row.playersAvailable),
+    row.source, row.fetchedAt
+  ];
+}
 
 export interface PerformanceRow {
   market: Market;
@@ -305,6 +367,78 @@ export class AnalyzerDatabase {
       );
       CREATE INDEX IF NOT EXISTS idx_fixture_expected_goals_league
         ON fixture_expected_goals(league_id, season, kickoff);
+      CREATE TABLE IF NOT EXISTS fixture_results (
+        fixture_id INTEGER PRIMARY KEY,
+        kickoff TEXT NOT NULL,
+        status TEXT NOT NULL,
+        league_id INTEGER NOT NULL,
+        country TEXT NOT NULL,
+        league TEXT NOT NULL,
+        season INTEGER NOT NULL,
+        round TEXT,
+        home_team_id INTEGER NOT NULL,
+        away_team_id INTEGER NOT NULL,
+        home_team TEXT NOT NULL,
+        away_team TEXT NOT NULL,
+        final_home_goals INTEGER NOT NULL,
+        final_away_goals INTEGER NOT NULL,
+        ht_home_goals INTEGER, ht_away_goals INTEGER,
+        ft_home_goals INTEGER, ft_away_goals INTEGER,
+        sh_home_goals INTEGER, sh_away_goals INTEGER,
+        et_home_goals INTEGER, et_away_goals INTEGER,
+        pen_home_goals INTEGER, pen_away_goals INTEGER,
+        goals_ht1_home INTEGER, goals_ht1_away INTEGER,
+        goals_ht2_home INTEGER, goals_ht2_away INTEGER,
+        goals_et_home INTEGER, goals_et_away INTEGER,
+        goals_complete INTEGER NOT NULL DEFAULT 0,
+        yellow_ht1_home INTEGER, yellow_ht1_away INTEGER,
+        yellow_ht2_home INTEGER, yellow_ht2_away INTEGER,
+        red_ht1_home INTEGER, red_ht1_away INTEGER,
+        red_ht2_home INTEGER, red_ht2_away INTEGER,
+        subs_ht1_home INTEGER, subs_ht1_away INTEGER,
+        subs_ht2_home INTEGER, subs_ht2_away INTEGER,
+        home_possession REAL, away_possession REAL,
+        home_shots INTEGER, away_shots INTEGER,
+        home_shots_on_goal INTEGER, away_shots_on_goal INTEGER,
+        home_corners INTEGER, away_corners INTEGER,
+        home_xg REAL, away_xg REAL,
+        home_possession_ht1 REAL, home_possession_ht2 REAL,
+        away_possession_ht1 REAL, away_possession_ht2 REAL,
+        home_shots_ht1 INTEGER, home_shots_ht2 INTEGER,
+        away_shots_ht1 INTEGER, away_shots_ht2 INTEGER,
+        home_shots_on_goal_ht1 INTEGER, home_shots_on_goal_ht2 INTEGER,
+        away_shots_on_goal_ht1 INTEGER, away_shots_on_goal_ht2 INTEGER,
+        home_corners_ht1 INTEGER, home_corners_ht2 INTEGER,
+        away_corners_ht1 INTEGER, away_corners_ht2 INTEGER,
+        home_formation TEXT, away_formation TEXT,
+        home_coach TEXT, away_coach TEXT,
+        goal_events_json TEXT,
+        card_events_json TEXT,
+        substitution_events_json TEXT,
+        home_stats_json TEXT, away_stats_json TEXT,
+        home_stats_ht1_json TEXT, home_stats_ht2_json TEXT,
+        away_stats_ht1_json TEXT, away_stats_ht2_json TEXT,
+        home_lineup_json TEXT, away_lineup_json TEXT,
+        home_players_json TEXT, away_players_json TEXT,
+        events_available INTEGER NOT NULL DEFAULT 0,
+        stats_available INTEGER NOT NULL DEFAULT 0,
+        lineups_available INTEGER NOT NULL DEFAULT 0,
+        players_available INTEGER NOT NULL DEFAULT 0,
+        half_stats_status TEXT,
+        half_stats_fetched_at TEXT,
+        source TEXT NOT NULL,
+        fetched_at TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_fixture_results_league
+        ON fixture_results(league_id, season, kickoff);
+      CREATE INDEX IF NOT EXISTS idx_fixture_results_kickoff
+        ON fixture_results(kickoff);
+      CREATE INDEX IF NOT EXISTS idx_fixture_results_home
+        ON fixture_results(home_team_id, kickoff);
+      CREATE INDEX IF NOT EXISTS idx_fixture_results_away
+        ON fixture_results(away_team_id, kickoff);
+      CREATE INDEX IF NOT EXISTS idx_fixture_results_half_todo
+        ON fixture_results(half_stats_status, kickoff);
       CREATE TABLE IF NOT EXISTS league_strength_snapshots (
         pool TEXT NOT NULL,
         league_id INTEGER NOT NULL,
@@ -461,6 +595,159 @@ export class AnalyzerDatabase {
       for (const row of rows) statement.run(row.fixtureId,row.kickoff,row.leagueId,row.season,row.homeTeamId,row.awayTeamId,row.homeXg,row.awayXg,row.status,row.fetchedAt);
       this.db.exec("COMMIT");
     } catch (error) { this.db.exec("ROLLBACK"); throw error; }
+  }
+
+  /**
+   * Die Spalten von `fixture_results` ohne die Halbzeit-Statistik. Als Liste notiert, damit
+   * Spaltenfolge und Platzhalter nicht auseinanderlaufen können.
+   */
+  private static readonly RESULT_COLUMNS = [
+    "fixture_id", "kickoff", "status", "league_id", "country", "league", "season", "round",
+    "home_team_id", "away_team_id", "home_team", "away_team",
+    "final_home_goals", "final_away_goals",
+    "ht_home_goals", "ht_away_goals", "ft_home_goals", "ft_away_goals",
+    "sh_home_goals", "sh_away_goals", "et_home_goals", "et_away_goals",
+    "pen_home_goals", "pen_away_goals",
+    "goals_ht1_home", "goals_ht1_away", "goals_ht2_home", "goals_ht2_away",
+    "goals_et_home", "goals_et_away", "goals_complete",
+    "yellow_ht1_home", "yellow_ht1_away", "yellow_ht2_home", "yellow_ht2_away",
+    "red_ht1_home", "red_ht1_away", "red_ht2_home", "red_ht2_away",
+    "subs_ht1_home", "subs_ht1_away", "subs_ht2_home", "subs_ht2_away",
+    "home_possession", "away_possession", "home_shots", "away_shots",
+    "home_shots_on_goal", "away_shots_on_goal", "home_corners", "away_corners",
+    "home_xg", "away_xg",
+    "home_formation", "away_formation", "home_coach", "away_coach",
+    "goal_events_json", "card_events_json", "substitution_events_json",
+    "home_stats_json", "away_stats_json",
+    "home_lineup_json", "away_lineup_json", "home_players_json", "away_players_json",
+    "events_available", "stats_available", "lineups_available", "players_available",
+    "source", "fetched_at"
+  ] as const;
+
+  /**
+   * Schreibt die Ergebnisdaten einer Partie. Die Halbzeit-Statistik fasst diese Methode
+   * bewusst nicht an - dafür gibt es `saveHalfStatistics`. So kann ein späterer Lauf aus dem
+   * Cache, der keine Halbzeitwerte kennt, sie auch nicht versehentlich löschen.
+   *
+   * Eine vorhandene Zeile wird nur überschrieben, wenn die neue in **jeder** Hinsicht
+   * mindestens so reich ist. Eine Kopie mit Ereignissen, aber ohne Statistik, verdrängt damit
+   * keine vollständigere - lieber einmal zu wenig geschrieben als Daten verloren.
+   */
+  saveFixtureResults(rows: FixtureResult[]): void {
+    const columns = AnalyzerDatabase.RESULT_COLUMNS;
+    const assignments = columns
+      .filter((column) => column !== "fixture_id")
+      .map((column) => `${column}=excluded.${column}`)
+      .join(",");
+    const statement = this.db.prepare(`INSERT INTO fixture_results(${columns.join(",")})
+      VALUES(${columns.map(() => "?").join(",")})
+      ON CONFLICT(fixture_id) DO UPDATE SET ${assignments}
+      WHERE excluded.events_available >= fixture_results.events_available
+        AND excluded.stats_available >= fixture_results.stats_available
+        AND excluded.lineups_available >= fixture_results.lineups_available
+        AND excluded.players_available >= fixture_results.players_available`);
+    this.db.exec("BEGIN IMMEDIATE");
+    try {
+      for (const row of rows) statement.run(...resultValues(row));
+      this.db.exec("COMMIT");
+    } catch (error) { this.db.exec("ROLLBACK"); throw error; }
+  }
+
+  /**
+   * Trägt die Statistik je Halbzeit nach. `status` hält fest, ob gefragt wurde und ob es
+   * etwas gab - `unavailable` verhindert, dass der nächste Lauf dieselben Ligen ohne
+   * Halbzeitdaten erneut abfragt und Budget verbrennt.
+   */
+  saveHalfStatistics(rows: Array<{
+    fixtureId: number;
+    status: "available" | "unavailable";
+    fetchedAt: string;
+    home?: { firstHalf: TeamHalfStats | null; secondHalf: TeamHalfStats | null };
+    away?: { firstHalf: TeamHalfStats | null; secondHalf: TeamHalfStats | null };
+  }>): void {
+    const statement = this.db.prepare(`UPDATE fixture_results SET
+      home_possession_ht1=?, home_possession_ht2=?, away_possession_ht1=?, away_possession_ht2=?,
+      home_shots_ht1=?, home_shots_ht2=?, away_shots_ht1=?, away_shots_ht2=?,
+      home_shots_on_goal_ht1=?, home_shots_on_goal_ht2=?,
+      away_shots_on_goal_ht1=?, away_shots_on_goal_ht2=?,
+      home_corners_ht1=?, home_corners_ht2=?, away_corners_ht1=?, away_corners_ht2=?,
+      home_stats_ht1_json=?, home_stats_ht2_json=?,
+      away_stats_ht1_json=?, away_stats_ht2_json=?,
+      half_stats_status=?, half_stats_fetched_at=?
+      WHERE fixture_id=?`);
+    this.db.exec("BEGIN IMMEDIATE");
+    try {
+      for (const row of rows) {
+        const h1 = row.home?.firstHalf ?? null;
+        const h2 = row.home?.secondHalf ?? null;
+        const a1 = row.away?.firstHalf ?? null;
+        const a2 = row.away?.secondHalf ?? null;
+        statement.run(
+          h1?.possession ?? null, h2?.possession ?? null,
+          a1?.possession ?? null, a2?.possession ?? null,
+          h1?.shots ?? null, h2?.shots ?? null, a1?.shots ?? null, a2?.shots ?? null,
+          h1?.shotsOnGoal ?? null, h2?.shotsOnGoal ?? null,
+          a1?.shotsOnGoal ?? null, a2?.shotsOnGoal ?? null,
+          h1?.corners ?? null, h2?.corners ?? null, a1?.corners ?? null, a2?.corners ?? null,
+          h1 ? JSON.stringify(h1) : null, h2 ? JSON.stringify(h2) : null,
+          a1 ? JSON.stringify(a1) : null, a2 ? JSON.stringify(a2) : null,
+          row.status, row.fetchedAt, row.fixtureId
+        );
+      }
+      this.db.exec("COMMIT");
+    } catch (error) { this.db.exec("ROLLBACK"); throw error; }
+  }
+
+  /**
+   * Partien, für die die Halbzeit-Statistik noch aussteht: neueste zuerst, und nur solche mit
+   * Statistik überhaupt - ohne sie gibt es auch keine Halbzeitwerte, der Aufruf wäre verschenkt.
+   */
+  fixturesMissingHalfStatistics(limit: number): Array<{
+    fixtureId: number; homeTeamId: number; awayTeamId: number;
+  }> {
+    const rows = this.db.prepare(`SELECT fixture_id, home_team_id, away_team_id
+      FROM fixture_results
+      WHERE half_stats_status IS NULL AND stats_available = 1
+      ORDER BY kickoff DESC LIMIT ?`).all(limit) as Array<{
+        fixture_id: number; home_team_id: number; away_team_id: number;
+      }>;
+    // Die Mannschaften kommen mit, damit der Nachtrag die beiden Statistikblöcke über die
+    // Team-Kennung zuordnet statt über ihre Reihenfolge in der Antwort.
+    return rows.map((row) => ({
+      fixtureId: row.fixture_id,
+      homeTeamId: row.home_team_id,
+      awayTeamId: row.away_team_id
+    }));
+  }
+
+  countFixturesMissingHalfStatistics(): number {
+    const row = this.db.prepare(`SELECT COUNT(*) AS offen FROM fixture_results
+      WHERE half_stats_status IS NULL AND stats_available = 1`).get() as { offen: number };
+    return row.offen;
+  }
+
+  /**
+   * Alle je abgerechneten Partien, neueste zuerst. Grundlage des Nachtrags: Nur für diese
+   * Partien liegt überhaupt eine Antwort im Cache, weil nur sie je abgefragt wurden.
+   */
+  settledFixtureIds(): number[] {
+    const rows = this.db.prepare(`
+      SELECT fixture_id, MAX(kickoff) AS kickoff FROM (
+        SELECT fixture_id, kickoff FROM candidates WHERE settled_at IS NOT NULL
+        UNION ALL
+        SELECT fixture_id, kickoff FROM profile_predictions WHERE settled_at IS NOT NULL
+        UNION ALL
+        SELECT fixture_id, kickoff FROM goal_line_predictions WHERE settled_at IS NOT NULL
+      )
+      GROUP BY fixture_id
+      ORDER BY kickoff DESC, fixture_id DESC
+    `).all() as Array<{ fixture_id: number }>;
+    return rows.map((row) => row.fixture_id);
+  }
+
+  fixtureResult(fixtureId: number): Record<string, unknown> | undefined {
+    return this.db.prepare("SELECT * FROM fixture_results WHERE fixture_id=?")
+      .get(fixtureId) as Record<string, unknown> | undefined;
   }
 
   saveProfilePredictions(

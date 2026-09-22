@@ -253,6 +253,7 @@ async function settle(args: ParsedArgs): Promise<void> {
   }
   const result = await settleFixtures({ requestBudget, concurrency });
   console.log(`${result.settled} Kandidaten aus ${result.checked} von ${result.due} fälligen Spielen abgerechnet.`);
+  console.log(`Ergebnisse gespeichert: ${result.results} Spiele, davon ${result.halfStatistics} mit Zahlen je Halbzeit.`);
   console.log(`API-Aufrufe: ${result.apiRequests}`);
   if (result.budgetReached) {
     console.log(`Budget erreicht, ${result.due - result.checked} Partien bleiben offen.`);
@@ -540,6 +541,7 @@ async function dashboard(args: ParsedArgs): Promise<void> {
         });
         if (settled.checked > 0) {
           console.log(`Abgerechnet: ${settled.settled} Prognosen aus ${settled.checked} von ${settled.due} fälligen Partien${settled.budgetReached ? " (Budget erreicht)" : ""}`);
+          console.log(`Ergebnisse gespeichert: ${settled.results} Spiele, davon ${settled.halfStatistics} mit Zahlen je Halbzeit`);
         }
       } catch (error) {
         console.error(`Abrechnung übersprungen: ${error instanceof Error ? error.message : String(error)}`);

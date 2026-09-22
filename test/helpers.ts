@@ -1,4 +1,10 @@
-import type { ApiFixture } from "../src/types.ts";
+import type {
+  ApiFixture,
+  ApiFixtureEvent,
+  ApiFixtureLineup,
+  ApiFixturePlayers,
+  ApiTeamStatistics
+} from "../src/types.ts";
 
 export function fixture(options: {
   id: number;
@@ -15,6 +21,16 @@ export function fixture(options: {
   country?: string;
   season?: number;
   round?: string;
+  extraTimeHomeGoals?: number | null;
+  extraTimeAwayGoals?: number | null;
+  penaltyHomeGoals?: number | null;
+  penaltyAwayGoals?: number | null;
+  // Die vier Zusatzfelder liefert API-Football bei `fixtures?id=` mit. Ohne sie im Helfer
+  // ließe sich keine Halbzeit-Aufteilung prüfen.
+  events?: ApiFixtureEvent[];
+  statistics?: ApiTeamStatistics[];
+  lineups?: ApiFixtureLineup[];
+  players?: ApiFixturePlayers[];
 }): ApiFixture {
   const status = options.status ?? (options.homeGoals === undefined ? "NS" : "FT");
   const date = new Date(options.timestamp * 1000).toISOString();
@@ -48,8 +64,65 @@ export function fixture(options: {
     goals: { home: homeGoals, away: awayGoals },
     score: {
       halftime: { home: halfTimeHomeGoals, away: halfTimeAwayGoals },
-      fulltime: { home: homeGoals, away: awayGoals }
-    }
+      fulltime: { home: homeGoals, away: awayGoals },
+      ...(options.extraTimeHomeGoals === undefined && options.extraTimeAwayGoals === undefined
+        ? {}
+        : {
+          extratime: {
+            home: options.extraTimeHomeGoals ?? null,
+            away: options.extraTimeAwayGoals ?? null
+          }
+        }),
+      ...(options.penaltyHomeGoals === undefined && options.penaltyAwayGoals === undefined
+        ? {}
+        : {
+          penalty: {
+            home: options.penaltyHomeGoals ?? null,
+            away: options.penaltyAwayGoals ?? null
+          }
+        })
+    },
+    ...(options.events === undefined ? {} : { events: options.events }),
+    ...(options.statistics === undefined ? {} : { statistics: options.statistics }),
+    ...(options.lineups === undefined ? {} : { lineups: options.lineups }),
+    ...(options.players === undefined ? {} : { players: options.players })
+  };
+}
+
+/** Ein Ereignis, wie API-Football es liefert. Kurzform für die Tests. */
+export function event(options: {
+  type: string;
+  minute: number | null;
+  teamId: number;
+  detail?: string;
+  extra?: number | null;
+  player?: string;
+  assist?: string;
+}): ApiFixtureEvent {
+  return {
+    time: { elapsed: options.minute, extra: options.extra ?? null },
+    team: { id: options.teamId, name: `Team ${options.teamId}` },
+    player: { id: null, name: options.player ?? null },
+    assist: { id: null, name: options.assist ?? null },
+    type: options.type,
+    detail: options.detail ?? "Normal Goal"
+  };
+}
+
+/** Ein Statistikblock je Mannschaft, wahlweise mit Halbzeitwerten. */
+export function teamStatistics(options: {
+  teamId: number;
+  full: Record<string, number | string | null>;
+  firstHalf?: Record<string, number | string | null>;
+  secondHalf?: Record<string, number | string | null>;
+}): ApiTeamStatistics {
+  const list = (values: Record<string, number | string | null>) =>
+    Object.entries(values).map(([type, value]) => ({ type, value }));
+  return {
+    team: { id: options.teamId, name: `Team ${options.teamId}` },
+    statistics: list(options.full),
+    ...(options.firstHalf === undefined ? {} : { statistics_1h: list(options.firstHalf) }),
+    ...(options.secondHalf === undefined ? {} : { statistics_2h: list(options.secondHalf) })
   };
 }
 
