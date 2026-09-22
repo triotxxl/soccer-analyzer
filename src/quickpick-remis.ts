@@ -255,6 +255,7 @@ export function evaluateRemis(
 export const REMIS_PRESET: QuickpickPreset<RemisQuickpickSettings> = {
   id: "remis",
   label: "Remis-Kandidaten",
+  short: "Remis",
   description: "Spiele, die am ehesten unentschieden enden. Gesucht wird kein Sieger,"
     + " sondern ein geteilter Punkt – zu einer Quote, die sich noch lohnt.",
   criteria: [

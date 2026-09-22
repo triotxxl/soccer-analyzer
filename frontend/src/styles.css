@@ -193,10 +193,6 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .quickpick-chip-label { padding: 0 6px 0 11px; border: 0; background: transparent; color: var(--accent); font-size: 11px; font-weight: 700; }
 .quickpick-chip-clear { display: grid; place-items: center; width: 24px; height: 100%; padding: 0; border: 0; border-left: 1px solid rgba(255,255,255,.12); background: transparent; color: var(--accent); }
 .quickpick-chip-clear:hover { background: rgba(255,255,255,.08); }
-.quickpick-preset { margin-top: 14px; padding: 13px 15px; border: 1px solid #383838; border-radius: 10px; background: #232324; }
-.quickpick-preset-head { display: flex; gap: 14px; align-items: flex-start; justify-content: space-between; }
-.quickpick-preset-head strong { color: var(--text); font-size: 13px; }
-.quickpick-preset-head p { margin: 4px 0 0; color: #9c9c9c; font-size: 11px; line-height: 1.5; }
 .quickpick-apply { flex: none; height: 32px; padding: 0 14px; border: 1px solid var(--line); border-radius: 9px; background: #1e1e1e; color: #b8b8b8; font-size: 11px; font-weight: 700; }
 .quickpick-apply:hover { border-color: var(--accent); color: var(--accent); }
 .quickpick-apply.active { border-color: var(--accent); background: var(--accent); color: #10281a; }
@@ -206,15 +202,7 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .quickpick-honesty strong { color: #e0bf87; }
 .quickpick-honesty code { color: #cfcfcf; font-size: 10px; }
 .quickpick-badge { display: inline-block; margin-top: 4px; padding: 1px 6px; border-radius: 5px; background: #3a2f22; color: #d9a05b; font-weight: 700; }
-.quickpick-presets { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 8px; margin-top: 14px; }
-.quickpick-presets button { padding: 10px 12px; border: 1px solid var(--line); border-radius: 9px; background: #1a1a1a; color: #b8b8b8; font-size: 12px; font-weight: 700; text-align: left; }
-.quickpick-presets button:hover { border-color: #5a5a5a; }
-.quickpick-presets button.active { border-color: var(--accent); background: #26312b; color: var(--accent); }
 .quickpick-cart-note { margin: 0; color: #8f8f8f; font-size: 11px; line-height: 1.6; }
-.quickpick-table td.quickpick-add { width: 34px; padding-right: 8px; text-align: right; }
-.quickpick-table td.quickpick-add button { display: grid; place-items: center; width: 24px; height: 24px; border: 1px solid var(--line); border-radius: 7px; background: #1a1a1a; color: #b8b8b8; }
-.quickpick-table td.quickpick-add button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
-.quickpick-table td.quickpick-add button:disabled { opacity: .35; }
 .quickpick-levels { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; padding: 14px 2px 0; }
 .quickpick-levels button { display: flex; flex-direction: column; gap: 3px; padding: 9px 11px; border: 1px solid var(--line); border-radius: 9px; background: #1a1a1a; color: #b8b8b8; text-align: left; }
 .quickpick-levels button:hover { border-color: #5a5a5a; }
@@ -835,3 +823,86 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .quickpick-kombis td.schlecht { color: #f14c4c; font-weight: 700; }
 .quickpick-kombis td.erwartet { color: #8f8f8f; }
 .quickpick-kombis > small { display: block; margin-top: 8px; color: #8f8f8f; font-size: 10px; line-height: 1.6; }
+
+/* ---------------------------------------------------------------------------
+   Quickpicker: Liste zuerst.
+
+   Der Dialog ist eine feste Säule - Kopf, Reiter, Kontextzeile, Liste, Schublade,
+   Fußzeile. Nur die Liste wächst; alles andere behält seine Höhe, damit die
+   Fußzeile mit dem Wettschein-Knopf nie weggescrollt wird.
+   --------------------------------------------------------------------------- */
+.quickpick-dialog { width: min(680px, calc(100vw - 32px)); height: min(760px, calc(100vh - 48px)); max-height: none; }
+.quickpick-head { padding-bottom: 12px; }
+
+.quickpick-tabs { display: flex; gap: 4px; flex: 0 0 auto; margin: 0 16px; padding: 3px; border: 1px solid var(--line); border-radius: 10px; background: #1a1a1a; }
+.quickpick-tabs button { display: flex; gap: 6px; flex: 1; align-items: center; justify-content: center; height: 30px; border: 0; border-radius: 7px; background: transparent; color: var(--muted); font-size: 11px; font-weight: 700; white-space: nowrap; }
+.quickpick-tabs button:hover { color: #d0d0d0; }
+.quickpick-tabs button.active { background: #26312b; color: var(--accent); }
+.quickpick-tab-count { display: grid; place-items: center; min-width: 17px; height: 17px; padding: 0 4px; border-radius: 5px; background: rgba(255,255,255,.07); color: #8f8f8f; font-size: 10px; font-variant-numeric: tabular-nums; }
+.quickpick-tabs button.active .quickpick-tab-count { background: rgba(55,148,255,.22); color: var(--home); }
+
+.quickpick-context { position: relative; display: flex; gap: 10px; flex: 0 0 auto; align-items: center; margin-top: 11px; padding: 9px 16px; border-top: 1px solid var(--line-soft); border-bottom: 1px solid var(--line-soft); background: #1a1a1a; }
+.quickpick-context > strong { color: var(--text); font-size: 12px; white-space: nowrap; }
+.quickpick-context-note { overflow: hidden; color: #8f8f8f; font-size: 11px; font-variant-numeric: tabular-nums; text-overflow: ellipsis; white-space: nowrap; }
+.quickpick-sort { display: flex; gap: 6px; align-items: center; margin-left: auto; color: #8f8f8f; font-size: 10px; white-space: nowrap; }
+.quickpick-sort select { height: 24px; padding: 0 4px; border: 1px solid var(--line); border-radius: 7px; background: var(--shell); color: #d0d0d0; font-size: 11px; }
+.quickpick-info-toggle { display: grid; flex: 0 0 auto; place-items: center; width: 24px; height: 24px; border: 1px solid var(--line); border-radius: 50%; background: transparent; color: var(--muted); }
+.quickpick-info-toggle:hover, .quickpick-info-toggle.active { border-color: var(--accent); color: var(--accent); }
+.quickpick-info { position: absolute; top: 100%; right: 0; left: 0; z-index: 20; max-height: 42vh; padding: 13px 16px; overflow: auto; border-bottom: 1px solid var(--line-soft); background: #232324; box-shadow: 0 14px 30px rgba(0,0,0,.5); }
+.quickpick-info > p { margin: 0; max-width: 68ch; color: #b8b8b8; font-size: 11px; line-height: 1.6; }
+
+.quickpick-list { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+.quickpick-row { display: grid; grid-template-columns: 74px minmax(0,1fr) auto 56px 14px; gap: 12px; align-items: center; width: 100%; padding: 11px 16px; border: 0; border-bottom: 1px solid var(--line-soft); background: transparent; text-align: left; }
+.quickpick-row:hover { background: rgba(255,255,255,.03); }
+.quickpick-row.open { background: rgba(55,148,255,.07); }
+.quickpick-when { display: grid; gap: 2px; min-width: 0; }
+.quickpick-when small { overflow: hidden; color: #8f8f8f; font-size: 10px; font-variant-numeric: tabular-nums; text-overflow: ellipsis; white-space: nowrap; }
+.quickpick-league { color: #6f6f6f; }
+.quickpick-match { display: grid; gap: 4px; min-width: 0; }
+.quickpick-match strong { overflow: hidden; color: #eaeaea; font-size: 13px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.quickpick-pick { justify-self: start; max-width: 100%; overflow: hidden; padding: 3px 9px; border-radius: 999px; background: rgba(137,209,133,.16); color: #a6d9a2; font-size: 11px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.quickpick-pick-note { color: #8f8f8f; font-size: 10px; }
+.quickpick-strength { display: grid; gap: 4px; justify-items: end; }
+.quickpick-strength small { color: #8f8f8f; font-size: 10px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.quickpick-bar { display: block; width: 84px; height: 5px; overflow: hidden; border-radius: 3px; background: rgba(255,255,255,.08); }
+.quickpick-bar span { display: block; height: 5px; border-radius: 3px; }
+.quickpick-bar .gut { background: var(--green); }
+.quickpick-bar .mittel { background: #d9c05b; }
+.quickpick-bar .schwach { background: #8f8f8f; }
+.quickpick-odds { color: #eaeaea; font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; text-align: right; }
+.quickpick-chevron { color: #6f6f6f; transition: transform .15s; }
+.quickpick-row.open .quickpick-chevron { transform: rotate(90deg); }
+.quickpick-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; padding: 12px 16px 14px; border-bottom: 1px solid var(--line-soft); background: #1a1a1a; }
+.quickpick-fact { display: grid; gap: 3px; align-content: start; }
+.quickpick-fact > small:first-child { color: #8f8f8f; font-size: 10px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; }
+.quickpick-fact > span { color: #d0d0d0; font-size: 12px; font-variant-numeric: tabular-nums; }
+.quickpick-fact-note { color: #8f8f8f; font-size: 10px; line-height: 1.4; }
+.quickpick-empty { margin: 0; padding: 28px 16px; color: #8f8f8f; font-size: 12px; text-align: center; }
+
+.quickpick-drawer { flex: 0 1 auto; max-height: min(340px, 48vh); overflow-y: auto; border-top: 1px solid var(--line-soft); background: #1a1a1a; }
+.quickpick-drawer > section { padding: 12px 16px; }
+.quickpick-setup-head { display: flex; gap: 10px; align-items: center; margin-top: 13px; padding-top: 11px; border-top: 1px solid var(--line-soft); }
+.quickpick-setup-head strong { color: #8f8f8f; font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+.quickpick-setup-head span { color: #8f8f8f; font-size: 10px; }
+.quickpick-reset { height: 24px; margin-left: auto; padding: 0 9px; border: 1px solid #333; border-radius: 7px; background: transparent; color: #6f6f6f; font-size: 10px; font-weight: 600; white-space: nowrap; }
+.quickpick-reset.active { border-color: var(--accent); color: var(--accent); }
+.quickpick-reset:disabled { cursor: default; }
+.quickpick-params { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 4px 18px; margin-top: 6px; }
+.quickpick-param { display: grid; grid-template-columns: minmax(0,1fr) minmax(60px,90px) 60px; gap: 8px; align-items: center; padding: 4px 0; }
+.quickpick-param label { overflow: hidden; color: #c8c8c8; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.quickpick-param input[type="range"] { width: 100%; height: 18px; margin: 0; accent-color: var(--accent); background: transparent; }
+.quickpick-param input[type="number"] { height: 26px; padding: 0 7px; border: 1px solid var(--line); border-radius: 7px; background: var(--shell); color: #d0d0d0; font-size: 11px; font-variant-numeric: tabular-nums; text-align: right; }
+.quickpick-param input[type="number"].changed { border-color: var(--accent); color: var(--home); }
+.quickpick-toggle { display: flex; gap: 8px; align-items: center; padding: 4px 0; color: #c8c8c8; font-size: 11px; }
+
+.quickpick-footer { display: flex; gap: 8px; flex: 0 0 auto; align-items: center; padding: 11px 16px; border-top: 1px solid var(--line-soft); background: var(--shell); }
+.quickpick-footer > button { height: 30px; padding: 0 11px; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: var(--muted); font-size: 11px; font-weight: 600; white-space: nowrap; }
+.quickpick-footer > button:hover:not(:disabled) { border-color: #5a5a5a; color: #d0d0d0; }
+.quickpick-footer > button.active { border-color: var(--accent); background: #26312b; color: var(--accent); }
+.quickpick-footer-gap { flex: 1 1 auto; }
+.quickpick-footer .quickpick-cart { display: flex; gap: 7px; align-items: center; height: 32px; padding: 0 15px; border-color: var(--accent); background: var(--accent); color: #0d1a26; font-weight: 700; }
+.quickpick-footer .quickpick-cart:hover:not(:disabled) { border-color: var(--accent); color: #0d1a26; }
+.quickpick-footer .quickpick-cart:disabled { border-color: var(--line); background: transparent; color: #6f6f6f; cursor: default; }
+.quickpick-footer .quickpick-cart-note { color: #c8a978; font-size: 10px; white-space: nowrap; }
+.quickpick-drawer .quickpick-kombis, .quickpick-drawer .quickpick-rejections { margin: 0; border: 0; border-radius: 0; background: transparent; }
+.quickpick-drawer .quickpick-levels { padding: 0; }

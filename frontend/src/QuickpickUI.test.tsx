@@ -1,9 +1,15 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { QuickpickButton, QuickpickChip, QuickpickDialog } from "./QuickpickUI";
-import { DEFAULT_QUICKPICK_SETTINGS, DEFAULT_DOMINANZ_SETTINGS, type DavesQuickpickSettings, type QuickpickPresetId, type QuickpickSettings } from "./quickpick";
+import {
+  DEFAULT_QUICKPICK_STORE,
+  withSettings,
+  type DavesQuickpickSettings,
+  type QuickpickPresetId,
+  type QuickpickStore
+} from "./quickpick";
 import type { DashboardFixture } from "./types";
 
 afterEach(cleanup);
@@ -49,23 +55,38 @@ function Harness({ fixtures, initial, preset = "daves1x2", active = false, onAct
   onActiveChange?(active: boolean): void;
   onAddAll?(rows: Array<{ fixture: DashboardFixture; evaluation: { side: "1" | "2" | null } }>): void;
 }) {
-  const [settings, setSettings] = useState<QuickpickSettings>(
-    preset === "dominanz" ? DEFAULT_DOMINANZ_SETTINGS : { ...DEFAULT_QUICKPICK_SETTINGS, ...initial });
+  const [store, setStore] = useState<QuickpickStore>({
+    ...DEFAULT_QUICKPICK_STORE,
+    aktiv: preset,
+    daves1x2: { ...DEFAULT_QUICKPICK_STORE.daves1x2, ...initial }
+  });
   const [isActive, setActive] = useState(active);
   return <QuickpickDialog
     fixtures={fixtures}
-    settings={settings}
+    store={store}
     active={isActive}
-    onSettingsChange={setSettings}
-    onPresetChange={(next) => setSettings(next === "dominanz" ? DEFAULT_DOMINANZ_SETTINGS : DEFAULT_QUICKPICK_SETTINGS)}
+    timezone="Europe/Berlin"
+    onSettingsChange={(next) => setStore((value) => withSettings(value, next))}
+    onPresetChange={(next) => setStore((value) => ({ ...value, aktiv: next }))}
     onActiveChange={(next) => { setActive(next); onActiveChange?.(next); }}
     onAddAll={(rows) => onAddAll?.(rows)}
     onClose={() => undefined}
   />;
 }
 
-async function openSettings(): Promise<void> {
-  await userEvent.click(screen.getByRole("button", { name: /^Einstellungen/ }));
+/** Die drei Schubladen der Fußzeile schließen einander aus - eine reicht je Prüfung. */
+async function openDrawer(name: RegExp): Promise<void> {
+  await userEvent.click(screen.getByRole("button", { name }));
+}
+
+/** Beschreibung, Kriterien und Ehrlichkeitsabsatz stehen hinter dem ⓘ. */
+async function openInfo(): Promise<void> {
+  await userEvent.click(screen.getByRole("button", { name: "Worauf dieser Filter achtet" }));
+}
+
+/** Die Werte eines Spiels stehen aufgeklappt unter seiner Zeile. */
+async function openRow(partie: string): Promise<void> {
+  await userEvent.click(screen.getByText(partie));
 }
 
 describe("QuickpickButton", () => {
@@ -105,10 +126,12 @@ describe("QuickpickChip", () => {
 });
 
 describe("QuickpickDialog", () => {
-  it("nennt die Voreinstellung mit allen Kriterien", () => {
+  it("nennt die Voreinstellung mit allen Kriterien", async () => {
     render(<Harness fixtures={[fixture(1, "Alpha", "Beta", 75)]} />);
-    // Der Name steht zweimal: einmal im Auswahlknopf, einmal in der Karte darunter.
-    expect(screen.getByRole("button", { name: "Daves 1x2-Filter" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Daves 1x2-Filter" })).toBeInTheDocument();
+
+    await openInfo();
+
     expect(screen.getByText(/Tabelle: mehr Punkte je Spiel/)).toBeInTheDocument();
     expect(screen.getByText(/Ein Remis zählt nicht als Niederlage/)).toBeInTheDocument();
     expect(screen.getByText(/keine Niederlagen in Folge/)).toBeInTheDocument();
@@ -121,18 +144,32 @@ describe("QuickpickDialog", () => {
    * Stand vom 21.09.2026 misst keine Stufe einen Gewinn, und das darf nicht stillschweigend
    * verschwinden - auch nicht, wenn die Trefferquote gut aussieht.
    */
-  it("warnt vor dem Ertrag, statt nur die Trefferquote zu zeigen", () => {
+  it("warnt vor dem Ertrag, statt nur die Trefferquote zu zeigen", async () => {
     render(<Harness fixtures={[fixture(1, "Alpha", "Beta", 75)]} />);
+    expect(screen.getByText("Treffer je Tipp")).toBeInTheDocument();
+
+    await openInfo();
+
     expect(screen.getByText(/Rechne nicht mit Gewinn/)).toBeInTheDocument();
     expect(screen.getByText(/jede Stufe im Minus/)).toBeInTheDocument();
-    expect(screen.getByText("Treffer je Tipp")).toBeInTheDocument();
   });
 
-  it("zeigt den Tabellenvorsprung der getippten Seite", () => {
+  /** Die Zeile nennt Partie, Tipp und Quote; alles Weitere steht aufgeklappt darunter. */
+  it("zeigt den Tabellenvorsprung erst, wenn die Zeile aufgeklappt ist", async () => {
     render(<Harness fixtures={[fixture(1, "Alpha", "Beta", 75)]} />);
     expect(screen.getByText("Alpha – Beta")).toBeInTheDocument();
+    expect(screen.queryByText("+1,50 P")).not.toBeInTheDocument();
+
+    await openRow("Alpha – Beta");
+
     expect(screen.getByText("+1,50 P")).toBeInTheDocument();
     expect(screen.getByText(/1\. gegen 8\./)).toBeInTheDocument();
+  });
+
+  /** Der Balken je Zeile misst je Voreinstellung etwas anderes - hier die Favoritenpunkte. */
+  it("zeigt die Stärke des Tipps in der Zeile", () => {
+    render(<Harness fixtures={[fixture(1, "Alpha", "Beta", 75)]} />);
+    expect(screen.getByText("Stärke 75")).toBeInTheDocument();
   });
 
   it("schaltet den Filter an und wieder aus", async () => {
@@ -142,6 +179,14 @@ describe("QuickpickDialog", () => {
     expect(onActiveChange).toHaveBeenLastCalledWith(true);
     await userEvent.click(screen.getByRole("button", { name: "Filter aufheben" }));
     expect(onActiveChange).toHaveBeenLastCalledWith(false);
+  });
+
+  /** Ein Reiterwechsel meint „zeig mir diese Auswahl" - also greift der Filter sofort. */
+  it("schaltet den Filter mit dem Reiterwechsel ein", async () => {
+    const onActiveChange = vi.fn();
+    render(<Harness fixtures={[fixture(1, "Alpha", "Beta", 75)]} onActiveChange={onActiveChange} />);
+    await userEvent.click(screen.getByRole("tab", { name: "Remis-Kandidaten" }));
+    expect(onActiveChange).toHaveBeenLastCalledWith(true);
   });
 
   /** Der Weg, für den der Filter gedacht ist: Treffer in den Wettschein, dort Kombis bauen. */
@@ -160,34 +205,53 @@ describe("QuickpickDialog", () => {
   });
 
   describe("Strengestufen", () => {
+    const stufen = () => within(screen.getByRole("group", { name: "Strengestufe" }));
+
     it("zeigt jede Stufe mit ihrer gemessenen Menge und Trefferquote", async () => {
       render(<Harness fixtures={[fixture(1, "Alpha", "Beta", 75)]} />);
-      await openSettings();
+      await openDrawer(/^Strenge:/);
       for (const label of ["Streng", "Ausgewogen", "Locker", "Weit"]) {
-        expect(screen.getByRole("button", { name: new RegExp(`^${label}`) })).toBeInTheDocument();
+        expect(stufen().getByRole("button", { name: new RegExp(`^${label}`) })).toBeInTheDocument();
       }
       // Bewusst gegen das Format geprüft, nicht gegen den Stand: Die Zahlen wandern mit jeder
       // Nachkalibrierung. Ob sie noch zur Messung passen, prüft npm run quickpick-report.
-      expect(screen.getByRole("button", { name: /^Ausgewogen/ }))
+      expect(stufen().getByRole("button", { name: /^Ausgewogen/ }))
         .toHaveTextContent(/^Ausgewogen\d+,\d\/Tag · \d+,\d %$/);
     });
 
     it("hebt die eingestellte Stufe hervor und wechselt auf Klick", async () => {
       render(<Harness fixtures={[fixture(1, "Alpha", "Beta", 75)]} />);
-      await openSettings();
-      expect(screen.getByRole("button", { name: /^Ausgewogen/ })).toHaveAttribute("aria-pressed", "true");
+      await openDrawer(/^Strenge:/);
+      expect(stufen().getByRole("button", { name: /^Ausgewogen/ })).toHaveAttribute("aria-pressed", "true");
 
-      await userEvent.click(screen.getByRole("button", { name: /^Streng/ }));
+      await userEvent.click(stufen().getByRole("button", { name: /^Streng/ }));
 
-      expect(screen.getByRole("button", { name: /^Streng/ })).toHaveAttribute("aria-pressed", "true");
-      expect(screen.getByRole("button", { name: /^Ausgewogen/ })).toHaveAttribute("aria-pressed", "false");
+      expect(stufen().getByRole("button", { name: /^Streng/ })).toHaveAttribute("aria-pressed", "true");
+      expect(stufen().getByRole("button", { name: /^Ausgewogen/ })).toHaveAttribute("aria-pressed", "false");
       expect((screen.getByLabelText(/^Getippte Mannschaft ab/) as HTMLInputElement).value).toBe("70");
     });
 
     /** Wer an einem einzelnen Regler dreht, soll nicht fälschlich auf einer Stufe stehen. */
-    it("meldet eigene Werte, sobald ein Regler abweicht", async () => {
+    it("meldet eigene Werte, sobald ein Regler abweicht", () => {
       render(<Harness fixtures={[fixture(1, "Alpha", "Beta", 75)]} initial={{ strongMinimum: 63 }} />);
-      expect(screen.getByRole("button", { name: /^Einstellungen/ })).toHaveTextContent("Eigene Werte");
+      expect(screen.getByRole("button", { name: /^Strenge:/ })).toHaveTextContent("Strenge: eigene Werte");
+    });
+
+    /**
+     * Der blaue Rahmen ist die einzige Warnung, dass die gemessenen Zahlen auf den
+     * Stufenknöpfen zu anderen Werten gehören. Ohne ihn liest man eine Trefferquote ab,
+     * die für die eigene Einstellung nie gemessen wurde.
+     */
+    it("markiert den geänderten Regler und stellt ihn zurück", async () => {
+      render(<Harness fixtures={[fixture(1, "Alpha", "Beta", 75)]} initial={{ strongMinimum: 63 }} />);
+      await openDrawer(/^Strenge:/);
+      const feld = screen.getByLabelText(/^Getippte Mannschaft ab/) as HTMLInputElement;
+      expect(feld).toHaveClass("changed");
+
+      await userEvent.click(screen.getByRole("button", { name: "Auf Stufe zurücksetzen" }));
+
+      expect((screen.getByLabelText(/^Getippte Mannschaft ab/) as HTMLInputElement).value).toBe("60");
+      expect(screen.getByLabelText(/^Getippte Mannschaft ab/)).not.toHaveClass("changed");
     });
   });
 
@@ -197,17 +261,16 @@ describe("QuickpickDialog", () => {
     expect(screen.getByText("Alpha – Beta")).toBeInTheDocument();
     expect(screen.getByText("Gamma – Delta")).toBeInTheDocument();
 
-    await openSettings();
-    const points = screen.getByLabelText(/^Modell sieht Favoriten ab/) as HTMLInputElement;
-    await userEvent.clear(points);
-    await userEvent.type(points, "80");
+    await openDrawer(/^Strenge:/);
+    fireEvent.change(screen.getByLabelText(/^Modell sieht Favoriten ab/), { target: { value: "80" } });
 
     expect(screen.getByText("Alpha – Beta")).toBeInTheDocument();
     expect(screen.queryByText("Gamma – Delta")).not.toBeInTheDocument();
   });
 
-  it("benennt die Abweisungen mit Zahl und Grund", () => {
+  it("benennt die Abweisungen mit Zahl und Grund", async () => {
     render(<Harness fixtures={[fixture(1, "Alpha", "Beta", 75), balanced(2)]} />);
+    await openDrawer(/^Abgewiesen/);
     expect(screen.getByText(/Woran die übrigen 1 Partien scheitern/)).toBeInTheDocument();
     expect(screen.getByText("keine Mannschaft ist in der Form klar besser")).toBeInTheDocument();
   });
@@ -218,7 +281,7 @@ describe("QuickpickDialog", () => {
   });
 });
 
-describe("Zwei Voreinstellungen", () => {
+describe("Vier Voreinstellungen", () => {
   /**
    * Nacional Potosí – Always Ready: Der Gast gewann alle fünf Duelle, steht 2. gegen 7. und
    * hat die bessere Saisonbilanz – bei Quote 2,00. Seine Venue-Form ist dabei **schlechter**
@@ -248,31 +311,44 @@ describe("Zwei Voreinstellungen", () => {
 
   it("lässt zwischen den Voreinstellungen wechseln", async () => {
     render(<Harness fixtures={[dominant(1)]} />);
-    expect(screen.getByRole("button", { name: "Daves 1x2-Filter" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("tab", { name: "Daves 1x2-Filter" })).toHaveAttribute("aria-selected", "true");
 
-    await userEvent.click(screen.getByRole("button", { name: "Dominanz zum Kombipreis" }));
+    await userEvent.click(screen.getByRole("tab", { name: "Dominanz zum Kombipreis" }));
 
-    expect(screen.getByRole("button", { name: "Dominanz zum Kombipreis" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("tab", { name: "Dominanz zum Kombipreis" })).toHaveAttribute("aria-selected", "true");
+    await openInfo();
     expect(screen.getByText(/rechnet es in die Quote ein/)).toBeInTheDocument();
   });
 
-  it("zeigt eigene Spalten für Serie und Bilanz", () => {
-    render(<Harness fixtures={[dominant(1)]} preset="dominanz" />);
-    expect(screen.getByRole("button", { name: /^Serie in den direkten Duellen/ })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /^Verliert seltener als der Gegner/ })).toBeInTheDocument();
-    // Favoritenpunkte gelten der Modellseite und taugen hier weder als Spalte noch als Tor.
-    expect(screen.queryByRole("button", { name: /^Favoritenpunkte/ })).not.toBeInTheDocument();
+  /** Jeder Reiter nennt, wie viele Spiele er mit **seinen** Einstellungen findet. */
+  it("zählt die Treffer je Reiter", () => {
+    render(<Harness fixtures={[fixture(1, "Alpha", "Beta", 75)]} />);
+    expect(screen.getByRole("tab", { name: "Daves 1x2-Filter" })).toHaveTextContent("1");
+    expect(screen.getByRole("tab", { name: "Remis-Kandidaten" })).toHaveTextContent("0");
   });
 
-  it("findet die dominante Seite trotz schlechterer Venue-Form", () => {
+  it("zeigt eigene Werte für Serie und Bilanz", async () => {
+    render(<Harness fixtures={[dominant(1)]} preset="dominanz" />);
+    await openRow("Nacional Potosí – Always Ready");
+    expect(screen.getByText("Serie")).toBeInTheDocument();
+    expect(screen.getByText("Bilanz")).toBeInTheDocument();
+    // Favoritenpunkte gelten der Modellseite und taugen hier weder als Wert noch als Tor.
+    expect(screen.queryByText("Favoritenpunkte")).not.toBeInTheDocument();
+  });
+
+  it("findet die dominante Seite trotz schlechterer Venue-Form", async () => {
     render(<Harness fixtures={[dominant(1)]} preset="dominanz" />);
     expect(screen.getByText("Always Ready")).toBeInTheDocument();
+
+    await openRow("Nacional Potosí – Always Ready");
+
     expect(screen.getByText("Serie 5")).toBeInTheDocument();
   });
 
-  /** Kurze Kombis sind der Zweck – was sie kosten, steht in der Tabelle darunter. */
-  it("zeigt die Kombi-Tabelle, sobald eine Messung vorliegt", () => {
+  /** Kurze Kombis sind der Zweck – was sie kosten, steht in der Schublade. */
+  it("zeigt die Kombi-Tabelle, sobald eine Messung vorliegt", async () => {
     render(<Harness fixtures={[dominant(1)]} />);
+    await openDrawer(/^Kombi-Chancen/);
     expect(screen.getByText(/Was Kombis aus dieser Stufe gebracht hätten/)).toBeInTheDocument();
     // Die Spalte „erwartet" ist der Kern: Eine Kombi multipliziert den Ertrag je Bein.
     expect(screen.getByRole("columnheader", { name: "erwartet" })).toBeInTheDocument();

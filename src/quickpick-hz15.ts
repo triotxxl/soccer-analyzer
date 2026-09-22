@@ -293,6 +293,7 @@ export function evaluateHz15(
 export const HZ15_PRESET: QuickpickPreset<Hz15QuickpickSettings> = {
   id: "hz15",
   label: "Erste Halbzeit: zwei Tore",
+  short: "1. HZ 2 Tore",
   description: "Spiele, in denen schon bis zur Pause mindestens zwei Tore fallen sollen."
     + " Gesucht wird keine Mannschaft, sondern ein torreiches Spiel: viele erwartete Tore,"
     + " wenig Chance auf ein Unentschieden, und eine Quote, die sich noch lohnt.",

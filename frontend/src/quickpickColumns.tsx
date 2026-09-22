@@ -359,9 +359,93 @@ const REMIS_COLUMNS: QuickpickColumn[] = [
   }
 ];
 
-export const QUICKPICK_COLUMNS: Record<QuickpickPresetId, QuickpickColumn[]> = {
+const QUICKPICK_COLUMNS: Record<QuickpickPresetId, QuickpickColumn[]> = {
   daves1x2: DAVES_COLUMNS,
   dominanz: DOMINANZ_COLUMNS,
   hz15: HZ15_COLUMNS,
   remis: REMIS_COLUMNS
 };
+
+/**
+ * Die Trefferliste zeigt je Zeile Partie, Tipp und Quote; alles andere steht aufgeklappt
+ * darunter. Beides kommt aus **derselben** Spaltenliste - es gibt keine zweite Beschreibung
+ * der Werte, die auseinanderlaufen könnte.
+ */
+const HEAD_KEYS = new Set(["team", "tipp", "auswahl", "quote"]);
+
+/** Die Spalte, die den Tipp benennt. Bei „Dominanz" trägt sie das Abzeichen „Modell dagegen". */
+export function pickColumn(preset: QuickpickPresetId): QuickpickColumn {
+  const columns = QUICKPICK_COLUMNS[preset];
+  return columns.find((column) => column.key === "tipp" || column.key === "auswahl") ?? columns[0]!;
+}
+
+/** Die Quotenspalte. Bei „Dominanz" kennzeichnet sie eine geschätzte Quote mit „≈". */
+export function oddsColumn(preset: QuickpickPresetId): QuickpickColumn {
+  return QUICKPICK_COLUMNS[preset].find((column) => column.key === "quote")!;
+}
+
+/** Was beim Aufklappen einer Zeile erscheint: alles, was nicht schon in der Zeile steht. */
+export function factColumns(preset: QuickpickPresetId): QuickpickColumn[] {
+  return QUICKPICK_COLUMNS[preset].filter((column) => !HEAD_KEYS.has(column.key));
+}
+
+/**
+ * Der Balken je Zeile. Jede Voreinstellung misst etwas anderes, deshalb bringt jede ihre
+ * eigene Größe **und ihre eigenen Grenzen** mit: 30 % Remischance ist ein guter Wert, 30
+ * Favoritenpunkte ein miserabler. Ein gemeinsamer Maßstab würde die Hälfte der Filter
+ * falsch einfärben.
+ *
+ * `gut` und `mittel` sind an den gemessenen Grundraten ausgerichtet, die in
+ * `src/quickpick-*.ts` stehen: Remis 25 %, erste Halbzeit 35 %, Favoritenpunkte im Band
+ * „stark" ab 70.
+ */
+export interface QuickpickStrength {
+  /** 0 bis 100, nur zur Länge des Balkens. */
+  percent: number;
+  label: string;
+  title: string;
+  gut: number;
+  mittel: number;
+}
+
+export function strengthOf(preset: QuickpickPresetId, row: QuickpickRow): QuickpickStrength | null {
+  const evaluation = row.evaluation;
+  if (preset === "daves1x2") {
+    const points = evaluation.points;
+    if (points === null) return null;
+    return {
+      percent: points, label: `Stärke ${points}`, gut: 70, mittel: 60,
+      title: "Wie stark das Modell den Favoriten sieht, von 0 bis 100. Grob: 50 schwach,"
+        + " 60 interessant, 70 stark, 80 sehr stark."
+    };
+  }
+  if (preset === "dominanz") {
+    const superiority = evaluation.superiority;
+    if (superiority === null) return null;
+    const percent = Math.round(superiority.nonLossRate * 100);
+    return {
+      percent, label: `${percent} % ohne Niederlage`, gut: 70, mittel: 55,
+      title: "Wie oft die getippte Mannschaft in dieser Saison nicht verloren hat, aus der"
+        + " Tabelle. Der Gegner steht bei"
+        + ` ${Math.round(superiority.opponentNonLossRate * 100)} %.`
+    };
+  }
+  if (preset === "hz15") {
+    const detail = evaluation.hz15;
+    if (detail === null || detail === undefined) return null;
+    const percent = Math.round(detail.probability * 100);
+    return {
+      percent, label: `Chance ${percent} %`, gut: 50, mittel: 40,
+      title: "Wie wahrscheinlich das Modell zwei Tore bis zur Pause hält. Ohne Filter passiert"
+        + " das in 35 von 100 Spielen."
+    };
+  }
+  const detail = evaluation.remis;
+  if (detail === null || detail === undefined) return null;
+  const percent = Math.round(detail.probability * 100);
+  return {
+    percent, label: `Remis ${percent} %`, gut: 32, mittel: 28,
+    title: "Wie hoch das Modell die Chance auf ein Unentschieden sieht. Ohne Filter endet"
+      + " jedes vierte Spiel unentschieden."
+  };
+}

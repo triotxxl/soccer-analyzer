@@ -275,6 +275,7 @@ export function evaluateDominanz(
 export const DOMINANZ_PRESET: QuickpickPreset<DominanzQuickpickSettings> = {
   id: "dominanz",
   label: "Dominanz zum Kombipreis",
+  short: "Dominanz",
   description: "Eine Mannschaft, die die letzten direkten Duelle gewonnen hat, in der Tabelle"
     + " klar vorn steht und seltener verliert als der Gegner – und für die es trotzdem 1,80"
     + " oder mehr gibt. Gedacht für kurze Kombis.",

@@ -1340,8 +1340,9 @@ function Dashboard({ document }: { document: DashboardDocument }) {
   />}
   {quickpickOpen && <QuickpickDialog
     fixtures={scopedFixtures}
-    settings={quickpickSettings}
+    store={quickpickStore}
     active={quickpickActive}
+    timezone={document.meta.timezone}
     onSettingsChange={(next) => setQuickpickStore((store) => withSettings(store, next))}
     onPresetChange={(preset: QuickpickPresetId) => setQuickpickStore((store) => ({ ...store, aktiv: preset }))}
     onActiveChange={setQuickpickActive}

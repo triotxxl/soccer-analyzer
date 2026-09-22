@@ -188,6 +188,7 @@ export const DEFAULT_QUICKPICK_SETTINGS: DavesQuickpickSettings = {
 export const DAVES_PRESET: QuickpickPreset<DavesQuickpickSettings> = {
   id: "daves1x2",
   label: "Daves 1x2-Filter",
+  short: "Daves 1x2",
   description: "Klar überlegene Mannschaften für eine Kombi: Die Tabelle muss den Vorsprung"
     + " zeigen, die Form ihn bestätigen, und die direkten Duelle (H2H) dürfen nicht dagegen"
     + " sprechen.",

@@ -66,6 +66,12 @@ export interface QuickpickLevel<V> {
 export interface QuickpickPreset<S> {
   id: QuickpickPresetId;
   label: string;
+  /**
+   * Der Name auf dem Reiter. Vier volle Namen nebeneinander passen nicht in eine Zeile,
+   * und ein abgeschnittener Name ist schlechter als ein kurzer. Der volle Name steht in
+   * der Kontextzeile darunter.
+   */
+  short: string;
   description: string;
   criteria: string[];
   /**
