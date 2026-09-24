@@ -9,6 +9,61 @@
     "country": "World",
     "league": "AFC Champions League Elite"
   },
+  "africa cup of nations|africa cup of nations qualifikation gruppe a": {
+    "leagueId": 36,
+    "country": "World",
+    "league": "Africa Cup of Nations - Qualification"
+  },
+  "africa cup of nations|africa cup of nations qualifikation gruppe b": {
+    "leagueId": 36,
+    "country": "World",
+    "league": "Africa Cup of Nations - Qualification"
+  },
+  "africa cup of nations|africa cup of nations qualifikation gruppe c": {
+    "leagueId": 36,
+    "country": "World",
+    "league": "Africa Cup of Nations - Qualification"
+  },
+  "africa cup of nations|africa cup of nations qualifikation gruppe e": {
+    "leagueId": 36,
+    "country": "World",
+    "league": "Africa Cup of Nations - Qualification"
+  },
+  "africa cup of nations|africa cup of nations qualifikation gruppe f": {
+    "leagueId": 36,
+    "country": "World",
+    "league": "Africa Cup of Nations - Qualification"
+  },
+  "africa cup of nations|africa cup of nations qualifikation gruppe g": {
+    "leagueId": 36,
+    "country": "World",
+    "league": "Africa Cup of Nations - Qualification"
+  },
+  "africa cup of nations|africa cup of nations qualifikation gruppe h": {
+    "leagueId": 36,
+    "country": "World",
+    "league": "Africa Cup of Nations - Qualification"
+  },
+  "africa cup of nations|africa cup of nations qualifikation gruppe i": {
+    "leagueId": 36,
+    "country": "World",
+    "league": "Africa Cup of Nations - Qualification"
+  },
+  "africa cup of nations|africa cup of nations qualifikation gruppe j": {
+    "leagueId": 36,
+    "country": "World",
+    "league": "Africa Cup of Nations - Qualification"
+  },
+  "africa cup of nations|africa cup of nations qualifikation gruppe k": {
+    "leagueId": 36,
+    "country": "World",
+    "league": "Africa Cup of Nations - Qualification"
+  },
+  "africa cup of nations|africa cup of nations qualifikation gruppe l": {
+    "leagueId": 36,
+    "country": "World",
+    "league": "Africa Cup of Nations - Qualification"
+  },
   "agypten|2nd division a": {
     "leagueId": 887,
     "country": "Egypt",
@@ -338,6 +393,21 @@
     "leagueId": 772,
     "country": "World",
     "league": "Leagues Cup"
+  },
+  "concacaf nations league|concacaf nations league c gruppe a": {
+    "leagueId": 536,
+    "country": "World",
+    "league": "CONCACAF Nations League"
+  },
+  "concacaf nations league|concacaf nations league c gruppe b": {
+    "leagueId": 536,
+    "country": "World",
+    "league": "CONCACAF Nations League"
+  },
+  "concacaf nations league|concacaf nations league c gruppe c": {
+    "leagueId": 536,
+    "country": "World",
+    "league": "CONCACAF Nations League"
   },
   "conference league|qualifikationsrunde": {
     "leagueId": 848,
@@ -943,6 +1013,11 @@
     "leagueId": 261,
     "country": "Luxembourg",
     "league": "National Division"
+  },
+  "marokko|botola": {
+    "leagueId": 200,
+    "country": "Morocco",
+    "league": "Botola Pro"
   },
   "mexiko|liga de expansion mx apertura": {
     "leagueId": 263,
