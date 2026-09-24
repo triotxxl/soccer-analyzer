@@ -106,6 +106,8 @@ export function recentTeamMatches(
     const halfTimeHomeGoals = match.score.halftime?.home;
     const halfTimeAwayGoals = match.score.halftime?.away;
     return {
+      fixtureId: match.fixture.id,
+      teamWasHome: match.teams.home.id === teamId,
       date: match.fixture.date,
       homeTeam: match.teams.home.name,
       awayTeam: match.teams.away.name,
@@ -398,6 +400,9 @@ function h2hSummary(
     const halfTimeHomeGoals = match.score.halftime?.home;
     const halfTimeAwayGoals = match.score.halftime?.away;
     return {
+      fixtureId: match.fixture.id,
+      // In den direkten Duellen ist die Bezugsseite immer die aktuelle Heimmannschaft.
+      teamWasHome: match.teams.home.id === currentHomeTeamId,
       date: match.fixture.date,
       homeTeam: match.teams.home.name,
       awayTeam: match.teams.away.name,

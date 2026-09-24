@@ -78,6 +78,10 @@ export const config = {
   activeProfileVersion: "1.3.0",
   goalLineModelVersion: "3.2.0",
   xgEnrichmentRequestBudget: 250,
+  // Torschüsse und Ecken der letzten fünf Partien. Ein Aufruf deckt zwanzig Partien ab, und
+  // jede geholte wird gespeichert - ein 48-Stunden-Lauf braucht damit etwa zwanzig Aufrufe,
+  // spätere Läufe fast keine mehr.
+  recentStatsRequestBudget: 200,
   // Rekalibrierung der Torerwartung: tatsächliche Torsumme = intercept + slope * erwartete.
   // Kleinste Quadrate über 1306 abgerechnete Ligapartien der Version 3.1.0 (02.08.-29.08.2026),
   // geprüft auf 560 später angepfiffenen Partien, die nicht im Fit stecken.

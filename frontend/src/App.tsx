@@ -1,5 +1,5 @@
 import {
-  Binoculars, Broadcast, ChartBar, CaretDoubleLeft, CaretDoubleRight, CaretLeft, CaretRight, CheckCircle, ClockCounterClockwise, ListBullets, RocketLaunch, Shield, ShieldCheck, Star, WarningCircle, X
+  Binoculars, Broadcast, ChartBar, CaretDoubleLeft, CaretDoubleRight, CaretLeft, CaretRight, CheckCircle, ClockCounterClockwise, Crosshair, FlagPennant, ListBullets, RocketLaunch, Shield, ShieldCheck, Star, WarningCircle, X
 } from "@phosphor-icons/react";
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { BetBuilderDrawer, CartAddRadial, CartBadge } from "./BetCartUI";
@@ -52,7 +52,7 @@ type H2hView = "outcome" | "btts" | "over" | "firstHalfOver";
 type FormView = H2hView;
 type FullTimeOverLine = 1.5 | 2.5 | 3.5;
 type FirstHalfOverLine = 0.5 | 1.5;
-type SortKey = "kickoff" | "team" | "form" | "h2h" | "expected" | "score" | "market";
+type SortKey = "kickoff" | "team" | "form" | "h2h" | "expected" | "score" | "market" | "shots" | "corners";
 
 // Entspricht config.liveCandidateTrailMs: so lange nach dem Anpfiff kann eine Partie
 // noch laufen. Nur innerhalb dieses Fensters bleiben angepfiffene Partien sichtbar.
@@ -432,6 +432,61 @@ function FormDots({ results, h2h = false }: { results: FormResult[]; h2h?: boole
       ? <span className={`result-dot ${result} ${index === 0 ? "latest" : ""}`} title={resultLabels[result].title} key={index}>{h2h ? ({ win: "H", draw: "U", loss: "A" } as const)[result] : resultLabels[result].text}</span>
       : <span className="result-dot missing" title="Keine Daten" key={index}>–</span>)}
   </div>;
+}
+
+/** Welche Kennzahl die beiden neuen Spalten zeigen. */
+type RecentStatField = "shotsOnGoal" | "corners";
+
+/**
+ * Der Schnitt einer Seite, oder null, wenn keine der letzten Partien den Wert trug. Läufe vor
+ * dieser Ergänzung führen das Feld gar nicht und landen ebenfalls bei null.
+ */
+function recentValue(
+  fixture: DashboardFixture,
+  side: "home" | "away",
+  field: RecentStatField
+): number | null {
+  const stats = side === "home" ? fixture.form.homeStats : fixture.form.awayStats;
+  return stats?.[field] ?? null;
+}
+
+/**
+ * Sortiert wird über die Summe beider Seiten - eine Partie, in der beide Mannschaften viel
+ * schießen, steht oben. Partien ganz ohne Zahlen rutschen ans Ende statt als 0 mitten hinein.
+ */
+function recentSortValue(fixture: DashboardFixture, field: RecentStatField): number {
+  const home = recentValue(fixture, "home", field);
+  const away = recentValue(fixture, "away", field);
+  if (home === null && away === null) return -1;
+  return (home ?? 0) + (away ?? 0);
+}
+
+/** Eine Zahl mit einer Nachkommastelle, Komma wie im Rest der Ansicht. */
+function recentLabel(value: number | null): string {
+  return value === null ? "–" : value.toFixed(1).replace(".", ",");
+}
+
+/**
+ * Eine Zelle der beiden neuen Spalten: oben das Heim-, unten das Auswärtsteam, jeweils der
+ * Schnitt der letzten fünf Partien. Ein Strich heißt "nicht überliefert" - viele kleinere
+ * Ligen führen weder Schüsse noch Ecken.
+ */
+function RecentStatCell({ fixture, field, label }: {
+  fixture: DashboardFixture;
+  field: RecentStatField;
+  label: string;
+}) {
+  const home = recentValue(fixture, "home", field);
+  const away = recentValue(fixture, "away", field);
+  const title = home === null && away === null
+    ? `${label}: für diese Liga gibt es keine Zahlen`
+    : `${label} im Schnitt der letzten fünf Spiele – ${fixture.homeTeam}: ${recentLabel(home)}, ${fixture.awayTeam}: ${recentLabel(away)}`;
+  // Bewusst ohne aria-label: Die Zelle steht in einem Knopf, und ein Label am Kind wandert in
+  // den Namen der ganzen Zeile. Die Bedeutung trägt die Spaltenüberschrift.
+  return <span className="recent-stat-cell" title={title}>
+    <strong className={home === null ? "missing" : ""}>{recentLabel(home)}</strong>
+    <strong className={away === null ? "missing" : ""}>{recentLabel(away)}</strong>
+  </span>;
 }
 
 function DefenseShield({ profile, team }: { profile: NonNullable<DashboardFixture["defense"]>["home"] | undefined; team: string }) {
@@ -921,6 +976,8 @@ function Dashboard({ document }: { document: DashboardDocument }) {
       comparison = (firstHalf ? left.expectedFirstHalfGoals?.total ?? -1 : left.expectedGoals.total) -
         (firstHalf ? right.expectedFirstHalfGoals?.total ?? -1 : right.expectedGoals.total);
     }
+    else if (sortKey === "shots") comparison = recentSortValue(left, "shotsOnGoal") - recentSortValue(right, "shotsOnGoal");
+    else if (sortKey === "corners") comparison = recentSortValue(left, "corners") - recentSortValue(right, "corners");
     else if (sortKey === "score") comparison = (marketFilter === "draw" ? left.scores.draw ?? -1 : left.scores.favorite ?? -1) - (marketFilter === "draw" ? right.scores.draw ?? -1 : right.scores.favorite ?? -1);
     else if (sortKey === "market") comparison = (marketFor(left, selectedMarket)?.probability ?? -1) - (marketFor(right, selectedMarket)?.probability ?? -1);
     else if (sortKey === "form" || sortKey === "h2h") {
@@ -989,11 +1046,12 @@ function Dashboard({ document }: { document: DashboardDocument }) {
   // Vier Basisspalten, dazu der Score, wenn der Markt ihn zeigt, und die Marktspalten.
   // Die Summe muss zur Spaltenliste in styles.css passen, sonst scrollt die Tabelle
   // entweder zu frueh oder laesst die letzte Spalte abschneiden.
-  const columnCount = 4 + (showScore ? 1 : 0) + shownMarkets.length;
-  // 730 = die vier Basisminima (280+184+134+82) plus den Innenabstand der Zeile (40+10);
-  // der Score kommt mit seinem eigenen Minimum dazu. Die Summe muss zur Spaltenliste in
-  // styles.css passen, sonst klemmen die Spalten oder die Tabelle scrollt ohne Not.
-  const minimumWidth = 730 + (showScore ? 52 : 0) + shownMarkets.length * 126 + (columnCount - 1) * 10;
+  // Partie, Form, H2H, Schüsse, Ecken, Erwartete Tore - dazu Score und die Märkte.
+  const columnCount = 6 + (showScore ? 1 : 0) + shownMarkets.length;
+  // 822 = die sechs Basisminima (280+184+134+46+46+82) plus den Innenabstand der Zeile
+  // (40+10); der Score kommt mit seinem eigenen Minimum dazu. Die Summe muss zur Spaltenliste
+  // in styles.css passen, sonst klemmen die Spalten oder die Tabelle scrollt ohne Not.
+  const minimumWidth = 822 + (showScore ? 52 : 0) + shownMarkets.length * 126 + (columnCount - 1) * 10;
   const gridStyle = {
     "--market-count": shownMarkets.length,
     "--table-min-width": `${minimumWidth}px`
@@ -1188,6 +1246,12 @@ function Dashboard({ document }: { document: DashboardDocument }) {
                 ? <span className="sort-mode-badge secondary" aria-label="Sekundäre Sortierung" title="Sekundäre Sortierung">2</span>
                 : arrow("h2h")}
           </button>
+          <button className="icon-head" onClick={() => sort("shots")} title="Schüsse aufs Tor im Schnitt der letzten fünf Spiele" aria-label={sortStateLabel("Schüsse aufs Tor", sortKey === "shots", sortDirection)}>
+            <Crosshair size={15} weight="bold" aria-hidden="true" /> {arrow("shots")}
+          </button>
+          <button className="icon-head" onClick={() => sort("corners")} title="Ecken im Schnitt der letzten fünf Spiele" aria-label={sortStateLabel("Ecken", sortKey === "corners", sortDirection)}>
+            <FlagPennant size={15} weight="bold" aria-hidden="true" /> {arrow("corners")}
+          </button>
           <button onClick={() => sort("expected")} aria-label={sortStateLabel(showFirstHalfExpected ? "Erw. Tore 1. HZ" : "Erw. Tore", sortKey === "expected", sortDirection)}>{showFirstHalfExpected ? "Erw. Tore 1. HZ" : "Erw. Tore"} {arrow("expected")}</button>
           {showScore && <button onClick={() => sort("score")} aria-label={sortStateLabel("Score", sortKey === "score", sortDirection)}>Score {arrow("score")}</button>}
           {shownMarkets.map((option) => <button key={option.key} onClick={() => sort("market")} aria-label={sortStateLabel(option.label, sortKey === "market", sortDirection)}>{option.label} {arrow("market")}</button>)}
@@ -1215,8 +1279,21 @@ function Dashboard({ document }: { document: DashboardDocument }) {
                 <span className="fixture-meta"><strong>{time.clock}{isPast && <em> angepfiffen</em>}</strong><small>{time.day} · <CountryFlag country={fixture.country} /> {fixture.country} · {fixture.league}</small>{(fixture.h2hNotice || fixture.warnings.length > 0) && <i>{fixture.h2hNotice ? "H2H" : "Daten"}</i>}{fixture.classGap && <ClassGapBadge gap={fixture.classGap} homeTeam={fixture.homeTeam} awayTeam={fixture.awayTeam} />}</span>
               </span>
               <span className="form-cell">
-                <span className="form-labels" aria-label={fixture.form.scope === "overall" ? "Form insgesamt: Home und Away" : "Heim- und Auswärtsform"}>
-                  <small>Home</small><small>Away</small>
+                {/*
+                  * Bei Pokal- und Länderspielen zählt der Lauf die letzten Spiele insgesamt
+                  * (src/dashboard.ts setzt dann scope "overall"). "Home"/"Away" hätte dort
+                  * eine Trennung nach Ort behauptet, die in den Punkten gar nicht steckt.
+                  */}
+                <span
+                  className="form-labels"
+                  title={fixture.form.scope === "overall"
+                    ? `Alle Spiele der letzten Zeit, zu Hause und auswärts zusammen – oben ${fixture.homeTeam}, unten ${fixture.awayTeam}`
+                    : `Nur die Heimspiele von ${fixture.homeTeam} gegen die Auswärtsspiele von ${fixture.awayTeam}`}
+                  aria-label={fixture.form.scope === "overall" ? "Form aus allen Spielen" : "Heim- und Auswärtsform"}
+                >
+                  {fixture.form.scope === "overall"
+                    ? <><small>Alle</small><small>Alle</small></>
+                    : <><small>Home</small><small>Away</small></>}
                 </span>
                 <span>{formView === "outcome"
                   ? <><FormDots results={fixture.form.home} /><FormDots results={fixture.form.away} /></>
@@ -1226,6 +1303,8 @@ function Dashboard({ document }: { document: DashboardDocument }) {
                   </>}</span>
               </span>
               <span className="h2h-cell"><H2hDots fixture={fixture} view={h2hView} overLine={overLine} firstHalfOverLine={firstHalfOverLine} inverted={counterDirection} /></span>
+              <RecentStatCell fixture={fixture} field="shotsOnGoal" label="Schüsse aufs Tor" />
+              <RecentStatCell fixture={fixture} field="corners" label="Ecken" />
               <span className="expected-cell"><strong>{(showFirstHalfExpected ? fixture.expectedFirstHalfGoals?.home ?? 0 : fixture.expectedGoals.home).toFixed(2).replace(".", ",")}</strong><i>:</i><strong>{(showFirstHalfExpected ? fixture.expectedFirstHalfGoals?.away ?? 0 : fixture.expectedGoals.away).toFixed(2).replace(".", ",")}</strong></span>
               {showScore && <span className="score-cell">{marketFilter !== "draw" && <span><small>1X2</small><strong>{fixture.scores.favorite ?? "–"}</strong></span>}{marketFilter !== "1x2" && <span><small>X</small><strong>{fixture.scores.draw ?? "–"}</strong></span>}</span>}
               {markets.map((item) => <MarketCard market={item} showEdge={showKelly} key={item.key} />)}

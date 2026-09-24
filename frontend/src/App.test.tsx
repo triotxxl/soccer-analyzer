@@ -57,12 +57,12 @@ function fixture(id: number, homeTeam: string, level: "none" | "recommended" | "
     modelVersion: "test", crossLeague: false, dataConfidence: 85, warnings: [], h2hNotice: null,
     form: {
       scope: "venue", home: ["win", "draw", "loss"], away: ["loss", "draw", "win"],
-      homeMatches: [{ date: "2026-04-24T18:00:00.000Z", homeTeam, awayTeam: "Vorheim FC", homeGoals: 2, awayGoals: 1 }],
-      awayMatches: [{ date: "2026-04-24T18:00:00.000Z", homeTeam: "Vorauswärts FC", awayTeam: "Gast FC", homeGoals: 0, awayGoals: 0 }]
+      homeMatches: [{ fixtureId: 9501, teamWasHome: true, date: "2026-04-24T18:00:00.000Z", homeTeam, awayTeam: "Vorheim FC", homeGoals: 2, awayGoals: 1 }],
+      awayMatches: [{ fixtureId: 9001, teamWasHome: true, date: "2026-04-24T18:00:00.000Z", homeTeam: "Vorauswärts FC", awayTeam: "Gast FC", homeGoals: 0, awayGoals: 0 }]
     },
     h2h: {
       outcomes: ["win", "draw", "loss"], btts: [true, false, true], draws: 1, consecutiveDraws: 0,
-      matches: [{ date: "2026-05-01T18:00:00.000Z", homeTeam, awayTeam: "Gast FC", homeGoals: 2, awayGoals: 1 }]
+      matches: [{ fixtureId: 9502, teamWasHome: true, date: "2026-05-01T18:00:00.000Z", homeTeam, awayTeam: "Gast FC", homeGoals: 2, awayGoals: 1 }]
     },
     expectedGoals: { home: 1.6, away: 1.1, total: 2.7 }, scores: { favorite: 75, draw: 61 }, markets: markets(level)
   };
@@ -153,6 +153,22 @@ describe("React-Dashboard", () => {
     await user.click(screen.getByRole("button", { name: /Alpha FCGast FC/i }));
     expect(await within(screen.getByLabelText("Details")).findByText("Direkte Begegnungen")).toBeInTheDocument();
     expect(screen.getAllByText(/Testbegründung/)).toHaveLength(5);
+  });
+
+  it("schreibt bei Pokal- und Länderspielen Alle statt Home und Away über die Form", async () => {
+    const current = document();
+    current.fixtures[0] = {
+      ...current.fixtures[0]!,
+      crossLeague: true,
+      form: { ...current.fixtures[0]!.form, scope: "overall" }
+    };
+    vi.stubGlobal("fetch", dashboardFetch(() => current));
+    render(<App />);
+    expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
+    const formLabels = globalThis.document.querySelector(".form-labels");
+    expect(formLabels).toHaveTextContent("AlleAlle");
+    expect(formLabels).not.toHaveTextContent("Home");
+    expect(formLabels).toHaveAttribute("title", expect.stringContaining("zu Hause und auswärts zusammen"));
   });
 
   it("stellt jedem Teamnamen der Übersicht sein Wappen voran, ohne URL die Initialen", async () => {
@@ -321,11 +337,11 @@ describe("React-Dashboard", () => {
     const current = document();
     current.schemaVersion = 2;
     current.fixtures[0]!.h2h.matches = [
-      { date: "2026-05-05T18:00:00.000Z", homeTeam: "Alpha FC", awayTeam: "Gast FC", homeGoals: 2, awayGoals: 1, halfTimeHomeGoals: 1, halfTimeAwayGoals: 0 },
-      { date: "2026-04-05T18:00:00.000Z", homeTeam: "Gast FC", awayTeam: "Alpha FC", homeGoals: 1, awayGoals: 0, halfTimeHomeGoals: 0, halfTimeAwayGoals: 0 },
-      { date: "2026-03-05T18:00:00.000Z", homeTeam: "Alpha FC", awayTeam: "Gast FC", homeGoals: 3, awayGoals: 1, halfTimeHomeGoals: 1, halfTimeAwayGoals: 1 },
-      { date: "2026-02-05T18:00:00.000Z", homeTeam: "Gast FC", awayTeam: "Alpha FC", homeGoals: 1, awayGoals: 2, halfTimeHomeGoals: 0, halfTimeAwayGoals: 1 },
-      { date: "2026-01-05T18:00:00.000Z", homeTeam: "Alpha FC", awayTeam: "Gast FC", homeGoals: 2, awayGoals: 0, halfTimeHomeGoals: null, halfTimeAwayGoals: null }
+      { fixtureId: 9002, teamWasHome: true, date: "2026-05-05T18:00:00.000Z", homeTeam: "Alpha FC", awayTeam: "Gast FC", homeGoals: 2, awayGoals: 1, halfTimeHomeGoals: 1, halfTimeAwayGoals: 0 },
+      { fixtureId: 9003, teamWasHome: true, date: "2026-04-05T18:00:00.000Z", homeTeam: "Gast FC", awayTeam: "Alpha FC", homeGoals: 1, awayGoals: 0, halfTimeHomeGoals: 0, halfTimeAwayGoals: 0 },
+      { fixtureId: 9004, teamWasHome: true, date: "2026-03-05T18:00:00.000Z", homeTeam: "Alpha FC", awayTeam: "Gast FC", homeGoals: 3, awayGoals: 1, halfTimeHomeGoals: 1, halfTimeAwayGoals: 1 },
+      { fixtureId: 9005, teamWasHome: true, date: "2026-02-05T18:00:00.000Z", homeTeam: "Gast FC", awayTeam: "Alpha FC", homeGoals: 1, awayGoals: 2, halfTimeHomeGoals: 0, halfTimeAwayGoals: 1 },
+      { fixtureId: 9006, teamWasHome: true, date: "2026-01-05T18:00:00.000Z", homeTeam: "Alpha FC", awayTeam: "Gast FC", homeGoals: 2, awayGoals: 0, halfTimeHomeGoals: null, halfTimeAwayGoals: null }
     ];
     vi.stubGlobal("fetch", dashboardFetch(() => current));
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
@@ -926,5 +942,84 @@ describe("Klassenunterschied", () => {
     expect(screen.getByText(/keine Mannschaft ist in der Form klar besser/)).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Filter aufheben" }));
     expect(screen.getByText("Alpha FC")).toBeInTheDocument();
+  });
+});
+
+describe("Schüsse und Ecken", () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date("2026-08-16T12:00:00.000Z"));
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+  });
+
+  const mitZahlen = (
+    id: number,
+    name: string,
+    heim: { shotsOnGoal: number | null; corners: number | null } | undefined,
+    gast: { shotsOnGoal: number | null; corners: number | null } | undefined
+  ) => {
+    const base = fixture(id, name, "none", `2026-08-16T${String(17 + id).padStart(2, "0")}:00:00.000Z`);
+    return {
+      ...base,
+      form: {
+        ...base.form,
+        ...(heim ? { homeStats: { ...heim, matches: 5 } } : {}),
+        ...(gast ? { awayStats: { ...gast, matches: 5 } } : {})
+      }
+    };
+  };
+
+  it("zeigt den Schnitt beider Seiten und einen Strich, wo nichts überliefert ist", async () => {
+    const current = document();
+    current.fixtures = [
+      mitZahlen(1, "Mit Zahlen", { shotsOnGoal: 5.2, corners: 6.4 }, { shotsOnGoal: 3, corners: 2 }),
+      mitZahlen(2, "Ohne Zahlen", undefined, undefined)
+    ];
+    current.meta.fixtureCount = 2;
+    vi.stubGlobal("fetch", dashboardFetch(() => current));
+    render(<App />);
+    expect(await screen.findByText("Mit Zahlen")).toBeInTheDocument();
+
+    const zeilen = globalThis.document.querySelectorAll(".fixture-row");
+    expect(zeilen[0]?.textContent).toContain("5,2");
+    expect(zeilen[0]?.textContent).toContain("6,4");
+    // Ohne Zahlen steht ein Strich - nicht 0,0, das wäre eine Aussage, die niemand geprüft hat.
+    const leer = zeilen[1]?.querySelectorAll(".recent-stat-cell strong");
+    expect(leer?.length).toBe(4);
+    for (const feld of Array.from(leer ?? [])) expect(feld.textContent).toBe("–");
+  });
+
+  it("sortiert nach Schüssen und nach Ecken getrennt", async () => {
+    const current = document();
+    current.fixtures = [
+      mitZahlen(1, "Wenig Schüsse", { shotsOnGoal: 1, corners: 9 }, { shotsOnGoal: 1, corners: 9 }),
+      mitZahlen(2, "Viele Schüsse", { shotsOnGoal: 8, corners: 1 }, { shotsOnGoal: 8, corners: 1 })
+    ];
+    current.meta.fixtureCount = 2;
+    vi.stubGlobal("fetch", dashboardFetch(() => current));
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(<App />);
+    expect(await screen.findByText("Viele Schüsse")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /Schüsse aufs Tor/i }));
+    expect(globalThis.document.querySelector(".fixture-row")?.textContent).toContain("Viele Schüsse");
+
+    await user.click(screen.getByRole("button", { name: /Ecken/i }));
+    expect(globalThis.document.querySelector(".fixture-row")?.textContent).toContain("Wenig Schüsse");
+  });
+
+  it("verträgt Läufe von vor dieser Ergänzung", async () => {
+    // Ältere Snapshots führen form.homeStats gar nicht - das darf nicht werfen.
+    const current = document();
+    vi.stubGlobal("fetch", dashboardFetch(() => current));
+    render(<App />);
+    expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
+    expect(globalThis.document.querySelectorAll(".recent-stat-cell").length).toBeGreaterThan(0);
   });
 });

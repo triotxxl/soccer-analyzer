@@ -1,6 +1,7 @@
 import { mkdir, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { config, ROOT_DIR } from "./config.ts";
+import { recentAverage, type MatchSideStats, type RecentAverage } from "./recent-stats.ts";
 import { teamNameSimilarity } from "./team-resolver.ts";
 import type { DefensiveProfile, DrawAnalysisResult, FavoriteAnalysisResult, GoalLineAnalysisResult, GoalLineRow, LeagueStats, LeagueStrengthComparison, RecentMatchSummary, TipicoOdds } from "./types.ts";
 
@@ -14,6 +15,11 @@ export interface DashboardInput {
   favorites: FavoriteAnalysisResult;
   goals: GoalLineAnalysisResult;
   tipicoOdds: TipicoOdds[];
+  /**
+   * Torschüsse und Ecken der jüngsten Partien, gesammelt von `collectRecentStats`. Fehlt die
+   * Angabe, bleiben die beiden Spalten leer - das Dokument entsteht trotzdem.
+   */
+  recentStats?: Map<number, { home: MatchSideStats; away: MatchSideStats }>;
 }
 
 export type RecommendationLevel = "none" | "recommended" | "strong";
@@ -91,7 +97,16 @@ export interface DashboardFixture {
   dataConfidence: number;
   warnings: string[];
   h2hNotice: string | null;
-  form: { scope: "venue" | "overall"; home: FormResult[]; away: FormResult[]; homeMatches: RecentMatchSummary[]; awayMatches: RecentMatchSummary[] };
+  form: {
+    scope: "venue" | "overall";
+    home: FormResult[];
+    away: FormResult[];
+    homeMatches: RecentMatchSummary[];
+    awayMatches: RecentMatchSummary[];
+    /** Schnitt aus Torschüssen und Ecken der letzten Partien; fehlt in älteren Läufen. */
+    homeStats?: RecentAverage;
+    awayStats?: RecentAverage;
+  };
   h2h: {
     outcomes: FormResult[];
     btts: boolean[];
@@ -262,6 +277,7 @@ function createMarket(input: Omit<DashboardMarket, "recommendation"> & { crossLe
 }
 
 export function buildDashboardDocument(input: DashboardInput): DashboardDocument {
+  const recentStats = input.recentStats ?? new Map<number, { home: MatchSideStats; away: MatchSideStats }>();
   const drawByFixture = new Map(input.draw.rows.map((row) => [row.fixtureId, row]));
   const favoriteByFixture = new Map(input.favorites.rows.map((row) => [row.fixtureId, row]));
   const fixtures: DashboardFixture[] = input.goals.rows.map((row) => {
@@ -395,7 +411,9 @@ export function buildDashboardDocument(input: DashboardInput): DashboardDocument
         home: draw?.recentHomeResults ?? [],
         away: draw?.recentAwayResults ?? [],
         homeMatches: draw?.recentHomeMatches ?? [],
-        awayMatches: draw?.recentAwayMatches ?? []
+        awayMatches: draw?.recentAwayMatches ?? [],
+        homeStats: recentAverage(draw?.recentHomeMatches ?? [], recentStats),
+        awayStats: recentAverage(draw?.recentAwayMatches ?? [], recentStats)
       },
       h2h: {
         outcomes: h2h?.recentHomeTeamResults ?? [], btts: h2h?.recentBttsResults ?? [], draws: h2h?.draws ?? 0,

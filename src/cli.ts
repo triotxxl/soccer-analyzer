@@ -28,6 +28,7 @@ import { applyGoalLineFilters } from "./goal-line-filter.ts";
 import { formatVenueFormResult, runVenueFormFilter } from "./venue-form.ts";
 import { importTipicoData } from "./tipico.ts";
 import { writeDashboard } from "./dashboard.ts";
+import { collectRecentStats, RECENT_STATS_WINDOW, type MatchSideStats } from "./recent-stats.ts";
 import { parseExpectedGoals } from "./xg.ts";
 import type {
   AnalysisInput,
@@ -521,7 +522,29 @@ async function dashboard(args: ParsedArgs): Promise<void> {
     const favoriteResult = client
       ? await runFavoriteAnalysis(input, { client, database })
       : emptyBase;
+    // Torschüsse und Ecken der jüngsten Partien. Der größte Teil steht schon in
+    // fixture_results und kostet nichts; geholt wird nur der Rest, zwanzig Partien je Aufruf.
+    let recentStats = new Map<number, { home: MatchSideStats; away: MatchSideStats }>();
+    if (client) {
+      const benoetigt = drawResult.rows.flatMap((row) => [
+        ...(row.recentHomeMatches ?? []).slice(0, RECENT_STATS_WINDOW),
+        ...(row.recentAwayMatches ?? []).slice(0, RECENT_STATS_WINDOW)
+      ]).map((match) => match.fixtureId);
+      try {
+        const gesammelt = await collectRecentStats(benoetigt, client, database, {
+          maxRequests: config.recentStatsRequestBudget
+        });
+        recentStats = gesammelt.values;
+        if (benoetigt.length > 0) {
+          const gesucht = new Set(benoetigt).size;
+          console.log(`Schüsse und Ecken: ${gesammelt.values.size} von ${gesucht} Partien bekannt, ${gesammelt.apiRequests} Aufrufe`);
+        }
+      } catch (error) {
+        console.error(`Schüsse und Ecken übersprungen: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
     const files = await writeDashboard({
+      recentStats,
       createdAt: goalsResult.createdAt,
       sourceFile,
       totalTipicoEvents: imported.totalEvents,

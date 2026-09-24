@@ -26,6 +26,7 @@ function dashboardInput(odds = 1.75, strengthAvailable = true): DashboardInput {
           matches: 4, draws: 3, consecutiveDraws: 3, allDraws: false,
           recentHomeTeamResults: ["win", "draw", "loss", "draw"], recentBttsResults: [true, true, false, true],
           recentMatches: [{
+            fixtureId: 4711, teamWasHome: true,
             date: "2026-05-10T15:30:00.000Z", homeTeam: "Heim FC", awayTeam: "Gast FC",
             homeGoals: 2, awayGoals: 1, halfTimeHomeGoals: 1, halfTimeAwayGoals: 0
           }]
@@ -267,4 +268,34 @@ test("Ausgeglichene Quoten und Ligapartien bleiben unmarkiert", () => {
   const fixture = buildDashboardDocument(domestic).fixtures[0]!;
   assert.equal(fixture.crossLeague, false);
   assert.equal(fixture.classGap, undefined);
+});
+
+test("der Lauf trägt Schüsse und Ecken als Schnitt der letzten Partien in den Snapshot", () => {
+  const input = dashboardInput();
+  const partie = (fixtureId: number, teamWasHome: boolean) => ({
+    fixtureId, teamWasHome, date: "2026-08-01T18:00:00.000Z",
+    homeTeam: "Heim FC", awayTeam: "Gast FC", homeGoals: 1, awayGoals: 1,
+    halfTimeHomeGoals: 0, halfTimeAwayGoals: 0
+  });
+  input.draw.rows[0]!.recentHomeMatches = [partie(11, true), partie(12, false)];
+  input.draw.rows[0]!.recentAwayMatches = [partie(13, true)];
+  input.recentStats = new Map([
+    [11, { home: { shotsOnGoal: 8, corners: 6 }, away: { shotsOnGoal: 1, corners: 1 } }],
+    [12, { home: { shotsOnGoal: 0, corners: 0 }, away: { shotsOnGoal: 4, corners: 2 } }],
+    // Die dritte Partie führt keine Ecken - das darf den Schüsseschnitt nicht kosten.
+    [13, { home: { shotsOnGoal: 5, corners: null }, away: { shotsOnGoal: 2, corners: 9 } }]
+  ]);
+
+  const form = buildDashboardDocument(input).fixtures[0]!.form;
+  assert.equal(form.homeStats?.shotsOnGoal, 6, "8 aus der Heim- und 4 aus der Auswärtspartie");
+  assert.equal(form.homeStats?.corners, 4);
+  assert.equal(form.homeStats?.matches, 2);
+  assert.equal(form.awayStats?.shotsOnGoal, 5);
+  assert.equal(form.awayStats?.corners, null);
+});
+
+test("ohne gesammelte Zahlen bleibt der Snapshot leer statt null", () => {
+  const form = buildDashboardDocument(dashboardInput()).fixtures[0]!.form;
+  assert.equal(form.homeStats?.shotsOnGoal, null);
+  assert.equal(form.homeStats?.matches, 0);
 });

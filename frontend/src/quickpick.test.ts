@@ -782,6 +782,7 @@ describe("Erste Halbzeit: zwei Tore", () => {
     expect(evaluateFixture(ohneHistorie, streng).rejectedBy).toBe("hzHistorie");
 
     const torreicheHistorie = Array.from({ length: 5 }, (_, index) => ({
+      fixtureId: 7100 + index, teamWasHome: true,
       date: `2026-09-0${index + 1}`, homeTeam: "Alpha", awayTeam: "Gamma",
       homeGoals: 3, awayGoals: 1, halfTimeHomeGoals: 2, halfTimeAwayGoals: 0
     }));
@@ -830,6 +831,7 @@ describe("Erste Halbzeit: zwei Tore", () => {
 
 describe("firstHalfRateOf", () => {
   const partie = (halbzeit: number | null) => ({
+    fixtureId: 7200, teamWasHome: true,
     date: "2026-09-01", homeTeam: "A", awayTeam: "B", homeGoals: 2, awayGoals: 1,
     halfTimeHomeGoals: halbzeit, halfTimeAwayGoals: halbzeit === null ? null : 0
   });

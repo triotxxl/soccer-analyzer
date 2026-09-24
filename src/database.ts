@@ -17,6 +17,7 @@ import type {
 } from "./types.ts";
 import type { MatchWinnerOdds } from "./draw-criteria.ts";
 import type { FixtureResult, FixtureResultStats } from "./fixture-result.ts";
+import type { StoredRecentStats } from "./recent-stats.ts";
 import type { InsightTeamStats } from "./fixture-insights.ts";
 
 /** Der Statistikkatalog einer Mannschaft für einen Abschnitt. */
@@ -743,6 +744,44 @@ export class AnalyzerDatabase {
       ORDER BY kickoff DESC, fixture_id DESC
     `).all() as Array<{ fixture_id: number }>;
     return rows.map((row) => row.fixture_id);
+  }
+
+  /**
+   * Torschüsse und Ecken beider Seiten für die gefragten Partien, soweit gespeichert.
+   * Grundlage der Spalten "Schüsse aufs Tor" und "Ecken".
+   *
+   * Auch Partien **ohne** Statistik kommen zurück, kenntlich an `statsAvailable`. Sonst
+   * gälten sie als unbekannt und würden bei jedem Lauf erneut geholt - gemessen am
+   * 22.09.2026 betraf das 147 von 391 Vorspielen, also acht verschenkte Aufrufe je Lauf.
+   * Ob ein solcher Eintrag noch einmal gefragt wird, entscheidet der Aufrufer.
+   */
+  recentStatsForFixtures(fixtureIds: number[]): Map<number, StoredRecentStats> {
+    const result = new Map<number, StoredRecentStats>();
+    for (let offset = 0; offset < fixtureIds.length; offset += 500) {
+      const ids = fixtureIds.slice(offset, offset + 500);
+      if (!ids.length) continue;
+      const rows = this.db.prepare(`SELECT fixture_id, kickoff, fetched_at, stats_available,
+          home_shots_on_goal, away_shots_on_goal, home_corners, away_corners
+        FROM fixture_results
+        WHERE fixture_id IN (${ids.map(() => "?").join(",")})`)
+        .all(...ids) as Array<Record<string, number | string | null>>;
+      for (const row of rows) {
+        result.set(Number(row.fixture_id), {
+          home: {
+            shotsOnGoal: row.home_shots_on_goal as number | null,
+            corners: row.home_corners as number | null
+          },
+          away: {
+            shotsOnGoal: row.away_shots_on_goal as number | null,
+            corners: row.away_corners as number | null
+          },
+          statsAvailable: row.stats_available === 1,
+          kickoff: String(row.kickoff),
+          fetchedAt: String(row.fetched_at)
+        });
+      }
+    }
+    return result;
   }
 
   fixtureResult(fixtureId: number): Record<string, unknown> | undefined {

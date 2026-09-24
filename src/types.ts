@@ -459,6 +459,13 @@ export interface CrossLeagueDrawBreakdown {
 }
 
 export interface RecentMatchSummary {
+  /**
+   * Die Partie bei API-Football. Ohne sie ließen sich Ecken und Torschüsse nur über Datum
+   * und Mannschaftsnamen zuordnen - das trifft bei Namensvarianten daneben.
+   */
+  fixtureId: number;
+  /** Ob die betrachtete Mannschaft in dieser Partie zu Hause war. */
+  teamWasHome: boolean;
   date: string;
   homeTeam: string;
   awayTeam: string;

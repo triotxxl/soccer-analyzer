@@ -273,8 +273,13 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
    Ueberschuss anderswo verteilen - genau so hing der Platz vorher in Score und Erw. Tore
    fest, obwohl die Formspalte ueberlief. Die Partie-Spalte darf darunter bleiben, sie
    kuerzt per Ellipse und bekommt dafuer den groessten fr-Anteil. */
-.fixture-grid { --market-count: 5; --table-min-width: 1440px; display: grid; grid-template-columns: minmax(280px,1.7fr) minmax(184px,1fr) minmax(134px,.8fr) minmax(82px,.5fr) repeat(var(--market-count),minmax(126px,.8fr)); gap: 10px; width: 100%; min-width: max(100%,var(--table-min-width)); align-items: center; }
-.fixture-grid.has-score { grid-template-columns: minmax(280px,1.7fr) minmax(184px,1fr) minmax(134px,.8fr) minmax(82px,.5fr) minmax(52px,.34fr) repeat(var(--market-count),minmax(126px,.8fr)); }
+.fixture-grid { --market-count: 5; --table-min-width: 1440px; display: grid; grid-template-columns: minmax(280px,1.7fr) minmax(184px,1fr) minmax(134px,.8fr) minmax(46px,.3fr) minmax(46px,.3fr) minmax(82px,.5fr) repeat(var(--market-count),minmax(126px,.8fr)); gap: 10px; width: 100%; min-width: max(100%,var(--table-min-width)); align-items: center; }
+.fixture-grid.has-score { grid-template-columns: minmax(280px,1.7fr) minmax(184px,1fr) minmax(134px,.8fr) minmax(46px,.3fr) minmax(46px,.3fr) minmax(82px,.5fr) minmax(52px,.34fr) repeat(var(--market-count),minmax(126px,.8fr)); }
+/* Schuesse und Ecken: zwei Zeilen wie die Formspalte, oben Heim, unten Gast. */
+.recent-stat-cell { display: grid; gap: 4px; justify-items: center; font-variant-numeric: tabular-nums; }
+.recent-stat-cell strong { font-size: 12px; font-weight: 600; color: #d4d4d4; }
+.recent-stat-cell strong.missing { color: #6a6a6a; font-weight: 400; }
+.table-head button.icon-head { display: flex; align-items: center; justify-content: center; gap: 3px; }
 .table-head { position: sticky; top: 0; z-index: 5; margin: 0; padding: 11px 10px 9px 40px; border-bottom: 1px solid var(--line); background: #252526; }
 .table-head button { padding: 4px 0; border: 0; background: transparent; color: #969696; font-size: 10px; font-weight: 700; letter-spacing: .08em; text-align: left; text-transform: uppercase; white-space: nowrap; }
 .table-head > button:nth-child(n+2) { width: 100%; text-align: center; }
