@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { formatOdd } from "./App";
+import { DRAW_SIGNAL_CONFIG, DRAW_SIGNAL_META, formatDrawPoints } from "../../src/draw-signals.ts";
 import type { QuickpickEvaluation, QuickpickPresetId } from "./quickpick";
 import type { DashboardFixture } from "./types";
 
@@ -359,11 +360,74 @@ const REMIS_COLUMNS: QuickpickColumn[] = [
   }
 ];
 
+/**
+ * Die Spalten der Voreinstellung „Remis-Score". Aufgeklappt steht **je Kriterium** eine Zeile
+ * mit Punkten und Begründung - das war der Kern von Davids Vorgabe: kein Score ohne das Warum.
+ * Kriterien mit Gewicht 0 bleiben hier weg; sie werden nur in der Rückrechnung gemessen.
+ */
+const REMIS_SCORE_CRITERIA: QuickpickColumn[] = DRAW_SIGNAL_META
+  .filter((meta) => DRAW_SIGNAL_CONFIG.rules[meta.id].weight > 0)
+  .map((meta) => ({
+    key: `signal-${meta.id}`, label: meta.label, sortable: true,
+    value: (row: QuickpickRow) => row.evaluation.remisScore?.criteria.find((entry) => entry.id === meta.id)?.points ?? -1,
+    cell: (row: QuickpickRow) => {
+      const criterion = row.evaluation.remisScore?.criteria.find((entry) => entry.id === meta.id);
+      if (!criterion) return { main: "–" };
+      if (!criterion.evaluable) {
+        return { main: "–", note: criterion.reason, mainTitle: "Nicht bewertbar – zählt weder für noch gegen das Spiel." };
+      }
+      return {
+        main: criterion.points > 0
+          ? `+${formatDrawPoints(criterion.points)} von ${formatDrawPoints(criterion.weight)}`
+          : `0 von ${formatDrawPoints(criterion.weight)}`,
+        note: criterion.reason
+      };
+    }
+  }));
+
+const REMIS_SCORE_COLUMNS: QuickpickColumn[] = [
+  partie,
+  {
+    key: "auswahl", label: "Auswahl", sortable: false, className: "quickpick-side",
+    cell: () => ({ main: "Remis", note: "geteilte Punkte" })
+  },
+  {
+    key: "remisscore", label: "Remis-Score", sortable: true,
+    value: (row) => row.evaluation.remisScore?.score ?? -1,
+    cell: (row) => {
+      const detail = row.evaluation.remisScore;
+      if (detail == null) return { main: "–" };
+      return {
+        main: `${formatDrawPoints(detail.score)} von ${detail.max}`,
+        mainTitle: "Die Summe der Punkte aus den Hinweisen darunter. Keine Wahrscheinlichkeit –"
+          + " und die Punkte je Hinweis sind noch nicht an alten Spielen geprüft.",
+        note: detail.evaluableMax < detail.max
+          ? `${detail.evaluableMax} von ${detail.max} Punkten bewertbar`
+          : "alles bewertbar"
+      };
+    }
+  },
+  ...REMIS_SCORE_CRITERIA,
+  {
+    key: "quote", label: "Quote", sortable: true,
+    value: (row) => row.evaluation.odds ?? -1,
+    cell: (row) => {
+      const odds = row.evaluation.odds;
+      return {
+        main: odds === null ? "–" : formatOdd(odds),
+        mainTitle: "Quote für ein Unentschieden. Sie geht in den Remis-Score nicht ein.",
+        note: odds === null ? undefined : `braucht ${(100 / odds).toFixed(0)} %`
+      };
+    }
+  }
+];
+
 const QUICKPICK_COLUMNS: Record<QuickpickPresetId, QuickpickColumn[]> = {
   daves1x2: DAVES_COLUMNS,
   dominanz: DOMINANZ_COLUMNS,
   hz15: HZ15_COLUMNS,
-  remis: REMIS_COLUMNS
+  remis: REMIS_COLUMNS,
+  remisScore: REMIS_SCORE_COLUMNS
 };
 
 /**
@@ -438,6 +502,17 @@ export function strengthOf(preset: QuickpickPresetId, row: QuickpickRow): Quickp
       percent, label: `Chance ${percent} %`, gut: 50, mittel: 40,
       title: "Wie wahrscheinlich das Modell zwei Tore bis zur Pause hält. Ohne Filter passiert"
         + " das in 35 von 100 Spielen."
+    };
+  }
+  if (preset === "remisScore") {
+    const signals = evaluation.remisScore;
+    if (signals === null || signals === undefined || signals.max === 0) return null;
+    return {
+      percent: signals.score / signals.max * 100,
+      label: `Score ${formatDrawPoints(signals.score)}/${signals.max}`,
+      gut: 64, mittel: 48,
+      title: "Der Remis-Score: Punkte aus den einzelnen Hinweisen, aufgeklappt mit Begründung."
+        + " Noch nicht an alten Spielen geprüft."
     };
   }
   const detail = evaluation.remis;

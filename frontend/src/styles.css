@@ -839,12 +839,13 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .quickpick-dialog { width: min(680px, calc(100vw - 32px)); height: min(760px, calc(100vh - 48px)); max-height: none; }
 .quickpick-head { padding-bottom: 12px; }
 
-.quickpick-tabs { display: flex; gap: 4px; flex: 0 0 auto; margin: 0 16px; padding: 3px; border: 1px solid var(--line); border-radius: 10px; background: #1a1a1a; }
-.quickpick-tabs button { display: flex; gap: 6px; flex: 1; align-items: center; justify-content: center; height: 30px; border: 0; border-radius: 7px; background: transparent; color: var(--muted); font-size: 11px; font-weight: 700; white-space: nowrap; }
-.quickpick-tabs button:hover { color: #d0d0d0; }
-.quickpick-tabs button.active { background: #26312b; color: var(--accent); }
-.quickpick-tab-count { display: grid; place-items: center; min-width: 17px; height: 17px; padding: 0 4px; border-radius: 5px; background: rgba(255,255,255,.07); color: #8f8f8f; font-size: 10px; font-variant-numeric: tabular-nums; }
-.quickpick-tabs button.active .quickpick-tab-count { background: rgba(55,148,255,.22); color: var(--home); }
+/* Umschalter Daves/Modell und daneben das Dropdown der Filter dieser Gruppe - ersetzt die vier Reiter. */
+.quickpick-picker { display: flex; flex-wrap: wrap; gap: 8px; flex: 0 0 auto; align-items: center; margin: 0 16px; }
+.quickpick-groups { display: flex; gap: 4px; flex: 0 0 auto; padding: 3px; border: 1px solid var(--line); border-radius: 10px; background: #1a1a1a; }
+.quickpick-groups button { height: 28px; padding: 0 12px; border: 0; border-radius: 7px; background: transparent; color: var(--muted); font-size: 11px; font-weight: 700; white-space: nowrap; }
+.quickpick-groups button:hover { color: #d0d0d0; }
+.quickpick-groups button.active { background: #26312b; color: var(--accent); }
+.quickpick-preset-select { flex: 1 1 200px; min-width: 0; height: 36px; padding: 0 8px; border: 1px solid var(--line); border-radius: 10px; background: var(--shell); color: #d0d0d0; font-size: 12px; font-weight: 600; }
 
 .quickpick-context { position: relative; display: flex; gap: 10px; flex: 0 0 auto; align-items: center; margin-top: 11px; padding: 9px 16px; border-top: 1px solid var(--line-soft); border-bottom: 1px solid var(--line-soft); background: #1a1a1a; }
 .quickpick-context > strong { color: var(--text); font-size: 12px; white-space: nowrap; }

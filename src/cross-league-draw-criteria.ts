@@ -197,6 +197,7 @@ function h2hSummary(
       fixtureId: match.fixture.id,
       // In den direkten Duellen ist die Bezugsseite immer die aktuelle Heimmannschaft.
       teamWasHome: match.teams.home.id === currentHomeTeamId,
+      friendly: /\b(friendl|freundschaft)/i.test(match.league.name),
       date: match.fixture.date,
       homeTeam: match.teams.home.name,
       awayTeam: match.teams.away.name,

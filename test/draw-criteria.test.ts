@@ -64,6 +64,7 @@ test("100-Punkte-System ist deterministisch und summiert alle Blöcke", () => {
   assert.ok((first.recentAwayResults?.length ?? 0) <= 5);
   assert.deepEqual(first.h2hSummary?.recentMatches?.[0], {
     fixtureId: 1001,
+    friendly: false,
     // In den direkten Duellen ist die Bezugsseite die aktuelle Heimmannschaft.
     teamWasHome: true,
     date: new Date((timestamp - 30 * 86_400) * 1000).toISOString(),

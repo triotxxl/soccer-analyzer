@@ -747,8 +747,9 @@ export class AnalyzerDatabase {
   }
 
   /**
-   * Torschüsse und Ecken beider Seiten für die gefragten Partien, soweit gespeichert.
-   * Grundlage der Spalten "Schüsse aufs Tor" und "Ecken".
+   * Torschüsse, Ecken, Schüsse gesamt, Ballbesitz und xG beider Seiten für die gefragten
+   * Partien, soweit gespeichert. Grundlage der Spalten "Schüsse aufs Tor" und "Ecken" und der
+   * Spielbild-Kriterien des Remis-Scores.
    *
    * Auch Partien **ohne** Statistik kommen zurück, kenntlich an `statsAvailable`. Sonst
    * gälten sie als unbekannt und würden bei jedem Lauf erneut geholt - gemessen am
@@ -760,20 +761,31 @@ export class AnalyzerDatabase {
     for (let offset = 0; offset < fixtureIds.length; offset += 500) {
       const ids = fixtureIds.slice(offset, offset + 500);
       if (!ids.length) continue;
-      const rows = this.db.prepare(`SELECT fixture_id, kickoff, fetched_at, stats_available,
-          home_shots_on_goal, away_shots_on_goal, home_corners, away_corners
-        FROM fixture_results
-        WHERE fixture_id IN (${ids.map(() => "?").join(",")})`)
+      // xG steht in fixture_results nur, wenn die Statistik es trug; der xG-Erstaufbau
+      // (`fixture_expected_goals`) kennt weitere Partien und springt dann ein.
+      const rows = this.db.prepare(`SELECT r.fixture_id, r.kickoff, r.fetched_at, r.stats_available,
+          r.home_shots_on_goal, r.away_shots_on_goal, r.home_corners, r.away_corners,
+          r.home_shots, r.away_shots, r.home_possession, r.away_possession,
+          COALESCE(r.home_xg, x.home_xg) AS home_xg, COALESCE(r.away_xg, x.away_xg) AS away_xg
+        FROM fixture_results r
+        LEFT JOIN fixture_expected_goals x ON x.fixture_id = r.fixture_id AND x.status = 'available'
+        WHERE r.fixture_id IN (${ids.map(() => "?").join(",")})`)
         .all(...ids) as Array<Record<string, number | string | null>>;
       for (const row of rows) {
         result.set(Number(row.fixture_id), {
           home: {
             shotsOnGoal: row.home_shots_on_goal as number | null,
-            corners: row.home_corners as number | null
+            corners: row.home_corners as number | null,
+            shots: row.home_shots as number | null,
+            possession: row.home_possession as number | null,
+            xg: row.home_xg as number | null
           },
           away: {
             shotsOnGoal: row.away_shots_on_goal as number | null,
-            corners: row.away_corners as number | null
+            corners: row.away_corners as number | null,
+            shots: row.away_shots as number | null,
+            possession: row.away_possession as number | null,
+            xg: row.away_xg as number | null
           },
           statsAvailable: row.stats_available === 1,
           kickoff: String(row.kickoff),

@@ -7,6 +7,14 @@ import type { RecentMatchSummary } from "./types.ts";
 export interface MatchSideStats {
   shotsOnGoal: number | null;
   corners: number | null;
+  /**
+   * Schüsse gesamt, Ballbesitz in Prozent und xG. Optional, weil sie erst mit dem Remis-Score
+   * dazukamen und Aufrufer mit dem alten Zuschnitt weiter gültig bleiben. Fehlend oder null
+   * heißt beides "nicht überliefert".
+   */
+  shots?: number | null;
+  possession?: number | null;
+  xg?: number | null;
 }
 
 /** Der Durchschnitt über die letzten Partien, mit der Zahl der Partien, die ihn tragen. */
@@ -100,11 +108,17 @@ export async function collectRecentStats(
         values.set(result.fixtureId, {
           home: {
             shotsOnGoal: result.homeStats.full?.shotsOnGoal ?? null,
-            corners: result.homeStats.full?.corners ?? null
+            corners: result.homeStats.full?.corners ?? null,
+            shots: result.homeStats.full?.shots ?? null,
+            possession: result.homeStats.full?.possession ?? null,
+            xg: result.homeXg
           },
           away: {
             shotsOnGoal: result.awayStats.full?.shotsOnGoal ?? null,
-            corners: result.awayStats.full?.corners ?? null
+            corners: result.awayStats.full?.corners ?? null,
+            shots: result.awayStats.full?.shots ?? null,
+            possession: result.awayStats.full?.possession ?? null,
+            xg: result.awayXg
           }
         });
       }

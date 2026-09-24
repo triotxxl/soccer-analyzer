@@ -473,6 +473,27 @@ export interface RecentMatchSummary {
   awayGoals: number;
   halfTimeHomeGoals?: number | null;
   halfTimeAwayGoals?: number | null;
+  /**
+   * Ein Freundschaftsspiel. Nur bei den direkten Duellen gesetzt: Die Form filtert Testspiele
+   * schon beim Einlesen heraus, `h2hSummary` nicht. Fehlt das Feld (Läufe vor schemaVersion 6),
+   * ist es unbekannt.
+   */
+  friendly?: boolean;
+  /**
+   * Die Spielstatistik beider Seiten, aus `fixture_results` beim Dashboard-Lauf angehängt
+   * (ab schemaVersion 6). Fehlt sie, führt die Liga keine Statistik oder sie wurde noch nicht
+   * geholt - das ist "unbekannt", nicht null Schüsse.
+   */
+  stats?: { home: RecentMatchSideStats; away: RecentMatchSideStats };
+}
+
+/** Die Statistik einer Seite in einer Partie. `null` heißt: nicht überliefert. */
+export interface RecentMatchSideStats {
+  shots?: number | null;
+  shotsOnGoal: number | null;
+  possession?: number | null;
+  xg?: number | null;
+  corners: number | null;
 }
 
 export interface DrawScoreRow {

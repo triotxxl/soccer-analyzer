@@ -6364,6 +6364,11 @@
     "apiTeamId": 269,
     "apiTeamName": "Keflavik"
   },
+  "kenia": {
+    "tipicoName": "Kenia",
+    "apiTeamId": 1511,
+    "apiTeamName": "Kenya"
+  },
   "kerry fc": {
     "tipicoName": "Kerry FC",
     "apiTeamId": 11328,
@@ -9833,6 +9838,11 @@
     "tipicoName": "Stranraer FC",
     "apiTeamId": 6785,
     "apiTeamName": "Stranraer"
+  },
+  "sudafrika": {
+    "tipicoName": "Südafrika",
+    "apiTeamId": 1531,
+    "apiTeamName": "South Africa"
   },
   "sudkorea": {
     "tipicoName": "Südkorea",

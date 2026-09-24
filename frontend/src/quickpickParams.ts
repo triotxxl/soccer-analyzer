@@ -158,11 +158,26 @@ const REMIS: QuickpickParam[] = [
   }
 ];
 
+const REMIS_SCORE: QuickpickParam[] = [
+  {
+    id: "minScore", label: "Remis-Score ab", min: 0, max: 25, step: 1,
+    title: "Wie viele Punkte ein Spiel mindestens sammeln muss, von 25 möglichen. Die Punkte je"
+      + " Hinweis sind gesetzt und noch nicht an alten Spielen geprüft."
+  },
+  {
+    id: "minEvaluable", label: "Mindestens bewertbar", min: 0, max: 25, step: 1,
+    title: "Wie viele der 25 Punkte überhaupt zu holen sein müssen. Ohne Tabelle oder ohne"
+      + " Schussdaten fehlen einige Hinweise – so ein Spiel soll nicht nur wegen der Lücken"
+      + " durchrutschen oder herausfallen."
+  }
+];
+
 export const QUICKPICK_PARAMS: Record<QuickpickPresetId, QuickpickParam[]> = {
   daves1x2: DAVES,
   dominanz: DOMINANZ,
   hz15: HZ15,
-  remis: REMIS
+  remis: REMIS,
+  remisScore: REMIS_SCORE
 };
 
 /**
@@ -187,7 +202,8 @@ export const QUICKPICK_TOGGLES: Record<QuickpickPresetId, QuickpickToggle[]> = {
       + " dieses Filters."
   }],
   hz15: [],
-  remis: []
+  remis: [],
+  remisScore: []
 };
 
 /** Anzeigewert eines Reglers: Wahrscheinlichkeiten stehen im Modell als 0 bis 1. */

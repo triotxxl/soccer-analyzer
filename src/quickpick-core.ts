@@ -1,4 +1,5 @@
 import type { DashboardFixture, DashboardMarket, DashboardMarketKey, FormResult } from "./dashboard.ts";
+import type { DrawSignalResult } from "./draw-signals.ts";
 import type { RecentMatchSummary } from "./types.ts";
 
 /**
@@ -9,7 +10,14 @@ import type { RecentMatchSummary } from "./types.ts";
  * Hier steht bewusst keine Regel - nur das, woraus Regeln gebaut werden.
  */
 
-export type QuickpickPresetId = "daves1x2" | "dominanz" | "hz15" | "remis";
+export type QuickpickPresetId = "daves1x2" | "dominanz" | "hz15" | "remis" | "remisScore";
+
+/**
+ * Die Gruppe, unter der eine Voreinstellung im Dialog erscheint. `daves` wählt über Tabelle,
+ * H2H und Form eine Mannschaft aus, `modell` über die Wahrscheinlichkeiten und Torerwartungen
+ * des Modells einen Markt. Rein eine Frage der Anzeige - keine Regel liest das Feld.
+ */
+export type QuickpickGroup = "daves" | "modell";
 
 export type QuickpickLevelId = "streng" | "ausgewogen" | "locker" | "weit";
 
@@ -66,12 +74,8 @@ export interface QuickpickLevel<V> {
 export interface QuickpickPreset<S> {
   id: QuickpickPresetId;
   label: string;
-  /**
-   * Der Name auf dem Reiter. Vier volle Namen nebeneinander passen nicht in eine Zeile,
-   * und ein abgeschnittener Name ist schlechter als ein kurzer. Der volle Name steht in
-   * der Kontextzeile darunter.
-   */
-  short: string;
+  /** Unter welchem Umschalter die Voreinstellung im Dropdown steht. */
+  group: QuickpickGroup;
   description: string;
   criteria: string[];
   /**
@@ -128,7 +132,11 @@ export type QuickpickRejection =
   // Grund der Voreinstellung "Remis-Kandidaten". Bewusst ein eigener Schlüssel: `remisbild`
   // ist vergeben und meint bei "Erste Halbzeit" das Gegenteil - dort weist es eine Partie
   // ab, weil sie zu remisnah ist.
-  | "remisChance";
+  | "remisChance"
+  // Gründe der Voreinstellung "Remis-Score". `remisDaten` heißt "zu wenig bewertbar", nicht
+  // "unausgeglichen" - dieselbe Trennung wie zwischen `formFehlt` und `venueForm`.
+  | "remisScore"
+  | "remisDaten";
 
 export const REJECTION_LABELS: Record<QuickpickRejection, string> = {
   keinTipp: "für dieses Spiel gibt es keinen Sieger-Tipp",
@@ -149,7 +157,9 @@ export const REJECTION_LABELS: Record<QuickpickRejection, string> = {
   torerwartung: "es sind zu wenige Tore zu erwarten",
   remisbild: "ein Unentschieden ist zu wahrscheinlich",
   hzHistorie: "in der ersten Halbzeit fallen hier selten zwei Tore",
-  remisChance: "die Chance auf ein Unentschieden ist zu klein"
+  remisChance: "die Chance auf ein Unentschieden ist zu klein",
+  remisScore: "zu wenige Hinweise auf ein Unentschieden",
+  remisDaten: "zu wenige Daten, um den Remis-Score zu bilden"
 };
 
 export interface QuickpickDominance {
@@ -278,6 +288,8 @@ export interface QuickpickEvaluation {
   hz15?: Hz15Detail | null;
   /** Nur bei „remis" gesetzt. */
   remis?: RemisDetail | null;
+  /** Nur bei „remisScore" gesetzt: der ganze Score samt Begründung je Kriterium. */
+  remisScore?: DrawSignalResult | null;
   passes: boolean;
   rejectedBy: QuickpickRejection | null;
 }
@@ -294,7 +306,7 @@ export function emptyRejections(): Record<QuickpickRejection, number> {
     h2hDagegen: 0, keineTabelle: 0, tabelle: 0, serie: 0, formFehlt: 0,
     keineQuote: 0, bilanz: 0, keineDuelle: 0, modellDagegen: 0,
     keinMarkt: 0, torerwartung: 0, remisbild: 0, hzHistorie: 0,
-    remisChance: 0
+    remisChance: 0, remisScore: 0, remisDaten: 0
   };
 }
 

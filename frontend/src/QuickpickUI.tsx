@@ -1,6 +1,7 @@
 import { CaretRight, Funnel, Info, ShoppingCartSimple, X } from "@phosphor-icons/react";
 import { useState } from "react";
 import {
+  QUICKPICK_GROUPS,
   QUICKPICK_PRESET_LIST,
   REJECTION_LABELS,
   applyLevel,
@@ -8,6 +9,7 @@ import {
   levelOf,
   presetOf,
   settingsOf,
+  type QuickpickGroup,
   type QuickpickLevelId,
   type QuickpickPresetId,
   type QuickpickRejection,
@@ -33,6 +35,8 @@ import type { DashboardFixture } from "./types";
 const formatPercent = (value: number) => `${(value * 100).toFixed(1).replace(".", ",")} %`;
 const formatSigned = (value: number) =>
   `${value >= 0 ? "+" : "−"}${Math.abs(value * 100).toFixed(1).replace(".", ",")} %`;
+
+const spieleText = (count: number) => `${count} ${count === 1 ? "Spiel" : "Spiele"}`;
 
 /** Die Schubladen über der Fußzeile. Immer höchstens eine, sonst frisst sie die Liste auf. */
 type Drawer = "kombi" | "strenge" | "abgewiesen" | null;
@@ -133,6 +137,18 @@ export function QuickpickDialog({
   // Welche Stufe die Regler zuletzt gesetzt hat. Sobald ein Regler abweicht, liefert
   // `levelOf` null - ohne dieses Gedächtnis wüsste „Auf Stufe zurücksetzen" nicht, wohin.
   const [levelMemory, setLevelMemory] = useState<Partial<Record<QuickpickPresetId, QuickpickLevelId>>>({});
+  // Welcher Filter je Gruppe zuletzt gewählt war. Wer zwischen Daves und Modell hin- und
+  // herschaltet, landet so wieder bei seinem Filter statt jedes Mal beim ersten der Gruppe.
+  const [groupMemory, setGroupMemory] = useState<Partial<Record<QuickpickGroup, QuickpickPresetId>>>({});
+
+  /** Ein Wechsel meint „zeig mir diese Auswahl" - also greift der Filter sofort. */
+  const choose = (id: QuickpickPresetId) => {
+    setGroupMemory((memory) => ({ ...memory, [preset.group]: preset.id }));
+    onPresetChange(id);
+    onActiveChange(true);
+    setOpenRow(null);
+    setInfo(false);
+  };
 
   const exactLevel = levelOf(settings);
   const baseLevel = exactLevel ?? levelMemory[preset.id] ?? levelOf(preset.defaults) ?? preset.levels[1]!.id;
@@ -202,24 +218,30 @@ export function QuickpickDialog({
         </span>
       </div>
 
-      <div className="quickpick-tabs" role="tablist" aria-label="Filter">
-        {QUICKPICK_PRESET_LIST.map((entry) => {
-          const treffer = applyQuickpick(fixtures, store[entry.id]).report.passed;
-          return <button key={entry.id} role="tab"
-            className={entry.id === preset.id ? "active" : ""}
-            aria-selected={entry.id === preset.id}
-            aria-label={entry.label}
-            title={entry.description}
+      <div className="quickpick-picker">
+        <div className="quickpick-groups" role="radiogroup" aria-label="Art der Filter">
+          {QUICKPICK_GROUPS.map((group) => <button key={group.id} role="radio"
+            className={group.id === preset.group ? "active" : ""}
+            aria-checked={group.id === preset.group}
+            title={group.title}
             onClick={() => {
-              onPresetChange(entry.id);
-              onActiveChange(true);
-              setOpenRow(null);
-              setInfo(false);
+              if (group.id === preset.group) return;
+              choose(groupMemory[group.id]
+                ?? QUICKPICK_PRESET_LIST.find((entry) => entry.group === group.id)!.id);
             }}>
-            <span>{entry.short}</span>
-            <span className="quickpick-tab-count">{treffer}</span>
-          </button>;
-        })}
+            {group.label}
+          </button>)}
+        </div>
+        {/* Die Zahl hinter jedem Namen: wie viele Spiele dieser Filter mit **seinen**
+            Einstellungen findet, damit der Wechsel nicht blind geschieht. */}
+        <select className="quickpick-preset-select" aria-label="Filter" value={preset.id}
+          title={preset.description}
+          onChange={(event) => choose(event.target.value as QuickpickPresetId)}>
+          {QUICKPICK_PRESET_LIST.filter((entry) => entry.group === preset.group).map((entry) =>
+            <option key={entry.id} value={entry.id}>
+              {entry.label} · {spieleText(applyQuickpick(fixtures, store[entry.id]).report.passed)}
+            </option>)}
+        </select>
       </div>
 
       <div className="quickpick-context">

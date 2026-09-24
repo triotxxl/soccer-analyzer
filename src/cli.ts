@@ -526,9 +526,12 @@ async function dashboard(args: ParsedArgs): Promise<void> {
     // fixture_results und kostet nichts; geholt wird nur der Rest, zwanzig Partien je Aufruf.
     let recentStats = new Map<number, { home: MatchSideStats; away: MatchSideStats }>();
     if (client) {
+      // Dazu die letzten drei direkten Duelle: Der Remis-Score vergleicht dort das Spielbild.
+      // Ältere Duelle tragen seltener Statistik, deshalb bewusst nur drei.
       const benoetigt = drawResult.rows.flatMap((row) => [
         ...(row.recentHomeMatches ?? []).slice(0, RECENT_STATS_WINDOW),
-        ...(row.recentAwayMatches ?? []).slice(0, RECENT_STATS_WINDOW)
+        ...(row.recentAwayMatches ?? []).slice(0, RECENT_STATS_WINDOW),
+        ...(row.h2hSummary?.recentMatches ?? []).slice(0, 3)
       ]).map((match) => match.fixtureId);
       try {
         const gesammelt = await collectRecentStats(benoetigt, client, database, {

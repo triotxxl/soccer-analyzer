@@ -10,13 +10,15 @@ import {
   DEFAULT_DOMINANZ_SETTINGS,
   DEFAULT_HZ15_SETTINGS,
   DEFAULT_REMIS_SETTINGS,
+  DEFAULT_REMIS_SCORE_SETTINGS,
   QUICKPICK_PRESETS,
   type DavesQuickpickSettings,
   type QuickpickPresetId,
   type QuickpickSettings,
   type DominanzQuickpickSettings,
   type Hz15QuickpickSettings,
-  type RemisQuickpickSettings
+  type RemisQuickpickSettings,
+  type RemisScoreQuickpickSettings
 } from "../../src/quickpick.ts";
 
 const STORAGE_KEY = "football-analyzer:quickpick-settings";
@@ -32,6 +34,7 @@ export interface QuickpickStore {
   dominanz: DominanzQuickpickSettings;
   hz15: Hz15QuickpickSettings;
   remis: RemisQuickpickSettings;
+  remisScore: RemisScoreQuickpickSettings;
 }
 
 export const DEFAULT_QUICKPICK_STORE: QuickpickStore = {
@@ -39,7 +42,8 @@ export const DEFAULT_QUICKPICK_STORE: QuickpickStore = {
   daves1x2: DEFAULT_QUICKPICK_SETTINGS,
   dominanz: DEFAULT_DOMINANZ_SETTINGS,
   hz15: DEFAULT_HZ15_SETTINGS,
-  remis: DEFAULT_REMIS_SETTINGS
+  remis: DEFAULT_REMIS_SETTINGS,
+  remisScore: DEFAULT_REMIS_SCORE_SETTINGS
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -79,7 +83,7 @@ export function loadQuickpickStore(): QuickpickStore {
     // als flacher Altbestand und wanderte komplett in den Daves-Zweig.
     if (parsed.daves1x2 === undefined && parsed.dominanz === undefined
       && parsed.underdog === undefined && parsed.hz15 === undefined
-      && parsed.remis === undefined) {
+      && parsed.remis === undefined && parsed.remisScore === undefined) {
       return { ...DEFAULT_QUICKPICK_STORE, daves1x2: mergeBranch(DEFAULT_QUICKPICK_SETTINGS, parsed) };
     }
 
@@ -96,7 +100,8 @@ export function loadQuickpickStore(): QuickpickStore {
       daves1x2: mergeBranch(DEFAULT_QUICKPICK_SETTINGS, parsed.daves1x2),
       dominanz: mergeBranch(DEFAULT_DOMINANZ_SETTINGS, parsed.dominanz),
       hz15: mergeBranch(DEFAULT_HZ15_SETTINGS, parsed.hz15),
-      remis: mergeBranch(DEFAULT_REMIS_SETTINGS, parsed.remis)
+      remis: mergeBranch(DEFAULT_REMIS_SETTINGS, parsed.remis),
+      remisScore: mergeBranch(DEFAULT_REMIS_SCORE_SETTINGS, parsed.remisScore)
     };
   } catch {
     return DEFAULT_QUICKPICK_STORE;
@@ -117,6 +122,7 @@ export function settingsOf(store: QuickpickStore): QuickpickSettings {
   return store.aktiv === "dominanz" ? store.dominanz
     : store.aktiv === "hz15" ? store.hz15
     : store.aktiv === "remis" ? store.remis
+    : store.aktiv === "remisScore" ? store.remisScore
     : store.daves1x2;
 }
 
@@ -125,6 +131,7 @@ export function withSettings(store: QuickpickStore, settings: QuickpickSettings)
   return settings.preset === "dominanz" ? { ...store, dominanz: settings }
     : settings.preset === "hz15" ? { ...store, hz15: settings }
     : settings.preset === "remis" ? { ...store, remis: settings }
+    : settings.preset === "remisScore" ? { ...store, remisScore: settings }
     : { ...store, daves1x2: settings };
 }
 

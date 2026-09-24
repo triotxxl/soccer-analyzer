@@ -128,7 +128,7 @@ describe("QuickpickChip", () => {
 describe("QuickpickDialog", () => {
   it("nennt die Voreinstellung mit allen Kriterien", async () => {
     render(<Harness fixtures={[fixture(1, "Alpha", "Beta", 75)]} />);
-    expect(screen.getByRole("tab", { name: "Daves 1x2-Filter" })).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "Filter" })).toHaveValue("daves1x2");
 
     await openInfo();
 
@@ -181,11 +181,11 @@ describe("QuickpickDialog", () => {
     expect(onActiveChange).toHaveBeenLastCalledWith(false);
   });
 
-  /** Ein Reiterwechsel meint „zeig mir diese Auswahl" - also greift der Filter sofort. */
-  it("schaltet den Filter mit dem Reiterwechsel ein", async () => {
+  /** Ein Wechsel meint „zeig mir diese Auswahl" - also greift der Filter sofort. */
+  it("schaltet den Filter mit dem Wechsel ein", async () => {
     const onActiveChange = vi.fn();
     render(<Harness fixtures={[fixture(1, "Alpha", "Beta", 75)]} onActiveChange={onActiveChange} />);
-    await userEvent.click(screen.getByRole("tab", { name: "Remis-Kandidaten" }));
+    await userEvent.click(screen.getByRole("radio", { name: "Modell-Filter" }));
     expect(onActiveChange).toHaveBeenLastCalledWith(true);
   });
 
@@ -311,20 +311,45 @@ describe("Vier Voreinstellungen", () => {
 
   it("lässt zwischen den Voreinstellungen wechseln", async () => {
     render(<Harness fixtures={[dominant(1)]} />);
-    expect(screen.getByRole("tab", { name: "Daves 1x2-Filter" })).toHaveAttribute("aria-selected", "true");
+    const auswahl = screen.getByRole("combobox", { name: "Filter" });
+    expect(auswahl).toHaveValue("daves1x2");
 
-    await userEvent.click(screen.getByRole("tab", { name: "Dominanz zum Kombipreis" }));
+    await userEvent.selectOptions(auswahl, "dominanz");
 
-    expect(screen.getByRole("tab", { name: "Dominanz zum Kombipreis" })).toHaveAttribute("aria-selected", "true");
+    expect(auswahl).toHaveValue("dominanz");
     await openInfo();
     expect(screen.getByText(/rechnet es in die Quote ein/)).toBeInTheDocument();
   });
 
-  /** Jeder Reiter nennt, wie viele Spiele er mit **seinen** Einstellungen findet. */
-  it("zählt die Treffer je Reiter", () => {
+  /** Das Dropdown zeigt nur die Filter der gewählten Gruppe. */
+  it("teilt die Filter auf Daves und Modell auf", async () => {
     render(<Harness fixtures={[fixture(1, "Alpha", "Beta", 75)]} />);
-    expect(screen.getByRole("tab", { name: "Daves 1x2-Filter" })).toHaveTextContent("1");
-    expect(screen.getByRole("tab", { name: "Remis-Kandidaten" })).toHaveTextContent("0");
+    expect(screen.getByRole("radio", { name: "Daves Filter" })).toHaveAttribute("aria-checked", "true");
+    const namen = () => within(screen.getByRole("combobox", { name: "Filter" })).getAllByRole("option").map((option) => option.getAttribute("value"));
+    expect(namen()).toEqual(["daves1x2", "dominanz", "remisScore"]);
+
+    await userEvent.click(screen.getByRole("radio", { name: "Modell-Filter" }));
+
+    expect(screen.getByRole("radio", { name: "Modell-Filter" })).toHaveAttribute("aria-checked", "true");
+    expect(namen()).toEqual(["hz15", "remis"]);
+    expect(screen.getByRole("combobox", { name: "Filter" })).toHaveValue("hz15");
+  });
+
+  /** Wer hin- und herschaltet, landet wieder bei seinem Filter, nicht beim ersten der Gruppe. */
+  it("merkt sich den Filter je Gruppe", async () => {
+    render(<Harness fixtures={[fixture(1, "Alpha", "Beta", 75)]} />);
+    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Filter" }), "dominanz");
+    await userEvent.click(screen.getByRole("radio", { name: "Modell-Filter" }));
+    await userEvent.click(screen.getByRole("radio", { name: "Daves Filter" }));
+    expect(screen.getByRole("combobox", { name: "Filter" })).toHaveValue("dominanz");
+  });
+
+  /** Jeder Eintrag nennt, wie viele Spiele er mit **seinen** Einstellungen findet. */
+  it("zählt die Treffer je Filter", async () => {
+    render(<Harness fixtures={[fixture(1, "Alpha", "Beta", 75)]} />);
+    expect(screen.getByRole("option", { name: /Daves 1x2-Filter/ })).toHaveTextContent("· 1 Spiel");
+    await userEvent.click(screen.getByRole("radio", { name: "Modell-Filter" }));
+    expect(screen.getByRole("option", { name: /Remis-Kandidaten/ })).toHaveTextContent("0 Spiele");
   });
 
   it("zeigt eigene Werte für Serie und Bilanz", async () => {
@@ -358,5 +383,47 @@ describe("Vier Voreinstellungen", () => {
     render(<Harness fixtures={[dominant(1)]} preset="dominanz" />);
     expect(screen.getByText("Gewinn je Tipp")).toBeInTheDocument();
     expect(screen.queryByText("Treffer je Tipp")).not.toBeInTheDocument();
+  });
+});
+
+describe("Remis-Score", () => {
+  /** Davids Vorgabe: kein Score ohne das Warum - aufgeklappt steht jedes Kriterium mit Grund. */
+  it("zeigt beim Aufklappen die Punkte und die Begründung je Kriterium", async () => {
+    const spiel = fixture(1, "Alpha", "Beta", 40);
+    spiel.markets = [...spiel.markets, {
+      key: "draw", label: "Remis", selection: "Unentschieden (X)", pick: null, selectionTone: "draw",
+      probability: 0.28, odds: 3.3, confidence: 80, score: null,
+      recommendation: { level: "none", label: "Nicht empfehlenswert" }, details: []
+    }];
+    const store: QuickpickStore = {
+      ...DEFAULT_QUICKPICK_STORE,
+      aktiv: "remisScore",
+      remisScore: { ...DEFAULT_QUICKPICK_STORE.remisScore, minScore: 0, minEvaluable: 0 }
+    };
+    render(<QuickpickDialog fixtures={[spiel]} store={store} active timezone="Europe/Berlin"
+      onSettingsChange={() => undefined} onPresetChange={() => undefined}
+      onActiveChange={() => undefined} onAddAll={() => undefined} onClose={() => undefined} />);
+
+    expect(screen.getByRole("combobox", { name: "Filter" })).toHaveValue("remisScore");
+    await openRow("Alpha – Beta");
+
+    expect(screen.getByText("Punkte je Spiel ähnlich")).toBeInTheDocument();
+    expect(screen.getByText("2,50 zu 1,00 Punkte je Spiel")).toBeInTheDocument();
+    expect(screen.getByText("2,70 Tore erwartet")).toBeInTheDocument();
+    // Ohne Vorspiele ist das Spielbild nicht bewertbar - das steht als Grund da, nicht als 0.
+    expect(screen.getByText("zu wenige Spiele mit Schussdaten")).toBeInTheDocument();
+  });
+
+  it("steht im Dropdown bei Daves Filtern und warnt ehrlich vor der dünnen Grundlage", async () => {
+    render(<Harness fixtures={[fixture(1, "Alpha", "Beta", 75)]} />);
+    const namen = within(screen.getByRole("combobox", { name: "Filter" })).getAllByRole("option")
+      .map((option) => option.getAttribute("value"));
+    expect(namen).toEqual(["daves1x2", "dominanz", "remisScore"]);
+
+    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Filter" }), "remisScore");
+    await openInfo();
+    expect(screen.getByText(/Das kann auch Zufall sein/)).toBeInTheDocument();
+    expect(screen.getByText(/Rechne nicht mit Gewinn/)).toBeInTheDocument();
+    expect(screen.getByText(/Großchancen fehlen/)).toBeInTheDocument();
   });
 });

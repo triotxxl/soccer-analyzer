@@ -126,6 +126,11 @@ export interface DashboardFixture {
     points: number;
     goalsFor: number;
     goalsAgainst: number;
+    /** Heim- und Auswärtsbilanz, ab schemaVersion 6. Ältere Läufe führen sie nicht. */
+    homePlayed?: number;
+    homePoints?: number;
+    awayPlayed?: number;
+    awayPoints?: number;
   }>;
   expectedGoals: { home: number; away: number; total: number };
   expectedFirstHalfGoals?: { home: number; away: number; total: number };
@@ -134,7 +139,7 @@ export interface DashboardFixture {
 }
 
 export interface DashboardDocument {
-  schemaVersion: 1 | 2 | 3 | 4 | 5;
+  schemaVersion: 1 | 2 | 3 | 4 | 5 | 6;
   meta: {
     createdAt: string;
     timezone: string;
@@ -276,6 +281,21 @@ function createMarket(input: Omit<DashboardMarket, "recommendation"> & { crossLe
   };
 }
 
+/**
+ * Hängt jedem Vorspiel seine Statistik an, soweit sie gesammelt wurde. Grundlage der
+ * Spielbild-Kriterien des Remis-Scores (`src/draw-signals.ts`), der nur den Snapshot liest.
+ * Ohne Eintrag bleibt das Spiel unverändert - "keine Statistik" statt "null Schüsse".
+ */
+function withMatchStats(
+  matches: RecentMatchSummary[],
+  values: Map<number, { home: MatchSideStats; away: MatchSideStats }>
+): RecentMatchSummary[] {
+  return matches.map((match) => {
+    const entry = values.get(match.fixtureId);
+    return entry ? { ...match, stats: { home: entry.home, away: entry.away } } : match;
+  });
+}
+
 export function buildDashboardDocument(input: DashboardInput): DashboardDocument {
   const recentStats = input.recentStats ?? new Map<number, { home: MatchSideStats; away: MatchSideStats }>();
   const drawByFixture = new Map(input.draw.rows.map((row) => [row.fixtureId, row]));
@@ -410,21 +430,23 @@ export function buildDashboardDocument(input: DashboardInput): DashboardDocument
         scope: crossLeague ? "overall" : "venue",
         home: draw?.recentHomeResults ?? [],
         away: draw?.recentAwayResults ?? [],
-        homeMatches: draw?.recentHomeMatches ?? [],
-        awayMatches: draw?.recentAwayMatches ?? [],
+        homeMatches: withMatchStats(draw?.recentHomeMatches ?? [], recentStats),
+        awayMatches: withMatchStats(draw?.recentAwayMatches ?? [], recentStats),
         homeStats: recentAverage(draw?.recentHomeMatches ?? [], recentStats),
         awayStats: recentAverage(draw?.recentAwayMatches ?? [], recentStats)
       },
       h2h: {
         outcomes: h2h?.recentHomeTeamResults ?? [], btts: h2h?.recentBttsResults ?? [], draws: h2h?.draws ?? 0,
-        consecutiveDraws: h2h?.consecutiveDraws ?? 0, matches: h2h?.recentMatches ?? []
+        consecutiveDraws: h2h?.consecutiveDraws ?? 0, matches: withMatchStats(h2h?.recentMatches ?? [], recentStats)
       },
       ...(row.defense ? { defense: row.defense } : {}),
       ...(row.strength ? { strength: row.strength } : {}),
       ...(row.standings ? { table: row.standings.map((standing) => ({
         position: standing.position, teamName: standing.teamName, played: standing.played,
         wins: standing.wins, draws: standing.draws, losses: standing.played - standing.wins - standing.draws,
-        points: standing.points, goalsFor: standing.goalsFor, goalsAgainst: standing.goalsAgainst
+        points: standing.points, goalsFor: standing.goalsFor, goalsAgainst: standing.goalsAgainst,
+        homePlayed: standing.homePlayed, homePoints: standing.homePoints,
+        awayPlayed: standing.awayPlayed, awayPoints: standing.awayPoints
       })) } : {}),
       expectedGoals: { home: row.expectedHomeGoals, away: row.expectedAwayGoals, total: row.expectedTotalGoals },
       expectedFirstHalfGoals: {
@@ -445,7 +467,7 @@ export function buildDashboardDocument(input: DashboardInput): DashboardDocument
   const createdAt = Date.parse(input.createdAt);
   const latestKickoff = fixtures.reduce((latest, fixture) => Math.max(latest, Date.parse(fixture.kickoff)), createdAt);
   return {
-    schemaVersion: 5,
+    schemaVersion: 6,
     meta: {
       createdAt: input.createdAt, timezone: config.timezone, sourceFile: input.sourceFile,
       totalTipicoEvents: input.totalTipicoEvents, selectedTipicoEvents: input.selectedTipicoEvents,

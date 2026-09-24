@@ -43,8 +43,8 @@ import {
   type QuickpickPresetId,
   type QuickpickSettings
 } from "../src/quickpick.ts";
+import { enrichWithMatchStats, readFixtures, readOutcomes, type SettledOutcome } from "./snapshot-history.ts";
 
-const OUTPUT_DIR = path.join(ROOT_DIR, "output");
 const STATE_FILE = path.join(ROOT_DIR, "docs", "quickpick-kalibrierung.json");
 
 /**
@@ -67,36 +67,6 @@ interface CalibrationState {
 
 interface Bet { kickoff: string; odds: number; hit: boolean }
 interface Triple { home: number; draw: number; away: number }
-
-interface SettledOutcome { home: number; away: number; halfHome: number | null; halfAway: number | null }
-
-/**
- * Die abgerechneten Ergebnisse. Der Pausenstand gehört seit „hz15" dazu: Ohne ihn ließe sich
- * „1. HZ Ü1,5" gar nicht entscheiden.
- */
-function readOutcomes(): Map<number, SettledOutcome> {
-  if (!fs.existsSync(DB_FILE)) {
-    throw new Error("Es gibt noch keine Datenbank mit abgerechneten Ergebnissen.");
-  }
-  const database = new DatabaseSync(DB_FILE, { readOnly: true });
-  const outcomes = new Map<number, SettledOutcome>();
-  const rows = database.prepare(`
-    SELECT fixture_id, actual_home_goals, actual_away_goals,
-           actual_halftime_home_goals, actual_halftime_away_goals
-    FROM goal_line_predictions
-    WHERE settled_at IS NOT NULL AND actual_home_goals IS NOT NULL AND actual_away_goals IS NOT NULL
-  `).all() as Array<Record<string, number | null>>;
-  for (const row of rows) {
-    outcomes.set(row.fixture_id as number, {
-      home: row.actual_home_goals as number,
-      away: row.actual_away_goals as number,
-      halfHome: row.actual_halftime_home_goals ?? null,
-      halfAway: row.actual_halftime_away_goals ?? null
-    });
-  }
-  database.close();
-  return outcomes;
-}
 
 /**
  * Die vollständigen Tipico-Quoten je Partie. Nur hierüber lässt sich eine Wette auf die Seite
@@ -122,29 +92,6 @@ function readTipicoOdds(): Map<number, Triple> {
   }
   database.close();
   return prices;
-}
-
-/** Je Partie der jüngste Snapshot - Quoten werden bis zum Anpfiff nachgeführt. */
-function readFixtures(): DashboardFixture[] {
-  const latest = new Map<number, { stamp: string; fixture: DashboardFixture }>();
-  const files = fs.existsSync(OUTPUT_DIR)
-    ? fs.readdirSync(OUTPUT_DIR).filter((file) => file.startsWith("dashboard-") && file.endsWith(".json"))
-    : [];
-  for (const file of files) {
-    let snapshot: { fixtures?: DashboardFixture[] };
-    try {
-      snapshot = JSON.parse(fs.readFileSync(path.join(OUTPUT_DIR, file), "utf8"));
-    } catch {
-      continue; // Ein abgebrochener Lauf hinterlässt gelegentlich eine halbe Datei.
-    }
-    const stamp = file.slice("dashboard-".length, -".json".length);
-    for (const fixture of snapshot.fixtures ?? []) {
-      const previous = latest.get(fixture.fixtureId);
-      if (previous && previous.stamp >= stamp) continue;
-      latest.set(fixture.fixtureId, { stamp, fixture });
-    }
-  }
-  return [...latest.values()].map((entry) => entry.fixture);
 }
 
 interface BetResult {
@@ -366,6 +313,8 @@ function main(): void {
   const prices = readTipicoOdds();
   const fixtures = readFixtures();
   if (fixtures.length === 0) throw new Error("Im Ordner output/ liegt kein Dashboard-Snapshot.");
+  // Nur der Remis-Score liest die Statistik der Vorspiele; alte Läufe tragen sie nicht selbst.
+  enrichWithMatchStats(fixtures);
 
   const settled = fixtures.filter((fixture) => outcomes.has(fixture.fixtureId)).length;
   console.log(`Abgerechnete Partien im Snapshot-Bestand: ${settled} (von ${fixtures.length} insgesamt)`);

@@ -114,7 +114,8 @@ Benutzer auf Deutsch und führe Analyseaufträge selbstständig über die vorhan
   separat ausgewiesenen Referenzwert, implementiere keinen dauerhaften Aufruf und
   speichere weder die API-Prognose noch daraus abgeleitete Werte in der Datenbank.
 - Erzeuge Remis-Punktwerte ausschließlich mit dem in `src/draw-criteria.ts`
-  implementierten Punktesystem.
+  implementierten 100-Punkte-System oder mit dem Remis-Score aus `src/draw-signals.ts`
+  (seit 24.09.2026, von David so entschieden). Eine dritte Stelle gibt es nicht.
 - Erzeuge 1X2-Favoritenpunkte ausschließlich mit `src/favorite-criteria.ts`.
 - Erfinde oder verändere keine Modellwahrscheinlichkeiten.
 - Tipico-Quoten beeinflussen nicht die sportliche Modellauswahl; sie dürfen nur die
@@ -423,7 +424,7 @@ nachgezogen, nicht gesammelt am Ende.
 ## Quickpicker
 
 Der **Quickpicker** neben dem Kelly-Knopf filtert die Tabelle nach einer **Voreinstellung**.
-Es gibt drei, und sie haben **verschiedene Maßstäbe** - was für die eine gilt, gilt für die
+Es gibt fünf, und sie haben **verschiedene Maßstäbe** - was für die eine gilt, gilt für die
 anderen ausdrücklich nicht.
 
 ### Gemeinsames Gerüst
@@ -440,6 +441,13 @@ anderen ausdrücklich nicht.
   Vorgaben, Strengestufen, Maßstab, Spalten, Texte und den Wettschein-Modus. Wer eine dritte
   hinzufügt, ergänzt `QuickpickPresetId`, einen Deskriptor und einen Eintrag in
   `QUICKPICK_COLUMNS` - sonst nichts.
+- **Der Dialog wählt über einen Umschalter und ein Dropdown, nicht über Reiter.** Das Feld
+  `group` im Deskriptor ordnet jede Voreinstellung einem der beiden Umschalter zu
+  (`QUICKPICK_GROUPS` in `src/quickpick.ts`): **Daves Filter** (`daves1x2`, `dominanz`) wählen
+  über Tabelle, H2H und Form eine Mannschaft, **Modell-Filter** (`hz15`, `remis`) über
+  Wahrscheinlichkeiten und Torerwartung des Modells einen Markt. Das Dropdown zeigt nur die
+  Filter der gewählten Gruppe, jeweils mit der Zahl ihrer Treffer. Die Gruppe ist reine
+  Anzeige, keine Regel liest sie.
 - **Die Messwerte der Stufen sind Zahlen, keine Strings.** `QuickpickLevel.measured` trägt
   `{ n, proTag, trefferquote, roi }`; den Knopftext formatiert `preset.noteOf`. Früher stand
   dort ein Text, den die Rückrechnung wieder zerlegen musste.
@@ -714,6 +722,63 @@ anderen ausdrücklich nicht.
   `npm run quickpick-report` gelaufen, auch ohne die 2.000er-Schwelle.
 - Eigener Abweisungsgrund `remisChance`: `remisbild` ist vergeben und meint bei „Erste
   Halbzeit" das **Gegenteil** - dort fliegt eine Partie raus, *weil* sie remisnah ist.
+
+### „Remis-Score": Punkte mit Begründung statt Wahrscheinlichkeit
+
+- Davids Auftrag vom 24.09.2026: ein **transparenter** Remis-Filter, keine Blackbox. Jedes
+  Spiel sammelt bis zu 25 Punkte aus benannten Kriterien, und die App zeigt aufgeklappt je
+  Kriterium Punkte und Grund („2,50 zu 1,00 Punkte je Spiel"). Er steht **neben** dem
+  100-Punkte-System, nicht an dessen Stelle; `scores.draw` und `npm run draw` bleiben unverändert.
+- Die Regel steht in `src/draw-signals.ts` (`scoreDrawSignals`, Gewichte und Schwellen in
+  `DRAW_SIGNAL_CONFIG`), die Voreinstellung in `src/quickpick-remisscore.ts` (Gruppe *Daves
+  Filter*). Die Funktion liest **nur den Snapshot** und wird **nicht** im Snapshot gespeichert:
+  App, Quickpicker und Rückrechnung rechnen dieselbe Fassung, und eine geänderte Gewichtung gilt
+  sofort auch rückwirkend.
+- **Tipico-Quoten und `p(Remis)` gehen bewusst nicht ein.** `p(Remis)` ist der Vergleichsmaßstab
+  der Rückrechnung - wäre es ein Kriterium, könnte der Report nicht mehr zeigen, ob der Score
+  etwas Eigenes weiß.
+- **Was die Daten nicht hergeben, gibt es nicht als Kriterium:** Gefährliche Angriffe, Angriffe
+  und Großchancen liefert API-Football nicht (Statistikkatalog in `fixture_results`: Schüsse,
+  aufs Tor, im Strafraum, Ecken, Ballbesitz, Pässe, Paraden, Fouls, Karten, xG). Torminuten
+  fehlen in v1, weil sie ohne gespeicherte Ereignisse rund vier Aufrufe je Spiel kosten.
+- Fehlt die Grundlage, ist ein Kriterium **nicht bewertbar** - 0 Punkte, aber kein Urteil.
+  `evaluableMax` sagt, wie viel überhaupt zu holen war, und die Voreinstellung verlangt davon
+  mindestens 15 (`minEvaluable`), sonst Abweisungsgrund `remisDaten`.
+- **Gegnerstärke:** Die Form am Ort zählt nur, wenn die letzten Gegner beider Seiten im Mittel
+  höchstens 0,3 Tabellenpunkte je Spiel auseinanderlagen (`opponentStrengthTolerance`). Sonst
+  0 Punkte mit Grund. Ohne auffindbare Gegner (Pokal, fremde Liga) wird die Form mit Hinweis
+  „nicht prüfbar" trotzdem bewertet.
+- Die direkten Duelle filtern **Testspiele** heraus - anders als `h2hSummary`. Dafür trägt
+  `RecentMatchSummary` seit `schemaVersion: 6` das Feld `friendly`.
+- Datenfelder ab `schemaVersion: 6`: `stats` an jedem Vorspiel und Duell (Schüsse, aufs Tor,
+  Ballbesitz, xG, Ecken; aus `fixture_results`, xG ersatzweise aus `fixture_expected_goals`)
+  und `homePlayed`/`homePoints`/`awayPlayed`/`awayPoints` in den Tabellenzeilen. Die
+  Sammlung im Dashboard-Lauf nimmt die letzten drei Duelle dazu; das kostete einmalig rund 40
+  Bündelaufrufe innerhalb von `recentStatsRequestBudget`.
+- **Die Gewichte sind gesetzt, nicht gemessen.** Kriterien mit `weight: 0` (Spielbild im H2H,
+  Zu-null-Spiele, Tore in den letzten Spielen) werden mitgerechnet und gemessen, geben aber
+  keine Punkte - so wird ein Kandidat geprüft, bevor er zählt.
+- **Rückrechnung: `npm run draw-signals-report`** (kein API-Budget). Je Kriterium Abdeckung,
+  Remisquote bei greifend/nicht greifend mit Standardfehler und **derselbe Unterschied innerhalb
+  der p(Remis)-Bänder** - trennt ein Kriterium nur im Ganzen, wiederholt es das Modell. Mit
+  `--config <datei.json>` wird eine andere Gewichtung gegenübergestellt; die Datei darf Teile
+  enthalten, etwa `{ "rules": { "h2hDraws": { "weight": 5 } } }`. **Kein automatisches
+  Durchprobieren** - dieselbe Lehre wie bei der Kelly-Automatik.
+- Alte Snapshots reichert `tools/snapshot-history.ts` über `fixture_results` an (Fixture-ID,
+  sonst Anstoßzeit plus Namen). Das trifft nur rund 16 % der Vorspiele, weil Läufe vor dem
+  22.09.2026 keine Fixture-ID führen und `fixture_results` viele alte Vorspiele nicht kennt.
+  **Die Spielbild-Kriterien sind deshalb rückwirkend nur für rund 11 % der Spiele bewertbar**,
+  die Heim-/Auswärtsbilanz für gar keins. Belastbar werden sie erst mit neuen Läufen.
+- **Erste Messung, 24.09.2026, 5.931 Spiele, Basisrate 25,5 %:** Vorgabestufe (ab 14) 83
+  Tipps, 36,1 % ±5,3, Ertrag je Bein +7,4 %, Zeithälften 41,5 / 31,0 %. `p(Remis) >= 0,30`
+  allein trifft auf demselben Bestand **35,5 % über 299 Spiele** - der Score trifft also nicht
+  besser als das Modell, nur bei einem Viertel der Menge. Gegen die mittlere Modellprognose
+  seiner Auswahl (29,4 %) liegt er gut eine Standardabweichung darüber: **kein Beleg.**
+  Innerhalb der p(Remis)-Bänder tragen am ehesten *Punkte je Spiel* und *Tordifferenz ähnlich*
+  (+5 ±1,9 pp bei p < 0,25), *oft knappe Spiele* (+3,6 ±1,7) und das ungewichtete *wenige Tore
+  in den letzten Spielen* (+5,7 ±2,0 bei 0,25-0,30); *Form am Ort* trennt gar nicht
+  (+0,9 ±1,1). Das sind Hinweise für die nächste Runde, keine Freigabe zum Umgewichten - es
+  wurden 15 Kriterien in drei Bändern geprüft, einzelne Zwei-Sigma-Treffer sind da zu erwarten.
 
 ### Verdrahtung
 
