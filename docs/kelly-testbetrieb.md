@@ -142,8 +142,8 @@ Dieses Protokoll ist die Plausibilitätsprüfung gegen sie, nicht ihr Ersatz.
 
 ## Ergebnisse der Prüfzeitpunkte
 
-Noch keine Marke erreicht. Stand: **78 abgerechnete Wetten im Testbetrieb** (21.09.2026),
-236 über beide Ketten zusammen — die erste Marke liegt bei 300.
+Noch keine Marke erreicht. Stand: **89 abgerechnete Wetten im Testbetrieb** (23.09.2026),
+247 über beide Ketten zusammen — die erste Marke liegt bei 300.
 
 | Marke | Datum | Befund |
 |---|---|---|
@@ -153,21 +153,21 @@ Noch keine Marke erreicht. Stand: **78 abgerechnete Wetten im Testbetrieb** (21.
 
 ## Der Testbetrieb auf einen Blick
 
-Stand 21.09.2026, nach Lauf 2. Fortgeschrieben nach jedem vollständig abgerechneten Lauf.
+Stand 23.09.2026, nach Lauf 3. Fortgeschrieben nach jedem vollständig abgerechneten Lauf.
 
 | | |
 |---|---|
-| Läufe | 2 |
-| Wetten | 78 (78 entschieden, 1 verlegt) |
-| Einsatz | 126,05 |
-| **Ergebnis** | **−5,49 · ROI −4,4 %** |
-| Trefferquote | 32/78 (41,0 %) |
-| Modellprognose | 56,5 % |
-| Kalibrierbias | **−15,5 pp** |
-| ohne den Remis-Markt | −25,00 · ROI −21,2 % |
+| Läufe | 3 |
+| Wetten | 89 (89 entschieden, 1 verlegt) |
+| Einsatz | 143,21 |
+| **Ergebnis** | **−17,14 · ROI −12,0 %** |
+| Trefferquote | 34/89 (38,2 %) |
+| Modellprognose | 56,2 % |
+| Kalibrierbias | **−18,0 pp** |
+| ohne den Remis-Markt | −35,11 · ROI −26,3 % |
 
-Zum Vergleich: Derselbe Gesamteinsatz gleichmäßig verteilt hätte −6,59 ergeben — die
-Kelly-Staffelung liegt also 1,10 darüber, was auf 78 Wetten nichts bedeutet.
+Zum Vergleich: Derselbe Gesamteinsatz gleichmäßig verteilt hätte −18,15 ergeben — die
+Kelly-Staffelung liegt also 1,01 darüber, was auf 89 Wetten nichts bedeutet.
 
 ## Laufprotokoll
 
@@ -175,6 +175,7 @@ Kelly-Staffelung liegt also 1,10 darüber, was auf 78 Wetten nichts bedeutet.
 |---|---|---:|---:|---:|---:|---:|---:|---:|---:|
 | 1 | 15.09.2026 | 24 | 36,42 | **−10,15** | −27,9 % | 9/24 (37,5 %) | 51,6 % | −14,1 pp | −10,15 |
 | 2 | 18.09.2026 | 54 | 89,63 | **+4,66** | +5,2 % | 23/54 (42,6 %) | 58,7 % | −16,1 pp | −5,49 |
+| 3 | 21.09.2026 | 11 | 17,16 | **−11,65** | −67,9 % | 2/11 (18,2 %) | 54,0 % | −35,8 pp | −17,14 |
 
 **Lauf 1** — `docs/kelly-all-2026-09-15.json`, ausgewählt am Abend des 15.09. für die Partien
 vom 16./17.09.2026, 25 Wetten aus 197 geprüften Kandidaten, mittlere Quote 2,115.
@@ -229,6 +230,36 @@ als das Ende.
 **Flacher Einsatz hätte +2,77 ergeben**, die Kelly-Staffelung liegt also 1,89 **darüber** —
 nach Lauf 1, wo sie darunter lag. Zwei Läufe belegen nichts.
 
+**Lauf 3** — `docs/kelly-all-2026-09-21.json`, ausgewählt am **Vormittag** des 21.09. (10:01)
+für die Partien vom 21./22.09.2026, 11 Wetten aus 61 geprüften Partien, vollständig
+abgerechnet am 23.09.2026 (alle 11 entschieden, keine offen).
+
+**Der schlechteste Lauf des Testbetriebs:** 2 von 11 Tipps haben gestimmt, erwartet waren
+knapp 6. Das sind rund −2,4 Sigma für diesen einen Lauf — auffällig, bei 11 Wetten aber
+noch im Bereich dessen, was Zufall hergibt. Getroffen haben nur BTTS in ASA Târgu Mureș –
+Dinamo București (4:3, +1,71) und Über 2,5 in Spaeri – Dila (1:4, +0,90).
+
+- **BTTS Nein 0/5, −8,28.** In allen fünf Spielen trafen beide Teams, dreimal mit fünf oder
+  mehr Toren (HB Køge – Hobro 5:2, Jönköping – Skövde 3:2, Arlanda – Hammarby Talang 4:2).
+- **Zwei 0:0 kosteten die Über-Tipps:** Real Cartagena – Envigado (Über 2,5) und
+  TSC Bačka Topola – Dubočica (BTTS).
+- **Ohne den Remis-Markt −10,11 bei 2/10.** Diesmal gab es keinen Remis-Treffer, der den Lauf
+  rettet (Spezia – Vis Pesaro 3:1).
+
+**Flacher Einsatz hätte −11,23 ergeben**, die Kelly-Staffelung liegt 0,42 darunter.
+
+**Abweichungen von der Testanlage, wieder nicht beabsichtigt:**
+
+- **Budget 95,20 statt 100,00.** Das ist 90,54 + 4,66 — also zum zweiten Mal in Folge
+  reinvestiert. Entweder setzt der Knopf „Testbetrieb übernehmen" das Budget nicht, oder er
+  wurde nicht gedrückt.
+- **Einsatzrahmen 1,00 statt 0,70.** Bei 17,16 Einsatz hat er nicht abgeschnitten
+  (`exposureScaleFactor` 1), für diesen Lauf also ohne Wirkung — zeigt aber, dass die
+  Einstellungen nicht der Vorgabe folgen.
+- **Vormittags statt abends, heute und morgen statt `tomorrow2`.** Keine Überschneidung mit
+  Lauf 2 (19./20.09.); der nächste Lauf muss am 23.09. beginnen, damit nichts doppelt zählt.
+- **Nur 11 Wetten** statt 25–30, aus 61 Partien. Der Rahmen war es nicht.
+
 **Regeln für diese Tabelle:**
 
 - Eine Zeile wird erst eingetragen, wenn der Lauf **vollständig abgerechnet** ist, also im
@@ -243,15 +274,20 @@ nach Lauf 1, wo sie darunter lag. Zwei Läufe belegen nichts.
 
 | Markt | Wetten | Einsatz | Ergebnis | ROI | Treffer | Bias |
 |---|---:|---:|---:|---:|---:|---:|
-| BTTS | 29 | 44,77 | −0,12 | −0,3 % | 15/29 | −9,9 pp |
-| Über 2,5 | 25 | 44,15 | −17,56 | −39,8 % | 8/25 | −29,9 pp |
-| BTTS Nein | 18 | 27,94 | −8,26 | −29,6 % | 6/18 | −17,0 pp |
-| Remis | 5 | 8,19 | +19,50 | +238,1 % | 2/5 | +17,4 pp |
+| BTTS | 31 | 47,93 | +0,33 | +0,7 % | 16/31 | −10,0 pp |
+| Über 2,5 | 28 | 48,33 | −19,84 | −41,1 % | 9/28 | −29,6 pp |
+| BTTS Nein | 23 | 36,22 | −16,54 | −45,7 % | 6/23 | −24,7 pp |
+| Remis | 6 | 9,73 | +17,96 | +184,6 % | 2/6 | +10,3 pp |
 | Unter 2,5 | 1 | 1,00 | +0,95 | +95,0 % | 1/1 | +45,7 pp |
 
 Diese Tabelle ist die eigentlich interessante: Über die alte Kette trug **Über 2,5** allein
 (+36,7 % über 28 Wetten, out of sample +14,0 %), während **1. HZ Ü1,5** mit −48,7 % über
 13 Wetten am stärksten leckte. Ob die neue Regel das trennt, zeigt sich hier zuerst.
+
+**Nach Lauf 3:** Über 2,5 und BTTS Nein verlieren weiter, zusammen 15/51 und −36,38. BTTS
+ist der einzige Markt außer Remis, der ungefähr auf null steht. Der Bias über alle drei
+Testläufe liegt bei −18,0 pp — dasselbe Bild wie in AGENTS.md (55,5 % Prognose gegen 40,0 %
+auf den gewählten Zeilen der Rückrechnung).
 
 **Nach Lauf 2 — der Befund, auf den der Testbetrieb achten sollte:**
 
@@ -277,12 +313,12 @@ Diese Tabelle ist die eigentlich interessante: Über die alte Kette trug **Über
   diesen Lauf steht der Markt bei 21/32 und +16,13 (ROI +25,4 %), trägt also weiter —
   aber der einzige belastbare Gewinnbringer ist nicht mehr ungebrochen.
 
-Zur Einordnung über beide Ketten hinweg (Stand 21.09.2026): **236 abgerechnete Wetten, 111
-Treffer (47,0 %) gegen 55,3 % Prognose, Bias −8,3 pp.** Drei Läufe in Folge mit stark
-negativem Bias (−16,5, −14,1, −16,1 pp) nach drei unauffälligen.
+Zur Einordnung über beide Ketten hinweg (Stand 23.09.2026): **247 abgerechnete Wetten, 113
+Treffer (45,7 %) gegen 55,2 % Prognose, Bias −9,5 pp.** Vier Läufe in Folge mit stark
+negativem Bias (−16,5, −14,1, −16,1, −35,8 pp) nach drei unauffälligen.
 
-Schwellenwert-Abgleich: 236 von 300 für den ersten Prüfzeitpunkt, 236 von 400 für die
-Entscheidungsschwelle. **Nichts fällig.**
+Schwellenwert-Abgleich: 247 von 300 für den ersten Prüfzeitpunkt, 89 Testwetten von 400 für
+die Entscheidungsschwelle. **Nichts fällig.**
 
 ---
 
