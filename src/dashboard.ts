@@ -20,6 +20,20 @@ export interface DashboardInput {
    * Angabe, bleiben die beiden Spalten leer - das Dokument entsteht trotzdem.
    */
   recentStats?: Map<number, { home: MatchSideStats; away: MatchSideStats }>;
+  /**
+   * Team-Elo je Team-ID aus dem letzten `npm run elo -- build`. Reine Anzeige neben dem Namen -
+   * es geht in keinen Tipp, keine Wahrscheinlichkeit und keinen Filter ein.
+   */
+  elo?: Map<number, TeamElo>;
+}
+
+/** Das Team-Elo, wie es neben dem Namen steht. `asOf` ist der Stand des letzten Aufbaus. */
+export interface TeamElo {
+  elo: number;
+  /** 0-100, wie belastbar der Wert ist - getrennt vom Elo selbst. */
+  confidence: number;
+  system: "club" | "national";
+  asOf: string;
 }
 
 export type RecommendationLevel = "none" | "recommended" | "strong";
@@ -91,6 +105,12 @@ export interface DashboardFixture {
    */
   homeCrest?: string;
   awayCrest?: string;
+  /**
+   * Team-Elo beider Seiten, nur zur Anzeige. Fehlt, wenn das Team im Elo nicht vorkommt oder
+   * der Lauf vor dieser Ergänzung entstand.
+   */
+  homeElo?: TeamElo;
+  awayElo?: TeamElo;
   modelVersion: string;
   crossLeague: boolean;
   classGap?: ClassGap;
@@ -422,6 +442,8 @@ export function buildDashboardDocument(input: DashboardInput): DashboardDocument
     return {
       fixtureId: row.fixtureId, kickoff: row.kickoff, country: row.country, league: row.league,
       homeTeam: row.homeTeam, awayTeam: row.awayTeam, modelVersion: row.modelVersion, crossLeague,
+      ...(row.homeTeamId !== undefined && input.elo?.has(row.homeTeamId) ? { homeElo: input.elo.get(row.homeTeamId)! } : {}),
+      ...(row.awayTeamId !== undefined && input.elo?.has(row.awayTeamId) ? { awayElo: input.elo.get(row.awayTeamId)! } : {}),
       ...(row.homeCrest ? { homeCrest: row.homeCrest } : {}),
       ...(row.awayCrest ? { awayCrest: row.awayCrest } : {}),
       ...(classGap ? { classGap } : {}),

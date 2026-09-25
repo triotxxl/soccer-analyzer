@@ -356,6 +356,9 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .team-name .team-crest { width: 18px; height: 18px; }
 .team-name .team-crest.fallback { font-size: 8px; }
 .team-name strong { overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+/* Team-Elo neben dem Namen: klein und grau, damit es nicht wie ein Tipp aussieht. */
+.elo-tag { flex: 0 0 auto; color: #8a8a8a; font-size: 10px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.elo-tag.unsicher { color: #5f5f5f; }
 .team-name:first-child strong { color: var(--home); }
 .team-name:last-child strong { color: var(--away); }
 .defense-shield { display: inline-grid; place-items: center; flex: 0 0 auto; color: #73c991; }

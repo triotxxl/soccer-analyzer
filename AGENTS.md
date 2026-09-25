@@ -220,6 +220,8 @@ Benutzer auf Deutsch und führe Analyseaufträge selbstständig über die vorhan
   Modell trennt zu scharf und `strength.factorDivisor` gehört erhöht. Pokalpartien enden
   häufiger remis als Ligapartien, was die Favoritenquote strukturell drückt - das gehört bei
   der Auslegung mitbedacht.
+- Das Team-Elo holt einmal pro Woche mit einer Analyse die laufenden Saisons aller aktiven
+  Ligen (rund 530 Aufrufe, Abschnitt „Team-Elo"). An dem Tag ist die Analyse entsprechend teurer.
 - Historische xG-Werte und bestätigte Nichtverfügbarkeit werden in SQLite gehalten; der
   xG-Erstaufbau darf pro Dashboard-Lauf höchstens 250 zusätzliche API-Anfragen auslösen.
 ## Sprache der sichtbaren Texte
@@ -420,6 +422,104 @@ nachgezogen, nicht gesammelt am Ende.
 - Marktprofil und Edge-Report kosten kein API-Budget - sie lesen nur `output/dashboard-*.json`
   und die abgerechneten Ergebnisse aus SQLite. Je mehr abgerechnet ist, desto belastbarer die
   Korrektur; deshalb gehört `npm run settle` vor jede Bewertung der Automatik.
+
+## Team-Elo
+
+- Davids Auftrag vom 24.09.2026: ein eigenes Elo je **Mannschaft**, chronologisch aus
+  historischen API-Football-Spielen, Vereine und Nationalteams auf **getrennten** Skalen.
+  **Es berührt weder Tipps noch Wahrscheinlichkeiten noch Filter**, bis ein Backtest-Befund
+  und David etwas anderes entscheiden.
+- **In der App steht es seit 24.09.2026 unverbindlich neben dem Teamnamen** (Davids Wunsch):
+  klein und grau, Vertrauen und Stand im Tooltip, unter 50 % Vertrauen blasser (`EloTag` in
+  `frontend/src/App.tsx`). Der Dashboard-Lauf hängt es über die Team-ID an
+  (`homeTeamId`/`awayTeamId` in `GoalLineRow`, `homeElo`/`awayElo` im Snapshot) und liest
+  dafür nur `elo_ratings` - kein Aufruf. Ein Test hält fest, dass die Märkte mit und ohne Elo
+  identisch bleiben.
+- **Automatische Pflege (seit 24.09.2026, `src/elo-update.ts`):** Jeder Dashboard-Lauf zieht das
+  Elo vor dem Schreiben des Snapshots nach - neue abgeschlossene Spiele aus den seit dem letzten
+  Import geschriebenen Cache-Dateien (rund 300 je Analyse, kostenlos), dann neu rechnen (rund
+  35 s). Die erste Analyse, die mehr als 7 Tage nach der letzten **Wochenrunde** läuft, holt
+  zusätzlich die laufende Saison jeder Liga mit Spielen in den letzten 45 Tagen (rund 530
+  Aufrufe, Deckel `ELO_TOPUP_REQUEST_BUDGET`, Vorgabe 600). Eine Runde, die am Deckel hängen
+  bleibt, gilt nicht als erledigt und läuft mit der nächsten Analyse weiter. Zeitpunkte stehen
+  in `elo_meta` (`lastImport`, `lastTopUp`). `ELO_AUTO_UPDATE=0` schaltet beides ab. Scheitert
+  der Schritt, entsteht das Dashboard trotzdem mit dem gespeicherten Stand. Ergebnisse aus der
+  Abrechnung am Laufende kommen erst mit der **nächsten** Analyse ins Elo. Von Hand:
+  `npm run elo -- update [--top-up|--no-top-up]`.
+- **Nicht verwechseln mit dem Liga-Elo** in `src/strength-builder.ts`: Jenes bewertet Ligen und
+  speist den Torfaktor des Modells (`src/strength-factor.ts`). Beide bleiben unabhängig.
+- Dateien: Parameter `src/elo-config.ts` (`ELO_CONFIG`, Wettbewerbs-IDs, Ausschlussmuster),
+  Einordnung `src/elo-competitions.ts`, Rechenkern `src/elo.ts` (rein, ohne I/O), Backtest
+  `src/elo-backtest.ts`, Lesen `src/elo-store.ts` (`getTeamElo`, `getEloRanking`,
+  `getEloHistory`, `getEloConfidence`), Befehle `tools/elo.ts` und `tools/elo-backtest.ts`.
+  Tabellen: `elo_matches` (einzige Quelle), `elo_league_seasons`, `elo_history`, `elo_ratings`.
+- Befehle: `npm run elo -- import` (Cache → `elo_matches`, 0 Aufrufe), `backfill --budget <n>
+  [--dry-run]` (beendete Liga-Saisons ab 2021 nachladen, ein Aufruf je Saison, fortsetzbar,
+  **nur nach Rückfrage**), `build` (rechnen und speichern, 0 Aufrufe), `ranking [--system
+  national] [--country X]`, `team <ID oder Name>`. Backtest: `npm run elo-backtest --
+  --test-start JJJJ-MM-TT --test-end JJJJ-MM-TT [--config datei.json]`.
+- Formeln stehen im Kopf von `src/elo.ts`: Erwartung mit Heimvorteil (0 bei Endrunden auf
+  neutralem Platz), `K_eff = K × Wettbewerb × Zeit-Decay × Tordifferenz × Einstieg` je Team,
+  Tordifferenz als `log2(|TD|+1)` mit Bremse für Kantersiege des Stärkeren und Deckel 2.
+  Der Zeit-Decay bezieht sich auf den **Stichtag** - dieselben Spiele ergeben an einem anderen
+  Tag ein anderes Rating, deshalb rechnet der Backtest je Testwoche neu.
+- **Review vom 24.09.2026 (Version 1.1.0)** - gefunden und behoben, jeweils mit Test:
+  1. Die Liga-Mitnahme stand in keiner Historienzeile (Bayern: +324 Elo ohne Nachweis). Jetzt
+     trägt jede Zeile `home_shift`/`away_shift`, und es gilt `vorher(n+1) = nachher(n) +
+     Verschiebung(n+1)`; `npm run elo -- team` zeigt sie als „Liga±".
+  2. Die Ligaebenen waren oft falsch (2. Bundesliga 2021 Ebene 1, Serie A 2022-2024 Ebene 2,
+     „Oberliga - Promotion Round" vor der ersten Liga). Jetzt zählen nur belastbar bewertete
+     Teams, mindestens 10 je Liga, eine Ebene tiefer erst ab 30 Punkten Abstand, unbestimmbar =
+     Ebene 1.
+  3. Die Liga-Spalte nannte die häufigste statt der aktuellen Liga (Aufsteiger falsch).
+  4. Änderungen über 30/90 Tage, Spitze und Tief enthalten jetzt die Mitnahme (Stand-Aufnahmen
+     zu den Stichtagen statt Spielprotokoll).
+  5. Der Einstiegsfaktor zählt gewichtete Spiele, verfallene alte Spiele verbrauchen ihn nicht.
+  6. Die Mitnahme überträgt den Grundanteil ohne Einstiegsfaktor und nur an Teams, die in den
+     letzten 400 Tagen gespielt haben.
+  7. **Zeit-Decay entschärft:** Die ursprüngliche Staffel gab Spielen vor 2024 so wenig K, dass
+     sie die Skala zwischen den Ligen nicht mit aufbauten. Jetzt Vereine 0-12 Monate 100 %,
+     12-24 80 %, 24-60 60 % (Davids Entscheidung). Gemessen: Test 2026 −0,0045 ±0,0004 Log-Loss
+     insgesamt, Pokal −0,025; Gegenprobe 2025 −0,0023 ±0,0002, Pokal −0,014. Ganz ohne Decay
+     war es 2026 gleich gut, bei Ligaspielen schlechter.
+  Die Korrekturen 1-6 allein senkten den Log-Loss 2026 von 1,0087 auf 1,0079. Nach dem Review:
+  Real Madrid von Platz 17 auf 12, Ligaebenen ab 2022 statt erst ab 2024 bestimmbar.
+- **Ligaebene aus den Daten, kein Ligabonus:** Ein erster Durchgang ordnet die Ligen eines
+  Landes je Saison nach dem Vor-Saison-Elo ihrer Teams (Ebene 1 / 2 / tiefer).
+- **Liga-Mitnahme (`leaguePropagation.share` 0,3) ist der wichtigste Parameter.** Ohne sie
+  behält eine Liga, die fast nur gegen sich selbst spielt, ihren Schnitt bei 1500, und ihr
+  Meister steht weit oben: Simba (Tansania) lag vor Real Madrid, Johor Darul Takzim auf Platz
+  13. Mit ihr bekommt jedes Team einer Liga 30 % der Änderung seines Ligakollegen aus Spielen
+  gegen andere Ligen. Gemessen (gepaarter Log-Loss, negativ = besser): Test 2025 Pokal −0,029
+  ±0,002 und Europapokal −0,028 ±0,005; Gegenprobe Test 2026 Pokal −0,041 ±0,003 und
+  Europapokal −0,031 ±0,005. Sie ist nicht nullsummig und spreizt die Skala (Spitze rund 2240).
+- **Ausschlüsse:** Frauen-, Jugend-, Reserve- und Olympiawettbewerbe über den Wettbewerbs-
+  **und** den Teamnamen („Häcken W" rutschte über „Damallsvenskan" sonst durch), unbekannte
+  Wettbewerbe unter `World` (sie könnten Nationalteams tragen). „Friendlies" (10) sind
+  Länderspiele, „Friendlies Clubs" (667) Vereins-Testspiele - die IDs stammen aus
+  `getAllLeagues()`, nicht aus dem Gedächtnis.
+- **Stand 24.09.2026, nach dem Nachladen** (2.562 Liga-Saisons, 2.533 Aufrufe, 413.432 neue
+  Spiele): 674.512 Spiele, je Jahr 2021-2025 zwischen 78.000 und 126.000; 572.895 gewertet,
+  81.013 älter als fünf Jahre, 20.574 ausgeschlossen; 16.359 Vereine, 234 Nationalteams.
+  Aufbau rund 35 s, ein Backtest über ein Jahr rund 5 Minuten.
+- **Backtest mit voller Historie** (Log-Loss, kleiner ist besser; Basis = nur Heimvorteil):
+
+  | Test | alle | Liga | Pokal | Europapokal | Testspiel | Nationalteams |
+  |---|---|---|---|---|---|---|
+  | 2025 (108.358) | 1,007 / 1,067 | 1,011 / 1,069 | 0,969 / 1,055 | 0,995 / 1,051 | 1,016 / 1,057 | 0,906 / 1,053 |
+  | 2026 bis 23.09. (70.322) | 1,009 / 1,068 | 1,014 / 1,070 | 0,963 / 1,061 | 0,993 / 1,049 | 0,997 / 1,053 | 0,948 / 1,052 |
+
+  Ohne Liga-Mitnahme wäre es gepaart schlechter: 2025 Pokal +0,035 ±0,002, Europapokal
+  +0,033 ±0,005, Testspiele +0,038 ±0,003; 2026 Pokal +0,045 ±0,003, Europapokal +0,035 ±0,005.
+- **Das Elo ist zu selbstsicher, und das Nachladen hat daran nichts geändert:** Bei 0,7-0,8
+  Erwartung kamen 0,705 bzw. 0,709 heraus, der Favorit gewann 51,1 % statt vorhergesagter
+  53,9 % (2026: 50,8 gegen 54,2 %). Die Ratings liegen also zu weit auseinander. Der nächste
+  Hebel wäre ein Streckungsfaktor auf die Elo-Differenz (heute fest 400 in `expectedHome`) -
+  als Parameter einzuführen und per Backtest zu prüfen, nicht nach Gefühl zu setzen.
+- Die Rangliste nach dem Nachladen: Bayern, Manchester City, Arsenal vorn, Real Madrid auf 17,
+  Bodø/Glimt und Slavia Prag noch vor Real. Nationalteams: Spanien, England, Argentinien, Marokko.
+  K 20 statt 30 und Heimvorteil 50 statt 60 waren vor dem Nachladen nur minimal und
+  uneinheitlich besser - nicht übernommen, auf dem vollen Bestand nicht neu gemessen.
 
 ## Quickpicker
 

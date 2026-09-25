@@ -9,6 +9,9 @@ const settleRequestBudget = Number(
 const settleConcurrency = Number(
   process.env.SETTLE_CONCURRENCY ?? 1
 );
+const eloTopUpRequestBudget = Number(
+  process.env.ELO_TOPUP_REQUEST_BUDGET ?? 600
+);
 const apiRequestsPerMinute = Number(
   process.env.API_REQUESTS_PER_MINUTE ?? 300
 );
@@ -124,6 +127,13 @@ export const config = {
     Number.isInteger(settleConcurrency) && settleConcurrency > 0
       ? settleConcurrency
       : 1,
+  // Team-Elo mit jeder Analyse nachziehen (kostenlos) und wöchentlich alle aktiven Ligen
+  // holen (rund 530 Aufrufe). ELO_AUTO_UPDATE=0 schaltet beides ab. src/elo-update.ts.
+  eloAutoUpdate: process.env.ELO_AUTO_UPDATE !== "0",
+  eloTopUpRequestBudget:
+    Number.isInteger(eloTopUpRequestBudget) && eloTopUpRequestBudget >= 0
+      ? eloTopUpRequestBudget
+      : 600,
   strengthOnDemandRequestBudget:
     Number.isInteger(strengthOnDemandRequestBudget) &&
     strengthOnDemandRequestBudget > 0

@@ -299,3 +299,17 @@ test("ohne gesammelte Zahlen bleibt der Snapshot leer statt null", () => {
   assert.equal(form.homeStats?.shotsOnGoal, null);
   assert.equal(form.homeStats?.matches, 0);
 });
+
+test("das Team-Elo steht über die Team-ID im Spiel, nur zur Anzeige", () => {
+  const input = dashboardInput();
+  input.goals.rows[0]!.homeTeamId = 157;
+  input.goals.rows[0]!.awayTeamId = 160;
+  input.elo = new Map([[157, { elo: 2304, confidence: 97, system: "club" as const, asOf: "2026-09-24T12:00:00.000Z" }]]);
+  const with_ = buildDashboardDocument(input).fixtures[0]!;
+  const without = buildDashboardDocument(dashboardInput()).fixtures[0]!;
+  assert.equal(with_.homeElo?.elo, 2304);
+  // Ein Team, das im Elo fehlt, bekommt kein Feld - kein erfundener Startwert.
+  assert.equal(with_.awayElo, undefined);
+  // Unverbindlich: Märkte und Wahrscheinlichkeiten bleiben exakt gleich.
+  assert.deepEqual(with_.markets, without.markets);
+});

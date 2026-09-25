@@ -185,6 +185,24 @@ describe("React-Dashboard", () => {
     expect(screen.getByRole("button", { name: /Alpha FCGast FC/i })).toBeInTheDocument();
   });
 
+  /** Davids Vorgabe: das Elo unverbindlich neben dem Namen, die Erklärung im Tooltip. */
+  it("zeigt das Team-Elo klein neben dem Namen, mit Vertrauen im Tooltip", async () => {
+    const current = document();
+    current.fixtures[0] = {
+      ...current.fixtures[0]!,
+      homeElo: { elo: 2104.4, confidence: 96, system: "club", asOf: "2026-09-24T12:00:00.000Z" },
+      awayElo: { elo: 1612, confidence: 31, system: "club", asOf: "2026-09-24T12:00:00.000Z" }
+    };
+    vi.stubGlobal("fetch", dashboardFetch(() => current));
+    render(<App />);
+    const home = await screen.findByText("2104");
+    expect(home).toHaveClass("elo-tag");
+    expect(home).toHaveAttribute("title", expect.stringContaining("Vertrauen 96 %"));
+    expect(home).toHaveAttribute("title", expect.stringContaining("geht in keinen Tipp ein"));
+    // Auf dünner Grundlage blasser.
+    expect(screen.getByText("1612")).toHaveClass("unsicher");
+  });
+
   it("synchronisiert die H2H-Ansicht mit dem ausgewählten Markt", async () => {
     const current = document();
     current.schemaVersion = 2;

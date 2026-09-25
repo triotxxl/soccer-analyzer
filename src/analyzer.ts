@@ -714,6 +714,8 @@ export async function runGoalLineAnalysis(
         league: fixture.league.name,
         homeTeam: fixture.teams.home.name,
         awayTeam: fixture.teams.away.name,
+        homeTeamId: fixture.teams.home.id,
+        awayTeamId: fixture.teams.away.id,
         homeCrest: fixture.teams.home.logo,
         awayCrest: fixture.teams.away.logo,
         modelVersion: config.goalLineModelVersion,

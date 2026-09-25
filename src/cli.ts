@@ -27,8 +27,9 @@ import { buildLeagueStrength } from "./strength-builder.ts";
 import { applyGoalLineFilters } from "./goal-line-filter.ts";
 import { formatVenueFormResult, runVenueFormFilter } from "./venue-form.ts";
 import { importTipicoData } from "./tipico.ts";
-import { writeDashboard } from "./dashboard.ts";
+import { writeDashboard, type TeamElo } from "./dashboard.ts";
 import { collectRecentStats, RECENT_STATS_WINDOW, type MatchSideStats } from "./recent-stats.ts";
+import { autoUpdateElo } from "./elo-update.ts";
 import { parseExpectedGoals } from "./xg.ts";
 import type {
   AnalysisInput,
@@ -546,8 +547,35 @@ async function dashboard(args: ParsedArgs): Promise<void> {
         console.error(`Schüsse und Ecken übersprungen: ${error instanceof Error ? error.message : String(error)}`);
       }
     }
+    // Team-Elo nachziehen: neue Ergebnisse aus dem Cache (kostenlos), einmal pro Woche die
+    // laufenden Saisons aller aktiven Ligen. Scheitert das, bleibt der gespeicherte Stand -
+    // das Dashboard entsteht trotzdem.
+    if (client && config.eloAutoUpdate) {
+      try {
+        const update = await autoUpdateElo(client, database, { topUpBudget: config.eloTopUpRequestBudget });
+        const topUp = update.topUp
+          ? `Wochenrunde ${update.topUp.loaded} von ${update.topUp.leagues} Ligen, ${update.topUp.apiRequests} Aufrufe`
+            + (update.topUp.budgetReached ? " (Budget erreicht, Rest bei der nächsten Analyse)" : "")
+          : `Wochenrunde fällig ab ${new Date(update.nextTopUp ?? Date.now()).toLocaleDateString("de-DE")}`;
+        console.log(`Elo: ${update.imported.inserted} neue Spiele (${update.imported.read} Cache-Dateien), ${topUp},`
+          + ` neu gerechnet in ${update.rebuilt.seconds.toFixed(0)} s`);
+      } catch (error) {
+        console.error(`Elo nicht aktualisiert, es gilt der gespeicherte Stand: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+    // Team-Elo nur zur Anzeige neben dem Namen.
+    const elo = new Map<number, TeamElo>();
+    for (const row of database.eloRatings()) {
+      elo.set(Number(row.team_id), {
+        elo: Number(row.elo),
+        confidence: Number(row.confidence),
+        system: row.system === "national" ? "national" : "club",
+        asOf: new Date(Number(row.as_of)).toISOString()
+      });
+    }
     const files = await writeDashboard({
       recentStats,
+      elo,
       createdAt: goalsResult.createdAt,
       sourceFile,
       totalTipicoEvents: imported.totalEvents,

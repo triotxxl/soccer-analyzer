@@ -489,6 +489,24 @@ function RecentStatCell({ fixture, field, label }: {
   </span>;
 }
 
+/**
+ * Das Team-Elo klein neben dem Namen. **Unverbindlich** - Davids Vorgabe vom 24.09.2026: Es geht
+ * in keinen Tipp, keine Wahrscheinlichkeit und keinen Filter ein, es steht nur zur Einordnung da.
+ * Unter 50 % Vertrauen wird es blasser, weil der Wert dann auf wenigen Spielen steht.
+ * Bewusst ohne aria-label: Die Zeile ist ein Knopf, und ein Label am Kind wandert in dessen Namen.
+ */
+function EloTag({ value, team }: { value: DashboardFixture["homeElo"]; team: string }) {
+  if (!value) return null;
+  const elo = Math.round(value.elo);
+  const confidence = Math.round(value.confidence);
+  const stand = new Date(value.asOf).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" });
+  return <small className={confidence < 50 ? "elo-tag unsicher" : "elo-tag"}
+    title={`Elo ${elo} (${value.system === "national" ? "Nationalteams" : "Vereine"}): Stärkewert von ${team} aus allen bisherigen Spielen.`
+      + ` Vertrauen ${confidence} %, Stand ${stand}. Nur zur Einordnung – geht in keinen Tipp ein.`}>
+    {elo}
+  </small>;
+}
+
 function DefenseShield({ profile, team }: { profile: NonNullable<DashboardFixture["defense"]>["home"] | undefined; team: string }) {
   if (!profile?.strong) return null;
   const verified = profile.badge === "verified";
@@ -1273,8 +1291,8 @@ function Dashboard({ document }: { document: DashboardDocument }) {
             <button className={`${fixtureGridClass} fixture-row`} style={gridStyle} onClick={() => setOpenFixture((value) => value === fixture.fixtureId ? null : fixture.fixtureId)} aria-expanded={openFixture === fixture.fixtureId}>
               <span className="fixture-summary-cell">
                 <span className="teams-cell">
-                  <span className="team-name"><TeamCrest name={fixture.homeTeam} logo={fixture.homeCrest} /><strong>{fixture.homeTeam}</strong><DefenseShield profile={fixture.defense?.home} team={fixture.homeTeam} /></span>
-                  <span className="team-name"><TeamCrest name={fixture.awayTeam} logo={fixture.awayCrest} /><strong>{fixture.awayTeam}</strong><DefenseShield profile={fixture.defense?.away} team={fixture.awayTeam} /></span>
+                  <span className="team-name"><TeamCrest name={fixture.homeTeam} logo={fixture.homeCrest} /><strong>{fixture.homeTeam}</strong><EloTag value={fixture.homeElo} team={fixture.homeTeam} /><DefenseShield profile={fixture.defense?.home} team={fixture.homeTeam} /></span>
+                  <span className="team-name"><TeamCrest name={fixture.awayTeam} logo={fixture.awayCrest} /><strong>{fixture.awayTeam}</strong><EloTag value={fixture.awayElo} team={fixture.awayTeam} /><DefenseShield profile={fixture.defense?.away} team={fixture.awayTeam} /></span>
                 </span>
                 <span className="fixture-meta"><strong>{time.clock}{isPast && <em> angepfiffen</em>}</strong><small>{time.day} · <CountryFlag country={fixture.country} /> {fixture.country} · {fixture.league}</small>{(fixture.h2hNotice || fixture.warnings.length > 0) && <i>{fixture.h2hNotice ? "H2H" : "Daten"}</i>}{fixture.classGap && <ClassGapBadge gap={fixture.classGap} homeTeam={fixture.homeTeam} awayTeam={fixture.awayTeam} />}</span>
               </span>

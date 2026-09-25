@@ -362,6 +362,9 @@ export interface GoalLineRow {
   league: string;
   homeTeam: string;
   awayTeam: string;
+  /** Team-IDs von API-Football - darüber findet der Dashboard-Lauf das Team-Elo. */
+  homeTeamId?: number;
+  awayTeamId?: number;
   /**
    * Wappen-URLs von API-Football. Sie fehlen, wenn die Fixture-Antwort sie nicht führt, und
    * in jedem Lauf, der vor dieser Ergänzung entstanden ist; die App zeigt dann die Initialen.
