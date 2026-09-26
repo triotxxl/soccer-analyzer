@@ -1,6 +1,6 @@
 import { classifyMatch, type EloMatch } from "./elo-competitions.ts";
-import { ELO_CONFIG, type EloConfig, type EloSystem } from "./elo-config.ts";
-import { calculateHistoricalElo, expectedHome, teamKey } from "./elo.ts";
+import { ELO_CONFIG, ELO_TEAM_MERGES, type EloConfig, type EloSystem } from "./elo-config.ts";
+import { calculateHistoricalElo, expectedHome, mergeTeams, teamKey } from "./elo.ts";
 
 /**
  * Backtest des Team-Elo **ohne Blick in die Zukunft**.
@@ -111,7 +111,8 @@ export function backtestElo(
     while (index < testMatches.length && testMatches[index]!.kickoff < weekEnd) week.push(testMatches[index++]!);
     if (week.length === 0) continue;
     const state = calculateHistoricalElo(matches, config, { asOf: weekStart, lean: true });
-    for (const match of week) {
+    // Dieselben Team-IDs wie im Rechenkern, sonst fände ein Spiel unter einer alten ID sein Team nicht.
+    for (const match of week.map((raw) => mergeTeams(raw, ELO_TEAM_MERGES))) {
       const cls = classifyMatch(match);
       const group = groupOf(match);
       if (cls.excluded || group === null) continue;

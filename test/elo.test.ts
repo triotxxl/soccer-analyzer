@@ -349,6 +349,35 @@ test("ein doppelt geführtes Spiel zählt einmal, ein Team gegen sich selbst gar
   assert.ok(!state.teams.has(teamKey("club", 5)));
 });
 
+test("zusammengeführte Team-IDs ergeben eine Geschichte, mit Land und Ausnahme", () => {
+  // Wie AFC Malmö: 2023-2025 unter ID 300, seit 2026 unter 400. ID 500 teilt sich der Verein
+  // mit einem tunesischen Klub - nur die schwedischen Spiele und Testspiele gehören dazu.
+  const merges = [
+    { from: 300, to: 400, note: "alt" },
+    { from: 500, to: 400, countries: ["Sweden", "World"], exceptFixtures: [9003], note: "geteilt" }
+  ];
+  const sweden = { country: "Sweden", leagueId: 564, leagueName: "Ettan - Södra" };
+  const friendly = { country: "World", leagueId: 667, leagueName: "Friendlies Clubs", leagueType: "Cup" };
+  const matches = [
+    match({ fixtureId: 9001, homeId: 300, awayId: 1, homeGoals: 2, awayGoals: 0, homeName: "Ariana", kickoff: NOW - 400 * DAY, ...sweden }),
+    match({ fixtureId: 9002, homeId: 500, awayId: 2, homeGoals: 1, awayGoals: 1, homeName: "Ariana", kickoff: NOW - 200 * DAY, ...friendly }),
+    // Tunesischer Gegner im Testspiel: bleibt beim tunesischen Klub.
+    match({ fixtureId: 9003, homeId: 3, awayId: 500, homeGoals: 1, awayGoals: 0, awayName: "Ariana", kickoff: NOW - 150 * DAY, ...friendly }),
+    // Tunesische Liga: bleibt ebenfalls bei 500.
+    match({ fixtureId: 9004, homeId: 500, awayId: 4, homeGoals: 0, awayGoals: 0, homeName: "Ariana", kickoff: NOW - 100 * DAY, country: "Tunisia", leagueId: 828, leagueName: "Ligue 2" }),
+    match({ fixtureId: 9005, homeId: 400, awayId: 5, homeGoals: 3, awayGoals: 1, homeName: "AFC Malmo", kickoff: NOW - 10 * DAY, ...sweden })
+  ];
+  const state = calculateHistoricalElo(matches, PLAIN, { asOf: NOW, merges });
+  const malmo = state.teams.get(teamKey("club", 400))!;
+  assert.equal(malmo.games, 3);
+  assert.equal(malmo.name, "AFC Malmo");
+  assert.ok(!state.teams.has(teamKey("club", 300)));
+  assert.equal(state.teams.get(teamKey("club", 500))!.games, 2);
+  // Ohne Zusammenführung zerfällt dieselbe Geschichte in drei Teams.
+  const split = calculateHistoricalElo(matches, PLAIN, { asOf: NOW, merges: [] });
+  assert.equal(split.teams.get(teamKey("club", 400))!.games, 1);
+});
+
 test("mainLeague: ein Nebenwettbewerb zieht einen Verein nicht aus seiner Liga", () => {
   // Verein 1 spielt Serie A (Liga 100, zehn Spiele je Team), dann Staatsliga (Liga 500, drei je
   // Team) und danach im Pokal gegen Verein 31 aus Liga 200 - wie Palmeiras im Februar.

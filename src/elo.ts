@@ -1,5 +1,7 @@
 import { CONFEDERATION_OF_COMPETITION, classifyMatch, type Classification, type EloMatch } from "./elo-competitions.ts";
-import { ELO_CONFIG, type EloCompetitionKind, type EloConfig, type EloSystem, type EloSystemConfig } from "./elo-config.ts";
+import {
+  ELO_CONFIG, ELO_TEAM_MERGES, type EloCompetitionKind, type EloConfig, type EloSystem, type EloSystemConfig, type EloTeamMerge
+} from "./elo-config.ts";
 
 /**
  * Team-Elo, chronologisch aus abgeschlossenen Spielen gerechnet. Rein und ohne I/O: Der
@@ -181,10 +183,14 @@ export function movFactor(
  *   zu sagen. Nicht zusammengelegt wird über Wettbewerbe hinweg: PSG - Marseille stand im
  *   Februar 2013 binnen drei Tagen zweimal 2:0 im Bestand, in Liga und Pokal.
  * - Ein Team gegen sich selbst (interne Testspiele) fällt heraus.
+ * - **Zusammengeführte Team-IDs** (`ELO_TEAM_MERGES`) werden vorher umgehängt: Führt API-Football
+ *   einen Verein unter mehreren IDs, rechnet das Elo sonst mit mehreren „Teams" (AFC Malmö begann
+ *   im April 2026 beim Startwert, seine gut 120 Spiele davor lagen unter zwei alten IDs).
  */
-function prepare(matches: EloMatch[], state: EloState): Prepared[] {
+function prepare(matches: EloMatch[], state: EloState, merges: EloTeamMerge[]): Prepared[] {
   const classified: Prepared[] = [];
-  for (const match of matches) {
+  for (const original of matches) {
+    const match = mergeTeams(original, merges);
     const cls = classifyMatch(match);
     if (cls.excluded) {
       if (cls.reason === "jugendFrauen") state.counts.excludedYouthWomen += 1;
@@ -233,6 +239,18 @@ function prepare(matches: EloMatch[], state: EloState): Prepared[] {
     prepared.push(match);
   }
   return prepared;
+}
+
+/** Hängt ein Spiel auf die heutige Team-ID um, wenn eine Zusammenführung darauf passt. */
+export function mergeTeams(match: EloMatch, merges: EloTeamMerge[]): EloMatch {
+  let { homeId, awayId } = match;
+  for (const merge of merges) {
+    if (merge.exceptFixtures?.includes(match.fixtureId)) continue;
+    if (merge.countries && !merge.countries.includes(match.country)) continue;
+    if (homeId === merge.from) homeId = merge.to;
+    if (awayId === merge.from) awayId = merge.to;
+  }
+  return homeId === match.homeId && awayId === match.awayId ? match : { ...match, homeId, awayId };
 }
 
 /**
@@ -352,6 +370,10 @@ function run(
 
     const home = ensure(system, match.homeId, match.homeName, match);
     const away = ensure(system, match.awayId, match.awayName, match);
+    // Der jüngste Name gilt - nach einer Umbenennung oder Zusammenführung zeigt die Rangliste
+    // „AFC Malmo", nicht den Namen des ersten Spiels.
+    home.name = match.homeName;
+    away.name = match.awayName;
     state.leagues.set(match.leagueId, { name: match.leagueName, country: match.country });
 
     if (match.cls.isLeague && system === "club") {
@@ -504,7 +526,7 @@ function deriveTiers(
 export function calculateHistoricalElo(
   matches: EloMatch[],
   config: EloConfig = ELO_CONFIG,
-  options: { asOf?: number; lean?: boolean } = {}
+  options: { asOf?: number; lean?: boolean; merges?: EloTeamMerge[] } = {}
 ): EloState {
   const asOf = options.asOf ?? Date.now();
   const fresh = (): EloState => ({
@@ -513,7 +535,7 @@ export function calculateHistoricalElo(
   });
 
   const first = fresh();
-  const prepared = prepare(matches, first);
+  const prepared = prepare(matches, first, options.merges ?? ELO_TEAM_MERGES);
   const lengths = leagueLengths(prepared, asOf, config.leaguePropagation.sideCompetition.minMatches);
   const firstRatings = new Map<string, { all: number; rated: number[] }>();
   run(prepared, config, first, { record: false, log: false, tierOf: () => 1, lengths, firstRatings });

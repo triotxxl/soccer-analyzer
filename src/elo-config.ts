@@ -140,8 +140,8 @@ export interface EloConfig {
 
 export const ELO_CONFIG: EloConfig = {
   // 1.2.0 (26.09.2026): Spiele zwischen Verein und Nationalteam und doppelt geführte Spiele
-  // fallen heraus (`prepare` in src/elo.ts).
-  version: "1.2.0",
+  // fallen heraus (`prepare` in src/elo.ts). 1.2.1: `ELO_TEAM_MERGES` führt Team-IDs zusammen.
+  version: "1.2.1",
   club: {
     startRating: 1500,
     k: 30,
@@ -254,6 +254,38 @@ export const ELO_COMPETITIONS: {
   },
   neutral: [1, 4, 6, 7, 9, 22, 806, 21, 913, 19, 23, 24, 25, 28, 535, 804, 805, 807, 849, 859, 860, 1008, 15, 1168, 1186]
 };
+
+/**
+ * Ein Verein, den API-Football unter mehreren Team-IDs führt. Das Elo erkennt Mannschaften nur an
+ * der ID; ohne Zusammenführung zerfällt die Geschichte eines Vereins in mehrere „Teams", und das
+ * jüngste beginnt beim Startwert. Die meisten Umbenennungen behalten ihre ID (York United →
+ * Inter Toronto FC, Dépor FC → Atlético FC) und brauchen keinen Eintrag.
+ */
+export interface EloTeamMerge {
+  /** Die alte oder zusätzlich benutzte ID. */
+  from: number;
+  /** Die ID, unter der API-Football den Verein heute führt. */
+  to: number;
+  /** Nur Spiele in Wettbewerben dieser Länder; „World" sind Testspiele und internationale Wettbewerbe. */
+  countries?: string[];
+  /** Einzelne Spiele, die trotzdem bei `from` bleiben. */
+  exceptFixtures?: number[];
+  note: string;
+}
+
+/** Gefunden über gleiche Liga, gleiche Gegner und nahtlos anschließende Spielpläne - nicht geraten. */
+export const ELO_TEAM_MERGES: EloTeamMerge[] = [
+  {
+    from: 21435, to: 27669,
+    note: "Ariana FC Malmö 2023-2025 (Ettan Södra), seit der Umbenennung vom 31.05.2025 AFC Malmö unter 27669"
+  },
+  {
+    // Dieselbe ID trägt seit Oktober 2023 auch AS Ariana aus Tunesien (Ligue 2, Pokal, ein
+    // Testspiel gegen Club Africain). Nur die schwedischen Spiele und Testspiele gehören zu Malmö.
+    from: 10598, to: 27669, countries: ["Sweden", "World"], exceptFixtures: [1501344],
+    note: "Ariana FC Malmö 2022 (Division 2) und Vorbereitungsspiele bis März 2026"
+  }
+];
 
 /**
  * Dasselbe für Teamnamen: Frauenligen heißen nicht immer so („Damallsvenskan"), ihre Teams bei

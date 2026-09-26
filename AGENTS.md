@@ -527,6 +527,16 @@ nachgezogen, nicht gesammelt am Ende.
      Δ Elo in der Heatmap sagt jetzt, dass der Heimvorteil (rund 60) nicht eingerechnet ist.
   Die Vereinswerte bewegen sich dadurch kaum (Median 0,0, 99 % unter 1,2 Punkten, größte
   Änderung 22,8); Vietnam und El Salvador verlieren die Punkte aus Spielen gegen Vereine.
+- **Zusammengeführte Team-IDs (`ELO_TEAM_MERGES` in `src/elo-config.ts`, seit 1.2.1):** Das Elo
+  kennt Mannschaften nur an der Team-ID. Legt API-Football für einen Verein eine neue ID an,
+  zerfällt seine Geschichte, und die jüngste ID beginnt beim Startwert. Die Liste hängt alte IDs
+  um, wahlweise nur für Wettbewerbe bestimmter Länder und mit einzelnen Ausnahmen. Erster Fall
+  AFC Malmö (ehemals Ariana FC): 21435 ganz, 10598 nur schwedische Spiele und Testspiele, weil
+  dieselbe ID seit 2023 auch AS Ariana aus Tunesien trägt; vorher 1555 aus 24 Spielen bei 34 %
+  Vertrauen, danach 1569 aus 158 Spielen bei 86 %. Die meisten Umbenennungen behalten ihre ID
+  (York United → Inter Toronto FC, Dépor FC → Atlético FC) und brauchen keinen Eintrag. Neue
+  Einträge nur mit Beleg: gleiche Liga, gleiche Gegner, nahtlos anschließende Spielpläne. Die
+  Rangliste zeigt seitdem den jüngsten Namen eines Teams, nicht den seines ersten Spiels.
 - **Gefunden, gemessen, nicht übernommen (26.09.2026):** Die Liga-Mitnahme folgt der Liga des
   letzten Ligaspiels. API-Football führt aber auch parallele Wettbewerbe als Liga
   (brasilianische Staatsmeisterschaften, „USL League One Cup", eigene Play-off-Ligen). In
