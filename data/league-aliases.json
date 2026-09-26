@@ -69,6 +69,11 @@
     "country": "World",
     "league": "Africa Cup of Nations - Qualification"
   },
+  "africa cup of nations|qualifikation gruppe d": {
+    "leagueId": 36,
+    "country": "World",
+    "league": "Africa Cup of Nations - Qualification"
+  },
   "agypten|2nd division a": {
     "leagueId": 887,
     "country": "Egypt",
@@ -414,6 +419,26 @@
     "country": "World",
     "league": "CONCACAF Nations League"
   },
+  "concacaf nations league|league b gruppe d": {
+    "leagueId": 536,
+    "country": "World",
+    "league": "CONCACAF Nations League"
+  },
+  "concacaf nations league|league c gruppe a": {
+    "leagueId": 536,
+    "country": "World",
+    "league": "CONCACAF Nations League"
+  },
+  "concacaf nations league|league c gruppe b": {
+    "leagueId": 536,
+    "country": "World",
+    "league": "CONCACAF Nations League"
+  },
+  "concacaf nations league|league c gruppe c": {
+    "leagueId": 536,
+    "country": "World",
+    "league": "CONCACAF Nations League"
+  },
   "conference league|qualifikationsrunde": {
     "leagueId": 848,
     "country": "World",
@@ -699,6 +724,21 @@
     "country": "Georgia",
     "league": "Erovnuli Liga"
   },
+  "griechenland|gamma ethniki gr 4": {
+    "leagueId": 579,
+    "country": "Greece",
+    "league": "Gamma Ethniki - Group 4"
+  },
+  "griechenland|gamma ethniki gr 5": {
+    "leagueId": 580,
+    "country": "Greece",
+    "league": "Gamma Ethniki - Group 5"
+  },
+  "griechenland|gamma ethniki gr 6": {
+    "leagueId": 581,
+    "country": "Greece",
+    "league": "Gamma Ethniki - Group 6"
+  },
   "griechenland|pokal hauptrunde": {
     "leagueId": 199,
     "country": "Greece",
@@ -889,6 +929,11 @@
     "country": "Italy",
     "league": "Serie A"
   },
+  "italien|serie a frauen": {
+    "leagueId": 139,
+    "country": "Italy",
+    "league": "Serie A Women"
+  },
   "japan|emperor pokal": {
     "leagueId": 102,
     "country": "Japan",
@@ -1024,6 +1069,11 @@
     "country": "Morocco",
     "league": "Botola Pro"
   },
+  "marokko|botola 2": {
+    "leagueId": 201,
+    "country": "Morocco",
+    "league": "Botola 2"
+  },
   "mexiko|liga de expansion mx apertura": {
     "leagueId": 263,
     "country": "Mexico",
@@ -1058,6 +1108,11 @@
     "leagueId": 954,
     "country": "New-Zealand",
     "league": "National League - Central"
+  },
+  "neuseeland|national league": {
+    "leagueId": 955,
+    "country": "New-Zealand",
+    "league": "National League - National"
   },
   "neuseeland|northern league": {
     "leagueId": 956,
@@ -1144,11 +1199,6 @@
     "country": "Austria",
     "league": "Cup"
   },
-  "panama|liga prom apertura": {
-    "leagueId": 304,
-    "country": "Panama",
-    "league": "Liga Panameña de Fútbol"
-  },
   "panama|lpf apertura": {
     "leagueId": 304,
     "country": "Panama",
@@ -1175,6 +1225,16 @@
     "league": "Segunda División"
   },
   "peru|segunda division gruppe b": {
+    "leagueId": 282,
+    "country": "Peru",
+    "league": "Segunda División"
+  },
+  "peru|segunda division hauptrunde gruppe a": {
+    "leagueId": 282,
+    "country": "Peru",
+    "league": "Segunda División"
+  },
+  "peru|segunda division hauptrunde gruppe c": {
     "leagueId": 282,
     "country": "Peru",
     "league": "Segunda División"
@@ -1504,10 +1564,35 @@
     "country": "Tunisia",
     "league": "Ligue 1"
   },
+  "tunesien|ligue 2 gruppe a": {
+    "leagueId": 828,
+    "country": "Tunisia",
+    "league": "Ligue 2"
+  },
   "turkei|1 lig": {
     "leagueId": 204,
     "country": "Turkey",
     "league": "1. Lig"
+  },
+  "turkei|2 lig beyaz grup": {
+    "leagueId": 205,
+    "country": "Turkey",
+    "league": "2. Lig"
+  },
+  "turkei|2 lig kirmizi grup": {
+    "leagueId": 205,
+    "country": "Turkey",
+    "league": "2. Lig"
+  },
+  "u21 europameisterschaft|u21 em quali gr f": {
+    "leagueId": 850,
+    "country": "World",
+    "league": "UEFA U21 Championship - Qualification"
+  },
+  "u21 europameisterschaft|u21 em quali gr h": {
+    "leagueId": 850,
+    "country": "World",
+    "league": "UEFA U21 Championship - Qualification"
   },
   "uefa champions league frauen|champions league ligaphase frauen": {
     "leagueId": 525,
@@ -1523,6 +1608,56 @@
     "leagueId": 1191,
     "country": "World",
     "league": "UEFA Europa Cup - Women"
+  },
+  "uefa nations league|league a gruppe 2": {
+    "leagueId": 5,
+    "country": "World",
+    "league": "UEFA Nations League"
+  },
+  "uefa nations league|league a gruppe 3": {
+    "leagueId": 5,
+    "country": "World",
+    "league": "UEFA Nations League"
+  },
+  "uefa nations league|league a gruppe 4": {
+    "leagueId": 5,
+    "country": "World",
+    "league": "UEFA Nations League"
+  },
+  "uefa nations league|league b gruppe 1": {
+    "leagueId": 5,
+    "country": "World",
+    "league": "UEFA Nations League"
+  },
+  "uefa nations league|league b gruppe 3": {
+    "leagueId": 5,
+    "country": "World",
+    "league": "UEFA Nations League"
+  },
+  "uefa nations league|league c gruppe 1": {
+    "leagueId": 5,
+    "country": "World",
+    "league": "UEFA Nations League"
+  },
+  "uefa nations league|league c gruppe 3": {
+    "leagueId": 5,
+    "country": "World",
+    "league": "UEFA Nations League"
+  },
+  "uefa nations league|league c gruppe 4": {
+    "leagueId": 5,
+    "country": "World",
+    "league": "UEFA Nations League"
+  },
+  "uefa nations league|league d gruppe 1": {
+    "leagueId": 5,
+    "country": "World",
+    "league": "UEFA Nations League"
+  },
+  "uefa nations league|league d gruppe 2": {
+    "leagueId": 5,
+    "country": "World",
+    "league": "UEFA Nations League"
   },
   "uefa nations league|uefa nations league a gruppe 1": {
     "leagueId": 5,
