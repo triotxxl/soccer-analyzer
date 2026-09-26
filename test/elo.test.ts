@@ -216,8 +216,8 @@ test("die Liga-Mitnahme verschiebt die ganze Liga, nicht nur das Team, das gespi
     league(1, 2, 100, 30), league(11, 12, 200, 30),
     match({ homeId: 1, awayId: 11, homeGoals: 2, awayGoals: 0, leagueId: 300, leagueName: "Pokal", leagueType: "Cup", kickoff: NOW - 20 * DAY })
   ];
-  const on = calculateHistoricalElo(matches, { ...PLAIN, leaguePropagation: { share: 0.3 } }, { asOf: NOW });
-  const off = calculateHistoricalElo(matches, { ...PLAIN, leaguePropagation: { share: 0 } }, { asOf: NOW });
+  const on = calculateHistoricalElo(matches, { ...PLAIN, leaguePropagation: { ...ELO_CONFIG.leaguePropagation, share: 0.3 } }, { asOf: NOW });
+  const off = calculateHistoricalElo(matches, { ...PLAIN, leaguePropagation: { ...ELO_CONFIG.leaguePropagation, share: 0 } }, { asOf: NOW });
   const rating = (state: typeof on, id: number) => state.teams.get(teamKey("club", id))!.rating;
   const cup = on.history.find((row) => row.leagueId === 300)!;
   const gain = cup.homeEloAfter - cup.homeEloBefore;
@@ -248,7 +248,7 @@ test("ohne belastbare Ratings wird keine Ligaebene vergeben - keine zufällige A
   assert.notEqual(state.tiers.get("200|2026"), 2);
   assert.notEqual(state.tiers.get("200|2026"), 3);
   // Mit dem Einstieg der Vorgabe hat 2025 noch kein Team zehn gewichtete Spiele: keine Ebene.
-  const strict = calculateHistoricalElo(matches, { ...ELO_CONFIG, leaguePropagation: { share: 0 } }, { asOf: NOW });
+  const strict = calculateHistoricalElo(matches, { ...ELO_CONFIG, leaguePropagation: { ...ELO_CONFIG.leaguePropagation, share: 0 } }, { asOf: NOW });
   assert.equal(strict.tiers.get("100|2025"), undefined);
   assert.equal(strict.tiers.get("200|2025"), undefined);
 });
@@ -261,7 +261,7 @@ test("die Historie ist lückenlos: nachher + Liga-Mitnahme = nächstes vorher", 
     match({ homeId: 1, awayId: 11, homeGoals: 2, awayGoals: 0, leagueId: 300, leagueName: "Pokal", leagueType: "Cup", kickoff: NOW - 20 * DAY }),
     league(2, 1, 100, 10)
   ];
-  const state = calculateHistoricalElo(matches, { ...PLAIN, leaguePropagation: { share: 0.3 } }, { asOf: NOW });
+  const state = calculateHistoricalElo(matches, { ...PLAIN, leaguePropagation: { ...ELO_CONFIG.leaguePropagation, share: 0.3 } }, { asOf: NOW });
   const first = state.history.find((row) => row.kickoff === NOW - 30 * DAY && row.leagueId === 100)!;
   const next = state.history.find((row) => row.kickoff === NOW - 10 * DAY)!;
   // Team 2 hat das Pokalspiel nicht gespielt, aber über die Mitnahme gewonnen.
@@ -282,7 +282,7 @@ test("die Rangliste nennt die aktuelle Liga eines Aufsteigers, nicht die häufig
 });
 
 test("stark verfallene alte Spiele verbrauchen den Einstieg nicht", () => {
-  const config: EloConfig = { ...ELO_CONFIG, leaguePropagation: { share: 0 }, newTeamStart: { mode: "fixed", minRated: 5 }, mov: { ...ELO_CONFIG.mov, enabled: false } };
+  const config: EloConfig = { ...ELO_CONFIG, leaguePropagation: { ...ELO_CONFIG.leaguePropagation, share: 0 }, newTeamStart: { mode: "fixed", minRated: 5 }, mov: { ...ELO_CONFIG.mov, enabled: false } };
   const matches: EloMatch[] = [];
   // Zwölf Spiele vor gut vier Jahren: je 7,5 % K, zusammen weniger als ein volles Spiel.
   for (let i = 0; i < 12; i += 1) {
@@ -302,9 +302,99 @@ test("Änderungen über 30 und 90 Tage enthalten die Liga-Mitnahme", () => {
     league(1, 2, 100, 120), league(11, 12, 200, 120),
     match({ homeId: 1, awayId: 11, homeGoals: 3, awayGoals: 0, leagueId: 300, leagueName: "Pokal", leagueType: "Cup", kickoff: NOW - 10 * DAY })
   ];
-  const rows = summarizeElo(calculateHistoricalElo(matches, { ...PLAIN, leaguePropagation: { share: 0.3 } }, { asOf: NOW }));
+  const rows = summarizeElo(calculateHistoricalElo(matches, { ...PLAIN, leaguePropagation: { ...ELO_CONFIG.leaguePropagation, share: 0.3 } }, { asOf: NOW }));
   const mate = rows.find((row) => row.teamId === 2)!;
   // Team 2 hat seit 120 Tagen nicht gespielt, ist aber über die Mitnahme gestiegen.
   assert.ok(mate.change30 > 0);
   assert.ok(Math.abs(mate.change30 - mate.change90) < 1e-9);
+});
+
+test("ein Spiel zwischen Verein und Nationalteam zählt in keinem System", () => {
+  // API-Football legt solche Testspiele unter „Friendlies" (10) ab - Hull City gegen Curaçao -, und
+  // umgekehrt stehen Nationalteam-IDs in „Friendlies Clubs" (667).
+  const qualifier = { leagueId: 32, leagueName: "World Cup - Qualification Europe", leagueType: "Cup", country: "World" };
+  const matches = [
+    match({ homeId: 1, awayId: 2, homeGoals: 1, awayGoals: 0, kickoff: NOW - 40 * DAY }),
+    match({ homeId: 50, awayId: 51, homeGoals: 2, awayGoals: 0, kickoff: NOW - 30 * DAY, ...qualifier }),
+    match({ homeId: 1, awayId: 50, homeGoals: 0, awayGoals: 1, kickoff: NOW - 20 * DAY, leagueId: 10, leagueName: "Friendlies", leagueType: "Cup", country: "World" }),
+    match({ homeId: 2, awayId: 51, homeGoals: 3, awayGoals: 1, kickoff: NOW - 19 * DAY, leagueId: 667, leagueName: "Friendlies Clubs", leagueType: "Cup", country: "World" }),
+    // Ein Länderspiel unter Nationalteams bleibt ein Länderspiel.
+    match({ homeId: 51, awayId: 50, homeGoals: 1, awayGoals: 1, kickoff: NOW - 10 * DAY, leagueId: 10, leagueName: "Friendlies", leagueType: "Cup", country: "World" })
+  ];
+  const state = calculateHistoricalElo(matches, PLAIN, { asOf: NOW });
+  assert.equal(state.counts.excludedMixed, 2);
+  assert.ok(!state.teams.has(teamKey("national", 1)));
+  assert.ok(!state.teams.has(teamKey("club", 50)));
+  assert.ok(!state.teams.has(teamKey("club", 51)));
+  assert.equal(state.teams.get(teamKey("national", 50))!.games, 2);
+});
+
+test("ein doppelt geführtes Spiel zählt einmal, ein Team gegen sich selbst gar nicht", () => {
+  const cup = { leagueId: 300, leagueName: "Pokal", leagueType: "Cup" };
+  const matches = [
+    match({ homeId: 1, awayId: 2, homeGoals: 2, awayGoals: 0, kickoff: NOW - 20 * DAY }),
+    // Dasselbe Spiel unter zweiter ID, eine halbe Stunde später angesetzt.
+    match({ homeId: 1, awayId: 2, homeGoals: 2, awayGoals: 0, kickoff: NOW - 20 * DAY + 30 * 60 * 1000 }),
+    // Drei Tage später im Pokal, gleicher Stand: ein zweites, echtes Spiel.
+    match({ homeId: 1, awayId: 2, homeGoals: 2, awayGoals: 0, kickoff: NOW - 17 * DAY, ...cup }),
+    // Anderer Stand am selben Tag: Welches stimmt, ist nicht zu sagen - beide bleiben.
+    match({ homeId: 3, awayId: 4, homeGoals: 1, awayGoals: 1, kickoff: NOW - 10 * DAY }),
+    match({ homeId: 3, awayId: 4, homeGoals: 2, awayGoals: 1, kickoff: NOW - 10 * DAY }),
+    match({ homeId: 5, awayId: 5, homeGoals: 1, awayGoals: 0, kickoff: NOW - 5 * DAY })
+  ];
+  const state = calculateHistoricalElo(matches, PLAIN, { asOf: NOW });
+  assert.equal(state.counts.excludedDuplicate, 2);
+  assert.equal(state.history.length, 4);
+  assert.equal(state.teams.get(teamKey("club", 1))!.games, 2);
+  assert.ok(!state.teams.has(teamKey("club", 5)));
+});
+
+test("mainLeague: ein Nebenwettbewerb zieht einen Verein nicht aus seiner Liga", () => {
+  // Verein 1 spielt Serie A (Liga 100, zehn Spiele je Team), dann Staatsliga (Liga 500, drei je
+  // Team) und danach im Pokal gegen Verein 31 aus Liga 200 - wie Palmeiras im Februar.
+  const config = (membership: "lastLeague" | "mainLeague"): EloConfig => ({
+    ...PLAIN,
+    leaguePropagation: { share: 0.3, membership, sideCompetition: { ratio: 0.5, stickyDays: 180, minMatches: 5 } }
+  });
+  const scenario = (stateLeagueDay: number, cupDay: number) => {
+    const matches: EloMatch[] = [];
+    let day = 300;
+    const roundRobin = (teams: number[], leagueId: number, twice: boolean, start: number) => {
+      let d = start;
+      teams.forEach((home, i) => teams.forEach((away, j) => {
+        if (home !== away && (twice || i < j)) {
+          matches.push(match({ homeId: home, awayId: away, homeGoals: 1, awayGoals: 1, leagueId, leagueName: `Liga ${leagueId}`, kickoff: NOW - d-- * DAY }));
+        }
+      }));
+    };
+    roundRobin([1, 2, 3, 4, 5, 6], 100, true, day);
+    day -= 40;
+    roundRobin([31, 32, 33, 34], 200, false, day);
+    roundRobin([1, 2, 21, 22], 500, false, stateLeagueDay);
+    const cup = match({ homeId: 1, awayId: 31, homeGoals: 3, awayGoals: 0, leagueId: 300, leagueName: "Pokal", leagueType: "Cup", kickoff: NOW - cupDay * DAY });
+    return { matches, cup };
+  };
+  // Was das Pokalspiel an Team 3 (nur Serie A) und Team 21 (nur Staatsliga) weitergibt, gemessen
+  // gegen denselben Bestand ohne das Pokalspiel - relativ zum Gewinn von Verein 1.
+  const passedOn = (membership: "lastLeague" | "mainLeague", stateLeagueDay: number, cupDay: number) => {
+    const { matches, cup } = scenario(stateLeagueDay, cupDay);
+    const withCup = calculateHistoricalElo([...matches, cup], config(membership), { asOf: NOW });
+    const without = calculateHistoricalElo(matches, config(membership), { asOf: NOW });
+    const row = withCup.history.find((entry) => entry.leagueId === 300)!;
+    const gain = row.homeEloAfter - row.homeEloBefore;
+    const shift = (id: number) => (withCup.teams.get(teamKey("club", id))!.rating - without.teams.get(teamKey("club", id))!.rating) / gain;
+    return { serieA: shift(3), stateOnly: shift(21) };
+  };
+  // Staatsliga 150 Tage nach der Serie A: Mit mainLeague bleibt Verein 1 in der Serie A.
+  const main = passedOn("mainLeague", 150, 100);
+  assert.ok(Math.abs(main.serieA - 0.3) < 1e-9, String(main.serieA));
+  assert.equal(main.stateOnly, 0);
+  // Bisher zog das letzte Ligaspiel ihn in die Staatsliga.
+  const last = passedOn("lastLeague", 150, 100);
+  assert.equal(last.serieA, 0);
+  assert.ok(Math.abs(last.stateOnly - 0.3) < 1e-9, String(last.stateOnly));
+  // Nach mehr als 180 Tagen ohne Serie-A-Spiel gilt die kürzere Liga doch - wie nach einem Abstieg.
+  const relegated = passedOn("mainLeague", 60, 20);
+  assert.equal(relegated.serieA, 0);
+  assert.ok(Math.abs(relegated.stateOnly - 0.3) < 1e-9, String(relegated.stateOnly));
 });

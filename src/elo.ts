@@ -14,8 +14,9 @@ import { ELO_CONFIG, type EloCompetitionKind, type EloConfig, type EloSystem, ty
  * - `Elo_neu = Elo_alt + K_eff × (Ergebnis − E)`
  * - `K_eff = K × Wettbewerb × Zeit-Decay × Tordifferenz × Einstieg`, je Team.
  * - **Zeit-Decay** bezieht sich auf den Stichtag `asOf`, nicht auf das Spieldatum allein: Ein
- *   Spiel vor 20 Monaten wirkt mit 40 % seines K. Der Faktor senkt also den Einfluss des
- *   Spiels auf die Aktualisierung, er wird nicht nachträglich auf das fertige Elo gelegt.
+ *   Vereinsspiel vor 20 Monaten wirkt mit 80 % seines K (Staffel in `ELO_CONFIG`). Der Faktor
+ *   senkt also den Einfluss des Spiels auf die Aktualisierung, er wird nicht nachträglich auf
+ *   das fertige Elo gelegt.
  *   Folge: Dieselben Spiele ergeben an einem anderen Stichtag ein anderes Rating. Der Backtest
  *   rechnet deshalb je Testwoche neu.
  * - **Tordifferenz** (angelehnt an FiveThirtyEight, auf 1 Tor = 1 normiert):
@@ -39,12 +40,16 @@ import { ELO_CONFIG, type EloCompetitionKind, type EloConfig, type EloSystem, ty
  *   das nicht bestimmbar ist (zu wenige belastbare Teams, etwa am Anfang der Daten oder in
  *   Auf-/Abstiegsrunden), gilt Ebene 1 - also keine Abwertung. Es gibt keinen fest
  *   eingetragenen Ligabonus.
+ * - **Bereinigung** vor dem Rechnen (`prepare`): Spiele zwischen Verein und Nationalteam und
+ *   doppelt geführte Spiele fallen heraus, siehe dort.
  */
 
 const MONTH_MS = 30.4375 * 24 * 60 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
 /** Wer länger nicht gespielt hat, wird von der Liga-Mitnahme nicht mehr bewegt. */
 const PROPAGATION_ACTIVE_MS = 400 * DAY_MS;
+/** Dasselbe Spiel unter zwei Fixture-IDs liegt bei API-Football höchstens Stunden auseinander. */
+const DUPLICATE_WINDOW_MS = DAY_MS;
 
 type Prepared = EloMatch & { cls: Extract<Classification, { excluded: false }> };
 
@@ -123,7 +128,16 @@ export interface EloState {
   leagues: Map<number, { name: string; country: string }>;
   /** Stand aller Ratings zu den Zeitpunkten in `snapshotAt` - für Änderungen über 30/90 Tage. */
   snapshots: Map<number, Map<string, number>>;
-  counts: { used: number; excludedYouthWomen: number; excludedUnknown: number; tooOld: number };
+  counts: {
+    used: number;
+    excludedYouthWomen: number;
+    excludedUnknown: number;
+    /** Verein gegen Nationalteam, siehe `prepare`. */
+    excludedMixed: number;
+    /** Doppelt geführt oder Team gegen sich selbst, siehe `prepare`. */
+    excludedDuplicate: number;
+    tooOld: number;
+  };
 }
 
 export const teamKey = (system: EloSystem, teamId: number) => `${system}:${teamId}`;
@@ -149,8 +163,27 @@ export function movFactor(
   return Math.min(config.cap, raw);
 }
 
+/**
+ * Ordnet jedes Spiel ein und bereinigt den Bestand, chronologisch sortiert.
+ *
+ * - Frauen-, Jugend- und unbekannte Wettbewerbe fallen heraus (`classifyMatch`).
+ * - **Verein gegen Nationalteam** fällt heraus. API-Football legt solche Testspiele unter
+ *   „Friendlies" (10) ab - Hull City gegen Curaçao, LAFC gegen El Salvador -, und umgekehrt
+ *   stehen Nationalteam-IDs in „Friendlies Clubs" (667), etwa Cheshunt gegen „Romania". Bis
+ *   Version 1.1.0 bekamen so 13 Vereine ein zweites Elo als Nationalteam (Hull City 1488 aus
+ *   einem Spiel neben 2072), und Nationalteams wurden gegen Vereine bewertet, als wären es
+ *   Nationalteams bei 1500. Welcher Art ein Team ist, zeigen seine **Pflichtspiele**: mehr im
+ *   Vereins- als im Nationalteam-Betrieb heißt Verein. Testspiele zählen dafür nicht - sie sind
+ *   gerade das Problem. Gezählt wird nur vor `asOf`, der Backtest sieht nichts aus der Zukunft.
+ * - **Doppelt geführte Spiele** fallen heraus: derselbe Wettbewerb, dieselbe Paarung und derselbe
+ *   Endstand binnen 24 Stunden unter zwei Fixture-IDs (191 am 26.09.2026, 164 davon
+ *   Vereins-Testspiele). Unterscheidet sich der Stand, bleiben beide - welcher stimmt, ist nicht
+ *   zu sagen. Nicht zusammengelegt wird über Wettbewerbe hinweg: PSG - Marseille stand im
+ *   Februar 2013 binnen drei Tagen zweimal 2:0 im Bestand, in Liga und Pokal.
+ * - Ein Team gegen sich selbst (interne Testspiele) fällt heraus.
+ */
 function prepare(matches: EloMatch[], state: EloState): Prepared[] {
-  const prepared: Prepared[] = [];
+  const classified: Prepared[] = [];
   for (const match of matches) {
     const cls = classifyMatch(match);
     if (cls.excluded) {
@@ -158,9 +191,74 @@ function prepare(matches: EloMatch[], state: EloState): Prepared[] {
       else state.counts.excludedUnknown += 1;
       continue;
     }
-    prepared.push({ ...match, cls });
+    classified.push({ ...match, cls });
   }
-  return prepared.sort((left, right) => left.kickoff - right.kickoff || left.fixtureId - right.fixtureId);
+  classified.sort((left, right) => left.kickoff - right.kickoff || left.fixtureId - right.fixtureId);
+
+  const competitive = new Map<number, { club: number; national: number }>();
+  for (const match of classified) {
+    if (match.kickoff >= state.asOf) break;
+    if (match.cls.kind === "clubFriendly" || match.cls.kind === "nationalFriendly") continue;
+    for (const teamId of [match.homeId, match.awayId]) {
+      const entry = competitive.get(teamId) ?? { club: 0, national: 0 };
+      entry[match.cls.system] += 1;
+      competitive.set(teamId, entry);
+    }
+  }
+  const systemOf = (teamId: number): EloSystem | null => {
+    const entry = competitive.get(teamId);
+    if (!entry || entry.club === entry.national) return null;
+    return entry.club > entry.national ? "club" : "national";
+  };
+
+  const lastSeen = new Map<string, number>();
+  const prepared: Prepared[] = [];
+  for (const match of classified) {
+    if (match.homeId === match.awayId) {
+      state.counts.excludedDuplicate += 1;
+      continue;
+    }
+    const key = `${match.leagueId}|${match.homeId}|${match.awayId}|${match.homeGoals}|${match.awayGoals}`;
+    const previous = lastSeen.get(key);
+    if (previous !== undefined && match.kickoff - previous <= DUPLICATE_WINDOW_MS) {
+      state.counts.excludedDuplicate += 1;
+      continue;
+    }
+    lastSeen.set(key, match.kickoff);
+    const other: EloSystem = match.cls.system === "club" ? "national" : "club";
+    if (systemOf(match.homeId) === other || systemOf(match.awayId) === other) {
+      state.counts.excludedMixed += 1;
+      continue;
+    }
+    prepared.push(match);
+  }
+  return prepared;
+}
+
+/**
+ * Wie viele Ligaspiele ein Team in der vollsten Saison einer Liga im Schnitt bestreitet - nur
+ * Saisons mit mindestens `minMatches` Spielen, nur vor `asOf`. Daran erkennt `mainLeague` einen
+ * Nebenwettbewerb (Staatsliga rund 13 Spiele je Team, Serie A 38).
+ */
+function leagueLengths(prepared: Prepared[], asOf: number, minMatches: number): Map<number, number> {
+  const seasons = new Map<string, { leagueId: number; matches: number; teams: Set<number> }>();
+  for (const match of prepared) {
+    if (match.kickoff >= asOf) break;
+    if (!match.cls.isLeague) continue;
+    const key = `${match.leagueId}|${match.season}`;
+    const season = seasons.get(key) ?? { leagueId: match.leagueId, matches: 0, teams: new Set<number>() };
+    season.matches += 1;
+    season.teams.add(match.homeId);
+    season.teams.add(match.awayId);
+    seasons.set(key, season);
+  }
+  const lengths = new Map<number, number>();
+  for (const season of seasons.values()) {
+    if (season.matches < minMatches) continue;
+    const perTeam = (2 * season.matches) / season.teams.size;
+    lengths.set(season.leagueId, Math.max(lengths.get(season.leagueId) ?? 0, perTeam));
+  }
+  return lengths;
 }
 
 const TIER_KIND: Record<1 | 2 | 3, EloCompetitionKind> = { 1: "leagueTier1", 2: "leagueTier2", 3: "leagueTier3" };
@@ -173,6 +271,8 @@ function run(
     record: boolean;
     log: boolean;
     tierOf: (match: Prepared) => 1 | 2 | 3;
+    /** Spiele je Team in der vollsten Saison einer Liga, siehe `leagueLengths`. */
+    lengths: Map<number, number>;
     firstRatings?: Map<string, { all: number; rated: number[] }>;
     snapshotAt?: number[];
   }
@@ -184,14 +284,31 @@ function run(
   };
   // Welche Teams in welchem Ligawettbewerb schon gespielt haben - für den Startwert neuer Teams.
   const leagueMembers = new Map<number, Set<string>>();
-  // Die aktuelle Liga je Team (letztes Ligaspiel) und umgekehrt - für die Liga-Mitnahme.
+  // Die aktuelle Liga je Team und umgekehrt - für die Liga-Mitnahme. Mit `lastLeague` ist das
+  // die Liga des letzten Ligaspiels; mit `mainLeague` zieht ein Nebenwettbewerb nicht ab.
   const currentLeague = new Map<string, number>();
   const currentMembers = new Map<number, Set<string>>();
-  const moveTo = (key: string, leagueId: number) => {
+  const lastInCurrent = new Map<string, number>();
+  const { membership, sideCompetition } = config.leaguePropagation;
+  const isSideCompetition = (candidate: number, current: number) => {
+    const candidateLength = options.lengths.get(candidate);
+    const currentLength = options.lengths.get(current);
+    return candidateLength !== undefined && currentLength !== undefined
+      && candidateLength < sideCompetition.ratio * currentLength;
+  };
+  const moveTo = (key: string, leagueId: number, kickoff: number) => {
     const previous = currentLeague.get(key);
-    if (previous === leagueId) return;
+    if (previous === leagueId) {
+      lastInCurrent.set(key, kickoff);
+      return;
+    }
+    if (
+      previous !== undefined && membership === "mainLeague" && isSideCompetition(leagueId, previous)
+      && kickoff - lastInCurrent.get(key)! <= sideCompetition.stickyDays * DAY_MS
+    ) return;
     if (previous !== undefined) currentMembers.get(previous)?.delete(key);
     currentLeague.set(key, leagueId);
+    lastInCurrent.set(key, kickoff);
     const members = currentMembers.get(leagueId) ?? new Set<string>();
     members.add(key);
     currentMembers.set(leagueId, members);
@@ -238,8 +355,8 @@ function run(
     state.leagues.set(match.leagueId, { name: match.leagueName, country: match.country });
 
     if (match.cls.isLeague && system === "club") {
-      moveTo(teamKey(system, home.teamId), match.leagueId);
-      moveTo(teamKey(system, away.teamId), match.leagueId);
+      moveTo(teamKey(system, home.teamId), match.leagueId, match.kickoff);
+      moveTo(teamKey(system, away.teamId), match.leagueId, match.kickoff);
     }
     if (match.cls.isLeague) {
       const members = leagueMembers.get(match.leagueId) ?? new Set<string>();
@@ -392,24 +509,26 @@ export function calculateHistoricalElo(
   const asOf = options.asOf ?? Date.now();
   const fresh = (): EloState => ({
     asOf, config, teams: new Map(), history: [], tiers: new Map(), leagues: new Map(), snapshots: new Map(),
-    counts: { used: 0, excludedYouthWomen: 0, excludedUnknown: 0, tooOld: 0 }
+    counts: { used: 0, excludedYouthWomen: 0, excludedUnknown: 0, excludedMixed: 0, excludedDuplicate: 0, tooOld: 0 }
   });
 
   const first = fresh();
   const prepared = prepare(matches, first);
+  const lengths = leagueLengths(prepared, asOf, config.leaguePropagation.sideCompetition.minMatches);
   const firstRatings = new Map<string, { all: number; rated: number[] }>();
-  run(prepared, config, first, { record: false, log: false, tierOf: () => 1, firstRatings });
+  run(prepared, config, first, { record: false, log: false, tierOf: () => 1, lengths, firstRatings });
   const tiers = deriveTiers(prepared, firstRatings, config.tiers);
 
   const state = fresh();
-  state.counts.excludedYouthWomen = first.counts.excludedYouthWomen;
-  state.counts.excludedUnknown = first.counts.excludedUnknown;
+  const { excludedYouthWomen, excludedUnknown, excludedMixed, excludedDuplicate } = first.counts;
+  Object.assign(state.counts, { excludedYouthWomen, excludedUnknown, excludedMixed, excludedDuplicate });
   state.tiers = tiers;
   run(prepared, config, state, {
     record: !options.lean,
     log: !options.lean,
     snapshotAt: options.lean ? [] : [asOf - 30 * DAY_MS, asOf - 90 * DAY_MS],
-    tierOf: (match) => tiers.get(`${match.leagueId}|${match.season}`) ?? 1
+    tierOf: (match) => tiers.get(`${match.leagueId}|${match.season}`) ?? 1,
+    lengths
   });
   return state;
 }

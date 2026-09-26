@@ -915,3 +915,69 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .quickpick-footer .quickpick-cart-note { color: #c8a978; font-size: 10px; white-space: nowrap; }
 .quickpick-drawer .quickpick-kombis, .quickpick-drawer .quickpick-rejections { margin: 0; border: 0; border-radius: 0; background: transparent; }
 .quickpick-drawer .quickpick-levels { padding: 0; }
+
+/* Darstellung der Pre-Match-Liste: Tabelle oder Heatmap. Angelehnt an .segmented. */
+.layout-nav { display: flex; align-self: flex-start; gap: 2px; padding: 3px; border: 1px solid var(--line); border-radius: 10px; background: #1e1e1e; }
+.layout-nav button { display: flex; align-items: center; gap: 6px; padding: 6px 12px; border: 0; border-radius: 7px; background: transparent; color: #a0a0a0; font-size: 11px; }
+.layout-nav button:hover:not(.active) { color: #d4d4d4; }
+.layout-nav button.active { background: #37373d; color: #ffffff; font-weight: 700; }
+
+/* Heatmap: eine Zeile je Spiel, 34 px. Die Spaltenbreiten muessen zur Mindestbreite passen,
+   die HeatmapTable.tsx ausrechnet - sonst klemmen die Zellen oder die Tabelle scrollt ohne Not. */
+.heatmap-area { display: flex; flex: 1; flex-direction: column; min-width: 0; min-height: 0; }
+.heatmap-area .table-scroll { flex: 0 1 auto; margin-bottom: 8px; }
+.heatmap-grid { --heatmap-markets: 3; display: grid; grid-template-columns: 88px minmax(260px,1fr) repeat(5,84px) 76px repeat(var(--heatmap-markets),100px); gap: 6px; align-items: center; width: 100%; min-width: max(100%,var(--heatmap-min-width, 1200px)); }
+.heatmap-head { position: sticky; top: 0; z-index: 5; padding: 10px 10px 8px 38px; border-bottom: 1px solid var(--line); background: #252526; }
+.heatmap-head button { display: flex; align-items: center; justify-content: center; gap: 4px; min-width: 0; padding: 2px 0; border: 0; background: transparent; color: #969696; font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; white-space: nowrap; }
+.heatmap-head button:nth-child(-n+2) { justify-content: flex-start; }
+.heatmap-head button.active { color: #d4d4d4; }
+.heatmap-arrow { font-style: normal; opacity: 0; }
+.heatmap-head button:hover .heatmap-arrow, .heatmap-head button:focus-visible .heatmap-arrow, .heatmap-head button.active .heatmap-arrow { opacity: 1; }
+.heatmap-row-wrap { min-width: max(100%,var(--heatmap-min-width, 1200px)); border-bottom: 1px solid var(--line-soft); }
+.heatmap-row-wrap:last-of-type { border-bottom: 0; }
+.heatmap-row-wrap:hover { background: rgba(255,255,255,.025); }
+.heatmap-row-wrap.open { background: #252526; box-shadow: inset 3px 0 0 var(--accent); }
+.heatmap-row { height: 34px; padding: 0 10px 0 38px; border: 0; background: transparent; text-align: left; }
+.heatmap-row-wrap .cart-add-hub { --hub-size: 22px; }
+.cart-add-hub.compact .cart-add { border-radius: 6px; }
+.cart-add-hub.compact .cart-add-word { font-size: 14px; font-weight: 500; letter-spacing: 0; }
+.cart-add-hub.compact .cart-add-orbit { display: none; }
+.heatmap-time { display: flex; align-items: baseline; gap: 6px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.heatmap-time small { color: #6f6f6f; font-size: 10px; }
+.heatmap-time strong { color: #e0e0e0; font-size: 13px; font-weight: 700; }
+.heatmap-time.started strong { color: #8a8a8a; }
+.heatmap-teams { display: flex; align-items: center; gap: 6px; min-width: 0; white-space: nowrap; }
+.heatmap-teams strong { flex: 0 1 auto; min-width: 0; overflow: hidden; font-size: 13px; font-weight: 600; text-overflow: ellipsis; }
+.heatmap-teams strong.home { color: var(--home); }
+.heatmap-teams strong.away { color: var(--away); }
+.heatmap-teams > i { color: #5a5a5a; font-style: normal; }
+.heatmap-teams .class-gap { flex: none; }
+/* Die Liga bekommt nur den Platz, der neben den Teamnamen uebrig bleibt (Basis 0), und kuerzt
+   sich darin. Mit Basis auto schrumpften auch die Namen um Bruchteile eines Pixels mit - und
+   schon das loest die Ellipse aus ("Austral..."). */
+.heatmap-league { flex: 1 1 0; min-width: 0; padding-left: 8px; overflow: hidden; color: #7a7a7a; font-size: 10px; text-align: right; text-overflow: ellipsis; }
+/* Vorsprung: blau = Heim vorn, orange = Auswaerts vorn, --heat (0-1) steuert die Deckkraft. */
+.heat-cell, .odds-cell, .heatmap-draw-score { display: flex; align-items: center; justify-content: center; gap: 6px; height: 26px; border-radius: 5px; background: #232323; color: #d4d4d4; font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.heat-cell.home { background: rgba(117,190,255,calc(.08 + var(--heat, 0) * .5)); color: #eef6ff; }
+.heat-cell.away { background: rgba(206,145,120,calc(.08 + var(--heat, 0) * .5)); color: #fff3ee; }
+.heat-cell.even { color: #a0a0a0; }
+/* Wenig Vertrauen: schwaechere Farbe und gestrichelter Rand statt Deckkraft - die Zahl bleibt lesbar. */
+.heat-cell.faint { outline: 1px dashed rgba(255,255,255,.22); outline-offset: -1px; }
+.heat-cell.faint.home { background: rgba(117,190,255,calc(.05 + var(--heat, 0) * .22)); color: #c4d6e6; }
+.heat-cell.faint.away { background: rgba(206,145,120,calc(.05 + var(--heat, 0) * .22)); color: #e6d2c9; }
+.heat-cell.missing, .odds-cell.missing, .heatmap-draw-score.missing { color: #5a5a5a; font-weight: 400; }
+.heatmap-draw-score { background: transparent; font-size: 13px; }
+.heatmap-draw-score.zero { color: #5f5f5f; font-weight: 400; }
+.heatmap-draw-score.s50 { color: #a9cfa6; }
+.heatmap-draw-score.s60 { color: var(--green); font-weight: 700; }
+.heatmap-draw-score.s70 { background: rgba(137,209,133,.16); color: var(--green); font-weight: 800; }
+.odds-cell strong { font-weight: 700; }
+.odds-cell.value { background: rgba(137,209,133,calc(.1 + var(--heat, 0) * .35)); color: #f2fff1; }
+.heatmap-pick { font-size: 10px; font-weight: 700; }
+.heatmap-pick.home { color: var(--home); }
+.heatmap-pick.away { color: var(--away); }
+.heatmap-legend { display: flex; flex-wrap: wrap; gap: 6px 24px; margin: 0 0 16px; padding: 0 6px; color: #7a7a7a; font-size: 11px; }
+.heatmap-legend b { font-weight: 600; }
+.heatmap-legend b.home { color: var(--home); }
+.heatmap-legend b.away { color: var(--away); }
+.heatmap-legend b.value { color: var(--green); }

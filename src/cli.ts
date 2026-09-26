@@ -29,6 +29,7 @@ import { formatVenueFormResult, runVenueFormFilter } from "./venue-form.ts";
 import { importTipicoData } from "./tipico.ts";
 import { writeDashboard, type TeamElo } from "./dashboard.ts";
 import { collectRecentStats, RECENT_STATS_WINDOW, type MatchSideStats } from "./recent-stats.ts";
+import { getEloByTeam } from "./elo-store.ts";
 import { autoUpdateElo } from "./elo-update.ts";
 import { parseExpectedGoals } from "./xg.ts";
 import type {
@@ -555,6 +556,7 @@ async function dashboard(args: ParsedArgs): Promise<void> {
         const update = await autoUpdateElo(client, database, { topUpBudget: config.eloTopUpRequestBudget });
         const topUp = update.topUp
           ? `Wochenrunde ${update.topUp.loaded} von ${update.topUp.leagues} Ligen, ${update.topUp.apiRequests} Aufrufe`
+            + (update.topUp.alreadyDone ? ` (${update.topUp.alreadyDone} schon bei einer früheren Analyse)` : "")
             + (update.topUp.budgetReached ? " (Budget erreicht, Rest bei der nächsten Analyse)" : "")
           : `Wochenrunde fällig ab ${new Date(update.nextTopUp ?? Date.now()).toLocaleDateString("de-DE")}`;
         console.log(`Elo: ${update.imported.inserted} neue Spiele (${update.imported.read} Cache-Dateien), ${topUp},`
@@ -565,12 +567,12 @@ async function dashboard(args: ParsedArgs): Promise<void> {
     }
     // Team-Elo nur zur Anzeige neben dem Namen.
     const elo = new Map<number, TeamElo>();
-    for (const row of database.eloRatings()) {
-      elo.set(Number(row.team_id), {
-        elo: Number(row.elo),
-        confidence: Number(row.confidence),
+    for (const [teamId, row] of getEloByTeam(database)) {
+      elo.set(teamId, {
+        elo: row.elo,
+        confidence: row.confidence,
         system: row.system === "national" ? "national" : "club",
-        asOf: new Date(Number(row.as_of)).toISOString()
+        asOf: new Date(row.asOf).toISOString()
       });
     }
     const files = await writeDashboard({

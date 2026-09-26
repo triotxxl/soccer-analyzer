@@ -113,9 +113,13 @@ Benutzer auf Deutsch und führe Analyseaufträge selbstständig über die vorhan
   ausdrücklich angeforderten einmaligen Testlauf: Verwende die Antwort dabei nur als
   separat ausgewiesenen Referenzwert, implementiere keinen dauerhaften Aufruf und
   speichere weder die API-Prognose noch daraus abgeleitete Werte in der Datenbank.
-- Erzeuge Remis-Punktwerte ausschließlich mit dem in `src/draw-criteria.ts`
-  implementierten 100-Punkte-System oder mit dem Remis-Score aus `src/draw-signals.ts`
-  (seit 24.09.2026, von David so entschieden). Eine dritte Stelle gibt es nicht.
+- Erzeuge Remis-Punktwerte ausschließlich mit dem 100-Punkte-System oder mit dem
+  Remis-Score aus `src/draw-signals.ts` (seit 24.09.2026, von David so entschieden). Das
+  100-Punkte-System hat zwei Fassungen: `src/draw-criteria.ts` für Ligapartien und
+  `src/cross-league-draw-criteria.ts` für Cross-League-Partien (Weiche in `src/analyzer.ts`).
+  Beide landen in `scores.draw`. Die Cross-League-Fassung rechnet die erreichten Punkte auf
+  die bewertbaren Rohpunkte hoch und gibt unter 60 bewertbaren Rohpunkten 0 - dort heißt
+  0 „zu wenig Daten", nicht „kein Remis-Kandidat". Weitere Stellen gibt es nicht.
 - Erzeuge 1X2-Favoritenpunkte ausschließlich mit `src/favorite-criteria.ts`.
 - Erfinde oder verändere keine Modellwahrscheinlichkeiten.
 - Tipico-Quoten beeinflussen nicht die sportliche Modellauswahl; sie dürfen nur die
@@ -149,6 +153,17 @@ Benutzer auf Deutsch und führe Analyseaufträge selbstständig über die vorhan
   Dashboard-Snapshot; das kostet keinen zusätzlichen Aufruf. Führt die Antwort kein Wappen
   oder lädt das Bild nicht, zeigt die App die beiden Anfangsbuchstaben des Teams. Snapshots
   aus Läufen vor dieser Ergänzung tragen die Felder nicht und bleiben bei den Initialen.
+- Über der Filterleiste wechselt eine Navigation zwischen **Tabelle** und **Heatmap** (Wahl in
+  `localStorage`, Vorgabe Tabelle). Die Heatmap (`frontend/src/HeatmapTable.tsx`, Rechnung in
+  `frontend/src/heatmap.ts`) zeigt je Spiel eine Zeile mit Δ Elo, Δ Form, Δ xG, Δ Schüsse aufs
+  Tor und Δ Ecken als Heim minus Auswärts, die Remis-Punkte und die Quoten für 1X2, Remis und
+  BTTS (ein anderer gewählter Markt kommt als vierte Spalte dazu). Sie liest nur den Snapshot,
+  kostet keinen Aufruf und ändert weder Tipp noch Wahrscheinlichkeit. **Δ xG ist die
+  Torerwartung des Modells** (`expectedGoals`), nicht das xG von API-Football. Eine fehlende
+  Seite ergibt „–“, nie 0. Die **Value-Färbung der Quoten erscheint nur mit „Vorteil &
+  Kelly-Einsatz anzeigen“** (Davids Entscheidung vom 25.09.2026): Ein großer Value ist laut
+  Messung meist ein Ausrutscher des Modells, eine immer sichtbare Färbung höbe gerade die
+  schwächsten Wetten hervor. Bei `probabilityReliable: false` bleibt die 1X2-Quote ohne Farbe.
 - Klappt die App eine Partie auf, lädt sie deren Detailkennzahlen über
   `/api/fixture/insights`: Torphasen je Viertelstunde, direkte Duelle mit Liga und
   Halbzeitstand sowie Trends über die letzten zehn Partien inklusive Ballbesitz und
@@ -220,8 +235,9 @@ Benutzer auf Deutsch und führe Analyseaufträge selbstständig über die vorhan
   Modell trennt zu scharf und `strength.factorDivisor` gehört erhöht. Pokalpartien enden
   häufiger remis als Ligapartien, was die Favoritenquote strukturell drückt - das gehört bei
   der Auslegung mitbedacht.
-- Das Team-Elo holt einmal pro Woche mit einer Analyse die laufenden Saisons aller aktiven
-  Ligen (rund 530 Aufrufe, Abschnitt „Team-Elo"). An dem Tag ist die Analyse entsprechend teurer.
+- Das Team-Elo holt einmal pro Woche mit einer Analyse die laufenden Saisons aller Ligen aus
+  dem Bestand (rund 485 Aufrufe im September, 440 im Januar, 175 im Juli; Abschnitt „Team-Elo").
+  An dem Tag ist die Analyse entsprechend teurer.
 - Historische xG-Werte und bestätigte Nichtverfügbarkeit werden in SQLite gehalten; der
   xG-Erstaufbau darf pro Dashboard-Lauf höchstens 250 zusätzliche API-Anfragen auslösen.
 ## Sprache der sichtbaren Texte
@@ -439,10 +455,13 @@ nachgezogen, nicht gesammelt am Ende.
   Elo vor dem Schreiben des Snapshots nach - neue abgeschlossene Spiele aus den seit dem letzten
   Import geschriebenen Cache-Dateien (rund 300 je Analyse, kostenlos), dann neu rechnen (rund
   35 s). Die erste Analyse, die mehr als 7 Tage nach der letzten **Wochenrunde** läuft, holt
-  zusätzlich die laufende Saison jeder Liga mit Spielen in den letzten 45 Tagen (rund 530
-  Aufrufe, Deckel `ELO_TOPUP_REQUEST_BUDGET`, Vorgabe 600). Eine Runde, die am Deckel hängen
-  bleibt, gilt nicht als erledigt und läuft mit der nächsten Analyse weiter. Zeitpunkte stehen
-  in `elo_meta` (`lastImport`, `lastTopUp`). `ELO_AUTO_UPDATE=0` schaltet beides ab. Scheitert
+  zusätzlich die laufende Saison jeder Liga, die im letzten Jahr (400 Tage) im Bestand vorkam
+  und deren Saison laut Kalender von API-Football gerade läuft - begonnen und höchstens 14 Tage
+  über ihr Ende hinaus (rund 485 Aufrufe im September, Deckel `ELO_TOPUP_REQUEST_BUDGET`,
+  Vorgabe 600). Eine Runde, die am Deckel hängen bleibt, gilt nicht als erledigt und **setzt**
+  mit der nächsten Analyse **fort**: Die schon geladenen Ligen stehen in `topUpDone`, ein
+  Fortschritt älter als eine Woche verfällt. Zeitpunkte stehen in `elo_meta` (`lastImport`,
+  `lastTopUp`, `topUpDone`). `ELO_AUTO_UPDATE=0` schaltet beides ab. Scheitert
   der Schritt, entsteht das Dashboard trotzdem mit dem gespeicherten Stand. Ergebnisse aus der
   Abrechnung am Laufende kommen erst mit der **nächsten** Analyse ins Elo. Von Hand:
   `npm run elo -- update [--top-up|--no-top-up]`.
@@ -451,7 +470,8 @@ nachgezogen, nicht gesammelt am Ende.
 - Dateien: Parameter `src/elo-config.ts` (`ELO_CONFIG`, Wettbewerbs-IDs, Ausschlussmuster),
   Einordnung `src/elo-competitions.ts`, Rechenkern `src/elo.ts` (rein, ohne I/O), Backtest
   `src/elo-backtest.ts`, Lesen `src/elo-store.ts` (`getTeamElo`, `getEloRanking`,
-  `getEloHistory`, `getEloConfidence`), Befehle `tools/elo.ts` und `tools/elo-backtest.ts`.
+  `getEloHistory`, `getEloConfidence`, `getEloByTeam` für die App), Befehle `tools/elo.ts` und
+  `tools/elo-backtest.ts`.
   Tabellen: `elo_matches` (einzige Quelle), `elo_league_seasons`, `elo_history`, `elo_ratings`.
 - Befehle: `npm run elo -- import` (Cache → `elo_matches`, 0 Aufrufe), `backfill --budget <n>
   [--dry-run]` (beendete Liga-Saisons ab 2021 nachladen, ein Aufruf je Saison, fortsetzbar,
@@ -484,6 +504,50 @@ nachgezogen, nicht gesammelt am Ende.
      war es 2026 gleich gut, bei Ligaspielen schlechter.
   Die Korrekturen 1-6 allein senkten den Log-Loss 2026 von 1,0087 auf 1,0079. Nach dem Review:
   Real Madrid von Platz 17 auf 12, Ligaebenen ab 2022 statt erst ab 2024 bestimmbar.
+- **Review vom 26.09.2026 (Version 1.2.0)** - gefunden und behoben, jeweils mit Test:
+  1. **Verein gegen Nationalteam.** API-Football legt solche Testspiele unter „Friendlies" (10)
+     ab (Hull City gegen Curaçao, LAFC gegen El Salvador), und Nationalteam-IDs stehen in
+     „Friendlies Clubs" (667). 13 Team-IDs hatten dadurch einen Wert in beiden Systemen, und
+     Nationalteams wurden gegen Vereine bewertet. Jetzt fallen solche Spiele heraus (24 Stück);
+     welcher Art ein Team ist, zeigen seine Pflichtspiele vor dem Stichtag (`prepare`).
+  2. **Die App zeigte bei doppelter ID den niedrigeren Wert** (neben Hull City 1488 aus einem
+     Länderspiel statt 2072). `getEloByTeam` nimmt den Eintrag mit mehr Spielen.
+  3. **Doppelt geführte Spiele** zählten doppelt: derselbe Wettbewerb, dieselbe Paarung, derselbe
+     Stand binnen 24 Stunden unter zwei Fixture-IDs (191, davon 164 Vereins-Testspiele), dazu
+     3 Spiele eines Teams gegen sich selbst. Über Wettbewerbe hinweg wird nicht zusammengelegt
+     (PSG - Marseille 2013 zweimal 2:0 binnen drei Tagen, Liga und Pokal).
+  4. **Die Wochenrunde verlor Ligen nach einer Pause über 45 Tage** für immer (49 Ligen am
+     26.09.2026, im Januar wären es 116 gewesen: Highland League, Regionalliga Mitte, Botola Pro
+     mit 87, 64 und 16 Spielen im Vorjahreszeitraum, 2026 keinem). Jetzt entscheidet der
+     Saisonkalender von API-Football. Kostet etwa gleich viel, im Sommer weniger, weil keine
+     beendeten Saisons mehr geholt werden.
+  5. **Eine Runde am Deckel begann beim nächsten Mal von vorn** und zahlte für dieselben Ligen
+     erneut. Jetzt setzt sie fort (`topUpDone`).
+  6. Tooltips: „aus allen bisherigen Spielen" stimmte nicht (es sind die letzten fünf Jahre);
+     Δ Elo in der Heatmap sagt jetzt, dass der Heimvorteil (rund 60) nicht eingerechnet ist.
+  Die Vereinswerte bewegen sich dadurch kaum (Median 0,0, 99 % unter 1,2 Punkten, größte
+  Änderung 22,8); Vietnam und El Salvador verlieren die Punkte aus Spielen gegen Vereine.
+- **Gefunden, gemessen, nicht übernommen (26.09.2026):** Die Liga-Mitnahme folgt der Liga des
+  letzten Ligaspiels. API-Football führt aber auch parallele Wettbewerbe als Liga
+  (brasilianische Staatsmeisterschaften, „USL League One Cup", eigene Play-off-Ligen). In
+  Brasilien gingen so 37 % der Mitnahmen an die Staatsliga statt an Serie A bis D, 56 % der
+  Empfänger waren Vereine ohne nationale Liga. Die Alternative `leaguePropagation.membership:
+  "mainLeague"` (ein Nebenwettbewerb zieht nicht ab) änderte die Vorhersagen nicht messbar -
+  2025 ±0, 2026 +0,0001 ±0,0001, USA sogar +0,0027 ±0,0011 schlechter. Sie bleibt als Schalter
+  in `src/elo-config.ts`, Vorgabe `lastLeague`.
+- **Woher die Selbstüberschätzung zum Teil kommt (26.09.2026):** Der Tordifferenz-Faktor holt
+  Favoriten zu schwach zurück. Der Elo-Favorit erreicht im Schnitt 0,016 weniger als erwartet,
+  mit dem Faktor gewichtet sind es nur 0,009 - ab 80 % Erwartung gewinnt er sogar Punkte, obwohl
+  er unter seiner Erwartung bleibt. Den Faktor abzuschalten macht es trotzdem schlechter
+  (gepaarter Log-Loss 2025 +0,0024 ±0,0003, 2026 +0,0020 ±0,0004; Favorit vorhergesagt 52,5
+  statt 54,4 % bei 51,0 % eingetreten, also besser kalibriert, aber schlechter trennend). Er
+  bleibt. Der nächste Hebel ist weiter der Streckungsfaktor (siehe unten) oder eine stärkere
+  Bremse (`mov.autocorrB`) - beides nur mit Messung.
+- **Die Rangliste trägt diese Spreizung sichtbar:** Die Premier League liegt im Schnitt rund 200
+  Punkte vor La Liga (2194 gegen 1993), Leeds als Aufsteiger vor Real Madrid, Brighton auf
+  Platz 5. Seit 2021 bekam ein Premier-League-Team im Schnitt +355 allein aus der Mitnahme von
+  Europapokalspielen, ein Championship-Team +197 aus der Mitnahme von Testspielen. Nicht
+  korrigiert - erst messen, ob etwa Testspiele von der Mitnahme ausgenommen gehören.
 - **Ligaebene aus den Daten, kein Ligabonus:** Ein erster Durchgang ordnet die Ligen eines
   Landes je Saison nach dem Vor-Saison-Elo ihrer Teams (Ebene 1 / 2 / tiefer).
 - **Liga-Mitnahme (`leaguePropagation.share` 0,3) ist der wichtigste Parameter.** Ohne sie
@@ -492,7 +556,8 @@ nachgezogen, nicht gesammelt am Ende.
   13. Mit ihr bekommt jedes Team einer Liga 30 % der Änderung seines Ligakollegen aus Spielen
   gegen andere Ligen. Gemessen (gepaarter Log-Loss, negativ = besser): Test 2025 Pokal −0,029
   ±0,002 und Europapokal −0,028 ±0,005; Gegenprobe Test 2026 Pokal −0,041 ±0,003 und
-  Europapokal −0,031 ±0,005. Sie ist nicht nullsummig und spreizt die Skala (Spitze rund 2240).
+  Europapokal −0,031 ±0,005. Sie ist nicht nullsummig und spreizt die Skala (Spitze vor dem
+  Nachladen rund 2240, seitdem rund 2485).
 - **Ausschlüsse:** Frauen-, Jugend-, Reserve- und Olympiawettbewerbe über den Wettbewerbs-
   **und** den Teamnamen („Häcken W" rutschte über „Damallsvenskan" sonst durch), unbekannte
   Wettbewerbe unter `World` (sie könnten Nationalteams tragen). „Friendlies" (10) sind

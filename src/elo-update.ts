@@ -13,14 +13,16 @@ import type { ApiFixture, ApiLeague } from "./types.ts";
  * rechnen. Dashboard-Lauf (`src/cli.ts`) und Befehle (`tools/elo.ts`) nutzen diese eine Fassung.
  *
  * Kosten: Der Import aus dem Cache und das Neurechnen kosten keinen Aufruf. Nur die
- * Wochenrunde (`topUpRunningSeasons`) fragt API-Football, je aktiver Liga einmal - gemessen
- * am 24.09.2026 rund 530 Aufrufe.
+ * Wochenrunde (`topUpRunningSeasons`) fragt API-Football, je laufender Liga einmal - geschätzt
+ * am 26.09.2026 rund 485 Aufrufe, im Januar rund 440, im Juli rund 175.
  */
 
 const FINISHED = new Set(["FT", "AET", "PEN"]);
 const DAY_MS = 24 * 60 * 60 * 1000;
-/** Wie lange eine Liga ohne Spiel noch als aktiv gilt. */
-const ACTIVE_WINDOW_MS = 45 * DAY_MS;
+/** Eine Liga gehört zur Wochenrunde, wenn sie in diesem Zeitraum im Bestand vorkam. */
+const KNOWN_WINDOW_MS = 400 * DAY_MS;
+/** Spiele nach dem Saisonende laut API (Nachholtermine, Relegation) noch mitnehmen. */
+const SEASON_GRACE_MS = 14 * DAY_MS;
 /** Abstand der Wochenrunde. */
 export const TOP_UP_INTERVAL_MS = 7 * DAY_MS;
 /**
@@ -123,39 +125,67 @@ function priorityOf(league: ApiLeague, counts: Map<number, number>): number {
 }
 
 export interface TopUpResult {
+  /** Ligen, die in diesem Aufruf noch offen waren. */
   leagues: number;
+  /** Ligen, die dieselbe Runde schon bei einer früheren Analyse geladen hatte. */
+  alreadyDone: number;
   loaded: number;
+  /** IDs der in diesem Aufruf geladenen Ligen - für die Fortsetzung einer unterbrochenen Runde. */
+  loadedLeagues: number[];
   apiRequests: number;
   inserted: number;
   budgetReached: boolean;
 }
 
 /**
- * Die Wochenrunde: Für jede Liga mit Spielen in den letzten 45 Tagen die laufende Saison frisch
- * holen. So bleiben auch Teams aktuell, deren Ligen gerade in keiner Analyse vorkommen - ohne
- * das verlöre die Skala zwischen den Ligen ihren Anschluss.
+ * Die Saison, die laut Kalender von API-Football gerade läuft: begonnen und höchstens 14 Tage
+ * über ihr Ende hinaus. Bei Überschneidungen die jüngste. `null` in der Sommer- oder Winterpause -
+ * dort gibt es nichts zu holen, und `current` zeigte dann oft noch auf die beendete Saison.
+ */
+export function runningSeason(league: ApiLeague, now: number): ApiLeague["seasons"][number] | null {
+  return league.seasons
+    .filter((season) => Date.parse(season.start) <= now && Date.parse(season.end) + SEASON_GRACE_MS >= now)
+    .sort((left, right) => Date.parse(right.start) - Date.parse(left.start))[0] ?? null;
+}
+
+/**
+ * Die Wochenrunde: Für jede Liga, die im letzten Jahr im Bestand vorkam und deren Saison gerade
+ * läuft, die laufende Saison frisch holen. So bleiben auch Teams aktuell, deren Ligen gerade in
+ * keiner Analyse vorkommen - ohne das verlöre die Skala zwischen den Ligen ihren Anschluss.
+ *
+ * Bis Version 1.1.0 galt eine Liga nur als aktiv, wenn in den letzten 45 Tagen ein Spiel von ihr
+ * im Bestand lag. Eine längere Pause warf sie heraus, und ihre neue Saison wurde nie wieder geladen:
+ * Am 26.09.2026 fehlten so 49 Ligen, darunter Highland League, Regionalliga Mitte und Botola Pro
+ * (im Vorjahr bis dahin 87, 64 und 16 Spiele, 2026 keines). Im Januar wären es 116 gewesen.
+ *
+ * `done` sind Ligen, die eine unterbrochene Runde schon geladen hat - sie werden übersprungen.
  */
 export async function topUpRunningSeasons(
   client: EloClient,
   database: Pick<AnalyzerDatabase, "eloActiveLeagues" | "saveEloMatches">,
   leagues: ApiLeague[],
   types: Map<number, string>,
-  options: { budget: number; now: number }
+  options: { budget: number; now: number; done?: ReadonlySet<number> }
 ): Promise<TopUpResult> {
-  const active = database.eloActiveLeagues(options.now - ACTIVE_WINDOW_MS);
+  const known = database.eloActiveLeagues(options.now - KNOWN_WINDOW_MS);
   const todo: Array<{ league: ApiLeague; season: number }> = [];
+  let alreadyDone = 0;
   for (const league of leagues) {
-    if (!active.has(league.league.id)) continue;
+    if (!known.has(league.league.id)) continue;
     const cls = classifyMatch({ leagueId: league.league.id, leagueName: league.league.name, leagueType: league.league.type, country: league.country.name });
     if (cls.excluded) continue;
-    const running = league.seasons.find((season) => season.current)
-      ?? league.seasons.find((season) => Date.parse(season.start) <= options.now && Date.parse(season.end) >= options.now - ACTIVE_WINDOW_MS);
-    if (running) todo.push({ league, season: running.year });
+    const running = runningSeason(league, options.now);
+    if (!running) continue;
+    if (options.done?.has(league.league.id)) {
+      alreadyDone += 1;
+      continue;
+    }
+    todo.push({ league, season: running.year });
   }
-  todo.sort((left, right) => priorityOf(right.league, active) - priorityOf(left.league, active));
+  todo.sort((left, right) => priorityOf(right.league, known) - priorityOf(left.league, known));
 
   const start = client.requestCount;
-  let loaded = 0;
+  const loadedLeagues: number[] = [];
   let inserted = 0;
   let budgetReached = false;
   for (const item of todo) {
@@ -167,9 +197,30 @@ export async function topUpRunningSeasons(
     const fixtures = await client.getSeasonFixtures(item.league.league.id, item.season);
     const matches = fixtures.map((fixture) => toEloMatch(fixture, types)).filter((match): match is EloMatch => match !== null);
     inserted += database.saveEloMatches(matches, "topup");
-    loaded += 1;
+    loadedLeagues.push(item.league.league.id);
   }
-  return { leagues: todo.length, loaded, apiRequests: client.requestCount - start, inserted, budgetReached };
+  return {
+    leagues: todo.length, alreadyDone, loaded: loadedLeagues.length, loadedLeagues,
+    apiRequests: client.requestCount - start, inserted, budgetReached
+  };
+}
+
+/** Fortschritt einer unterbrochenen Wochenrunde in `elo_meta` (`topUpDone`). */
+interface TopUpProgress {
+  startedAt: number;
+  leagues: number[];
+}
+
+function readProgress(raw: string | null): TopUpProgress | null {
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as Partial<TopUpProgress>;
+    return typeof parsed.startedAt === "number" && Array.isArray(parsed.leagues)
+      ? { startedAt: parsed.startedAt, leagues: parsed.leagues.filter((id): id is number => typeof id === "number") }
+      : null;
+  } catch {
+    return null;
+  }
 }
 
 export interface RebuildResult {
@@ -206,6 +257,11 @@ export interface AutoUpdateResult {
  * 2. Wochenrunde, wenn die letzte älter als 7 Tage ist (`topUp` erzwingt oder verbietet sie),
  * 3. neu rechnen,
  * 4. Zeitpunkte merken - erst ganz am Ende, damit ein abgebrochener Lauf nichts überspringt.
+ *
+ * Eine Wochenrunde, die am Deckel hängen bleibt, **setzt fort**: Die schon geladenen Ligen stehen
+ * in `topUpDone`, die nächste Analyse überspringt sie. Bis Version 1.1.0 begann sie von vorn -
+ * weil laufende Saisons immer frisch geholt werden, zahlte sie dann für dieselben Ligen erneut
+ * und erreichte das Ende der Liste nie. Ein Fortschritt, der älter als eine Woche ist, verfällt.
  */
 export async function autoUpdateElo(
   client: EloClient,
@@ -225,16 +281,28 @@ export async function autoUpdateElo(
   const lastTopUp = Number(database.getEloMeta("lastTopUp") ?? NaN);
   const due = !Number.isFinite(lastTopUp) || now - lastTopUp >= TOP_UP_INTERVAL_MS;
   const runTopUp = options.topUp ?? due;
+  const stored = readProgress(database.getEloMeta("topUpDone"));
+  const progress = stored && (!Number.isFinite(lastTopUp) || stored.startedAt > lastTopUp)
+    && now - stored.startedAt < TOP_UP_INTERVAL_MS ? stored : null;
   const topUp = runTopUp && options.topUpBudget > 0
-    ? await topUpRunningSeasons(client, database, leagues, types, { budget: options.topUpBudget, now })
+    ? await topUpRunningSeasons(client, database, leagues, types, {
+      budget: options.topUpBudget, now, done: new Set(progress?.leagues ?? [])
+    })
     : null;
 
   const rebuilt = rebuildElo(database, now);
 
   database.setEloMeta("lastImport", String(now));
   // Eine Wochenrunde, die am Budget hängen blieb, gilt nicht als erledigt: Die nächste Analyse
-  // macht weiter, statt eine Woche mit halbem Stand zu leben.
-  if (topUp && !topUp.budgetReached) database.setEloMeta("lastTopUp", String(now));
+  // macht dort weiter, statt eine Woche mit halbem Stand zu leben.
+  if (topUp?.budgetReached) {
+    database.setEloMeta("topUpDone", JSON.stringify({
+      startedAt: progress?.startedAt ?? now, leagues: [...(progress?.leagues ?? []), ...topUp.loadedLeagues]
+    } satisfies TopUpProgress));
+  } else if (topUp) {
+    database.setEloMeta("lastTopUp", String(now));
+    database.setEloMeta("topUpDone", "");
+  }
   const nextTopUp = topUp ? null : Number.isFinite(lastTopUp) ? lastTopUp + TOP_UP_INTERVAL_MS : now;
   const { state: _state, ...summary } = rebuilt;
   return { imported, topUp, nextTopUp, rebuilt: summary };

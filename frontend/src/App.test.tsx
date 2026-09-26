@@ -199,6 +199,8 @@ describe("React-Dashboard", () => {
     expect(home).toHaveClass("elo-tag");
     expect(home).toHaveAttribute("title", expect.stringContaining("Vertrauen 96 %"));
     expect(home).toHaveAttribute("title", expect.stringContaining("geht in keinen Tipp ein"));
+    // Nicht „aus allen bisherigen Spielen": Das Elo zählt nur die letzten fünf Jahre.
+    expect(home).toHaveAttribute("title", expect.stringContaining("Spielen der letzten fünf Jahre"));
     // Auf dünner Grundlage blasser.
     expect(screen.getByText("1612")).toHaveClass("unsicher");
   });
@@ -1039,5 +1041,108 @@ describe("Schüsse und Ecken", () => {
     render(<App />);
     expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
     expect(globalThis.document.querySelectorAll(".recent-stat-cell").length).toBeGreaterThan(0);
+  });
+});
+
+describe("Heatmap", () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date("2026-08-16T12:00:00.000Z"));
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+    window.localStorage.clear();
+  });
+
+  const elo = (value: number) => ({ elo: value, confidence: 80, system: "club" as const, asOf: "2026-08-15T00:00:00.000Z" });
+
+  it("wechselt über die Navigation, schaltet die Punkte-Dropdowns ab und merkt sich die Wahl", async () => {
+    vi.stubGlobal("fetch", dashboardFetch(() => document()));
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const { unmount } = render(<App />);
+    expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
+
+    const nav = screen.getByRole("navigation", { name: "Darstellung" });
+    expect(within(nav).getByRole("button", { name: "Tabelle" })).toHaveAttribute("aria-pressed", "true");
+    expect(globalThis.document.querySelector(".heatmap-row")).not.toBeInTheDocument();
+
+    await user.click(within(nav).getByRole("button", { name: "Heatmap" }));
+    expect(globalThis.document.querySelectorAll(".heatmap-row")).toHaveLength(2);
+    expect(globalThis.document.querySelector(".fixture-row")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("H2H")).toBeDisabled();
+    expect(screen.getByLabelText("Form")).toBeDisabled();
+    expect(screen.getByLabelText("Markt")).toBeEnabled();
+
+    unmount();
+    render(<App />);
+    expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
+    expect(globalThis.document.querySelectorAll(".heatmap-row")).toHaveLength(2);
+  });
+
+  it("zeigt Vorsprünge als Heim minus Auswärts und färbt Value nur mit dem Kelly-Schalter", async () => {
+    window.localStorage.setItem("football-analyzer:table-layout", "heatmap");
+    const current = document();
+    current.fixtures[0] = { ...current.fixtures[0]!, homeElo: elo(1900), awayElo: elo(1750) };
+    vi.stubGlobal("fetch", dashboardFetch(() => current));
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(<App />);
+    expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
+
+    const row = globalThis.document.querySelector(".heatmap-row")!;
+    const cells = row.querySelectorAll(".heat-cell");
+    expect(cells[0]).toHaveTextContent("+150");
+    expect(cells[0]).toHaveClass("home");
+    // Der Heimvorteil steckt nicht in Δ Elo - sonst läse man +0 als Gleichstand.
+    expect(screen.getByRole("button", { name: /Elo-Unterschied/ }))
+      .toHaveAttribute("title", expect.stringContaining("Heimvorteil ist nicht eingerechnet"));
+    expect(cells[2]).toHaveTextContent("+0,50");
+    // Ohne Schuss- und Eckenzahlen steht ein Strich, keine 0.
+    expect(cells[3]).toHaveTextContent("–");
+    expect(row.querySelectorAll(".odds-cell.value")).toHaveLength(3);
+
+    const optionen = screen.getByRole("heading", { name: "Optionen" }).closest("section")!;
+    await user.click(within(optionen).getByRole("checkbox", { name: /Vorteil & Kelly-Einsatz anzeigen/i }));
+    expect(globalThis.document.querySelectorAll(".odds-cell.value")).toHaveLength(0);
+    expect(screen.getByText(/Value-Färbung/)).toBeInTheDocument();
+  });
+
+  it("färbt eine 1X2-Quote ohne belastbare Wahrscheinlichkeit nicht", async () => {
+    window.localStorage.setItem("football-analyzer:table-layout", "heatmap");
+    const current = document();
+    current.fixtures[0] = {
+      ...current.fixtures[0]!,
+      markets: current.fixtures[0]!.markets.map((market) => market.key === "1x2" ? { ...market, probabilityReliable: false } : market)
+    };
+    vi.stubGlobal("fetch", dashboardFetch(() => current));
+    render(<App />);
+    expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
+
+    const oneXTwo = globalThis.document.querySelector(".heatmap-row")!.querySelectorAll(".odds-cell")[0]!;
+    expect(oneXTwo).not.toHaveClass("value");
+    expect(oneXTwo.getAttribute("title")).toContain("Ligastärke unbekannt");
+  });
+
+  it("sortiert nach Vorsprung, ergänzt den gewählten Markt und öffnet die Details", async () => {
+    window.localStorage.setItem("football-analyzer:table-layout", "heatmap");
+    const current = document();
+    current.fixtures[0] = { ...current.fixtures[0]!, homeElo: elo(1700), awayElo: elo(1800) };
+    current.fixtures[1] = { ...current.fixtures[1]!, homeElo: elo(1900), awayElo: elo(1600) };
+    vi.stubGlobal("fetch", dashboardFetch(() => current));
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(<App />);
+    expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /Elo-Unterschied/ }));
+    expect(globalThis.document.querySelector(".heatmap-row")).toHaveTextContent("Zulu FC");
+
+    await user.selectOptions(screen.getByLabelText("Markt"), "over25");
+    expect(globalThis.document.querySelector(".heatmap-head")).toHaveTextContent("Über 2,5");
+
+    await user.click(globalThis.document.querySelector(".heatmap-row")!);
+    expect(screen.getByRole("complementary", { name: "Details" })).toHaveTextContent("Zulu FC");
   });
 });

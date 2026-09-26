@@ -61,6 +61,21 @@ export function getEloRanking(
   return database.eloRatings(filter).map(toStored);
 }
 
+/**
+ * Das Elo je Team-ID für die Anzeige neben dem Namen, über beide Systeme. Seit Version 1.2.0 steht
+ * eine ID nur noch in einem; kommt sie doch in beiden vor, gilt der Eintrag mit mehr Spielen.
+ * Vorher gewann still der niedrigere Wert - neben Hull City stand 1488 aus einem Spiel gegen
+ * Curaçao statt 2072.
+ */
+export function getEloByTeam(database: Pick<AnalyzerDatabase, "eloRatings">): Map<number, StoredElo> {
+  const byTeam = new Map<number, StoredElo>();
+  for (const row of database.eloRatings().map(toStored)) {
+    const existing = byTeam.get(row.teamId);
+    if (!existing || row.games > existing.games) byTeam.set(row.teamId, row);
+  }
+  return byTeam;
+}
+
 export function getEloConfidence(database: AnalyzerDatabase, teamId: number, system: EloSystem = "club"): number | null {
   return getTeamElo(database, teamId, system)?.confidence ?? null;
 }

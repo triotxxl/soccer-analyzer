@@ -4,7 +4,8 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 import type { EloMatch } from "../src/elo-competitions.ts";
-import { autoUpdateElo, importFromCache, topUpRunningSeasons, TOP_UP_INTERVAL_MS, type EloClient } from "../src/elo-update.ts";
+import { getEloByTeam } from "../src/elo-store.ts";
+import { autoUpdateElo, importFromCache, runningSeason, topUpRunningSeasons, TOP_UP_INTERVAL_MS, type EloClient } from "../src/elo-update.ts";
 import type { ApiFixture, ApiLeague } from "../src/types.ts";
 
 const NOW = Date.parse("2026-09-24T20:00:00Z");
@@ -146,4 +147,78 @@ test("eine Wochenrunde, die am Budget hängen bleibt, gilt nicht als erledigt", 
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
+});
+
+test("eine unterbrochene Wochenrunde setzt fort, statt dieselben Ligen erneut zu bezahlen", async () => {
+  const directory = mkdtempSync(path.join(tmpdir(), "elo-cache-"));
+  try {
+    const leagues = [league(100), league(200)];
+    const database = { ...fakeDatabase({}), eloActiveLeagues: () => new Map([[100, 50], [200, 5]]) };
+    const client = fakeClient(leagues);
+    const first = await autoUpdateElo(client, database, { now: NOW, topUpBudget: 1, directory });
+    assert.deepEqual(client.seasonCalls, [100]);
+    assert.equal(first.topUp?.budgetReached, true);
+
+    const second = await autoUpdateElo(client, database, { now: NOW + 2 * HOUR, topUpBudget: 1, directory });
+    // Bis Elo 1.1.0 lud die zweite Analyse wieder Liga 100 und kam nie bei Liga 200 an.
+    assert.deepEqual(client.seasonCalls, [100, 200]);
+    assert.equal(second.topUp?.alreadyDone, 1);
+    assert.equal(second.topUp?.budgetReached, false);
+    assert.equal(database.meta.lastTopUp, String(NOW + 2 * HOUR));
+    assert.equal(database.meta.topUpDone, "");
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("ein Fortschritt, der älter als eine Woche ist, verfällt", async () => {
+  const directory = mkdtempSync(path.join(tmpdir(), "elo-cache-"));
+  try {
+    const leagues = [league(100), league(200)];
+    const database = {
+      ...fakeDatabase({ topUpDone: JSON.stringify({ startedAt: NOW - 8 * 24 * HOUR, leagues: [100] }) }),
+      eloActiveLeagues: () => new Map([[100, 50], [200, 5]])
+    };
+    const client = fakeClient(leagues);
+    await autoUpdateElo(client, database, { now: NOW, topUpBudget: 5, directory });
+    assert.deepEqual(client.seasonCalls, [100, 200]);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("die Wochenrunde holt jede Liga mit laufender Saison, auch nach einer langen Pause", async () => {
+  const season = (year: number, start: string, end: string, current = false) => ({ year, start, end, current });
+  const leagues: ApiLeague[] = [
+    // Sommerpause vorbei: letzte Saison endete im Mai, die neue läuft seit August.
+    { ...league(731, "Highland League"), seasons: [season(2025, "2025-07-26", "2026-04-18"), season(2026, "2026-07-25", "2027-04-17", true)] },
+    // Pause: beendet, die nächste beginnt erst. `current` zeigt noch auf die alte.
+    { ...league(111, "Pausenliga"), seasons: [season(2026, "2026-03-01", "2026-08-30", true), season(2027, "2026-10-10", "2027-05-30")] },
+    // Nicht im Bestand des letzten Jahres: gehört nicht zur Runde.
+    league(999, "Fremde Liga")
+  ];
+  let since = 0;
+  const database = {
+    ...collector(),
+    eloActiveLeagues: (value: number) => { since = value; return new Map([[731, 300], [111, 200]]); }
+  };
+  const client = fakeClient(leagues);
+  const result = await topUpRunningSeasons(client, database, leagues, new Map(), { budget: 10, now: NOW });
+  assert.equal(since, NOW - 400 * 24 * HOUR);
+  assert.deepEqual(client.seasonCalls, [731]);
+  assert.equal(result.leagues, 1);
+  // Nach dem Saisonende laut API noch 14 Tage, dann Pause.
+  assert.equal(runningSeason(leagues[1]!, Date.parse("2026-09-10T00:00:00Z"))?.year, 2026);
+  assert.equal(runningSeason(leagues[1]!, Date.parse("2026-09-20T00:00:00Z")), null);
+});
+
+test("eine Team-ID in beiden Systemen zeigt den Eintrag mit mehr Spielen", () => {
+  const row = (system: string, elo: number, games: number) => ({
+    system, team_id: 64, name: "Hull City", elo, games, last_change: 0, change_30: 0, change_90: 0, peak: elo, low: elo,
+    trend: "stabil", league: null, country: null, confidence: 50, last_played: 0, as_of: NOW, config_version: "1.1.0"
+  });
+  // Sortiert nach Elo absteigend - früher gewann der letzte, also der niedrigere Wert.
+  const byTeam = getEloByTeam({ eloRatings: () => [row("club", 2072, 270), row("national", 1488, 1)] });
+  assert.equal(byTeam.get(64)?.elo, 2072);
+  assert.equal(byTeam.get(64)?.system, "club");
 });

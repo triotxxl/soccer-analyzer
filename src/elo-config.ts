@@ -55,9 +55,18 @@ export interface EloConfig {
   national: EloSystemConfig;
   competition: Record<EloCompetitionKind, number>;
   /**
-   * Tordifferenz nach FiveThirtyEight:
-   * `ln(|Tordifferenz| + 1) × autocorrA / (autocorrB × EloDiff_Sieger + autocorrA)`,
+   * Tordifferenz angelehnt an FiveThirtyEight, aber mit `log2` statt `ln`, damit ein Sieg mit
+   * einem Tor Unterschied genau 1 ergibt:
+   * `log2(|Tordifferenz| + 1) × autocorrA / (autocorrB × EloDiff_Sieger + autocorrA)`,
    * bei Remis 1, gedeckelt bei `cap`. Mit `enabled: false` gilt immer 1.
+   *
+   * **Die Bremse reicht nur zur Hälfte** (gemessen am 26.09.2026, Vereinsspiele seit 2023): Der
+   * Elo-Favorit erreicht im Schnitt 0,016 weniger als erwartet, mit dem Faktor gewichtet aber nur
+   * 0,009 weniger - ab 80 % Erwartung sogar mehr. Favoriten werden also zu schwach
+   * zurückgeholt, ein Teil der bekannten Selbstüberschätzung stammt daher. Ohne den Faktor wäre
+   * es trotzdem schlechter (gepaarter Log-Loss 2025 +0,0024 ±0,0003, 2026 +0,0020 ±0,0004,
+   * Pokal +0,006/+0,011, Nationalteams +0,019/+0,020): Die Tordifferenz trägt mehr, als die
+   * Schieflage kostet. Wer die Bremse stärker stellt, misst vorher - kein Wert nach Gefühl.
    */
   mov: { enabled: boolean; autocorrA: number; autocorrB: number; cap: number };
   /** Die ersten `games` Spiele eines Teams zählen mit `multiplier` - schneller Einstieg, danach Ruhe. */
@@ -94,13 +103,45 @@ export interface EloConfig {
    * −0,003 ±0,0003. 0,5 wurde nicht als Vorgabe genommen, obwohl die Rangliste damit noch
    * stärker spreizt: Der Wert wäre auf denselben Daten gesucht, gegen die gemessen wird.
    * Nebenwirkung: Die Mitnahme ist nicht nullsummig, die Skala verschiebt sich insgesamt nach
-   * oben (Spitze rund 2240 statt 2000). Für Vergleiche zählt der Abstand, nicht die Zahl.
+   * oben (Spitze vor dem Nachladen rund 2240 statt 2000, am 26.09.2026 rund 2485). Für
+   * Vergleiche zählt der Abstand, nicht die Zahl.
    */
-  leaguePropagation: { share: number };
+  leaguePropagation: {
+    share: number;
+    /**
+     * Welcher Liga ein Verein für die Mitnahme angehört. `lastLeague`: der Liga seines letzten
+     * Ligaspiels. `mainLeague`: ebenso, aber ein **Nebenwettbewerb** zieht ihn nicht ab.
+     *
+     * API-Football führt auch parallel laufende Wettbewerbe als Liga: die brasilianischen
+     * Staatsmeisterschaften (Januar bis April neben Copa do Brasil und Libertadores), den „USL
+     * League One Cup" und eigene Play-off-Ligen (Serie C, Liga III, Segunda RFEF). Mit
+     * `lastLeague` gingen am 26.09.2026 in Brasilien 37 % der Mitnahmen an die Staatsliga statt
+     * an die Serie A bis D, und 56 % der Empfänger waren Vereine ohne nationale Liga.
+     *
+     * **Gemessen und verworfen am 26.09.2026** (gepaarter Log-Loss `mainLeague` minus
+     * `lastLeague`, negativ = besser): Test 2025 alle −0,0000 ±0,0001, Brasilien +0,0000
+     * ±0,0009; Test 2026 alle +0,0001 ±0,0001, Brasilien +0,0008 ±0,0011, USA +0,0027 ±0,0011.
+     * Die Fehlleitung ist echt, kostet aber keine messbare Vorhersagegüte - Vorgabe bleibt
+     * `lastLeague`. Nicht umstellen, ohne neu zu messen.
+     */
+    membership: "lastLeague" | "mainLeague";
+    /**
+     * Nebenwettbewerb: Ein Team bestreitet dort in der vollsten Saison im Schnitt weniger als
+     * `ratio` × so viele Spiele wie in seiner bisherigen Liga (Staatsliga rund 13 gegen 38 in
+     * der Serie A). Der Wechsel unterbleibt nur, solange das letzte Spiel in der bisherigen
+     * Liga höchstens `stickyDays` zurückliegt - ein Absteiger in eine kürzere Liga kommt so
+     * spätestens danach an. Gezählt werden nur Saisons mit mindestens `minMatches` Spielen.
+     * `ratio` 0,5 statt knapper: Der Abstieg aus der Serie B (38) in die Serie C (rund 22)
+     * darf nicht als Nebenwettbewerb gelten.
+     */
+    sideCompetition: { ratio: number; stickyDays: number; minMatches: number };
+  };
 }
 
 export const ELO_CONFIG: EloConfig = {
-  version: "1.1.0",
+  // 1.2.0 (26.09.2026): Spiele zwischen Verein und Nationalteam und doppelt geführte Spiele
+  // fallen heraus (`prepare` in src/elo.ts).
+  version: "1.2.0",
   club: {
     startRating: 1500,
     k: 30,
@@ -163,7 +204,11 @@ export const ELO_CONFIG: EloConfig = {
   newTeamStart: { mode: "competitionMean", minRated: 5 },
   confidence: { games: 20, opponents: 15, crossLeague: 6, windowMonths: 24 },
   tiers: { minTeams: 10, gap: 30 },
-  leaguePropagation: { share: 0.3 }
+  leaguePropagation: {
+    share: 0.3,
+    membership: "lastLeague",
+    sideCompetition: { ratio: 0.5, stickyDays: 180, minMatches: 20 }
+  }
 };
 
 /**

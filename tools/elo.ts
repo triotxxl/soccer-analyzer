@@ -54,7 +54,9 @@ async function update(database: AnalyzerDatabase): Promise<void> {
   console.log(`Import: ${result.imported.inserted} neue Spiele aus ${result.imported.read} Cache-Dateien`);
   if (result.topUp) {
     console.log(`Wochenrunde: ${result.topUp.loaded} von ${result.topUp.leagues} Ligen, ${result.topUp.inserted} neue Spiele,`
-      + ` ${result.topUp.apiRequests} Aufrufe${result.topUp.budgetReached ? " - Budget erreicht, der Rest folgt beim nächsten Mal" : ""}`);
+      + ` ${result.topUp.apiRequests} Aufrufe`
+      + (result.topUp.alreadyDone ? ` (${result.topUp.alreadyDone} Ligen schon bei einer früheren Analyse)` : "")
+      + (result.topUp.budgetReached ? " - Budget erreicht, der Rest folgt beim nächsten Mal" : ""));
   } else {
     console.log(`Wochenrunde: nicht gelaufen, fällig ab ${new Date(result.nextTopUp ?? Date.now()).toLocaleDateString("de-DE")}`);
   }
@@ -132,7 +134,8 @@ function build(database: AnalyzerDatabase): void {
   const bySystem = (system: EloSystem) => [...state.teams.values()].filter((team) => team.system === system).length;
   console.log(`Elo ${ELO_CONFIG.version} gerechnet in ${result.seconds.toFixed(1)} s`);
   console.log(`Spiele im Bestand: ${result.matches} · gewertet: ${state.counts.used} · älter als das Fenster: ${state.counts.tooOld}`);
-  console.log(`Ausgeschlossen: ${state.counts.excludedYouthWomen} Frauen/Jugend/Reserve, ${state.counts.excludedUnknown} unbekannte Wettbewerbe`);
+  console.log(`Ausgeschlossen: ${state.counts.excludedYouthWomen} Frauen/Jugend/Reserve, ${state.counts.excludedUnknown} unbekannte Wettbewerbe,`
+    + ` ${state.counts.excludedMixed} Verein gegen Nationalteam, ${state.counts.excludedDuplicate} doppelt geführt`);
   console.log(`Teams: ${bySystem("club")} Vereine, ${bySystem("national")} Nationalteams`);
 }
 

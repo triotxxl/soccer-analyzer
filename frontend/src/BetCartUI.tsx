@@ -89,13 +89,15 @@ function radialLayoutFor(trigger: HTMLElement | null, count: number): RadialLayo
   return { x, y, radius: radialRadius(count, item, rect.width), item };
 }
 
-export function CartAddRadial({ fixture, cart, open, onOpen, onClose, onSelect }: {
+export function CartAddRadial({ fixture, cart, open, onOpen, onClose, onSelect, compact = false }: {
   fixture: DashboardFixture;
   cart: CartEntry[];
   open: boolean;
   onOpen(): void;
   onClose(): void;
   onSelect(market: DashboardMarket): void;
+  /** Für die 34-px-Zeile der Heatmap: ein "+" statt des Wortes "Add". */
+  compact?: boolean;
 }) {
   const hubRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -147,7 +149,7 @@ export function CartAddRadial({ fixture, cart, open, onOpen, onClose, onSelect }
 
   return <div
     ref={hubRef}
-    className={`cart-add-hub ${open ? "open" : ""}`}
+    className={`cart-add-hub ${open ? "open" : ""}${compact ? " compact" : ""}`}
     onMouseEnter={() => { cancelClose(); onOpen(); }}
     onMouseLeave={scheduleClose}
     onFocus={() => { cancelClose(); onOpen(); }}
@@ -162,7 +164,7 @@ export function CartAddRadial({ fixture, cart, open, onOpen, onClose, onSelect }
       title="Zeigen öffnet die Marktauswahl"
       onClick={() => open ? onClose() : onOpen()}
     >
-      <span className="cart-add-word">Add</span>
+      <span className="cart-add-word">{compact ? "+" : "Add"}</span>
       <span className="cart-add-orbit" aria-hidden><i /><i /><i /></span>
     </button>
 

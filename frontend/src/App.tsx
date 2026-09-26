@@ -1,5 +1,5 @@
 import {
-  Binoculars, Broadcast, ChartBar, CaretDoubleLeft, CaretDoubleRight, CaretLeft, CaretRight, CheckCircle, ClockCounterClockwise, Crosshair, FlagPennant, ListBullets, RocketLaunch, Shield, ShieldCheck, Star, WarningCircle, X
+  Binoculars, Broadcast, ChartBar, CaretDoubleLeft, CaretDoubleRight, CaretLeft, CaretRight, CheckCircle, ClockCounterClockwise, Crosshair, FlagPennant, GridFour, ListBullets, RocketLaunch, Shield, ShieldCheck, Star, Table, WarningCircle, X
 } from "@phosphor-icons/react";
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { BetBuilderDrawer, CartAddRadial, CartBadge } from "./BetCartUI";
@@ -7,6 +7,8 @@ import { toCartEntry, toQuickpickCartEntry, useBetCart } from "./betCart";
 import { countryFlagCode } from "./countryFlags";
 import { FixtureInsightPanels, InsightsNotice, useFixtureInsights } from "./FixtureInsights";
 import { useDashboardData } from "./data";
+import { heatmapMarkets } from "./heatmap";
+import { HeatmapTable } from "./HeatmapTable";
 import { useLiveBoard } from "./liveData";
 import { LiveView } from "./LiveView";
 import { edgeOf, loadKellyAuto, loadKellySettings, loadKellyVisible, saveKellyAuto, saveKellySettings, saveKellyVisible, type KellySettings } from "./kelly";
@@ -296,7 +298,7 @@ function LeagueFilterModal({ leagues, statsByKey, deselected, search, onSearchCh
   </div>;
 }
 
-function kickoffParts(value: string, timezone: string): { clock: string; day: string } {
+export function kickoffParts(value: string, timezone: string): { clock: string; day: string } {
   const date = new Date(value);
   return {
     clock: new Intl.DateTimeFormat("de-DE", { timeZone: timezone, hour: "2-digit", minute: "2-digit" }).format(date),
@@ -356,6 +358,29 @@ function saveView(view: AppView): void {
   if (typeof window === "undefined") return;
   try {
     window.localStorage.setItem(VIEW_STORAGE_KEY, view);
+  } catch {
+    // Storage unavailable - the choice just doesn't persist for this session.
+  }
+}
+
+const LAYOUT_STORAGE_KEY = "football-analyzer:table-layout";
+
+/** Die Darstellung der Pre-Match-Liste: die ausführliche Tabelle oder die kompakte Heatmap. */
+export type TableLayout = "table" | "heatmap";
+
+function loadLayout(): TableLayout {
+  if (typeof window === "undefined") return "table";
+  try {
+    return window.localStorage.getItem(LAYOUT_STORAGE_KEY) === "heatmap" ? "heatmap" : "table";
+  } catch {
+    return "table";
+  }
+}
+
+function saveLayout(layout: TableLayout): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(LAYOUT_STORAGE_KEY, layout);
   } catch {
     // Storage unavailable - the choice just doesn't persist for this session.
   }
@@ -501,7 +526,7 @@ function EloTag({ value, team }: { value: DashboardFixture["homeElo"]; team: str
   const confidence = Math.round(value.confidence);
   const stand = new Date(value.asOf).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" });
   return <small className={confidence < 50 ? "elo-tag unsicher" : "elo-tag"}
-    title={`Elo ${elo} (${value.system === "national" ? "Nationalteams" : "Vereine"}): Stärkewert von ${team} aus allen bisherigen Spielen.`
+    title={`Elo ${elo} (${value.system === "national" ? "Nationalteams" : "Vereine"}): Stärkewert von ${team} aus den Spielen der letzten fünf Jahre.`
       + ` Vertrauen ${confidence} %, Stand ${stand}. Nur zur Einordnung – geht in keinen Tipp ein.`}>
     {elo}
   </small>;
@@ -741,6 +766,7 @@ function standingsWindow(table: StandingsRow[], homeTeam: string, awayTeam: stri
 
 function Dashboard({ document }: { document: DashboardDocument }) {
   const [view, setView] = useState<AppView>(loadView);
+  const [layout, setLayout] = useState<TableLayout>(loadLayout);
   // Zeigt die H2H- und Form-Spalte auf das Ausbleiben statt auf das Eintreten.
   const [counterDirection, setCounterDirection] = useState(false);
   const [kellyAuto, setKellyAuto] = useState(loadKellyAuto);
@@ -914,6 +940,7 @@ function Dashboard({ document }: { document: DashboardDocument }) {
   }, [builderOpen, calendarOpen, kellyOpen, leagueFilterOpen, openFixture, quickpickOpen, radialFixtureId]);
 
   useEffect(() => { saveView(view); }, [view]);
+  useEffect(() => { saveLayout(layout); }, [layout]);
   useEffect(() => { saveKellySettings(kellySettings); }, [kellySettings]);
   useEffect(() => { saveQuickpickStore(quickpickStore); }, [quickpickStore]);
   useEffect(() => { saveKellyVisible(showKelly); }, [showKelly]);
@@ -1075,6 +1102,19 @@ function Dashboard({ document }: { document: DashboardDocument }) {
     "--table-min-width": `${minimumWidth}px`
   } as CSSProperties;
   const fixtureGridClass = `fixture-grid${showScore ? " has-score" : ""}`;
+  const heatmap = layout === "heatmap";
+  // H2H, Form und Linie ändern nur die Punkte der Tabelle; in der Heatmap wirken sie nicht.
+  // Abgeschaltet statt ausgeblendet, damit die Leiste beim Umschalten nicht springt.
+  const tableOnly: { disabled?: boolean; title?: string } = heatmap ? { disabled: true, title: "Nur in der Tabelle" } : {};
+  const heatmapColumns = heatmapMarkets(marketFilter).map((key) =>
+    ({ key, label: MARKET_OPTIONS.find((option) => option.key === key)?.label ?? key }));
+  const emptyState = quickpickActive
+    ? <EmptyState title={`${quickpickLabel} lässt keine Partie übrig`}
+        text={quickpickReason(quickpick.report)}
+        action={<button className="empty-state-action" onClick={() => setQuickpickActive(false)}>
+          Filter aufheben
+        </button>} />
+    : <EmptyState title="Keine Partien für diese Auswahl" text="Wähle einen anderen Zeitraum oder setze den Bewertungsfilter zurück." />;
   const rangeLabel = rangeMode === "next48"
     ? "Nächste 48 Stunden ab jetzt"
     : `${customStart ? formatCalendarDate(customStart) : "–"} – ${customEnd ? formatCalendarDate(customEnd) : "–"}`;
@@ -1187,6 +1227,12 @@ function Dashboard({ document }: { document: DashboardDocument }) {
       <button className="mobile-sidebar-toggle" tabIndex={mobileViewport ? 0 : -1} aria-hidden={!mobileViewport} onClick={() => setSidebarOpen(true)} aria-controls="dashboard-sidebar" aria-expanded={sidebarOpen}><ListBullets size={17} weight="duotone" /> Filter & Zeitraum</button>
       {banner && <div className="banner"><span><RocketLaunch size={20} weight="duotone" /></span><p><strong>Grün</strong> markierte Tipps erfüllen alle Modellkriterien, gelbe sind starke Kandidaten. Sortiere über die Spaltenköpfe, filtere Märkte über die Auswahl darunter.</p><button onClick={() => { setBanner(false); saveBannerDismissed(); }} aria-label="Hinweis schließen"><X /></button></div>}
       {view === "prematch" ? <>
+      <nav className="layout-nav" aria-label="Darstellung">
+        {([["table", "Tabelle", Table], ["heatmap", "Heatmap", GridFour]] as const).map(([key, label, Icon]) =>
+          <button key={key} className={layout === key ? "active" : ""} aria-pressed={layout === key} onClick={() => setLayout(key)}>
+            <Icon size={14} weight={layout === key ? "fill" : "regular"} aria-hidden />{label}
+          </button>)}
+      </nav>
       <div className="view-toolbar">
         <label className="toolbar-field">
           <span>Markt</span>
@@ -1196,13 +1242,13 @@ function Dashboard({ document }: { document: DashboardDocument }) {
         </label>
         <label className="toolbar-field">
           <span>H2H</span>
-          <select value={h2hView} onChange={(event) => setH2hView(event.target.value as H2hView)}>
+          <select value={h2hView} onChange={(event) => setH2hView(event.target.value as H2hView)} {...tableOnly}>
             {([ ["outcome", "Ergebnis"], ["btts", "BTTS"], ["over", "Über"], ["firstHalfOver", "1. HZ Über"] ] as const).map(([key, label]) => <option value={key} key={key}>{label}</option>)}
           </select>
         </label>
         <label className="toolbar-field">
           <span>Form</span>
-          <select value={formView} onChange={(event) => setFormView(event.target.value as FormView)}>
+          <select value={formView} onChange={(event) => setFormView(event.target.value as FormView)} {...tableOnly}>
             {([ ["outcome", "Ergebnis"], ["btts", "BTTS"], ["over", "Über"], ["firstHalfOver", "1. HZ Über"] ] as const).map(([key, label]) => <option value={key} key={key}>{label}</option>)}
           </select>
         </label>
@@ -1211,7 +1257,8 @@ function Dashboard({ document }: { document: DashboardDocument }) {
           <select
             aria-label={activeLineView === "firstHalfOver" ? "Linie für H2H & Form, 1. Halbzeit" : "Linie für H2H & Form"}
             value={`${counterDirection ? "u" : "o"}:${activeLineView === "firstHalfOver" ? firstHalfOverLine : overLine}`}
-            disabled={activeLineView === null}
+            disabled={activeLineView === null || heatmap}
+            title={tableOnly.title}
             onChange={(event) => {
               const [direction, line] = event.target.value.split(":");
               setCounterDirection(direction === "u");
@@ -1244,7 +1291,25 @@ function Dashboard({ document }: { document: DashboardDocument }) {
       </div>
 
       <div className="table-with-detail">
-      <div className="table-scroll">
+      {heatmap ? <HeatmapTable
+        fixtures={sortedFixtures}
+        markets={heatmapColumns}
+        timezone={document.meta.timezone}
+        now={now}
+        showEdge={showKelly}
+        openFixture={openFixture}
+        onToggleFixture={(fixtureId) => setOpenFixture((value) => value === fixtureId ? null : fixtureId)}
+        cartSlot={(fixture) => <CartAddRadial
+          compact
+          fixture={fixture}
+          cart={cart}
+          open={radialFixtureId === fixture.fixtureId}
+          onOpen={() => setRadialFixtureId(fixture.fixtureId)}
+          onClose={() => setRadialFixtureId((current) => current === fixture.fixtureId ? null : current)}
+          onSelect={(market) => addEntry(toCartEntry(fixture, market))}
+        />}
+        empty={emptyState}
+      /> : <div className="table-scroll">
         <div className={`table-head ${fixtureGridClass}`} style={gridStyle}>
           <span className="fixture-summary-head">
             <button onClick={() => sort("team")} aria-label={sortStateLabel("Partie", sortKey === "team", sortDirection)}>Partie {arrow("team")}</button>
@@ -1330,14 +1395,8 @@ function Dashboard({ document }: { document: DashboardDocument }) {
             </div>
           </article>;
         })}
-        {sortedFixtures.length === 0 && (quickpickActive
-          ? <EmptyState title={`${quickpickLabel} lässt keine Partie übrig`}
-              text={quickpickReason(quickpick.report)}
-              action={<button className="empty-state-action" onClick={() => setQuickpickActive(false)}>
-                Filter aufheben
-              </button>} />
-          : <EmptyState title="Keine Partien für diese Auswahl" text="Wähle einen anderen Zeitraum oder setze den Bewertungsfilter zurück." />)}
-      </div>
+        {sortedFixtures.length === 0 && emptyState}
+      </div>}
       {openFixture !== null && (() => {
         const fixture = sortedFixtures.find((item) => item.fixtureId === openFixture);
         if (!fixture) return null;
