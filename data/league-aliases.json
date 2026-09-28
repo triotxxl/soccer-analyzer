@@ -149,6 +149,11 @@
     "country": "Argentina",
     "league": "Torneo Federal A"
   },
+  "argentinien|torneo federal a promotion playoffs": {
+    "leagueId": 134,
+    "country": "Argentina",
+    "league": "Torneo Federal A"
+  },
   "armenien|premier league": {
     "leagueId": 342,
     "country": "Armenia",
@@ -419,6 +424,16 @@
     "country": "World",
     "league": "CONCACAF Nations League"
   },
+  "concacaf nations league|league a gruppe a": {
+    "leagueId": 536,
+    "country": "World",
+    "league": "CONCACAF Nations League"
+  },
+  "concacaf nations league|league b gruppe a": {
+    "leagueId": 536,
+    "country": "World",
+    "league": "CONCACAF Nations League"
+  },
   "concacaf nations league|league b gruppe d": {
     "leagueId": 536,
     "country": "World",
@@ -563,6 +578,11 @@
     "leagueId": 370,
     "country": "El-Salvador",
     "league": "Primera Division"
+  },
+  "elfenbeinkuste|1 liga": {
+    "leagueId": 386,
+    "country": "Ivory-Coast",
+    "league": "Ligue 1"
   },
   "england|efl pokal": {
     "leagueId": 48,
@@ -724,6 +744,21 @@
     "country": "Georgia",
     "league": "Erovnuli Liga"
   },
+  "griechenland|gamma ethniki gr 10": {
+    "leagueId": 694,
+    "country": "Greece",
+    "league": "Gamma Ethniki - Group 10"
+  },
+  "griechenland|gamma ethniki gr 2": {
+    "leagueId": 577,
+    "country": "Greece",
+    "league": "Gamma Ethniki - Group 2"
+  },
+  "griechenland|gamma ethniki gr 3": {
+    "leagueId": 578,
+    "country": "Greece",
+    "league": "Gamma Ethniki - Group 3"
+  },
   "griechenland|gamma ethniki gr 4": {
     "leagueId": 579,
     "country": "Greece",
@@ -738,6 +773,16 @@
     "leagueId": 581,
     "country": "Greece",
     "league": "Gamma Ethniki - Group 6"
+  },
+  "griechenland|gamma ethniki gr 8": {
+    "leagueId": 583,
+    "country": "Greece",
+    "league": "Gamma Ethniki - Group 8"
+  },
+  "griechenland|gamma ethniki gr 9": {
+    "leagueId": 693,
+    "country": "Greece",
+    "league": "Gamma Ethniki - Group 9"
   },
   "griechenland|pokal hauptrunde": {
     "leagueId": 199,
@@ -934,6 +979,11 @@
     "country": "Italy",
     "league": "Serie A Women"
   },
+  "jamaika|premier league": {
+    "leagueId": 322,
+    "country": "Jamaica",
+    "league": "Premier League"
+  },
   "japan|emperor pokal": {
     "leagueId": 102,
     "country": "Japan",
@@ -1098,6 +1148,11 @@
     "leagueId": 394,
     "country": "Moldova",
     "league": "Super Liga"
+  },
+  "mongolei|premier league": {
+    "leagueId": 764,
+    "country": "Mongolia",
+    "league": "Premier League"
   },
   "montenegro|1 cfl": {
     "leagueId": 355,
@@ -1569,6 +1624,11 @@
     "country": "Tunisia",
     "league": "Ligue 2"
   },
+  "tunesien|ligue 2 gruppe b": {
+    "leagueId": 828,
+    "country": "Tunisia",
+    "league": "Ligue 2"
+  },
   "turkei|1 lig": {
     "leagueId": 204,
     "country": "Turkey",
@@ -1609,6 +1669,11 @@
     "country": "World",
     "league": "UEFA Europa Cup - Women"
   },
+  "uefa nations league|league a gruppe 1": {
+    "leagueId": 5,
+    "country": "World",
+    "league": "UEFA Nations League"
+  },
   "uefa nations league|league a gruppe 2": {
     "leagueId": 5,
     "country": "World",
@@ -1629,12 +1694,27 @@
     "country": "World",
     "league": "UEFA Nations League"
   },
+  "uefa nations league|league b gruppe 2": {
+    "leagueId": 5,
+    "country": "World",
+    "league": "UEFA Nations League"
+  },
   "uefa nations league|league b gruppe 3": {
     "leagueId": 5,
     "country": "World",
     "league": "UEFA Nations League"
   },
+  "uefa nations league|league b gruppe 4": {
+    "leagueId": 5,
+    "country": "World",
+    "league": "UEFA Nations League"
+  },
   "uefa nations league|league c gruppe 1": {
+    "leagueId": 5,
+    "country": "World",
+    "league": "UEFA Nations League"
+  },
+  "uefa nations league|league c gruppe 2": {
     "leagueId": 5,
     "country": "World",
     "league": "UEFA Nations League"
