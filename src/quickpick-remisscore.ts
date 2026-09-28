@@ -72,38 +72,65 @@ export function remisScoreNote(measured: QuickpickMeasurement | null): string {
 export const REMIS_SCORE_LEVELS: Array<QuickpickLevel<RemisScoreLevelValues>> = [
   {
     id: "streng", label: "Streng",
-    measured: { n: 25, proTag: 0.7, trefferquote: 0.4, roi: 0.182 },
-    hint: "Remis-Score ab 16 von 25. 4 von 10 Tipps stimmten, aber nur bei 25 alten Spielen –"
-      + " das kann auch Zufall sein. Weniger als ein Spiel am Tag.",
+    measured: {
+      n: 25, proTag: 0.6, trefferquote: 0.32, roi: -0.036,
+      kombis: [
+        { beine: 2, n: 280, trefferquote: 0.029, quote: 9.12, roi: -0.707, erwartung: -0.071 },
+        { beine: 3, n: 120, trefferquote: 0, quote: 29.33, roi: -1, erwartung: -0.104 },
+        { beine: 4, n: 40, trefferquote: 0, quote: 93.83, roi: -1, erwartung: -0.136 }
+      ]
+    },
+    hint: "Remis-Score ab 16 von 25. Gut 3 von 10 Tipps stimmten, bei nur 25 alten Spielen –"
+      + " nicht besser als die Vorgabe. Weniger als ein Spiel am Tag.",
     values: LEVELS.streng
   },
   {
     id: "ausgewogen", label: "Ausgewogen",
     measured: {
-      n: 83, proTag: 2.4, trefferquote: 0.361, roi: 0.074,
+      n: 77, proTag: 1.9, trefferquote: 0.312, roi: -0.077,
       kombis: [
-        { beine: 2, n: 1480, trefferquote: 0.099, quote: 9.0, roi: -0.095, erwartung: 0.154 },
-        { beine: 3, n: 880, trefferquote: 0.018, quote: 27.2, roi: -0.477, erwartung: 0.239 },
-        { beine: 4, n: 560, trefferquote: 0.004, quote: 82.2, roi: -0.756, erwartung: 0.331 },
-        { beine: 5, n: 400, trefferquote: 0, quote: 247.0, roi: -1, erwartung: 0.43 },
-        { beine: 6, n: 320, trefferquote: 0, quote: 789.2, roi: -1, erwartung: 0.536 },
-        { beine: 7, n: 200, trefferquote: 0, quote: 2223.9, roi: -1, erwartung: 0.649 }
+        { beine: 2, n: 1280, trefferquote: 0.088, quote: 9.09, roi: -0.198, erwartung: -0.149 },
+        { beine: 3, n: 840, trefferquote: 0.037, quote: 27.45, roi: -0.035, erwartung: -0.214 },
+        { beine: 4, n: 440, trefferquote: 0.018, quote: 80.03, roi: 0.348, erwartung: -0.275 },
+        { beine: 5, n: 400, trefferquote: 0.003, quote: 239.98, roi: -0.508, erwartung: -0.331 },
+        { beine: 6, n: 280, trefferquote: 0, quote: 745.69, roi: -1, erwartung: -0.383 },
+        { beine: 7, n: 160, trefferquote: 0, quote: 2037.74, roi: -1, erwartung: -0.43 }
       ]
     },
-    hint: "Remis-Score ab 14 von 25. Gut jedes dritte Spiel endete unentschieden, etwa zwei"
+    hint: "Remis-Score ab 14 von 25. Knapp jedes dritte Spiel endete unentschieden, etwa zwei"
       + " Spiele am Tag. Zuletzt seltener als am Anfang.",
     values: LEVELS.ausgewogen
   },
   {
     id: "locker", label: "Locker",
-    measured: { n: 282, proTag: 7.8, trefferquote: 0.305, roi: -0.077 },
+    measured: {
+      n: 249, proTag: 6.2, trefferquote: 0.301, roi: -0.089,
+      kombis: [
+        { beine: 2, n: 4800, trefferquote: 0.083, quote: 9.43, roi: -0.239, erwartung: -0.17 },
+        { beine: 3, n: 3000, trefferquote: 0.023, quote: 28.83, roi: -0.37, erwartung: -0.243 },
+        { beine: 4, n: 2200, trefferquote: 0.004, quote: 90.15, roi: -0.658, erwartung: -0.31 },
+        { beine: 5, n: 1680, trefferquote: 0.001, quote: 268.2, roi: -0.612, erwartung: -0.372 },
+        { beine: 6, n: 1360, trefferquote: 0, quote: 839.57, roi: -1, erwartung: -0.427 },
+        { beine: 7, n: 1040, trefferquote: 0, quote: 2617.96, roi: -1, erwartung: -0.478 }
+      ]
+    },
     hint: "Remis-Score ab 12 von 25. Knapp jedes dritte Spiel endete unentschieden – nur wenig"
       + " mehr als ohne Filter. Unterm Strich ein Verlust.",
     values: LEVELS.locker
   },
   {
     id: "weit", label: "Weit",
-    measured: { n: 690, proTag: 18.8, trefferquote: 0.28, roi: -0.131 },
+    measured: {
+      n: 599, proTag: 14.9, trefferquote: 0.277, roi: -0.122,
+      kombis: [
+        { beine: 2, n: 11800, trefferquote: 0.074, quote: 10.13, roi: -0.269, erwartung: -0.229 },
+        { beine: 3, n: 7680, trefferquote: 0.02, quote: 32.39, roi: -0.348, erwartung: -0.323 },
+        { beine: 4, n: 5720, trefferquote: 0.005, quote: 103.21, roi: -0.486, erwartung: -0.406 },
+        { beine: 5, n: 4480, trefferquote: 0.001, quote: 330.63, roi: -0.566, erwartung: -0.478 },
+        { beine: 6, n: 3640, trefferquote: 0, quote: 1060.73, roi: -0.836, erwartung: -0.542 },
+        { beine: 7, n: 3000, trefferquote: 0, quote: 3331.63, roi: 0.158, erwartung: -0.598 }
+      ]
+    },
     hint: "Remis-Score ab 10 von 25. Nur zum Überblick: kaum mehr Unentschieden als ohne Filter,"
       + " unterm Strich ein deutlicher Verlust.",
     values: LEVELS.weit

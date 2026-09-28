@@ -96,7 +96,11 @@ function quotedResult(market: TipicoMarket | undefined, values: string[]): numbe
     normalized.has(item.caption.toLocaleLowerCase()) ||
     normalized.has((item.choiceParam ?? "").toLocaleLowerCase())
   );
-  return Number.isFinite(result?.quoteFloatValue) ? result?.quoteFloatValue : undefined;
+  // Tipico führt eine ausgesetzte oder nicht angebotene Auswahl mit 0. Eine Quote unter 1 gibt
+  // es nicht, deshalb heißt das "keine Quote" - sonst landet die 0 im Snapshot und lädt
+  // nachgelagerte Ersatzwege ein (Prüfung Dominanz vom 28.09.2026).
+  const value = result?.quoteFloatValue;
+  return typeof value === "number" && Number.isFinite(value) && value > 1 ? value : undefined;
 }
 
 function oddsForEvent(

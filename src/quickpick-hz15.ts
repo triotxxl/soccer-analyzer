@@ -153,32 +153,32 @@ export const HZ15_LEVELS: Array<QuickpickLevel<Hz15LevelValues>> = [
   {
     id: "streng", label: "Streng",
     measured: {
-      n: 136, proTag: 4.7, trefferquote: 0.596, roi: 0.073,
+      n: 134, proTag: 5.8, trefferquote: 0.597, roi: 0.068,
       kombis: [
-        { beine: 2, n: 2520, trefferquote: 0.337, quote: 3.23, roi: 0.095, erwartung: 0.152 },
-        { beine: 3, n: 1600, trefferquote: 0.159, quote: 5.79, roi: -0.075, erwartung: 0.236 },
-        { beine: 4, n: 1160, trefferquote: 0.079, quote: 10.34, roi: -0.175, erwartung: 0.326 },
-        { beine: 5, n: 880, trefferquote: 0.031, quote: 18.67, roi: -0.4, erwartung: 0.423 },
-        { beine: 6, n: 680, trefferquote: 0.01, quote: 34.13, roi: -0.684, erwartung: 0.527 },
-        { beine: 7, n: 480, trefferquote: 0.004, quote: 60.26, roi: -0.783, erwartung: 0.639 }
+        { beine: 2, n: 2520, trefferquote: 0.351, quote: 3.21, roi: 0.119, erwartung: 0.14 },
+        { beine: 3, n: 1640, trefferquote: 0.2, quote: 5.76, roi: 0.139, erwartung: 0.218 },
+        { beine: 4, n: 1080, trefferquote: 0.131, quote: 10.33, roi: 0.351, erwartung: 0.301 },
+        { beine: 5, n: 920, trefferquote: 0.06, quote: 18.54, roi: 0.079, erwartung: 0.389 },
+        { beine: 6, n: 720, trefferquote: 0.024, quote: 32.79, roi: -0.192, erwartung: 0.483 },
+        { beine: 7, n: 600, trefferquote: 0.01, quote: 59.75, roi: -0.404, erwartung: 0.584 }
       ]
     },
     hint: "Quote höchstens 1,95, und bei beiden Mannschaften müssen zuletzt oft zwei Tore"
       + " bis zur Pause gefallen sein. 6 von 10 Tipps stimmen – die beste Stufe, aber nur"
-      + " knapp fünf Spiele am Tag.",
+      + " knapp sechs Spiele am Tag.",
     values: LEVELS.streng
   },
   {
     id: "ausgewogen", label: "Ausgewogen",
     measured: {
-      n: 277, proTag: 9.2, trefferquote: 0.556, roi: 0.024,
+      n: 256, proTag: 10.9, trefferquote: 0.535, roi: -0.022,
       kombis: [
-        { beine: 2, n: 5400, trefferquote: 0.298, quote: 3.43, roi: 0.009, erwartung: 0.049 },
-        { beine: 3, n: 3480, trefferquote: 0.166, quote: 6.36, roi: 0.034, erwartung: 0.074 },
-        { beine: 4, n: 2520, trefferquote: 0.09, quote: 11.77, roi: 0.018, erwartung: 0.1 },
-        { beine: 5, n: 2000, trefferquote: 0.046, quote: 21.88, roi: -0.018, erwartung: 0.126 },
-        { beine: 6, n: 1600, trefferquote: 0.022, quote: 40.71, roi: -0.176, erwartung: 0.153 },
-        { beine: 7, n: 1360, trefferquote: 0.005, quote: 76.1, roi: -0.644, erwartung: 0.181 }
+        { beine: 2, n: 4960, trefferquote: 0.273, quote: 3.41, roi: -0.087, erwartung: -0.043 },
+        { beine: 3, n: 3240, trefferquote: 0.14, quote: 6.29, roi: -0.145, erwartung: -0.064 },
+        { beine: 4, n: 2360, trefferquote: 0.075, quote: 11.6, roi: -0.154, erwartung: -0.085 },
+        { beine: 5, n: 1880, trefferquote: 0.031, quote: 21.56, roi: -0.343, erwartung: -0.105 },
+        { beine: 6, n: 1440, trefferquote: 0.015, quote: 39.72, roi: -0.385, erwartung: -0.124 },
+        { beine: 7, n: 1280, trefferquote: 0.008, quote: 74.26, roi: -0.474, erwartung: -0.143 }
       ]
     },
     hint: "Quote höchstens 2,00, ohne Blick auf die letzten Halbzeiten. Gut 5 von 10 Tipps"
@@ -188,31 +188,31 @@ export const HZ15_LEVELS: Array<QuickpickLevel<Hz15LevelValues>> = [
   {
     id: "locker", label: "Locker",
     measured: {
-      n: 368, proTag: 12.2, trefferquote: 0.527, roi: -0.004,
+      n: 351, proTag: 15, trefferquote: 0.51, roi: -0.038,
       kombis: [
-        { beine: 2, n: 7160, trefferquote: 0.268, quote: 3.64, roi: -0.047, erwartung: -0.007 },
-        { beine: 3, n: 4760, trefferquote: 0.143, quote: 6.94, roi: -0.036, erwartung: -0.011 },
-        { beine: 4, n: 3440, trefferquote: 0.067, quote: 13.23, roi: -0.158, erwartung: -0.015 },
-        { beine: 5, n: 2680, trefferquote: 0.038, quote: 25.29, roi: -0.119, erwartung: -0.019 },
-        { beine: 6, n: 2160, trefferquote: 0.018, quote: 48.22, roi: -0.233, erwartung: -0.022 },
-        { beine: 7, n: 1760, trefferquote: 0.009, quote: 92.38, roi: -0.349, erwartung: -0.026 }
+        { beine: 2, n: 6840, trefferquote: 0.255, quote: 3.64, roi: -0.095, erwartung: -0.075 },
+        { beine: 3, n: 4560, trefferquote: 0.124, quote: 6.96, roi: -0.171, erwartung: -0.11 },
+        { beine: 4, n: 3320, trefferquote: 0.058, quote: 13.25, roi: -0.274, erwartung: -0.144 },
+        { beine: 5, n: 2560, trefferquote: 0.026, quote: 25.31, roi: -0.36, erwartung: -0.177 },
+        { beine: 6, n: 2160, trefferquote: 0.012, quote: 48.28, roi: -0.461, erwartung: -0.208 },
+        { beine: 7, n: 1760, trefferquote: 0.005, quote: 91.44, roi: -0.6, erwartung: -0.238 }
       ]
     },
     hint: "Quote höchstens 2,10. Mehr Spiele, aber nur noch etwa jeder zweite Tipp stimmt,"
-      + " und unterm Strich bleibt nichts übrig.",
+      + " und unterm Strich ein kleiner Verlust.",
     values: LEVELS.locker
   },
   {
     id: "weit", label: "Weit",
     measured: {
-      n: 631, proTag: 20.8, trefferquote: 0.477, roi: -0.039,
+      n: 583, proTag: 24.8, trefferquote: 0.453, roi: -0.093,
       kombis: [
-        { beine: 2, n: 12440, trefferquote: 0.225, quote: 4.21, roi: -0.087, erwartung: -0.076 },
-        { beine: 3, n: 8120, trefferquote: 0.109, quote: 8.65, roi: -0.112, erwartung: -0.111 },
-        { beine: 4, n: 6080, trefferquote: 0.05, quote: 17.77, roi: -0.195, erwartung: -0.146 },
-        { beine: 5, n: 4840, trefferquote: 0.025, quote: 36.5, roi: -0.203, erwartung: -0.178 },
-        { beine: 6, n: 3840, trefferquote: 0.011, quote: 75.01, roi: -0.301, erwartung: -0.21 },
-        { beine: 7, n: 3400, trefferquote: 0.007, quote: 153.6, roi: -0.137, erwartung: -0.241 }
+        { beine: 2, n: 11600, trefferquote: 0.199, quote: 4.19, roi: -0.196, erwartung: -0.178 },
+        { beine: 3, n: 7560, trefferquote: 0.091, quote: 8.57, roi: -0.26, erwartung: -0.255 },
+        { beine: 4, n: 5680, trefferquote: 0.038, quote: 17.54, roi: -0.373, erwartung: -0.325 },
+        { beine: 5, n: 4480, trefferquote: 0.017, quote: 35.89, roi: -0.423, erwartung: -0.388 },
+        { beine: 6, n: 3680, trefferquote: 0.008, quote: 73.7, roi: -0.474, erwartung: -0.445 },
+        { beine: 7, n: 3120, trefferquote: 0.001, quote: 151.56, roi: -0.791, erwartung: -0.497 }
       ]
     },
     hint: "Quote höchstens 2,40. Nur zum Überblick: Weniger als jeder zweite Tipp stimmt,"
@@ -315,10 +315,10 @@ export const HZ15_PRESET: QuickpickPreset<Hz15QuickpickSettings> = {
         + ` (an ${measured.n} alten Wetten geprüft). Ohne Filter sind es nur 35 %. In einer Kombi`
         + ` müssen alle Tipps stimmen – deshalb zählt genau dieser Wert.`
   }),
-  honesty: "Der Filter hilft deutlich: Statt 35 von 100 Spielen stimmen gut 55. Aber der"
+  honesty: "Der Filter hilft deutlich: Statt 35 von 100 Spielen stimmen gut 50. Aber der"
     + " größere Teil davon kommt aus der Quotengrenze, also aus der Meinung des Buchmachers –"
     + " das Modell steuert nur wenig bei. Und für Kombis bleibt es schwierig: Ein Schein mit"
-    + " vier Spielen geht in 9 von 100 Fällen durch, mit sechs Spielen in 2 von 100.",
+    + " vier Spielen geht in 7 von 100 Fällen durch, mit sechs Spielen in 1 bis 2 von 100.",
   wettschein: {
     hinweis: "Legt jedes gefundene Spiel als „1. Halbzeit über 1,5 Tore“ in den Wettschein."
       + " Ein Sieger-Tipp zum selben Spiel bleibt daneben bestehen."

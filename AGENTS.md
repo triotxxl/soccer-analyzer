@@ -686,6 +686,16 @@ anderen ausdrücklich nicht.
   (`TIPICO_BOOK = 1,1068`, Median über 6.135 Ereignisse): Die **Seite** stimmt dann zu 97,6 %,
   der **Preis** liegt im Median 7,1 % daneben (p90 18,4 %). Solche Zeilen tragen in der App ein
   `≈` und dürfen **nicht** in den Wettschein.
+- **Die Rückrechnung rechnet die Tabellen der Läufe bis 03.09.2026 neu** (`tools/snapshot-history.ts`,
+  seit 28.09.2026). Diese Läufe summierten mehrere Saisons - alle 7.669 nachrechenbaren Tabellen
+  waren gemischt. Der Leser rechnet sie beim Einlesen mit `buildTable` und `tableScopeOf` aus den
+  Saison-Ansetzungen im API-Cache nach (Liga und Saison aus `fixture_results`, kein Aufruf); die
+  Snapshot-Dateien bleiben unverändert. Tabellen vor dem ersten Spieltag werden leer, die Partie
+  ist dann „nicht prüfbar“ wie in einem heutigen Lauf. **Nicht nachgerechnet** sind
+  `scores.favorite` und `scores.draw` dieser Läufe - sie brauchen Formlisten, Quoten und Duelle.
+  Dominanz und Remis-Score sind damit ganz korrigiert, Daves 1x2 nur beim Tabellenvorsprung.
+  Wirkung: Dominanz um 2 bis 6 Punkte schlechter, Remis-Score-Trefferquote um bis zu 8 Punkte
+  niedriger, Daves unverändert.
 
 ### „Daves 1x2-Filter": klar überlegene Mannschaften
 
@@ -744,6 +754,12 @@ anderen ausdrücklich nicht.
   70 stammt aus einem Durchprobieren der Regler an genau diesen Daten. Einzelne Tore gemessen:
   Punkte >= 70 allein 61,4 %, Venue-Form allein 50,8 %, H2H-Veto allein 46,7 % - letzteres
   trägt zur Trefferquote also nichts bei und steht dort, damit der Filter hält, was er zusagt.
+- **„Modellseite“ heißt hier `pick` aus `scores.favorite`, und das ist meist der Favorit der
+  Buchmacher.** `src/favorite-criteria.ts` wählt die Seite zuerst über den Median der
+  API-Football-Quoten (ohne Tipico), erst ohne Quoten über Tabelle und Form. In rund jedem
+  vierten Spiel weicht das vom Poisson-Favoriten ab (Prüfung vom 28.09.2026). **Das bleibt so -
+  Davids Entscheidung vom 28.09.2026: „Daves Filter bleibt Daves Filter, dafür haben wir die
+  Modell-Filter.“** Nicht auf den Poisson-Favoriten umstellen und nicht erneut als Fehler melden.
 - Gegen die **Modellseite** wird *hier* nicht getippt: Solche Zeilen lagen in der Rückrechnung
   bei 29,5 % Treffern. Die Voreinstellung „Dominanz" lässt sie zu, markiert sie aber - dort
   bestimmen die Kriterien die Seite, nicht der Modelltipp.
@@ -792,7 +808,7 @@ anderen ausdrücklich nicht.
   auswärts spielende Seite dort strukturell schlechter dasteht. Was David „Form" nennt, ist die
   **Saisonbilanz aus der Tabelle**: `(Siege + Remis) / Spiele`, in `superiorityOf` als
   `nonLossGap` in Prozentpunkten. Wer das Formtor wieder einbaut, entfernt genau die Partien,
-  um die es geht - der Regressionstest in `src/quickpick.test.ts` hält das fest.
+  um die es geht - der Regressionstest in `frontend/src/quickpick.test.ts` hält das fest.
 - **Die Kerntore staffeln nie**: `minPointsPerGame` 0,3, `minPositionGap` 3, `minNonLossGap` 10
   sind die Identität der Voreinstellung. Gestaffelt werden nur Quotenband, Serienlänge und die
   Modellseite.
@@ -801,12 +817,14 @@ anderen ausdrücklich nicht.
   trifft im Band 1,00-1,50 in **73,8 %** der Fälle gegenüber 37,2 % ohne jeden Filter - aber ab
   3,00 nur noch 17,3 % bei -42,0 % Ertrag. **Die Trefferquote folgt der Quote fast exakt; der
   Markt preist diese Kriterien ein.** Keine Variante lag über null.
-- Die Stufen der **gebauten** Regel (Stand 16.09.2026, eigene Messung über `quickpick-report`):
-  streng 3,4/Tag bei **-11,7 %**, ausgewogen 5,0 bei **-11,4 %**, locker 9,4 bei -10,6 %, weit
-  40,1 bei -12,1 %. Bei rund zehn Punkten Streuung je Stufe sind diese vier Zahlen
-  **untereinander nicht trennbar** - wer eine Stufe als „die bessere" verkauft, überliest die
-  Streuung. Vorgabe ist `ausgewogen`: gleicher gemessener Ertrag bei anderthalbmal so vielen
-  Partien.
+- Die Stufen der **gebauten** Regel (Stand 28.09.2026, 6.578 abgerechnete Partien, nach der
+  Korrektur des Gegenpreis-Fehlers unten und mit neu gerechneten Tabellen der Läufe bis 03.09.):
+  streng 3,2/Tag bei **-16,1 ± 9,0 %**, ausgewogen 4,7 bei **-15,0 ± 8,3 %**, locker 8,7 bei
+  -11,5 ± 5,6 %, weit 49,3 bei -11,0 ± 2,6 %. Diese vier
+  Zahlen sind **untereinander nicht trennbar** - wer eine Stufe als „die bessere" verkauft,
+  überliest die Streuung. Vorgabe ist `ausgewogen`: gleicher gemessener Ertrag bei
+  anderthalbmal so vielen Partien. Die Prüfung vom 28.09.2026 fand je Quotenbereich keinen
+  Abstand zwischen Kern und allen Seiten: Der Markt preist die Kriterien weiter ein.
 - **Die Zahlen der Vorabmessung dürfen nicht auf die Stufen geschrieben werden.** Die Zelle
   „Kern + Serie >= 2 + Modellseite, 1,8-2,5" maß -4,1 %, die gebaute Stufe `streng` misst
   -11,7 % - beides innerhalb einer Standardabweichung, aber ein anderer Schätzer: Die
@@ -814,8 +832,8 @@ anderen ausdrücklich nicht.
   Snapshot, und beide decken sich nur in 83,6 % der Fälle. Verbindlich ist immer, was der
   Report an der gebauten Regel misst.
 - **Kurze Kombis kosten mehr, nicht weniger.** Aus der Vorgabestufe, gezogen über zwei
-  Spieltage: Zweier -21,1 %, Dreier -34,5 %, Vierer -48,6 %, Fünfer **-60,1 %** bei 0,9 %
-  Trefferquote, Siebener 0 Treffer in 600 Ziehungen. Eine Kombi multipliziert den Ertrag je
+  Spieltage (Stand 28.09.2026): Zweier -30,3 %, Dreier -36,5 %, Vierer -49,7 %, Fünfer
+  **-80,7 %** bei 0,4 % Trefferquote, Siebener 0 Treffer in 760 Ziehungen. Eine Kombi multipliziert den Ertrag je
   Bein; die Spalte `erwartet` = `(1 + Ertrag je Bein)^Beine` steht im Report daneben, damit
   auffällt, wenn die Stichprobe zu dünn ist.
 - **Nicht einbauen:** Ein Value-Tor über die Modellwahrscheinlichkeit gegen den Markt zeigte
@@ -826,9 +844,17 @@ anderen ausdrücklich nicht.
   (`schemaVersion: 5`). Ältere Läufe führen sie nicht; dort greift `counterOddsOf` mit dem
   gemessenen Buchmacherzuschlag `TIPICO_BOOK`. `DominanzDetail.oddsSource` sagt, welcher Weg
   gegriffen hat.
+- **`counterOddsOf` nur für die Seite gegen den Modelltipp.** Es liefert per Definition den
+  Preis der Gegenseite des Tipps. Bis zum 28.09.2026 griff es auch, wenn die gestützte Seite
+  der Tipp war, aber keinen Preis hatte (Tipico führte dort 0) - dann bekam der Favorit den
+  Preis des Außenseiters: Chelsea W zu 23,00, FC Noah zu 13,00, Barcelona W zu 15,00. Die drei
+  Siege machten aus „Locker" −9,3 % ein scheinbares +3,5 %, und in der App wären sie mit
+  diesem Preis in den Wettschein gegangen. Seitdem gilt: eigener Preis fehlt → `keineQuote`,
+  und `src/tipico.ts` liest eine Tipico-0 als fehlende Quote statt als Quote.
 - **`h2hSummary` filtert keine Testspiele.** Eine „Serie 3" kann auf einem Freundschaftsspiel
   stehen. Der Spaltentitel sagt das; eine Korrektur wäre eine Backend-Änderung an
-  `src/h2h.ts` und träfe auch die Remis-Punkte.
+  `h2hSummary` in `src/draw-criteria.ts` (und der Cross-League-Fassung) und träfe auch die
+  Remis-Punkte.
 
 ### „Erste Halbzeit: zwei Tore": eine Torlinie statt einer Mannschaft
 
@@ -865,6 +891,10 @@ anderen ausdrücklich nicht.
   **kein besserer Filter, sondern ein anderer Abrechnungskurs**: Der Report rechnet zum Preis
   aus dem Lauf ab, die Vorabmessung zum letzten archivierten Tipico-Preis vor Anpfiff. Für
   eine Torlinie gibt es keinen Ersatzpreis aus dem 1X2-Tripel.
+  Nachkalibriert 28.09.2026, **nur Modellversion 3.2.0** (3.695 Partien, siehe
+  `MODEL_BOUND_PRESETS` in `tools/quickpick-report.ts`): streng 5,8/Tag bei 59,7 % und +6,8 %,
+  ausgewogen 10,9 bei 53,5 % und −2,2 %, locker 15,0 bei 51,0 % und −3,8 %, weit 24,8 bei 45,3 %
+  und −9,3 %. Über die Versionen stabil - der Filter hängt kaum an der Modellversion.
 - **Zwei Warnzeichen gehören zu diesen Zahlen.** Die zweite Zeithälfte liegt auf **allen vier**
   Stufen unter der ersten (−4,4 / −3,2 / −3,2 / −6,2 Punkte) - einzeln innerhalb der Streuung,
   aber viermal dasselbe Vorzeichen. Und die Schwellen 3,2 / 0,23 / 2,00 wurden auf denselben
@@ -924,6 +954,16 @@ anderen ausdrücklich nicht.
   +8,4 %, weit 13,6 bei 32,9 % und −0,4 %. Vorgabe ist `ausgewogen`: die stabilste Stufe
   (36,1 % gegen 40,2 % in den Zeithälften), während `streng` mit 33,3 % gegen 47,6 % weit
   auseinanderläuft.
+- **Mit dem laufenden Modell trägt dieser Filter kaum noch** (Nachkalibrierung 28.09.2026, nur
+  Modellversion 3.2.0, 3.695 Partien - Davids Entscheidung, modellgebundene Filter nur am
+  laufenden Modell zu messen): streng 1,2/Tag bei **20,7 ± 7,5 %** und −44,8 %, ausgewogen 2,6
+  bei **27,9 ± 5,7 %** und −25,2 %, locker 3,2 bei 32,5 % und −5,0 %, weit 6,7 bei 28,1 % und
+  −16,9 %. Über alle Versionen waren es 37,7 / 36,1 / 35,1 / 31,9 %. Grund: Unter 3.2.0 haben
+  nur 2,0 % der Spiele p(Remis) >= 0,30, unter den älteren Versionen 7,9 % - das Tor greift
+  seltener und trifft schlechter. `streng` liegt unter der Basisrate, bei 29 Tipps aber
+  innerhalb der Streuung. Die Staffelung ordnet die Stufen damit nicht mehr; ob Vorgabe oder
+  Schwelle anders gehören, ist eine Entscheidung für David und braucht mehr Daten des
+  laufenden Modells, nicht ein Durchprobieren an diesen.
 - **Die Ertragsspalte der Kombitabelle ist ab vier Beinen wertlos.** In `streng` misst der
   Fünfer +554 % - drei Treffer aus 720 Ziehungen bei Ø-Quote 147; in `ausgewogen` misst
   derselbe Fünfer −57 %. Belastbar ist allein die Trefferquote je Bein. Ein Vierer geht in

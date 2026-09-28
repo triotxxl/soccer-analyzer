@@ -182,3 +182,40 @@ test("liest die einzige angebotene Torlinie, auch wenn es die 3,5er ist", async 
     await rm(directory, { recursive: true, force: true });
   }
 });
+
+test("liest eine Tipico-Quote 0 als fehlende Quote", async () => {
+  // Tipico führt eine ausgesetzte Auswahl mit 0 (Chelsea W – Birmingham W, 28.09.2026). Im
+  // Snapshot stand sie als Quote, und der Dominanz-Filter setzte dafür den Preis des Gegners ein.
+  const directory = await mkdtemp(path.join(os.tmpdir(), "tipico-zero-"));
+  const filename = path.join(directory, "data.json");
+  const kickoff = Date.parse("2026-08-11T18:00:00Z");
+  await writeFile(filename, JSON.stringify({
+    SELECTION: {
+      sportCompetitionMap: { soccer: [{ groupId: 42, name: "Bundesliga", parentName: "Deutschland" }] },
+      events: {
+        "902": {
+          id: "902", eventStartTime: kickoff, status: "pre_match",
+          team1: "Heim FC", team2: "Gast 04", team1Id: 10, team2Id: 20, competitionId: 42
+        }
+      },
+      matchOddGroups: {
+        "902": {
+          standard: [{ results: [
+            { caption: "1", quoteFloatValue: 0 },
+            { caption: "X", quoteFloatValue: 9.5 },
+            { caption: "2", quoteFloatValue: 23 }
+          ] }]
+        }
+      }
+    }
+  }), "utf8");
+  try {
+    const result = await importTipicoData(filename, "today", new Date("2026-08-11T10:00:00Z"), "Europe/Berlin");
+    const odds = result.input.tipicoOdds?.[0];
+    assert.equal(odds?.home, undefined);
+    assert.equal(odds?.draw, 9.5);
+    assert.equal(odds?.away, 23);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});

@@ -100,6 +100,24 @@ Nachgerechnet wird mit `npm run quickpick-report`: Der Report misst jede Stufe n
 sie mit den Zahlen auf den Knöpfen und meldet, wenn sie auseinanderlaufen. Fällig ist das alle
 2.000 neu abgerechneten Partien; er sagt selbst, wie viele seither dazugekommen sind.
 
+> **Wiedervorlage – wann nachjustiert wird** (Stand 28.09.2026, 6.578 abgerechnete Partien)
+>
+> 1. **Remis-Kandidaten: Vorgabe und 30-%-Schwelle prüfen, sobald „Ausgewogen“ auf dem
+>    laufenden Modell mindestens 200 Tipps hat** – bei 2,6 Tipps am Tag etwa um den
+>    **20.11.2026**. Am 28.09. waren es 61 Tipps mit 27,9 % Treffern, kaum mehr als ohne Filter
+>    (25 %). Nachsehen mit `npm run quickpick-report -- --preset remis`, Spalte `n`. Vorher nicht
+>    an der Schwelle drehen: Auf 61 Tipps würde man sie an den Zufall anpassen.
+> 2. **Neue Modellversion** (`goalLineModelVersion` in `src/config.ts`): „Erste Halbzeit“ und
+>    „Remis-Kandidaten“ werden nur am laufenden Modell gemessen und starten danach bei null.
+>    Die Knopfzahlen erst ersetzen, wenn „Ausgewogen“ je Filter wieder mindestens 100 Tipps hat;
+>    bis dahin gelten die alten mit dem Zusatz, dass sie zum Vorgänger gehören.
+> 3. **Alle Filter alle 2.000 neu abgerechneten Partien** – als Nächstes Daves 1x2 bei 7.628,
+>    alle übrigen bei 8.578. Der Report meldet „FÄLLIG“ von selbst.
+> 4. **Daves 1x2: nur noch Analysen ab 04.09. werten, sobald die Vorgabe dort mindestens 300
+>    Tipps hat** (am 28.09. waren es 162). Die Favoritenpunkte der Analysen bis 03.09. standen auf
+>    der gemischten Tabelle und lassen sich nicht nachrechnen; die Tabellen selbst werden beim
+>    Einlesen korrigiert.
+
 #### Voreinstellung „Dominanz zum Kombipreis"
 
 Oben im Panel lässt sich auf **Dominanz zum Kombipreis** umschalten. Der sucht Partien wie
@@ -131,14 +149,16 @@ Tipp** statt der Trefferquote — und er ist auf allen vier negativ:
 
 | Stufe | Tipps je Tag | Treffer je Tipp | Gewinn je Tipp |
 |---|---|---|---|
-| Streng | 3,4 | 44,2 % | −11,7 % |
-| **Ausgewogen** (Vorgabe) | 5,0 | 40,3 % | −11,4 % |
-| Locker | 9,4 | 47,2 % | −10,6 % |
-| Weit | 40,1 | 42,7 % | −12,1 % |
+| Streng | 3,2 | 40,9 % | −16,1 % |
+| **Ausgewogen** (Vorgabe) | 4,7 | 37,4 % | −15,0 % |
+| Locker | 8,7 | 45,5 % | −11,5 % |
+| Weit | 49,3 | 41,7 % | −11,0 % |
 
-Die Schwankung beträgt je Stufe rund zehn Punkte — die vier Zahlen sind untereinander nicht
-trennbar. „Ausgewogen" ist die Vorgabe, weil es bei gleichem gemessenem Ertrag anderthalbmal so
-viele Partien zeigt.
+Stand 28.09.2026, nach zwei Korrekturen: Wo Tipico für den Favoriten keine Quote führte, bekam
+er früher die Quote des Gegners (Chelsea Frauen zu 23,00) – das machte „Locker“ zum Schein
+positiv. Und die Tabellen der Analysen bis 03.09. werden jetzt neu gerechnet, weil sie mehrere
+Saisons zusammenzählten. Die vier Zahlen sind untereinander nicht trennbar. „Ausgewogen" ist
+die Vorgabe, weil es bei gleichem gemessenem Ertrag anderthalbmal so viele Partien zeigt.
 
 **Für kurze Kombis ist genau dieser Wert entscheidend**, denn eine Kombi multipliziert den
 Gewinn je Tipp — nicht die Quote. Eine hohe Gesamtquote macht den Gewinn seltener, nicht
@@ -147,13 +167,13 @@ gezogen über je zwei Spieltage (der Umfang eines üblichen Laufs):
 
 | Tipps | Quote Ø | Treffer | Ertrag | erwartet |
 |---|---|---|---|---|
-| 2 | 5,2 | 16,2 % | −21,1 % | −21,5 % |
-| 3 | 11,9 | 6,4 % | −34,5 % | −30,5 % |
-| 4 | 27,4 | 2,5 % | −48,6 % | −38,4 % |
-| 5 | 60,5 | 0,9 % | **−60,1 %** | −45,4 % |
-| 7 | 321,9 | 0,0 % | −100 % | −57,2 % |
+| 2 | 5,4 | 13,5 % | −30,3 % | −27,7 % |
+| 3 | 12,5 | 5,5 % | −36,5 % | −38,5 % |
+| 4 | 28,6 | 2,1 % | −49,7 % | −47,7 % |
+| 5 | 65,3 | 0,4 % | **−80,7 %** | −55,5 % |
+| 7 | 355,3 | 0,0 % | −100 % | −67,8 % |
 
-Die Fünferkombi, um die es geht, gab im Schnitt 40 % des Einsatzes zurück; über 600
+Die Fünferkombi, um die es geht, gab im Schnitt ein Fünftel des Einsatzes zurück; über 760
 gezogene Siebenerkombis kam keine einzige durch. Weichen „Ertrag" und „erwartet" weit
 voneinander ab, ist nicht die Rechnung falsch, sondern die Stichprobe zu dünn.
 
@@ -194,29 +214,29 @@ Schönheitsfehler, sondern die ehrliche Beschreibung dessen, was der Filter tut.
 
 | Stufe | Tipps je Tag | Treffer je Tipp | Gewinn je Tipp | 1. / 2. Zeithälfte |
 |---|---|---|---|---|
-| Streng | 4,7 | **59,6 %** | +7,3 % | 61,8 / 57,4 % |
-| **Ausgewogen** (Vorgabe) | 9,2 | 55,6 % | +2,4 % | 57,2 / 54,0 % |
-| Locker | 12,2 | 52,7 % | −0,4 % | 54,3 / 51,1 % |
-| Weit | 20,8 | 47,7 % | −3,9 % | 50,8 / 44,6 % |
+| Streng | 5,8 | **59,7 %** | +6,8 % | 59,7 / 59,7 % |
+| **Ausgewogen** (Vorgabe) | 10,9 | 53,5 % | −2,2 % | 55,5 / 51,6 % |
+| Locker | 15,0 | 51,0 % | −3,8 % | 52,6 / 49,4 % |
+| Weit | 24,8 | 45,3 % | −9,3 % | 45,4 / 45,2 % |
 
-**Zwei Warnzeichen gehören zu diesen Zahlen.** Die zweite Zeithälfte liegt auf allen vier
-Stufen unter der ersten — einzeln innerhalb der Schwankung, aber viermal mit demselben
-Vorzeichen. Und die Schwellen wurden auf denselben Daten gesucht, gegen die gemessen wird.
+Stand 28.09.2026, **gemessen nur am laufenden Modell** (Version 3.2.0, 3.695 Partien). Über alle
+Modellversionen sah es fast gleich aus – dieser Filter hängt kaum an der Version. **Ein
+Warnzeichen gehört dazu:** Die Schwellen wurden auf denselben Daten gesucht, gegen die gemessen
+wird.
 
-**Für Kombis trägt die Messung bis vier Tipps, darüber nicht mehr.** Aus der Vorgabestufe,
-gezogen über je zwei Spieltage:
+**Für Kombis verliert jede Länge.** Aus der Vorgabestufe, gezogen über je zwei Spieltage:
 
 | Tipps | Treffer | Ertrag | erwartet |
 |---|---|---|---|
-| 2 | 29,8 % | +0,9 % | +4,9 % |
-| 3 | 16,6 % | +3,4 % | +7,4 % |
-| 4 | 9,0 % | +1,8 % | +10,0 % |
-| 5 | 4,7 % | −1,8 % | +12,6 % |
-| 6 | 2,2 % | **−17,6 %** | +15,3 % |
-| 7 | 0,5 % | **−64,4 %** | +18,1 % |
+| 2 | 27,3 % | −8,7 % | −4,3 % |
+| 3 | 14,0 % | −14,5 % | −6,4 % |
+| 4 | 7,5 % | −15,4 % | −8,5 % |
+| 5 | 3,1 % | −34,3 % | −10,5 % |
+| 6 | 1,5 % | **−38,5 %** | −12,4 % |
+| 7 | 0,8 % | **−47,4 %** | −14,3 % |
 
-Ein Sechser geht hier in etwa jedem fünfundvierzigsten Fall durch. Zum Vergleich: Der
-1x2-Filter liefert bei 69 % je Tipp eine Sechserkombi in rund 11 % der Fälle. Wer auf diesem
+Ein Sechser geht hier in etwa jedem siebzigsten Fall durch. Zum Vergleich: Der
+1x2-Filter liefert bei 67 % je Tipp eine Sechserkombi in rund 8 % der Fälle. Wer auf diesem
 Markt sechs oder sieben Tipps spielt, spielt sie auf Verdacht.
 
 **Die Ertragsspalte dieser Tabelle schwankt stark mit der Ziehung** — bei 0,5 % Trefferchance
@@ -252,17 +272,21 @@ stehen deshalb als Spalten in der Trefferliste, nicht als Bedingung.
 
 | Stufe | Tipps je Tag | Treffer je Tipp | Gewinn je Tipp | 1. / 2. Zeithälfte |
 |---|---|---|---|---|
-| Streng | 3,8 | **40,5 %** | +9,6 % | 33,3 / **47,6 %** |
-| **Ausgewogen** (Vorgabe) | 5,9 | 38,1 % | +3,5 % | 36,1 / 40,2 % |
-| Locker | 8,3 | 36,2 % | +8,4 % | 35,5 / 37,0 % |
-| Weit | 13,6 | 32,9 % | −0,4 % | 35,4 / 30,4 % |
+| Streng | 1,2 | 20,7 % | −44,8 % | 35,7 / 6,7 % |
+| **Ausgewogen** (Vorgabe) | 2,6 | 27,9 % | −25,2 % | 33,3 / 22,6 % |
+| Locker | 3,2 | **32,5 %** | −5,0 % | 39,5 / 25,6 % |
+| Weit | 6,7 | 28,1 % | −16,9 % | 31,3 / 25,0 % |
 
-Vorgabe ist „Ausgewogen", obwohl „Streng" die höhere Trefferquote misst: Dessen Zeithälften
-laufen über nur 126 Wetten um 14 Punkte auseinander.
+**Mit dem laufenden Modell trägt dieser Filter kaum noch.** Stand 28.09.2026, gemessen nur an
+Modellversion 3.2.0 (3.695 Partien). Über alle Versionen waren es 37,7 / 36,1 / 35,1 / 31,9 %.
+Das heutige Modell gibt nur bei 2 % der Spiele 30 % oder mehr auf ein Remis, die älteren bei
+8 % – die Bedingung greift seltener und trifft schlechter. „Streng“ liegt sogar unter dem Wert
+ohne Filter; bei 29 Tipps kann das auch Zufall sein. Wann nachjustiert wird, steht in der
+Wiedervorlage oben.
 
-**Für Kombis ist das der schwierigste der drei Märkte.** Ein Vierer geht in 2,1 % der Fälle
-durch, ein Sechser in 0,3 % — einer von 330. Zum Vergleich: Der 1x2-Filter liefert einen
-Vierer in 22,7 %, die Halbzeit-Voreinstellung in 9,0 %.
+**Für Kombis ist das der schwierigste der drei Märkte.** Ein Vierer ging in 0,3 % der Fälle
+durch, ein Sechser gar nicht. Zum Vergleich: Der 1x2-Filter liefert einen
+Vierer in 19,0 %, die Halbzeit-Voreinstellung in 7,5 %.
 
 **Die Ertragsspalte der Kombitabelle ist hier ab vier Tippsn wertlos.** In der Stufe „Streng"
 misst der Fünfer +554 % — das sind drei Treffer aus 720 Ziehungen bei einer

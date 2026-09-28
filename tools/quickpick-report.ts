@@ -29,7 +29,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import { DB_FILE, ROOT_DIR } from "../src/config.ts";
+import { config, DB_FILE, ROOT_DIR } from "../src/config.ts";
 import type { DashboardFixture } from "../src/dashboard.ts";
 import { decideMarket } from "../src/market-outcome.ts";
 import {
@@ -43,7 +43,7 @@ import {
   type QuickpickPresetId,
   type QuickpickSettings
 } from "../src/quickpick.ts";
-import { enrichWithMatchStats, readFixtures, readOutcomes, type SettledOutcome } from "./snapshot-history.ts";
+import { enrichWithMatchStats, readFixtures, readOutcomes, tableRepair, type SettledOutcome } from "./snapshot-history.ts";
 
 const STATE_FILE = path.join(ROOT_DIR, "docs", "quickpick-kalibrierung.json");
 
@@ -54,6 +54,17 @@ const STATE_FILE = path.join(ROOT_DIR, "docs", "quickpick-kalibrierung.json");
  * dass jede Woche eine neue Zahl im Code steht.
  */
 const RECALIBRATION_STEP = 2_000;
+
+/**
+ * Voreinstellungen, deren Regel auf Wahrscheinlichkeiten und Torerwartung des Modells steht.
+ * Sie werden nur an Partien der laufenden Modellversion gemessen (Davids Entscheidung vom
+ * 28.09.2026): Die Knöpfe sollen das Modell beschreiben, das die App heute rechnet. Unter den
+ * älteren Versionen hatten 7,9 % der Spiele p(Remis) >= 0,30, unter 3.2.0 nur 2,0 % - über alle
+ * Versionen gemittelt beschrieben die Remis-Knöpfe ein Modell, das nicht mehr läuft.
+ * Daves Filter, Dominanz und Remis-Score lesen Tabelle, Form und Duelle und bleiben beim
+ * ganzen Bestand.
+ */
+const MODEL_BOUND_PRESETS = new Set<QuickpickPresetId>(["hz15", "remis"]);
 
 interface StufenStand { n: number; proTag: number; trefferquote: number; roi: number; kombis?: QuickpickComboMeasurement[] }
 interface PresetStand { stand: string; abgerechnet: number; stufen: Record<string, StufenStand> }
@@ -319,6 +330,9 @@ function main(): void {
   const settled = fixtures.filter((fixture) => outcomes.has(fixture.fixtureId)).length;
   console.log(`Abgerechnete Partien im Snapshot-Bestand: ${settled} (von ${fixtures.length} insgesamt)`);
   console.log(`Vollständige Tipico-Quotentripel: ${prices.size}`);
+  console.log(`Tabellen aus Läufen vor dem 04.09. neu gerechnet: ${tableRepair.repaired}, davon leer`
+    + ` (vor dem ersten Spieltag) ${tableRepair.emptied}, nicht nachrechenbar ${tableRepair.unrepairable}.`
+    + " Favoritenpunkte und 100-Punkte-Remiswertung dieser Läufe bleiben auf dem alten Stand.");
 
   const state = readState();
   const abweichungen: string[] = [];
@@ -342,6 +356,15 @@ function main(): void {
       console.log("Noch keine Kalibrierung festgehalten - dieser Lauf kann die erste sein (--write).");
     }
 
+    const modelBound = MODEL_BOUND_PRESETS.has(preset.id);
+    const presetFixtures = modelBound
+      ? fixtures.filter((fixture) => fixture.modelVersion === config.goalLineModelVersion)
+      : fixtures;
+    if (modelBound) {
+      const settledHere = presetFixtures.filter((fixture) => outcomes.has(fixture.fixtureId)).length;
+      console.log(`Nur Modellversion ${config.goalLineModelVersion}: ${settledHere} abgerechnete Partien.`);
+    }
+
     console.log(`  ${"Stufe".padEnd(13)}${"n".padStart(6)}${"/Tag".padStart(7)}${"Treffer".padStart(10)}`
       + `${"Quote".padStart(8)}${"ROI".padStart(10)}${"±".padStart(9)}${"1.H".padStart(9)}${"2.H".padStart(9)}   im Code`);
 
@@ -350,7 +373,7 @@ function main(): void {
 
     for (const level of preset.levels) {
       const { bets, ohnePreis, seiteRichtig, seiteGesamt, unentscheidbar } =
-        betsFor(preset, level.id, fixtures, outcomes, prices);
+        betsFor(preset, level.id, presetFixtures, outcomes, prices);
       qualitaet = {
         richtig: qualitaet.richtig + seiteRichtig,
         gesamt: qualitaet.gesamt + seiteGesamt,

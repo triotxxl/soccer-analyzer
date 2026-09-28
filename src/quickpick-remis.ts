@@ -133,71 +133,70 @@ export const REMIS_LEVELS: Array<QuickpickLevel<RemisLevelValues>> = [
   {
     id: "streng", label: "Streng",
     measured: {
-      n: 126, proTag: 3.8, trefferquote: 0.405, roi: 0.096,
+      n: 29, proTag: 1.2, trefferquote: 0.207, roi: -0.448,
       kombis: [
-        { beine: 2, n: 2400, trefferquote: 0.17, quote: 7.35, roi: 0.249, erwartung: 0.2 },
-        { beine: 3, n: 1480, trefferquote: 0.097, quote: 19.81, roi: 0.96, erwartung: 0.315 },
-        { beine: 4, n: 1000, trefferquote: 0.052, quote: 54.42, roi: 1.932, erwartung: 0.441 },
-        { beine: 5, n: 720, trefferquote: 0.042, quote: 146.95, roi: 5.546, erwartung: 0.579 },
-        { beine: 6, n: 680, trefferquote: 0.006, quote: 394.97, roi: 1.528, erwartung: 0.73 },
-        { beine: 7, n: 560, trefferquote: 0.004, quote: 1065.75, roi: 2.896, erwartung: 0.895 }
+        { beine: 2, n: 480, trefferquote: 0.006, quote: 7.47, roi: -0.959, erwartung: -0.696 },
+        { beine: 3, n: 280, trefferquote: 0, quote: 20.46, roi: -1, erwartung: -0.832 },
+        { beine: 4, n: 160, trefferquote: 0, quote: 56.5, roi: -1, erwartung: -0.907 },
+        { beine: 5, n: 80, trefferquote: 0, quote: 149.71, roi: -1, erwartung: -0.949 },
+        { beine: 6, n: 80, trefferquote: 0, quote: 408.4, roi: -1, erwartung: -0.972 },
+        { beine: 7, n: 40, trefferquote: 0, quote: 1183.79, roi: -1, erwartung: -0.984 }
       ]
     },
-    hint: "Chance auf Unentschieden ab 31 %, Quote höchstens 3,00. 4 von 10 Tipps stimmen –"
-      + " die beste Stufe. Sie schwankt aber stark und ist nicht sicher besser als die"
-      + " Vorgabe, nur kürzer.",
+    hint: "Chance auf Unentschieden ab 31 %, Quote höchstens 3,00. Mit dem heutigen Modell"
+      + " stimmten nur 2 von 10 Tipps – weniger als ohne Filter. Bei 29 Spielen kann das auch"
+      + " Zufall sein. Etwa ein Spiel am Tag.",
     values: LEVELS.streng
   },
   {
     id: "ausgewogen", label: "Ausgewogen",
     measured: {
-      n: 194, proTag: 5.9, trefferquote: 0.381, roi: 0.035,
+      n: 61, proTag: 2.6, trefferquote: 0.279, roi: -0.252,
       kombis: [
-        { beine: 2, n: 3720, trefferquote: 0.145, quote: 7.43, roi: 0.067, erwartung: 0.072 },
-        { beine: 3, n: 2360, trefferquote: 0.055, quote: 20.4, roi: 0.095, erwartung: 0.11 },
-        { beine: 4, n: 1680, trefferquote: 0.021, quote: 55.34, roi: 0.181, erwartung: 0.149 },
-        { beine: 5, n: 1240, trefferquote: 0.002, quote: 151.1, roi: -0.574, erwartung: 0.189 },
-        { beine: 6, n: 1000, trefferquote: 0.003, quote: 415.74, roi: 0.215, erwartung: 0.231 },
-        { beine: 7, n: 840, trefferquote: 0.001, quote: 1122.78, roi: 0.647, erwartung: 0.275 }
+        { beine: 2, n: 1120, trefferquote: 0.04, quote: 7.45, roi: -0.719, erwartung: -0.44 },
+        { beine: 3, n: 640, trefferquote: 0.008, quote: 20.85, roi: -0.857, erwartung: -0.581 },
+        { beine: 4, n: 400, trefferquote: 0.003, quote: 56.58, roi: -0.884, erwartung: -0.686 },
+        { beine: 5, n: 320, trefferquote: 0, quote: 153.98, roi: -1, erwartung: -0.765 },
+        { beine: 6, n: 240, trefferquote: 0, quote: 427.09, roi: -1, erwartung: -0.824 },
+        { beine: 7, n: 160, trefferquote: 0, quote: 1126.49, roi: -1, erwartung: -0.869 }
       ]
     },
-    hint: "Chance auf Unentschieden ab 30 %, Quote höchstens 3,00. Knapp 4 von 10 Tipps"
-      + " stimmen, bei etwa sechs Spielen am Tag. Die gleichmäßigste Stufe und die Vorgabe.",
+    hint: "Chance auf Unentschieden ab 30 %, Quote höchstens 3,00. Knapp 3 von 10 Tipps"
+      + " stimmen – kaum mehr als ohne Filter. Zwei bis drei Spiele am Tag. Die Vorgabe.",
     values: LEVELS.ausgewogen
   },
   {
     id: "locker", label: "Locker",
     measured: {
-      n: 276, proTag: 8.3, trefferquote: 0.362, roi: 0.084,
+      n: 77, proTag: 3.2, trefferquote: 0.325, roi: -0.05,
       kombis: [
-        { beine: 2, n: 5320, trefferquote: 0.119, quote: 10.28, roi: 0.093, erwartung: 0.174 },
-        { beine: 3, n: 3440, trefferquote: 0.038, quote: 33.2, roi: -0.063, erwartung: 0.272 },
-        { beine: 4, n: 2400, trefferquote: 0.012, quote: 111.06, roi: -0.062, erwartung: 0.378 },
-        { beine: 5, n: 1960, trefferquote: 0.004, quote: 361.78, roi: 0.036, erwartung: 0.493 },
-        { beine: 6, n: 1520, trefferquote: 0.001, quote: 1207.91, roi: -0.38, erwartung: 0.618 },
-        { beine: 7, n: 1360, trefferquote: 0.001, quote: 4005.26, roi: 0.12, erwartung: 0.753 }
+        { beine: 2, n: 1400, trefferquote: 0.076, quote: 8.17, roi: -0.377, erwartung: -0.098 },
+        { beine: 3, n: 840, trefferquote: 0.014, quote: 23.84, roi: -0.684, erwartung: -0.143 },
+        { beine: 4, n: 560, trefferquote: 0, quote: 67.61, roi: -1, erwartung: -0.185 },
+        { beine: 5, n: 360, trefferquote: 0, quote: 183.68, roi: -1, erwartung: -0.226 },
+        { beine: 6, n: 320, trefferquote: 0, quote: 516.9, roi: -1, erwartung: -0.265 },
+        { beine: 7, n: 240, trefferquote: 0, quote: 1494.9, roi: -1, erwartung: -0.302 }
       ]
     },
-    hint: "Chance auf Unentschieden ab 30 %, Quote nach oben offen. Mehr Spiele und höhere"
-      + " Quoten, dafür stimmen etwas weniger Tipps.",
+    hint: "Chance auf Unentschieden ab 30 %, Quote nach oben offen. Gut 3 von 10 Tipps"
+      + " stimmen – mit dem heutigen Modell die beste Stufe, aber das kann auch Zufall sein.",
     values: LEVELS.locker
   },
   {
     id: "weit", label: "Weit",
     measured: {
-      n: 453, proTag: 13.6, trefferquote: 0.329, roi: -0.004,
+      n: 160, proTag: 6.7, trefferquote: 0.281, roi: -0.169,
       kombis: [
-        { beine: 2, n: 8880, trefferquote: 0.103, quote: 10.19, roi: -0.062, erwartung: -0.008 },
-        { beine: 3, n: 5760, trefferquote: 0.034, quote: 32.26, roi: -0.081, erwartung: -0.012 },
-        { beine: 4, n: 4280, trefferquote: 0.009, quote: 108.43, roi: -0.225, erwartung: -0.016 },
-        { beine: 5, n: 3400, trefferquote: 0.003, quote: 328.13, roi: -0.247, erwartung: -0.02 },
-        { beine: 6, n: 2760, trefferquote: 0.001, quote: 1105.13, roi: -0.182, erwartung: -0.024 },
-        { beine: 7, n: 2280, trefferquote: 0, quote: 3846.99, roi: -0.051, erwartung: -0.027 }
+        { beine: 2, n: 3040, trefferquote: 0.066, quote: 8.57, roi: -0.425, erwartung: -0.31 },
+        { beine: 3, n: 2040, trefferquote: 0.012, quote: 25.13, roi: -0.717, erwartung: -0.427 },
+        { beine: 4, n: 1400, trefferquote: 0.005, quote: 72.3, roi: -0.64, erwartung: -0.524 },
+        { beine: 5, n: 1080, trefferquote: 0, quote: 214.08, roi: -1, erwartung: -0.605 },
+        { beine: 6, n: 880, trefferquote: 0.001, quote: 625.86, roi: -0.5, erwartung: -0.672 },
+        { beine: 7, n: 720, trefferquote: 0, quote: 1834.86, roi: -1, erwartung: -0.727 }
       ]
     },
-    hint: "Chance auf Unentschieden ab 29 %, Quote offen. Nur zum Überblick: gut 3 von 10"
-      + " Tipps stimmen, unterm Strich bleibt nichts übrig. Tiefer geht es nicht, darunter"
-      + " wird es Verlust.",
+    hint: "Chance auf Unentschieden ab 29 %, Quote offen. Nur zum Überblick: knapp 3 von 10"
+      + " Tipps stimmen, unterm Strich ein deutlicher Verlust.",
     values: LEVELS.weit
   }
 ];
@@ -276,12 +275,12 @@ export const REMIS_PRESET: QuickpickPreset<RemisQuickpickSettings> = {
         + ` (an ${measured.n} alten Wetten geprüft). Ohne Filter sind es nur 25 %. In einer Kombi`
         + ` müssen alle Tipps stimmen – deshalb zählt genau dieser Wert.`
   }),
-  honesty: "Von allen vier Filtern sieht dieser beim Gewinn am besten aus – und ist für"
-    + " Kombis trotzdem der schwerste. Nur knapp 4 von 10 Tipps stimmen: Ein Schein mit vier"
-    + " Spielen geht in 2 von 100 Fällen durch, mit sechs Spielen in 3 von 1.000. Rechne"
-    + " nicht mit Gewinn, dafür sind es bisher zu wenige Spiele. Und schau dir in der"
-    + " Kombi-Tabelle nur an, wie oft ein Schein durchgeht – die Gewinnspalte springt dort"
-    + " ab vier Spielen wild hin und her und sagt nichts.",
+  honesty: "Mit dem heutigen Modell stimmen nur knapp 3 von 10 Tipps – kaum mehr als ohne"
+    + " Filter, wo es 1 von 4 sind. Frühere Modellversionen trafen öfter; die Zahlen hier"
+    + " gelten nur für das heutige. Ein Schein mit vier Spielen ging in 3 von 1.000 Fällen"
+    + " durch. Rechne nicht mit Gewinn. Und schau dir in der Kombi-Tabelle nur an, wie oft ein"
+    + " Schein durchgeht – die Gewinnspalte springt dort ab vier Spielen wild hin und her und"
+    + " sagt nichts.",
   wettschein: {
     hinweis: "Legt jedes gefundene Spiel als „Unentschieden“ in den Wettschein. Ein"
       + " Sieger-Tipp zum selben Spiel bleibt daneben bestehen."

@@ -82,17 +82,18 @@ const DAVES: QuickpickParam[] = [
 const DOMINANZ: QuickpickParam[] = [
   {
     id: "minOdds", label: "Quote ab", min: 1, max: 4, step: 0.1,
-    title: "Ab welcher Quote ein Spiel gezeigt wird. Erst ab etwa 1,80 lohnt es sich für eine Kombi."
+    title: "Ab welcher Quote ein Spiel gezeigt wird. Eine Untergrenze für kurze Kombis – im Plus"
+      + " liegt an alten Spielen geprüft keine Quote."
   },
   {
     id: "maxOdds", label: "Quote bis", min: 1, max: 99, step: 0.5, sliderMax: 10,
     title: "Bis zu welcher Quote. 99 heißt: keine Grenze. Je höher die Quote, desto seltener"
-      + " stimmt der Tipp – über 3,00 nur noch bei jedem sechsten Spiel."
+      + " stimmt der Tipp – über 3,00 nur noch bei etwa jedem vierten Spiel."
   },
   {
     id: "minStreak", label: "Siege in Folge im Duell", min: 0, max: 5, step: 1,
-    title: "Gewonnene direkte Duelle in Folge. 0 schaltet die Bedingung aus. Sie bringt geprüft"
-      + " etwa vier Prozent mehr."
+    title: "Gewonnene direkte Duelle in Folge. 0 schaltet die Bedingung aus. An alten Spielen"
+      + " geprüft macht sie die Tipps nicht besser, nur die Liste kürzer."
   },
   {
     id: "minNonLossGap", label: "Verliert seltener (Punkte)", min: 0, max: 100, step: 5,
@@ -198,8 +199,8 @@ export const QUICKPICK_TOGGLES: Record<QuickpickPresetId, QuickpickToggle[]> = {
   }],
   dominanz: [{
     id: "requireModelSide", label: "Nur wenn das Modell zustimmt",
-    title: "Verlangt, dass auch das Modell diese Mannschaft tippt. Der stärkste einzelne Hebel"
-      + " dieses Filters."
+    title: "Verlangt, dass auch das Modell diese Mannschaft tippt. Macht die Liste kürzer. Ob die"
+      + " Tipps dadurch besser werden, ist an alten Spielen nicht belegt."
   }],
   hz15: [],
   remis: [],

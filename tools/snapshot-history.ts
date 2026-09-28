@@ -8,11 +8,23 @@
 import fs from "node:fs";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import { DB_FILE, ROOT_DIR } from "../src/config.ts";
+import { CACHE_DIR, DB_FILE, ROOT_DIR } from "../src/config.ts";
 import type { DashboardFixture } from "../src/dashboard.ts";
-import type { RecentMatchSideStats, RecentMatchSummary } from "../src/types.ts";
+import { buildTable, tableScopeOf } from "../src/draw-criteria.ts";
+import type { ApiFixture, RecentMatchSideStats, RecentMatchSummary } from "../src/types.ts";
+import { sha256 } from "../src/util.ts";
 
 export const OUTPUT_DIR = path.join(ROOT_DIR, "output");
+
+/**
+ * Läufe vor diesem Tag rechneten die Ligatabelle ohne `tableScopeOf` und summierten mehrere
+ * Saisons (Londrina mit 60 Spielen, die Premier League mit 23 Mannschaften). Die Prüfung vom
+ * 28.09.2026 fand das in allen 7.669 nachrechenbaren Tabellen dieser Läufe.
+ */
+const TABLE_SCOPE_FIXED = "2026-09-04";
+
+/** Was die Tabellenreparatur beim letzten `readFixtures` getan hat - für die Fußzeile der Reports. */
+export const tableRepair = { repaired: 0, emptied: 0, unrepairable: 0 };
 
 export interface SettledOutcome { home: number; away: number; halfHome: number | null; halfAway: number | null }
 
@@ -44,12 +56,18 @@ export function readOutcomes(): Map<number, SettledOutcome> {
   return outcomes;
 }
 
-/** Je Partie der jüngste Snapshot - Quoten werden bis zum Anpfiff nachgeführt. */
+/**
+ * Je Partie der jüngste Snapshot - Quoten werden bis zum Anpfiff nachgeführt. Snapshots vor
+ * `TABLE_SCOPE_FIXED` bekommen ihre Ligatabelle neu gerechnet (`repairTables`), die Dateien
+ * selbst bleiben unverändert.
+ */
 export function readFixtures(): DashboardFixture[] {
   const latest = new Map<number, { stamp: string; fixture: DashboardFixture }>();
   const files = fs.existsSync(OUTPUT_DIR)
     ? fs.readdirSync(OUTPUT_DIR).filter((file) => file.startsWith("dashboard-") && file.endsWith(".json"))
     : [];
+  const repair = tableRepairer();
+  Object.assign(tableRepair, { repaired: 0, emptied: 0, unrepairable: 0 });
   for (const file of files) {
     let snapshot: { fixtures?: DashboardFixture[] };
     try {
@@ -58,13 +76,94 @@ export function readFixtures(): DashboardFixture[] {
       continue; // Ein abgebrochener Lauf hinterlässt gelegentlich eine halbe Datei.
     }
     const stamp = file.slice("dashboard-".length, -".json".length);
+    // Die Reparatur braucht alle Partien desselben Laufs, nicht nur die ausgewählten: Der Lauf
+    // fror jede Tabelle beim frühesten Anpfiff ihres Abschnitts ein.
+    if (stamp < TABLE_SCOPE_FIXED) repair?.(snapshot.fixtures ?? []);
     for (const fixture of snapshot.fixtures ?? []) {
       const previous = latest.get(fixture.fixtureId);
       if (previous && previous.stamp >= stamp) continue;
       latest.set(fixture.fixtureId, { stamp, fixture });
     }
   }
+  repair?.close();
   return [...latest.values()].map((entry) => entry.fixture);
+}
+
+/**
+ * Rechnet die Tabellen eines alten Laufs so, wie der Lauf sie seit dem 04.09.2026 gerechnet
+ * hätte: `buildTable` mit `tableScopeOf` auf die Saison-Ansetzungen der Liga, eingefroren beim
+ * frühesten Anpfiff des Abschnitts in diesem Lauf - dieselbe Regel wie in `src/analyzer.ts`.
+ *
+ * Die Ansetzungen kommen aus dem API-Cache (`fixtures?league=&season=`), abgelaufene Einträge
+ * eingeschlossen; Liga und Saison einer Partie aus `fixture_results`. Kein API-Aufruf. Neuere
+ * Cache-Stände schaden nicht: `buildTable` zählt nur beendete Spiele vor dem Stichtag.
+ *
+ * Nicht repariert werden die Favoritenpunkte (`scores.favorite`) und die 100-Punkte-Remiswertung
+ * (`scores.draw`) dieser Läufe - auch sie standen auf der gemischten Tabelle, brauchen zum
+ * Nachrechnen aber Formlisten, Quoten und Duelle. Daves 1x2-Filter ist deshalb nur teilweise
+ * korrigiert, Dominanz und Remis-Score ganz.
+ */
+function tableRepairer(): ((fixtures: DashboardFixture[]) => void) & { close(): void } | null {
+  if (!fs.existsSync(DB_FILE)) return null;
+  const database = new DatabaseSync(DB_FILE, { readOnly: true });
+  const leagueOf = database.prepare("SELECT league_id, season FROM fixture_results WHERE fixture_id = ?");
+  const seasons = new Map<string, ApiFixture[] | null>();
+  const seasonFixtures = (leagueId: number, season: number): ApiFixture[] | null => {
+    const key = `${leagueId}:${season}`;
+    if (!seasons.has(key)) {
+      const file = path.join(CACHE_DIR, `${sha256(`fixtures?league=${leagueId}&season=${season}`)}.json`);
+      let value: ApiFixture[] | null = null;
+      try {
+        const record = JSON.parse(fs.readFileSync(file, "utf8")) as { value?: ApiFixture[] };
+        value = Array.isArray(record.value) ? record.value : null;
+      } catch {
+        value = null;
+      }
+      seasons.set(key, value);
+    }
+    return seasons.get(key)!;
+  };
+
+  const repair = (fixtures: DashboardFixture[]) => {
+    const targets: Array<{ fixture: DashboardFixture; api: ApiFixture; season: ApiFixture[]; key: string }> = [];
+    for (const fixture of fixtures) {
+      if (!fixture.table || fixture.crossLeague) continue;
+      const row = leagueOf.get(fixture.fixtureId) as { league_id: number; season: number } | undefined;
+      const season = row ? seasonFixtures(row.league_id, row.season) : null;
+      const api = season?.find((entry) => entry.fixture.id === fixture.fixtureId);
+      if (!season || !api) { tableRepair.unrepairable += 1; continue; }
+      const scope = tableScopeOf(api);
+      targets.push({ fixture, api, season, key: `${api.league.id}:${scope.season}:${scope.stage}` });
+    }
+    const cutoffs = new Map<string, number>();
+    for (const { api, key } of targets) {
+      cutoffs.set(key, Math.min(cutoffs.get(key) ?? Number.POSITIVE_INFINITY, api.fixture.timestamp));
+    }
+    for (const { fixture, api, season, key } of targets) {
+      const table = buildTable(season, cutoffs.get(key)!, tableScopeOf(api));
+      if (table.length === 0) {
+        // Wie im Lauf: Vor dem ersten Spieltag gibt es keine Tabelle, die Partie ist dann
+        // "nicht prüfbar" statt mit einer falschen Tabelle bewertet.
+        delete fixture.table;
+        tableRepair.emptied += 1;
+        continue;
+      }
+      const names = new Map<number, string>();
+      for (const match of season) {
+        names.set(match.teams.home.id, match.teams.home.name);
+        names.set(match.teams.away.id, match.teams.away.name);
+      }
+      fixture.table = table.map((standing) => ({
+        position: standing.position, teamName: names.get(standing.id) ?? "?", played: standing.played,
+        wins: standing.wins, draws: standing.draws, losses: standing.played - standing.wins - standing.draws,
+        points: standing.points, goalsFor: standing.goalsFor, goalsAgainst: standing.goalsAgainst,
+        homePlayed: standing.homePlayed, homePoints: standing.homePoints,
+        awayPlayed: standing.awayPlayed, awayPoints: standing.awayPoints
+      }));
+      tableRepair.repaired += 1;
+    }
+  };
+  return Object.assign(repair, { close: () => database.close() });
 }
 
 type SideStats = { home: RecentMatchSideStats; away: RecentMatchSideStats };

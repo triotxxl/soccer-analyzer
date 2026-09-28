@@ -348,7 +348,7 @@ export function evaluateDaves(
   //
   // **Ab zwei Duellen**, und das ist kein Aufweichen: Ein einzelnes verlorenes Duell erfüllt
   // `losses > wins` immer, ist aber kein "Rückstand in der Serie" - es ist ein Spiel. Dazu
-  // kommt, dass `h2hSummary` Freundschaftsspiele mitzählt (siehe `src/h2h.ts`), ein solches
+  // kommt, dass `h2hSummary` Freundschaftsspiele mitzählt (siehe `src/draw-criteria.ts`), ein solches
   // Veto also auf einem Testspiel stehen kann. Die zweite Bedingung braucht ohnehin zwei
   // Duelle, die Grenze trifft damit nur den Einzelfall.
   const dominance = base.dominance;

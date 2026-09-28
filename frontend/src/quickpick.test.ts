@@ -675,6 +675,23 @@ describe("Dominanz", () => {
     expect(evaluateFixture(alwaysReady(), dom({ minOdds: 2.5 })).rejectedBy).toBe("quote");
   });
 
+  /**
+   * Prüfung vom 28.09.2026: Tipico führte für den Favoriten eine 0 (Chelsea W – Birmingham W,
+   * FC Noah – Van, Logroño W – Barcelona W). Der Filter nahm dann den Preis des Gegners -
+   * Always Ready stünde hier zu 2,85 im Wettschein, dem Preis von Nacional Potosí.
+   */
+  it("nimmt nie den Preis des Gegners, wenn der eigene fehlt", () => {
+    const ohnePreis = alwaysReady({
+      markets: [
+        { ...fixture().markets[0]!, pick: "2", odds: 0, oddsHome: 2.85, oddsAway: 0, probability: 0.494 },
+        { ...fixture().markets[0]!, key: "draw", pick: null, odds: 3.5, probability: 0.26 }
+      ]
+    });
+    const evaluation = evaluateFixture(ohnePreis, dom());
+    expect(evaluation.rejectedBy).toBe("keineQuote");
+    expect(evaluation.odds).toBeNull();
+  });
+
   it("verlangt die Serie in den direkten Duellen", () => {
     expect(evaluateFixture(alwaysReady({ h2h: h2h(["loss", "win", "loss"]) }), dom()).rejectedBy)
       .toBe("serie");
