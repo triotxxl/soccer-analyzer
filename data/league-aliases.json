@@ -69,7 +69,62 @@
     "country": "World",
     "league": "Africa Cup of Nations - Qualification"
   },
+  "africa cup of nations|qualifikation gruppe a": {
+    "leagueId": 36,
+    "country": "World",
+    "league": "Africa Cup of Nations - Qualification"
+  },
+  "africa cup of nations|qualifikation gruppe b": {
+    "leagueId": 36,
+    "country": "World",
+    "league": "Africa Cup of Nations - Qualification"
+  },
+  "africa cup of nations|qualifikation gruppe c": {
+    "leagueId": 36,
+    "country": "World",
+    "league": "Africa Cup of Nations - Qualification"
+  },
   "africa cup of nations|qualifikation gruppe d": {
+    "leagueId": 36,
+    "country": "World",
+    "league": "Africa Cup of Nations - Qualification"
+  },
+  "africa cup of nations|qualifikation gruppe e": {
+    "leagueId": 36,
+    "country": "World",
+    "league": "Africa Cup of Nations - Qualification"
+  },
+  "africa cup of nations|qualifikation gruppe f": {
+    "leagueId": 36,
+    "country": "World",
+    "league": "Africa Cup of Nations - Qualification"
+  },
+  "africa cup of nations|qualifikation gruppe g": {
+    "leagueId": 36,
+    "country": "World",
+    "league": "Africa Cup of Nations - Qualification"
+  },
+  "africa cup of nations|qualifikation gruppe h": {
+    "leagueId": 36,
+    "country": "World",
+    "league": "Africa Cup of Nations - Qualification"
+  },
+  "africa cup of nations|qualifikation gruppe i": {
+    "leagueId": 36,
+    "country": "World",
+    "league": "Africa Cup of Nations - Qualification"
+  },
+  "africa cup of nations|qualifikation gruppe j": {
+    "leagueId": 36,
+    "country": "World",
+    "league": "Africa Cup of Nations - Qualification"
+  },
+  "africa cup of nations|qualifikation gruppe k": {
+    "leagueId": 36,
+    "country": "World",
+    "league": "Africa Cup of Nations - Qualification"
+  },
+  "africa cup of nations|qualifikation gruppe l": {
     "leagueId": 36,
     "country": "World",
     "league": "Africa Cup of Nations - Qualification"
@@ -429,7 +484,22 @@
     "country": "World",
     "league": "CONCACAF Nations League"
   },
+  "concacaf nations league|league a gruppe b": {
+    "leagueId": 536,
+    "country": "World",
+    "league": "CONCACAF Nations League"
+  },
   "concacaf nations league|league b gruppe a": {
+    "leagueId": 536,
+    "country": "World",
+    "league": "CONCACAF Nations League"
+  },
+  "concacaf nations league|league b gruppe b": {
+    "leagueId": 536,
+    "country": "World",
+    "league": "CONCACAF Nations League"
+  },
+  "concacaf nations league|league b gruppe c": {
     "leagueId": 536,
     "country": "World",
     "league": "CONCACAF Nations League"
@@ -1650,6 +1720,11 @@
     "league": "UEFA U21 Championship - Qualification"
   },
   "u21 europameisterschaft|u21 em quali gr h": {
+    "leagueId": 850,
+    "country": "World",
+    "league": "UEFA U21 Championship - Qualification"
+  },
+  "u21 europameisterschaft|u21 em quali gr i": {
     "leagueId": 850,
     "country": "World",
     "league": "UEFA U21 Championship - Qualification"

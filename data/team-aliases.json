@@ -939,6 +939,11 @@
     "apiTeamId": 6326,
     "apiTeamName": "Zakynthos"
   },
+  "aquatorialguinea": {
+    "tipicoName": "Äquatorialguinea",
+    "apiTeamId": 1521,
+    "apiTeamName": "Equatorial Guinea"
+  },
   "arambagh ks": {
     "tipicoName": "Arambagh KS",
     "apiTeamId": 5011,
@@ -3209,6 +3214,11 @@
     "apiTeamId": 21,
     "apiTeamName": "Denmark"
   },
+  "danemark u21": {
+    "tipicoName": "Dänemark U21",
+    "apiTeamId": 8189,
+    "apiTeamName": "Denmark U21"
+  },
   "danubio fc": {
     "tipicoName": "Danubio FC",
     "apiTeamId": 2352,
@@ -3469,6 +3479,11 @@
     "apiTeamId": 17183,
     "apiTeamName": "Benjamín Aceval"
   },
+  "dr kongo": {
+    "tipicoName": "DR Kongo",
+    "apiTeamId": 1508,
+    "apiTeamName": "Congo DR"
+  },
   "dravinja kostroj": {
     "tipicoName": "Dravinja Kostroj",
     "apiTeamId": 16302,
@@ -3638,6 +3653,11 @@
     "tipicoName": "El Zamalek",
     "apiTeamId": 1040,
     "apiTeamName": "Zamalek SC"
+  },
+  "elfenbeinkuste": {
+    "tipicoName": "Elfenbeinküste",
+    "apiTeamId": 1501,
+    "apiTeamName": "Ivory Coast"
   },
   "empoli fc": {
     "tipicoName": "Empoli FC",
@@ -5379,6 +5399,11 @@
     "apiTeamId": 8617,
     "apiTeamName": "Příbram II"
   },
+  "fk proleter 023": {
+    "tipicoName": "FK Proleter 023",
+    "apiTeamId": 19839,
+    "apiTeamName": "Naftagas"
+  },
   "fk qarabag": {
     "tipicoName": "FK Qarabag",
     "apiTeamId": 556,
@@ -5443,6 +5468,11 @@
     "tipicoName": "FK Smederevo",
     "apiTeamId": 4254,
     "apiTeamName": "Semendrija 1924"
+  },
+  "fk spartak subotica": {
+    "tipicoName": "FK Spartak Subotica",
+    "apiTeamId": 2251,
+    "apiTeamName": "FK Spartak Zdrepceva KRV"
   },
   "fk sportist svoge": {
     "tipicoName": "FK Sportist Svoge",
@@ -6439,6 +6469,11 @@
     "apiTeamId": 1139,
     "apiTeamName": "Santa Fe"
   },
+  "independiente yumbo": {
+    "tipicoName": "Independiente Yumbo",
+    "apiTeamId": 27411,
+    "apiTeamName": "Ind. Yumbo"
+  },
   "indigenas de matagalpa": {
     "tipicoName": "Indigenas de Matagalpa",
     "apiTeamId": 19159,
@@ -6598,6 +6633,11 @@
     "tipicoName": "Jahn Regensburg",
     "apiTeamId": 177,
     "apiTeamName": "SSV Jahn Regensburg"
+  },
+  "jamaika": {
+    "tipicoName": "Jamaika",
+    "apiTeamId": 2385,
+    "apiTeamName": "Jamaica"
   },
   "jeonbuk fc ii": {
     "tipicoName": "Jeonbuk FC II",
@@ -6783,6 +6823,11 @@
     "tipicoName": "Kansas City Current (F)",
     "apiTeamId": 16487,
     "apiTeamName": "Kansas City W"
+  },
+  "kap verde": {
+    "tipicoName": "Kap Verde",
+    "apiTeamId": 1533,
+    "apiTeamName": "Cape Verde Islands"
   },
   "kapylan pallo": {
     "tipicoName": "Käpylän Pallo",
@@ -7078,6 +7123,11 @@
     "tipicoName": "Kuala Lumpur City",
     "apiTeamId": 2517,
     "apiTeamName": "Kuala Lumpur FA"
+  },
+  "kuba": {
+    "tipicoName": "Kuba",
+    "apiTeamId": 2388,
+    "apiTeamName": "Cuba"
   },
   "kuching city fc": {
     "tipicoName": "Kuching City FC",
@@ -9644,6 +9694,11 @@
     "apiTeamId": 20787,
     "apiTeamName": "St. Louis City"
   },
+  "saint lucia": {
+    "tipicoName": "Saint Lucia",
+    "apiTeamId": 5540,
+    "apiTeamName": "St. Lucia"
+  },
   "saint malo f": {
     "tipicoName": "Saint Malo (F)",
     "apiTeamId": 27932,
@@ -10559,6 +10614,11 @@
     "apiTeamId": 258,
     "apiTeamName": "ST Johnstone"
   },
+  "st kitts und nevis": {
+    "tipicoName": "St. Kitts und Nevis",
+    "apiTeamId": 5536,
+    "apiTeamName": "St. Kitts and Nevis"
+  },
   "st lucia fc": {
     "tipicoName": "St Lucia FC",
     "apiTeamId": 3651,
@@ -10683,6 +10743,11 @@
     "tipicoName": "Sur SC",
     "apiTeamId": 5337,
     "apiTeamName": "Sur"
+  },
+  "surinam": {
+    "tipicoName": "Surinam",
+    "apiTeamId": 8171,
+    "apiTeamName": "Suriname"
   },
   "surkhon termiz": {
     "tipicoName": "Surkhon Termiz",
@@ -11328,6 +11393,11 @@
     "tipicoName": "Urena FC",
     "apiTeamId": 2816,
     "apiTeamName": "Urena SC"
+  },
+  "uruguay de coronado": {
+    "tipicoName": "Uruguay de Coronado",
+    "apiTeamId": 2058,
+    "apiTeamName": "CS Uruguay"
   },
   "uruguay montevideo fc": {
     "tipicoName": "Uruguay Montevideo FC",
