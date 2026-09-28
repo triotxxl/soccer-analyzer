@@ -246,7 +246,7 @@ describe("React-Dashboard", () => {
       const checked = (name: string) =>
         (within(menu).queryByRole("group", { name })?.querySelector("input:checked") as HTMLInputElement | null)?.value;
       const result = {
-        view: checked("Punkte in Form und H2H (direkte Duelle)"),
+        view: checked("Punkte in Form und H2H"),
         line: checked("Linie"),
         direction: checked("Richtung")
       };
@@ -552,9 +552,10 @@ describe("React-Dashboard", () => {
     expect(within(days).queryByRole("button", { name: /15. August 2026/ })).not.toBeInTheDocument();
     expect(within(days).getByRole("button", { name: /17. August 2026/ })).toBeInTheDocument();
 
-    // Der Kartenkopf nennt, wie weit die 48 Stunden reichen; der Hinweis steht schon vor dem Klick.
+    // Der Kartenkopf nennt, wie weit die 48 Stunden reichen. Ein Bedienhinweis steht erst
+    // während der Wahl da, nicht in Ruhe (UX-Review vom 28.09.2026).
     expect(within(menu).getByText(/^bis [A-Z][a-z] \d{2}\.\d{2}\., \d{2}:\d{2}$/)).toBeInTheDocument();
-    expect(within(days).getByText("Ein Tag: einmal klicken. Mehrere Tage: ersten und letzten anklicken.")).toBeInTheDocument();
+    expect(within(days).queryByText(/einmal klicken|letzten Tag anklicken/)).not.toBeInTheDocument();
 
     // Ein Klick wählt einen Tag - sofort, ohne Übernehmen.
     await user.click(within(days).getByRole("button", { name: /18. August 2026/ }));

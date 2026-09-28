@@ -353,7 +353,9 @@ export function KellyDialog({ fixtures, marketFilter, marketLabel, settings, pro
             note={`von ${formatEuro(settings.budget)} Budget`} />
           <MetricCard label="Wetten" value={String(sorted.length)}
             note={`aus ${evaluated} geprüften Spielen`}
-            title="Geprüft wird, was die Ansicht gerade zeigt: Zeitraum, Ligaauswahl und der Cross-League-Schalter aus der Seitenleiste gelten auch hier." />
+            title={"Geprüft werden die Spiele aus Zeitraum und Wettbewerben im Filter, samt „Nur"
+              + " Ligaspiele“ und angepfiffenen Spielen, und der gewählte Markt. Bewertung und"
+              + " Klassenunterschied grenzen nur die Tabelle ein."} />
           <MetricCard label="Erwarteter Ertrag" value={formatSignedEuro(expected)}
             tone={expected >= 0 ? "good" : "bad"}
             note={automatic ? "auf Basis der Korrektur" : "auf Basis der Modellwerte"} />

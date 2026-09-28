@@ -174,10 +174,11 @@ function DayRangePicker({ minimum, maximum, custom, start, end, selectingEnd, on
         </button>;
       })}
     </div> : <p className="filter-note">Keine Tage verfügbar.</p>}
-    {minimum && maximum && <p className="filter-note day-range-hint">
-      {custom && selectingEnd
-        ? "Noch den letzten Tag anklicken – sonst gilt nur dieser."
-        : "Ein Tag: einmal klicken. Mehrere Tage: ersten und letzten anklicken."}
+    {/* Nur während der Wahl: Der erste Klick wählt schon einen Tag, und genau dann erklärt
+        der Satz den zweiten. Ein Bedienhinweis in Ruhe stand bei jedem Öffnen unter der
+        wichtigsten Stellschraube (UX-Review vom 28.09.2026). */}
+    {minimum && maximum && custom && selectingEnd && <p className="filter-note day-range-hint">
+      Noch den letzten Tag anklicken – sonst gilt nur dieser.
     </p>}
   </div>;
 }
@@ -1302,7 +1303,7 @@ function Dashboard({ document }: { document: DashboardDocument }) {
     setFormView(value);
   };
   const displayControls = heatmap ? undefined : <div className="filter-display">
-    <FilterSegment name="points-view" legend="Punkte in Form und H2H (direkte Duelle)" value={h2hView}
+    <FilterSegment name="points-view" legend="Punkte in Form und H2H" value={h2hView}
       onChange={setPointsView} options={POINTS_VIEW_OPTIONS} />
     {activeLineView && <div className="filter-display-line">
       <FilterSegment name="points-line" legend="Linie"
@@ -1315,7 +1316,6 @@ function Dashboard({ document }: { document: DashboardDocument }) {
       <FilterSegment name="points-direction" legend="Richtung" value={counterDirection ? "under" : "over"}
         onChange={(value) => setCounterDirection(value === "under")} options={DIRECTION_OPTIONS} />
     </div>}
-    <p className="filter-note">Folgt dem gewählten Markt.</p>
   </div>;
 
   const filterControl = <div className="filter-anchor" ref={filterAnchorRef} onBlur={(event) => {

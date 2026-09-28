@@ -232,7 +232,7 @@ const CLASS_GAP_OPTIONS: ReadonlyArray<SegmentOption<ClassGapFilter>> = [
  * Zustand und Schließregeln liegen beim Dashboard; hier steht nur die Darstellung.
  *
  * Zwei Spalten in Lesereihenfolge des Datenflusses: links der Umfang (`scopedFixtures`, gilt auch
- * für Kelly und Quickpick), rechts, was nur die Tabelle eingrenzt, und die Anzeige. So steht die
+ * für Kelly und Quickpick), rechts, was nur Tabelle und Heatmap eingrenzt, und die Anzeige. So steht die
  * Ursache "Nur Ligaspiele" vor ihrer Wirkung, dem abgeschalteten Klassenunterschied.
  */
 export function FilterMenu({ values, actions, rangeControl, displayControls }: {
@@ -302,7 +302,7 @@ export function FilterMenu({ values, actions, rangeControl, displayControls }: {
         </div>
         <div className="filter-column">
           <section className="filter-group">
-            <div className="filter-group-head"><h3>Tabelle eingrenzen</h3></div>
+            <div className="filter-group-head"><h3>Nur Tabelle und Heatmap</h3></div>
             <FilterCard title="Bewertung" aside={values.marketLabel ? `Markt: ${values.marketLabel}` : undefined}>
               <fieldset className="filter-tiles">
                 <legend className="visually-hidden">Bewertung</legend>
@@ -345,8 +345,8 @@ export function FilterMenu({ values, actions, rangeControl, displayControls }: {
             {leagueField}
             <div className="filter-card-rule">
               <FilterSwitch label="Nur Spiele mit Empfehlung" checked={values.liveRatedOnly} onChange={actions.setLiveRatedOnly} />
-              <p className="filter-note">Beobachtet werden {values.watched.count} von {values.watched.total} Spielen.
-                Abgewählte kosten keine API-Aufrufe.</p>
+              {/* Wie viele beobachtet werden, steht schon im Kopf. */}
+              <p className="filter-note">Abgewählte kosten keine API-Aufrufe.</p>
             </div>
           </FilterCard>
         </section>

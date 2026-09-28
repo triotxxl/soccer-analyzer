@@ -308,7 +308,9 @@ describe("Beobachtungsumfang", () => {
     // Beide Testpartien tragen eine Empfehlung, der Umfang bleibt also gleich gross -
     // entscheidend ist, dass der Schalter den gemeldeten Umfang steuert.
     await waitFor(() => expect(watched(calls).length).toBeGreaterThan(0));
-    expect(within(menu).getByText(/Beobachtet werden 2 von 2 Spielen/)).toBeInTheDocument();
+    // Der Umfang steht nur noch im Kopf, die Notiz darunter nennt nur die Kosten.
+    expect(menu.querySelector(".filter-menu-count")).toHaveTextContent("Beobachtet 2 von 2");
+    expect(within(menu).getByText("Abgewählte kosten keine API-Aufrufe.")).toBeInTheDocument();
     // Der Filter steht auch bei geschlossenem Menü da.
     expect(screen.getByRole("button", { name: "Filter, 1 aktiv" })).toBeInTheDocument();
   });
