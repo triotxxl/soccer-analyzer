@@ -1,5 +1,6 @@
 import { CaretRight, Funnel, Info, ShoppingCartSimple, X } from "@phosphor-icons/react";
 import { useState } from "react";
+import { FilterChip } from "./FilterMenu";
 import {
   QUICKPICK_GROUPS,
   QUICKPICK_PRESET_LIST,
@@ -69,12 +70,9 @@ export function QuickpickChip({ label, passed, evaluated, onOpen, onClear }: {
   onOpen(): void;
   onClear(): void;
 }) {
-  return <span className="quickpick-chip">
-    <button className="quickpick-chip-label" onClick={onOpen}
-      title="Quickpicker öffnen">{label} · {passed} von {evaluated}</button>
-    <button className="quickpick-chip-clear" aria-label="Quickpick-Filter aufheben"
-      title="Filter aufheben" onClick={onClear}><X size={11} weight="bold" /></button>
-  </span>;
+  // Öffnet den Quickpicker, nicht das Filtermenü: Dort stehen Regler und Pflichttexte.
+  return <FilterChip label={`${label} · ${passed} von ${evaluated}`} title="Quickpicker öffnen"
+    clearLabel="Quickpick-Filter aufheben" onOpen={onOpen} onClear={onClear} />;
 }
 
 /**

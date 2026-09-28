@@ -1,4 +1,4 @@
-import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
+import { useMemo, type CSSProperties, type ReactNode } from "react";
 import { ClassGapBadge, formatOdd, formatPercent, kickoffParts, sortStateLabel } from "./App";
 import {
   drawScoreLabel, drawScoreTone, eloDelta, expectedGoalsDelta, formatDelta, formDelta, HEAT_SCALE, heatOf,
@@ -7,7 +7,8 @@ import {
 import { edgeOf } from "./kelly";
 import type { DashboardFixture, DashboardMarket, DashboardMarketKey } from "./types";
 
-type SortState = { column: HeatmapColumn; direction: 1 | -1 } | null;
+/** Sortierung über eine Heatmap-Spalte; `null` heißt, die Reihenfolge der Tabelle gilt. */
+export type HeatmapSort = { column: HeatmapColumn; direction: 1 | -1 } | null;
 
 const heatStyle = (intensity: number) => ({ "--heat": intensity.toFixed(2) }) as CSSProperties;
 
@@ -91,9 +92,10 @@ function drawScoreCell(fixture: DashboardFixture) {
 /**
  * Die kompakte Heatmap: eine Zeile je Spiel, jede Kennzahl als Vorsprung Heim minus Auswärts.
  * Sie bekommt die bereits gefilterte und sortierte Liste der Tabelle. Solange keine eigene
- * Spalte sortiert ist, übernimmt sie deren Reihenfolge.
+ * Spalte sortiert ist, übernimmt sie deren Reihenfolge. Die Spaltensortierung liegt in der App,
+ * damit die Sortierauswahl über der Tabelle sie anzeigen und zurücksetzen kann.
  */
-export function HeatmapTable({ fixtures, markets, timezone, now, showEdge, openFixture, onToggleFixture, cartSlot, empty }: {
+export function HeatmapTable({ fixtures, markets, timezone, now, showEdge, openFixture, onToggleFixture, cartSlot, empty, sort, onSortChange }: {
   fixtures: DashboardFixture[];
   markets: Array<{ key: DashboardMarketKey; label: string }>;
   timezone: string;
@@ -103,17 +105,18 @@ export function HeatmapTable({ fixtures, markets, timezone, now, showEdge, openF
   onToggleFixture(fixtureId: number): void;
   cartSlot(fixture: DashboardFixture): ReactNode;
   empty: ReactNode;
+  sort: HeatmapSort;
+  onSortChange(sort: HeatmapSort): void;
 }) {
-  const [sort, setSort] = useState<SortState>(null);
   const rows = useMemo(() => sort ? sortHeatmap(fixtures, sort.column, sort.direction) : fixtures, [fixtures, sort]);
 
-  const toggleSort = (column: HeatmapColumn) => setSort((current) => {
-    if (current?.column === column) return { column, direction: current.direction === 1 ? -1 : 1 };
+  const toggleSort = (column: HeatmapColumn) => {
+    if (sort?.column === column) { onSortChange({ column, direction: sort.direction === 1 ? -1 : 1 }); return; }
     // Vorsprünge und Remis-Punkte zuerst absteigend: oben steht, wo am meisten los ist.
     // Quoten aufsteigend: oben stehen die Favoriten.
     const ascending = column === "kickoff" || column === "team" || column.startsWith("market:");
-    return { column, direction: ascending ? 1 : -1 };
-  });
+    onSortChange({ column, direction: ascending ? 1 : -1 });
+  };
 
   const head = (column: HeatmapColumn, label: string, name: string, title?: string) => {
     const active = sort?.column === column;

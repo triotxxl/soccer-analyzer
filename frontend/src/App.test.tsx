@@ -100,6 +100,12 @@ function rangeDocument(): DashboardDocument {
   return current;
 }
 
+/** Öffnet das Filtermenü über den Knopf in der Werkzeugleiste und gibt das Fenster zurück. */
+async function openFilters(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole("button", { name: /^Filter(, \d+ aktiv)?$/ }));
+  return screen.getByRole("dialog", { name: "Filter" });
+}
+
 describe("React-Dashboard", () => {
   beforeEach(() => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
@@ -121,6 +127,16 @@ describe("React-Dashboard", () => {
     expect(screen.getByText(/Dashboard-Lauf im Chat/)).toBeInTheDocument();
   });
 
+  /** Gold ★ ist die höhere Stufe ("Sehr empfehlenswert") - der Hinweis hatte es vertauscht. */
+  it("erklärt im Einsteigerhinweis die Stufen in der richtigen Reihenfolge", async () => {
+    vi.stubGlobal("fetch", dashboardFetch(() => document()));
+    render(<App />);
+    expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
+    const hint = globalThis.document.querySelector(".banner p");
+    expect(hint).toHaveTextContent("Gold ★ heißt sehr empfehlenswert, Grün ✓ empfehlenswert.");
+    expect(hint).toHaveTextContent("über „Filter“ ein");
+  });
+
   it("filtert Empfehlungen und Märkte und öffnet Fixture-Details", async () => {
     vi.stubGlobal("fetch", dashboardFetch(() => document()));
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
@@ -138,7 +154,7 @@ describe("React-Dashboard", () => {
     expect(formLabels).toHaveTextContent("HomeAway");
     expect(formLabels).not.toHaveTextContent("H/A");
 
-    await user.click(screen.getByRole("button", { name: /Starke Tipps/i }));
+    await user.click(within(await openFilters(user)).getByRole("radio", { name: /Starke Tipps/ }));
     expect(screen.queryByText("Zulu FC")).not.toBeInTheDocument();
     await user.selectOptions(screen.getByLabelText("Markt"), "draw");
     expect(globalThis.document.querySelector(".table-head")?.textContent).toContain("Remis");
@@ -222,69 +238,97 @@ describe("React-Dashboard", () => {
     render(<App />);
     expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
     const markets = screen.getByLabelText("Markt");
-    const h2h = screen.getByLabelText("H2H");
-    const form = screen.getByLabelText("Form");
+    // H2H und Form teilen sich im Filtermenü einen Umschalter; der Markt steht sichtbar in der
+    // Leiste. Das Menü wird je Prüfung geöffnet und wieder geschlossen, denn ein Marktwechsel ist
+    // ein Klick außerhalb und schließt es.
+    const display = async () => {
+      const menu = await openFilters(user);
+      const checked = (name: string) =>
+        (within(menu).queryByRole("group", { name })?.querySelector("input:checked") as HTMLInputElement | null)?.value;
+      const result = {
+        view: checked("Punkte in Form und H2H (direkte Duelle)"),
+        line: checked("Linie"),
+        direction: checked("Richtung")
+      };
+      await user.keyboard("{Escape}");
+      return result;
+    };
 
     await user.selectOptions(markets, "btts");
-    expect(h2h).toHaveValue("btts");
-    expect(form).toHaveValue("btts");
+    expect(await display()).toEqual({ view: "btts", line: undefined, direction: undefined });
 
     await user.selectOptions(markets, "over15");
-    expect(h2h).toHaveValue("over");
-    expect(form).toHaveValue("over");
-    expect(screen.getByRole("combobox", { name: "Linie für H2H & Form" })).toHaveValue("o:1.5");
+    expect(await display()).toEqual({ view: "over", line: "1.5", direction: "over" });
 
     await user.selectOptions(markets, "over25");
-    expect(screen.getByRole("combobox", { name: "Linie für H2H & Form" })).toHaveValue("o:2.5");
+    expect(await display()).toMatchObject({ line: "2.5" });
 
     // Ein Gegenmarkt stellt Linie und Richtung zugleich ein.
     await user.selectOptions(markets, "under25");
-    expect(h2h).toHaveValue("over");
-    expect(screen.getByRole("combobox", { name: "Linie für H2H & Form" })).toHaveValue("u:2.5");
+    expect(await display()).toEqual({ view: "over", line: "2.5", direction: "under" });
 
     await user.selectOptions(markets, "firstHalfOver05");
-    expect(h2h).toHaveValue("firstHalfOver");
-    expect(form).toHaveValue("firstHalfOver");
-    expect(screen.getByRole("combobox", { name: "Linie für H2H & Form, 1. Halbzeit" })).toHaveValue("o:0.5");
+    expect(await display()).toEqual({ view: "firstHalfOver", line: "0.5", direction: "over" });
 
     await user.selectOptions(markets, "firstHalfOver15");
-    expect(screen.getByRole("combobox", { name: "Linie für H2H & Form, 1. Halbzeit" })).toHaveValue("o:1.5");
+    expect(await display()).toMatchObject({ line: "1.5" });
 
+    // Linie und Richtung erscheinen nur, wenn es um Tore geht.
     await user.selectOptions(markets, "1x2");
-    expect(h2h).toHaveValue("outcome");
-    expect(form).toHaveValue("outcome");
+    expect(await display()).toEqual({ view: "outcome", line: undefined, direction: undefined });
     await user.selectOptions(markets, "draw");
-    expect(h2h).toHaveValue("outcome");
+    expect(await display()).toMatchObject({ view: "outcome" });
   });
 
-  /**
-   * Die Seitenleiste trägt keine Karten mehr: Die drei Schalter stehen zusammen unter
-   * "Optionen", und die Statuszeile über dem Ansichtswechsel zählt, was die aktuelle
-   * Filterung übrig lässt. Beide Zahlen kommen aus derselben Quelle wie die KPI-Liste.
-   */
-  it("bündelt die Schalter unter Optionen und zählt oben den gefilterten Stand", async () => {
+  it("zeigt Vorteil und Kelly ab Werk nicht, auch wenn der alte Schlüssel an war", async () => {
+    // Bis 27.09.2026 schrieb die App "1" schon beim ersten Laden - das darf nicht mehr gelten.
+    window.localStorage.setItem("football-analyzer:kelly-visible", "1");
     vi.stubGlobal("fetch", dashboardFetch(() => document()));
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     render(<App />);
     expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
 
-    const optionen = screen.getByRole("heading", { name: "Optionen" }).closest("section")!;
-    expect(within(optionen).getByRole("checkbox", { name: /Pokal \/ Cross-League/i })).toBeInTheDocument();
-    expect(within(optionen).getByRole("checkbox", { name: /Laufende \/ beendete Partien/i })).toBeInTheDocument();
-    const kelly = within(optionen).getByRole("checkbox", { name: /Vorteil & Kelly-Einsatz anzeigen/i });
-    expect(screen.getByRole("button", { name: /Kelly-Kriterium öffnen/ })).toBeInTheDocument();
-    await user.click(kelly);
     expect(screen.queryByRole("button", { name: /Kelly-Kriterium öffnen/ })).not.toBeInTheDocument();
+    expect(within(await openFilters(user)).getByRole("switch", { name: /Vorteil & Kelly-Einsatz anzeigen/i })).not.toBeChecked();
+  });
 
-    const status = globalThis.document.querySelector(".sidebar-status");
-    expect(status).toHaveTextContent("Partien im Zeitraum");
+  /**
+   * Die Schalter stehen im Filtermenü in den Gruppen "Umfang" und "Anzeige", die Statuszeile
+   * unter der Werkzeugleiste zählt, was die aktuelle Filterung übrig lässt. Die Zahl "mit
+   * Vorteil" ist Value und steht deshalb nur mit dem Kelly-Schalter da.
+   */
+  it("bündelt die Schalter im Filtermenü und zählt den gefilterten Stand", async () => {
+    window.localStorage.setItem("football-analyzer:kelly-visible-v2", "1");
+    vi.stubGlobal("fetch", dashboardFetch(() => document()));
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(<App />);
+    expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
+
+    const status = globalThis.document.querySelector(".filter-status");
+    expect(screen.getByRole("button", { name: /Kelly-Kriterium öffnen/ })).toBeInTheDocument();
     expect(status).toHaveTextContent("mit Vorteil");
+
+    const menu = await openFilters(user);
+    expect(within(menu).getByRole("heading", { name: "Umfang" })).toBeInTheDocument();
+    expect(within(menu).getByRole("heading", { name: "Anzeige" })).toBeInTheDocument();
+    // Ab Werk ist kein Schalter an - "an" heißt im Menü immer "Filter aktiv" oder "Anzeige an".
+    expect(within(menu).getByRole("switch", { name: "Nur Ligaspiele" })).not.toBeChecked();
+    expect(within(menu).getByRole("switch", { name: "Angepfiffene Spiele zeigen" })).not.toBeChecked();
+    await user.click(within(menu).getByRole("switch", { name: /Vorteil & Kelly-Einsatz anzeigen/i }));
+    expect(screen.queryByRole("button", { name: /Kelly-Kriterium öffnen/ })).not.toBeInTheDocument();
+    expect(status).not.toHaveTextContent("mit Vorteil");
+
+    expect(status).toHaveTextContent("Spiele angezeigt");
     expect(status?.querySelector("strong")).toHaveTextContent("2");
 
-    // Die erste Zahl folgt dem Tabellenfilter, die KPI-Liste dahinter bleibt beim vollen Umfang.
-    await user.click(screen.getByRole("button", { name: /Starke Tipps/i }));
+    // Die erste Zahl folgt dem Tabellenfilter, die Zähler im Menü bleiben beim vollen Umfang.
+    const headCount = menu.querySelector(".filter-menu-count");
+    expect(headCount).toHaveTextContent("2 Spiele angezeigt");
+    await user.click(within(menu).getByRole("radio", { name: /Starke Tipps/ }));
     expect(status?.querySelector("strong")).toHaveTextContent("1");
-    expect(screen.getByRole("button", { name: /Alle Partien/ })).toHaveTextContent("2");
+    // Die Statuszeile liegt unter dem Menü - der Kopf zeigt dieselbe Zahl, wo man hinschaut.
+    expect(headCount).toHaveTextContent("1 Spiel angezeigt");
+    expect(within(menu).getByRole("radio", { name: /Alle Spiele/ }).closest("label")).toHaveTextContent("2");
   });
 
   it("kennzeichnet besonders defensiv starke Teams mit einem Shield", async () => {
@@ -298,7 +342,6 @@ describe("React-Dashboard", () => {
     expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
     expect(screen.getByRole("img", { name: /Alpha FC: starke Abwehr, aus den kassierten Toren belegt/ })).toHaveClass("fallback");
     expect(screen.queryByRole("img", { name: /Gast FC:.*Defensive/ })).not.toBeInTheDocument();
-    expect(screen.getByRole("region", { name: "Legende Defensivstärke" })).toHaveTextContent("durch xGA verifiziert");
   });
 
   it("zeigt xGA-verifizierte Shields gefüllt mit Coverage im ARIA-Text", async () => {
@@ -368,10 +411,13 @@ describe("React-Dashboard", () => {
     render(<App />);
     expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
 
-    await user.selectOptions(screen.getByLabelText("H2H"), "firstHalfOver");
-    const line = screen.getByRole("combobox", { name: "Linie für H2H & Form, 1. Halbzeit" });
-    expect(within(line).getAllByRole("option").map((option) => option.textContent))
-      .toEqual(["Über 0,5", "Unter 0,5", "Über 1,5", "Unter 1,5"]);
+    // Das Menü bleibt offen, solange nur darin gewählt wird - die Tabelle daneben zeigt die Wirkung.
+    const menu = await openFilters(user);
+    await user.click(within(menu).getByRole("radio", { name: "Tore 1. HZ" }));
+    const line = within(menu).getByRole("group", { name: "Linie" });
+    const direction = within(menu).getByRole("group", { name: "Richtung" });
+    expect(within(line).getAllByRole("radio").map((option) => option.closest("label")!.textContent))
+      .toEqual(["0,5", "1,5"]);
     const firstH2h = globalThis.document.querySelector(".fixture-row")!;
     const dots = () => Array.from(firstH2h.querySelectorAll(".h2h-cell .result-dot"));
     // Die Punkte zeigen die Halbzeit-Torzahl; ob die Linie gerissen wurde, sagt die Farbe.
@@ -380,12 +426,12 @@ describe("React-Dashboard", () => {
     expect(dots().map((dot) => dot.textContent)).toEqual(["1", "0", "2", "1", "–"]);
     expect(hits()).toEqual(["Ü", "U", "Ü", "Ü", "–"]);
 
-    await user.selectOptions(line, "o:1.5");
+    await user.click(within(line).getByRole("radio", { name: "1,5" }));
     expect(dots().map((dot) => dot.textContent)).toEqual(["1", "0", "2", "1", "–"]);
     expect(hits()).toEqual(["U", "U", "Ü", "U", "–"]);
 
     // Bei der Gegenrichtung bleibt die Torzahl gleich, aber getroffen hat, wer darunter blieb.
-    await user.selectOptions(line, "u:1.5");
+    await user.click(within(direction).getByRole("radio", { name: "Unter" }));
     expect(dots().map((dot) => dot.textContent)).toEqual(["1", "0", "2", "1", "–"]);
     expect(hits()).toEqual(["Ü", "Ü", "U", "Ü", "–"]);
   });
@@ -474,63 +520,86 @@ describe("React-Dashboard", () => {
     expect(screen.getByText("Exaktes Ende")).toBeInTheDocument();
     expect(screen.queryByText("Vor Start")).not.toBeInTheDocument();
     expect(screen.queryByText("Nach Ende")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "48h" })).toHaveAttribute("aria-pressed", "true");
+    const menu = await openFilters(user);
+    expect(within(menu).getByRole("button", { name: "Nächste 48 Std." })).toHaveAttribute("aria-pressed", "true");
 
     // Der Haken ist der ausdrückliche Override: zusätzlich zu den kommenden Partien
     // erscheinen die gerade laufenden. Die obere 48-Stunden-Grenze bleibt unangetastet,
     // und längst beendete Partien bleiben ebenfalls draußen.
-    await user.click(screen.getByRole("checkbox", { name: /Laufende \/ beendete Partien/i }));
+    await user.click(within(menu).getByRole("switch", { name: "Angepfiffene Spiele zeigen" }));
     expect(screen.getByText("Vor Start")).toBeInTheDocument();
     expect(screen.queryByText("Nach Ende")).not.toBeInTheDocument();
     expect(screen.queryByText("Lange vorbei")).not.toBeInTheDocument();
   });
 
-  it("wählt inklusive Datumsbereiche, normalisiert die Reihenfolge und erlaubt spielfreie Tage", async () => {
+  /** Welche Tage im Zeitraum-Raster gerade gewählt sind (`aria-pressed`). */
+  const pressedDays = (menu: HTMLElement) =>
+    within(within(menu).getByRole("group", { name: "Zeitraum" }))
+      .getAllByRole("button", { name: /August 2026/ })
+      .filter((day) => day.getAttribute("aria-pressed") === "true")
+      .map((day) => day.querySelector(".day-num")?.textContent);
+
+  it("wählt Tage direkt im Menü, normalisiert die Reihenfolge und erlaubt spielfreie Tage", async () => {
     vi.stubGlobal("fetch", dashboardFetch(() => rangeDocument()));
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     render(<App />);
     expect(await screen.findByText("Exakter Start")).toBeInTheDocument();
-    await user.click(screen.getByRole("checkbox", { name: /Laufende \/ beendete Partien/i }));
+    const menu = await openFilters(user);
+    await user.click(within(menu).getByRole("switch", { name: "Angepfiffene Spiele zeigen" }));
+    const days = within(menu).getByRole("group", { name: "Zeitraum" });
 
-    await user.click(screen.getByRole("button", { name: "Datumsbereich auswählen" }));
-    let dialog = screen.getByRole("dialog", { name: "Datumsbereich auswählen" });
-    expect(within(dialog).getByRole("button", { name: /15. August 2026/i })).toBeDisabled();
-    expect(within(dialog).getByRole("button", { name: /17. August 2026/i })).toBeEnabled();
-    await user.click(within(dialog).getByRole("button", { name: /18. August 2026/i }));
-    await user.click(within(dialog).getByRole("button", { name: /16. August 2026/i }));
-    expect(within(dialog).getByText("16.08.2026")).toBeInTheDocument();
-    expect(within(dialog).getByText("18.08.2026")).toBeInTheDocument();
-    await user.click(within(dialog).getByRole("button", { name: "Übernehmen" }));
+    // Nur die Tage der Analyse stehen im Raster; andere Zellen bleiben leer statt grau.
+    expect(within(days).queryByRole("button", { name: /15. August 2026/ })).not.toBeInTheDocument();
+    expect(within(days).getByRole("button", { name: /17. August 2026/ })).toBeInTheDocument();
+
+    // Der Kartenkopf nennt, wie weit die 48 Stunden reichen; der Hinweis steht schon vor dem Klick.
+    expect(within(menu).getByText(/^bis [A-Z][a-z] \d{2}\.\d{2}\., \d{2}:\d{2}$/)).toBeInTheDocument();
+    expect(within(days).getByText("Ein Tag: einmal klicken. Mehrere Tage: ersten und letzten anklicken.")).toBeInTheDocument();
+
+    // Ein Klick wählt einen Tag - sofort, ohne Übernehmen.
+    await user.click(within(days).getByRole("button", { name: /18. August 2026/ }));
+    expect(pressedDays(menu)).toEqual(["18"]);
+    expect(within(days).getByText("Noch den letzten Tag anklicken – sonst gilt nur dieser.")).toBeInTheDocument();
+    expect(screen.getByText("Exaktes Ende")).toBeInTheDocument();
+    expect(screen.queryByText("Exakter Start")).not.toBeInTheDocument();
+
+    // Der zweite Klick macht daraus einen Zeitraum, auch rückwärts.
+    await user.click(within(days).getByRole("button", { name: /16. August 2026/ }));
+    expect(pressedDays(menu)).toEqual(["16", "17", "18"]);
     expect(screen.getByText("Exakter Start")).toBeInTheDocument();
-    expect(screen.getByText("Exaktes Ende")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "16.08. – 18.08." })).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "Datumsbereich auswählen" }));
-    dialog = screen.getByRole("dialog", { name: "Datumsbereich auswählen" });
-    await user.click(within(dialog).getByRole("button", { name: /17. August 2026/i }));
-    await user.click(within(dialog).getByRole("button", { name: "Übernehmen" }));
-    expect(screen.getByText("Keine Partien für diese Auswahl")).toBeInTheDocument();
+    // Der dritte beginnt neu; ein Tag ohne Spiele ist erlaubt.
+    await user.click(within(days).getByRole("button", { name: /17. August 2026/ }));
+    expect(pressedDays(menu)).toEqual(["17"]);
+    expect(screen.getByText("Keine Spiele für diese Auswahl")).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "Filter" })).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "48h" }));
+    await user.click(within(days).getByRole("button", { name: "Nächste 48 Std." }));
     expect(screen.getByText("Exaktes Ende")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "48h" })).toHaveAttribute("aria-pressed", "true");
+    expect(within(days).getByRole("button", { name: "Nächste 48 Std." })).toHaveAttribute("aria-pressed", "true");
+    expect(pressedDays(menu)).toEqual([]);
   });
 
-  it("verwirft Kalenderentwürfe beim Abbrechen und mit Escape", async () => {
+  it("beginnt nach „Nächste 48 Std.“ mit einem einzelnen Tag, und Escape schließt das Menü", async () => {
     vi.stubGlobal("fetch", dashboardFetch(() => rangeDocument()));
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     render(<App />);
     expect(await screen.findByText("Exakter Start")).toBeInTheDocument();
+    const menu = await openFilters(user);
+    const days = within(menu).getByRole("group", { name: "Zeitraum" });
 
-    await user.click(screen.getByRole("button", { name: "Datumsbereich auswählen" }));
-    let dialog = screen.getByRole("dialog", { name: "Datumsbereich auswählen" });
-    await user.click(within(dialog).getByRole("button", { name: /18. August 2026/i }));
-    await user.click(within(dialog).getByRole("button", { name: "Abbrechen" }));
-    expect(screen.getByRole("button", { name: "48h" })).toHaveAttribute("aria-pressed", "true");
+    await user.click(within(days).getByRole("button", { name: /16. August 2026/ }));
+    await user.click(within(days).getByRole("button", { name: "Nächste 48 Std." }));
+    // Sonst hinge dieser Klick still an den 16. an und ergäbe 16. bis 18.
+    await user.click(within(days).getByRole("button", { name: /18. August 2026/ }));
+    expect(pressedDays(menu)).toEqual(["18"]);
+    // Ein einzelner Tag heißt im Schildchen wie ein Tag, nicht "18.08. – 18.08.".
+    expect(screen.getByRole("button", { name: /^Di\.? 18\.08\.$/ })).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "Datumsbereich auswählen" }));
-    fireEvent.keyDown(window, { key: "Escape" });
-    expect(screen.queryByRole("dialog", { name: "Datumsbereich auswählen" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Sidebar einklappen" })).toHaveAttribute("aria-expanded", "true");
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog", { name: "Filter" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Filter, 1 aktiv" })).toHaveFocus();
   });
 
   it("begrenzt einen benutzerdefinierten Bereich nach einem Snapshot-Refresh", async () => {
@@ -540,12 +609,10 @@ describe("React-Dashboard", () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     render(<App />);
     expect(await screen.findByText("Exakter Start")).toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: "Datumsbereich auswählen" }));
-    const dialog = screen.getByRole("dialog", { name: "Datumsbereich auswählen" });
-    await user.click(within(dialog).getByRole("button", { name: /16. August 2026/i }));
-    await user.click(within(dialog).getByRole("button", { name: /18. August 2026/i }));
-    await user.click(within(dialog).getByRole("button", { name: "Übernehmen" }));
+    const menu = await openFilters(user);
+    const days = within(menu).getByRole("group", { name: "Zeitraum" });
+    await user.click(within(days).getByRole("button", { name: /16. August 2026/ }));
+    await user.click(within(days).getByRole("button", { name: /18. August 2026/ }));
 
     current = document("2026-08-17T10:00:00.000Z", "Nur neuer Tag");
     current.meta.firstAvailableDate = "2026-08-17";
@@ -555,49 +622,148 @@ describe("React-Dashboard", () => {
     current.fixtures = [fixture(10, "Nur neuer Tag", "strong", "2026-08-17T18:00:00.000Z")];
     fireEvent.focus(window);
     expect(await screen.findByText("Nur neuer Tag")).toBeInTheDocument();
-    await waitFor(() => expect(screen.getByRole("button", { name: "Datumsbereich auswählen" })).toHaveTextContent("17.08. – 17.08."));
+    await waitFor(() => expect(pressedDays(screen.getByRole("dialog", { name: "Filter" }))).toEqual(["17"]));
   });
 
-  it("klappt die Desktop-Sidebar ein und filtert über die kompakte Iconleiste", async () => {
+  /**
+   * Das Menü verdrängt nichts und ist meist zu. Damit dann kein Filter unbemerkt Spiele
+   * versteckt, steht jeder als Schildchen da, und der Knopf zählt sie.
+   */
+  it("zählt aktive Filter am Knopf und hebt sie über Schildchen auf", async () => {
     vi.stubGlobal("fetch", dashboardFetch(() => document()));
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     render(<App />);
-    expect(await screen.findByText("Fußball-Analyzer")).toBeInTheDocument();
+    expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Filter" })).toHaveAttribute("aria-expanded", "false");
 
-    await user.click(screen.getByRole("button", { name: "Sidebar einklappen" }));
-    expect(globalThis.document.querySelector(".app-shell")).toHaveClass("sidebar-collapsed");
-    expect(screen.queryByText("Fußball-Analyzer")).not.toBeInTheDocument();
+    const menu = await openFilters(user);
+    expect(within(menu).getByRole("heading", { name: "Filter" })).toHaveFocus();
+    await user.click(within(menu).getByRole("radio", { name: /Starke Tipps/ }));
+    await user.click(within(menu).getByRole("switch", { name: "Angepfiffene Spiele zeigen" }));
+    await user.keyboard("{Escape}");
 
-    await user.click(screen.getByRole("button", { name: /Starke Tipps: 1 Partien/i }));
+    expect(screen.queryByRole("dialog", { name: "Filter" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Filter, 2 aktiv" })).toHaveFocus();
     expect(screen.queryByText("Zulu FC")).not.toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Sidebar ausklappen" }));
-    expect(screen.getByText("Fußball-Analyzer")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Bewertungsfilter aufheben" }));
+    expect(screen.getByText("Zulu FC")).toBeInTheDocument();
+    // Das Schildchen verschwindet mit dem Filter; der Fokus landet am Knopf.
+    expect(screen.getByRole("button", { name: "Filter, 1 aktiv" })).toHaveFocus();
+
+    await user.click(screen.getByRole("button", { name: "Mit angepfiffenen Spielen" }));
+    expect(screen.getByRole("dialog", { name: "Filter" })).toBeInTheDocument();
   });
 
-  it("öffnet und schließt die mobile Sidebar als Drawer und reagiert auf den Breakpoint", async () => {
-    let breakpointListener: ((event: MediaQueryListEvent) => void) | undefined;
-    vi.stubGlobal("matchMedia", vi.fn().mockReturnValue({
-      matches: false, media: "(min-width: 700px)", onchange: null,
-      addEventListener: (_type: string, listener: (event: MediaQueryListEvent) => void) => { breakpointListener = listener; },
-      removeEventListener: vi.fn(), addListener: vi.fn(), removeListener: vi.fn(), dispatchEvent: vi.fn()
-    }));
+  it("setzt alle Filter zurück, und ohne Spiele zwischen Ligen gilt kein Klassenfilter", async () => {
     vi.stubGlobal("fetch", dashboardFetch(() => document()));
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     render(<App />);
-    expect(await screen.findByRole("button", { name: "Filter & Zeitraum" })).toHaveAttribute("aria-expanded", "false");
+    expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "Filter & Zeitraum" }));
-    expect(screen.getByRole("button", { name: "Filter & Zeitraum" })).toHaveAttribute("aria-expanded", "true");
-    await user.click(screen.getByRole("button", { name: "Sidebar schließen" }));
-    expect(screen.getByRole("button", { name: "Filter & Zeitraum" })).toHaveAttribute("aria-expanded", "false");
+    const menu = await openFilters(user);
+    const reset = within(menu).getByRole("button", { name: "Alle Filter zurücksetzen" });
+    expect(reset).toBeDisabled();
+    const leagueOnly = within(menu).getByRole("switch", { name: "Nur Ligaspiele" });
+    // Umgedreht gegenüber früher: ab Werk aus, "an" ist der Filter.
+    expect(leagueOnly).not.toBeChecked();
+    await user.click(within(menu).getByRole("radio", { name: "Nur mit Klassenunterschied" }));
+    // Sonst bliebe "nur mit" bei leerer Tabelle in einem abgeschalteten Feld stehen.
+    await user.click(leagueOnly);
+    expect(within(menu).getByRole("radio", { name: "Alle" })).toBeChecked();
+    expect(within(menu).getByRole("radio", { name: "Nur mit Klassenunterschied" })).toBeDisabled();
+    expect(within(menu).getByText("Greift nicht, solange „Nur Ligaspiele“ an ist.")).toBeInTheDocument();
+    await user.click(within(menu).getByRole("radio", { name: /Starke Tipps/ }));
 
-    await user.click(screen.getByRole("button", { name: "Filter & Zeitraum" }));
-    fireEvent.keyDown(window, { key: "Escape" });
-    expect(screen.getByRole("button", { name: "Filter & Zeitraum" })).toHaveAttribute("aria-expanded", "false");
+    await user.click(reset);
+    expect(within(menu).getByRole("switch", { name: "Nur Ligaspiele" })).not.toBeChecked();
+    expect(within(menu).getByRole("radio", { name: /Alle Spiele/ })).toBeChecked();
+    expect(reset).toBeDisabled();
+    expect(within(menu).getByRole("heading", { name: "Filter" })).toHaveFocus();
+    expect(screen.getByRole("button", { name: "Filter" })).toBeInTheDocument();
+  });
 
-    act(() => breakpointListener?.({ matches: true } as MediaQueryListEvent));
-    expect(screen.getByRole("button", { name: "Sidebar einklappen" })).toHaveAttribute("aria-expanded", "true");
-    expect(globalThis.document.querySelector(".app-shell")).not.toHaveClass("sidebar-collapsed");
+  it("findet Wettbewerbe über die Schnellsuche und zeigt mit „nur“ genau einen", async () => {
+    const current = document();
+    current.fixtures[1] = { ...current.fixtures[1]!, country: "England", league: "Championship" };
+    vi.stubGlobal("fetch", dashboardFetch(() => current));
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(<App />);
+    expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
+
+    const menu = await openFilters(user);
+    // Ohne Eingabe keine Trefferliste - das Menü bleibt kurz.
+    expect(within(menu).queryByRole("checkbox")).not.toBeInTheDocument();
+    await user.type(within(menu).getByRole("searchbox", { name: "Wettbewerb schnell suchen" }), "cham");
+    expect(within(menu).getByRole("checkbox", { name: "England · Championship" })).toBeChecked();
+    expect(within(menu).queryByRole("checkbox", { name: "Deutschland · Bundesliga" })).not.toBeInTheDocument();
+
+    await user.click(within(menu).getByRole("button", { name: "Nur England · Championship zeigen" }));
+    expect(screen.queryByText("Alpha FC")).not.toBeInTheDocument();
+    expect(screen.getByText("Zulu FC")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "1 von 2 Wettbewerben" })).toBeInTheDocument();
+
+    await user.click(within(menu).getByRole("checkbox", { name: "England · Championship" }));
+    expect(screen.getByRole("button", { name: "0 von 2 Wettbewerben" })).toBeInTheDocument();
+  });
+
+  it("schließt das Menü bei Klick außerhalb, aber nicht aus dem Wettbewerbe-Dialog heraus", async () => {
+    vi.stubGlobal("fetch", dashboardFetch(() => document()));
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(<App />);
+    expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
+
+    const menu = await openFilters(user);
+    await user.click(within(menu).getByRole("button", { name: "Wettbewerbe auswählen" }));
+    const leagues = screen.getByRole("dialog", { name: "Wettbewerbe auswählen" });
+    await user.click(within(leagues).getByRole("checkbox", { name: "Deutschland · Bundesliga" }));
+    expect(screen.getByRole("dialog", { name: "Filter" })).toBeInTheDocument();
+
+    // Escape schließt nur den obersten Dialog.
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog", { name: "Wettbewerbe auswählen" })).not.toBeInTheDocument();
+    expect(within(screen.getByRole("dialog", { name: "Filter" })).getByRole("button", { name: "Wettbewerbe auswählen" }))
+      .toHaveTextContent("0 von 1 Wettbewerben");
+
+    await user.click(globalThis.document.body);
+    expect(screen.queryByRole("dialog", { name: "Filter" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "0 von 1 Wettbewerben" })).toBeInTheDocument();
+  });
+
+  it("wechselt die Ansicht über die linke Leiste und merkt sich die Wahl", async () => {
+    vi.stubGlobal("fetch", dashboardFetch(() => document()));
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(<App />);
+    expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
+
+    const nav = screen.getByRole("navigation", { name: "Ansichten" });
+    expect(within(nav).getAllByRole("button").map((button) => button.textContent))
+      .toEqual(["Tabelle", "Heatmap", "Live", "Marktprofil"]);
+    expect(within(nav).getByRole("button", { name: "Tabelle" })).toHaveAttribute("aria-current", "page");
+    expect(within(nav).getByRole("button", { name: "Heatmap" })).not.toHaveAttribute("aria-current");
+    expect(within(nav).getByText(/Datenstand:/)).toBeInTheDocument();
+
+    await user.click(within(nav).getByRole("button", { name: "Heatmap" }));
+    expect(within(nav).getByRole("button", { name: "Heatmap" })).toHaveAttribute("aria-current", "page");
+    expect(within(nav).getByRole("button", { name: "Tabelle" })).not.toHaveAttribute("aria-current");
+    expect(window.localStorage.getItem("football-analyzer:view")).toBe("prematch");
+    expect(window.localStorage.getItem("football-analyzer:table-layout")).toBe("heatmap");
+  });
+
+  it("zeigt im Marktprofil keinen Filter-Knopf und schließt das Menü beim Ansichtswechsel", async () => {
+    vi.stubGlobal("fetch", dashboardFetch(() => document()));
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(<App />);
+    expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
+
+    await openFilters(user);
+    const nav = screen.getByRole("navigation", { name: "Ansichten" });
+    await user.click(within(nav).getByRole("button", { name: "Marktprofil" }));
+    expect(window.localStorage.getItem("football-analyzer:view")).toBe("profile");
+    expect(screen.queryByRole("button", { name: /^Filter/ })).not.toBeInTheDocument();
+
+    await user.click(within(nav).getByRole("button", { name: "Tabelle" }));
+    expect(screen.getByRole("button", { name: "Filter" })).toHaveAttribute("aria-expanded", "false");
   });
 
   it("lädt bei erneutem Fensterfokus einen neuen Lauf", async () => {
@@ -835,12 +1001,12 @@ describe("Klassenunterschied", () => {
     expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
     expect(screen.getByText("Zulu FC")).toBeInTheDocument();
 
-    const classGap = screen.getByLabelText("Klasse");
-    await user.selectOptions(classGap, "only");
+    const menu = await openFilters(user);
+    await user.click(within(menu).getByRole("radio", { name: "Nur mit Klassenunterschied" }));
     expect(screen.getByText("Alpha FC")).toBeInTheDocument();
     expect(screen.queryByText("Zulu FC")).not.toBeInTheDocument();
 
-    await user.selectOptions(classGap, "hide");
+    await user.click(within(menu).getByRole("radio", { name: "Ohne Klassenunterschied" }));
     expect(screen.queryByText("Alpha FC")).not.toBeInTheDocument();
     expect(screen.getByText("Zulu FC")).toBeInTheDocument();
   });
@@ -891,17 +1057,23 @@ describe("Klassenunterschied", () => {
    * Die Kennzahlen zählen weiter den vollen Umfang - wie bei Bewertungs- und Klassenfilter.
    * Sonst hinge auch die Kelly-Auswahl am Tabellenfilter, und die hat ihre eigene Regel.
    */
-  it("lässt die Kennzahlen der Seitenleiste unberührt", async () => {
+  it("lässt die Zähler im Filtermenü unberührt", async () => {
     vi.stubGlobal("fetch", dashboardFetch(() => quickpickDocument()));
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     render(<App />);
     expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
-    const total = () => screen.getByRole("button", { name: /Alle Partien/ }).textContent;
-    expect(total()).toContain("2");
+    const total = async () => {
+      const count = within(await openFilters(user)).getByRole("radio", { name: /Alle Spiele/ }).closest("label")!.textContent;
+      await user.keyboard("{Escape}");
+      return count;
+    };
+    expect(await total()).toContain("2");
 
     await applyQuickpick(user);
 
-    expect(total()).toContain("2");
+    expect(await total()).toContain("2");
+    // Der Quickpick zählt am Filter-Knopf mit - er blendet Spiele aus wie jeder andere Filter.
+    expect(screen.getByRole("button", { name: "Filter, 1 aktiv" })).toBeInTheDocument();
   });
 
   it("nimmt den Filter mit einem Klick auf das Kreuz zurück", async () => {
@@ -976,6 +1148,7 @@ describe("Schüsse und Ecken", () => {
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
     vi.useRealTimers();
+    window.localStorage.clear();
   });
 
   const mitZahlen = (
@@ -1066,15 +1239,17 @@ describe("Heatmap", () => {
     const { unmount } = render(<App />);
     expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
 
-    const nav = screen.getByRole("navigation", { name: "Darstellung" });
-    expect(within(nav).getByRole("button", { name: "Tabelle" })).toHaveAttribute("aria-pressed", "true");
+    const nav = screen.getByRole("navigation", { name: "Ansichten" });
+    expect(within(nav).getByRole("button", { name: "Tabelle" })).toHaveAttribute("aria-current", "page");
     expect(globalThis.document.querySelector(".heatmap-row")).not.toBeInTheDocument();
 
     await user.click(within(nav).getByRole("button", { name: "Heatmap" }));
     expect(globalThis.document.querySelectorAll(".heatmap-row")).toHaveLength(2);
     expect(globalThis.document.querySelector(".fixture-row")).not.toBeInTheDocument();
-    expect(screen.getByLabelText("H2H")).toBeDisabled();
-    expect(screen.getByLabelText("Form")).toBeDisabled();
+    const menu = await openFilters(user);
+    // In der Heatmap wirken die Punkte nicht - der Block entfällt, statt grau dazustehen.
+    expect(within(menu).queryByRole("group", { name: /Punkte in Form und H2H/ })).not.toBeInTheDocument();
+    expect(within(menu).getByRole("switch", { name: /Vorteil & Kelly-Einsatz anzeigen/ })).toBeInTheDocument();
     expect(screen.getByLabelText("Markt")).toBeEnabled();
 
     unmount();
@@ -1085,6 +1260,7 @@ describe("Heatmap", () => {
 
   it("zeigt Vorsprünge als Heim minus Auswärts und färbt Value nur mit dem Kelly-Schalter", async () => {
     window.localStorage.setItem("football-analyzer:table-layout", "heatmap");
+    window.localStorage.setItem("football-analyzer:kelly-visible-v2", "1");
     const current = document();
     current.fixtures[0] = { ...current.fixtures[0]!, homeElo: elo(1900), awayElo: elo(1750) };
     vi.stubGlobal("fetch", dashboardFetch(() => current));
@@ -1104,14 +1280,15 @@ describe("Heatmap", () => {
     expect(cells[3]).toHaveTextContent("–");
     expect(row.querySelectorAll(".odds-cell.value")).toHaveLength(3);
 
-    const optionen = screen.getByRole("heading", { name: "Optionen" }).closest("section")!;
-    await user.click(within(optionen).getByRole("checkbox", { name: /Vorteil & Kelly-Einsatz anzeigen/i }));
+    await user.click(within(await openFilters(user)).getByRole("switch", { name: /Vorteil & Kelly-Einsatz anzeigen/i }));
     expect(globalThis.document.querySelectorAll(".odds-cell.value")).toHaveLength(0);
     expect(screen.getByText(/Value-Färbung/)).toBeInTheDocument();
   });
 
   it("färbt eine 1X2-Quote ohne belastbare Wahrscheinlichkeit nicht", async () => {
     window.localStorage.setItem("football-analyzer:table-layout", "heatmap");
+    // Mit Schalter aus wäre ohnehin nichts gefärbt - der Test prüfte dann nichts.
+    window.localStorage.setItem("football-analyzer:kelly-visible-v2", "1");
     const current = document();
     current.fixtures[0] = {
       ...current.fixtures[0]!,
@@ -1144,5 +1321,86 @@ describe("Heatmap", () => {
 
     await user.click(globalThis.document.querySelector(".heatmap-row")!);
     expect(screen.getByRole("complementary", { name: "Details" })).toHaveTextContent("Zulu FC");
+  });
+});
+
+describe("Sortierauswahl", () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date("2026-08-16T12:00:00.000Z"));
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+    window.localStorage.clear();
+  });
+
+  const namen = ["Früh FC", "Spät FC", "Mitte FC"];
+  const reihenfolge = (selector: string) => Array.from(globalThis.document.querySelectorAll(selector))
+    .map((row) => namen.find((name) => row.textContent?.includes(name)));
+
+  const dreiLigen = () => {
+    const current = document();
+    current.fixtures = [
+      { ...fixture(1, "Spät FC", "none", "2026-08-16T20:00:00.000Z"), country: "Albanien", league: "Kategoria Superiore" },
+      { ...fixture(2, "Früh FC", "none", "2026-08-16T14:00:00.000Z"), country: "Zypern", league: "1. Division" },
+      { ...fixture(3, "Mitte FC", "none", "2026-08-16T17:00:00.000Z"), country: "England", league: "Championship" }
+    ];
+    current.meta.fixtureCount = 3;
+    return current;
+  };
+
+  it("sortiert nach Anstoß vor, nach Liga auf Wunsch und dreht die Reihenfolge um", async () => {
+    const current = dreiLigen();
+    vi.stubGlobal("fetch", dashboardFetch(() => current));
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(<App />);
+    expect(await screen.findByText("Früh FC")).toBeInTheDocument();
+
+    expect(screen.getByLabelText("Sortierung")).toHaveValue("kickoff");
+    expect(reihenfolge(".fixture-row")).toEqual(["Früh FC", "Mitte FC", "Spät FC"]);
+
+    await user.selectOptions(screen.getByLabelText("Sortierung"), "league");
+    expect(reihenfolge(".fixture-row")).toEqual(["Spät FC", "Mitte FC", "Früh FC"]);
+
+    await user.click(screen.getByRole("button", { name: /Reihenfolge umdrehen, jetzt aufsteigend/ }));
+    expect(reihenfolge(".fixture-row")).toEqual(["Früh FC", "Mitte FC", "Spät FC"]);
+    expect(screen.getByRole("button", { name: /Reihenfolge umdrehen, jetzt absteigend/ })).toBeInTheDocument();
+  });
+
+  it("folgt einem Klick auf den Spaltenkopf und merkt sich die Wahl über ein Neuladen", async () => {
+    const current = dreiLigen();
+    vi.stubGlobal("fetch", dashboardFetch(() => current));
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const { unmount } = render(<App />);
+    expect(await screen.findByText("Früh FC")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /^Partie,/ }));
+    expect(screen.getByLabelText("Sortierung")).toHaveValue("team");
+    unmount();
+
+    render(<App />);
+    expect(await screen.findByText("Früh FC")).toBeInTheDocument();
+    expect(screen.getByLabelText("Sortierung")).toHaveValue("team");
+    expect(reihenfolge(".fixture-row")).toEqual(["Früh FC", "Mitte FC", "Spät FC"]);
+  });
+
+  it("zeigt eine Heatmap-Spalte als eigene Sortierung und setzt sie über die Auswahl zurück", async () => {
+    window.localStorage.setItem("football-analyzer:table-layout", "heatmap");
+    const current = dreiLigen();
+    vi.stubGlobal("fetch", dashboardFetch(() => current));
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(<App />);
+    expect(await screen.findByText("Früh FC")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /^Spiel,/ }));
+    expect(screen.getByLabelText("Sortierung")).toHaveValue("heatmap");
+
+    await user.selectOptions(screen.getByLabelText("Sortierung"), "league");
+    expect(screen.getByLabelText("Sortierung")).toHaveValue("league");
+    expect(reihenfolge(".heatmap-row")).toEqual(["Spät FC", "Mitte FC", "Früh FC"]);
   });
 });

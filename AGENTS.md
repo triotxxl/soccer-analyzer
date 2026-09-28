@@ -153,8 +153,30 @@ Benutzer auf Deutsch und führe Analyseaufträge selbstständig über die vorhan
   Dashboard-Snapshot; das kostet keinen zusätzlichen Aufruf. Führt die Antwort kein Wappen
   oder lädt das Bild nicht, zeigt die App die beiden Anfangsbuchstaben des Teams. Snapshots
   aus Läufen vor dieser Ergänzung tragen die Felder nicht und bleiben bei den Initialen.
-- Über der Filterleiste wechselt eine Navigation zwischen **Tabelle** und **Heatmap** (Wahl in
-  `localStorage`, Vorgabe Tabelle). Die Heatmap (`frontend/src/HeatmapTable.tsx`, Rechnung in
+- Die linke Navigationsleiste (`frontend/src/NavRail.tsx`, seit 27.09.2026) wechselt zwischen
+  **Tabelle**, **Heatmap**, **Live** und **Marktprofil**. Tabelle und Heatmap sind intern dieselbe
+  Ansicht `prematch` mit anderer Darstellung (Wahl in `localStorage`, Vorgabe Tabelle).
+- Alle Filter stehen im **Filtermenü** (`frontend/src/FilterMenu.tsx`, seit 27.09.2026 statt der
+  Filterspalte): ein nicht-modales Fenster unter dem Filter-Knopf links in der Werkzeugleiste, das
+  über der Tabelle liegt und nichts verdrängt. Markt und Sortierung bleiben sichtbar in der Leiste,
+  weil sie nichts ausblenden. Jeder Filter, der Spiele ausblendet oder den Umfang ändert, steht bei
+  geschlossenem Menü als Schildchen mit ✕ darunter, und der Knopf zählt sie - dieselbe Begründung
+  wie beim unpersistierten Quickpick-Zustand. Im Marktprofil gibt es keinen Filter-Knopf, weil dort
+  kein Filter wirkt; Live hat eine eigene, kleinere Fassung (Wettbewerbe, „Nur Spiele mit
+  Empfehlung“). Die Elemente darin sind Segmentschalter und Schalter statt Auswahllisten und
+  Checkboxen; „an“ heißt überall „Filter aktiv“, deshalb heißt der Pokal-Schalter **„Nur
+  Ligaspiele“** (ab Werk aus, `showCrossLeague` negiert). Der Zeitraum ist „Nächste 48 Std.“ plus
+  ein Raster nur der Tage der Analyse, das ohne Übernehmen sofort wirkt; `next48` bleibt dabei
+  strikt. Form und H2H teilen sich einen Umschalter (beide Zustände bleiben, weil die Sortierung
+  je Spalte liest). Das Menü hat zwei Spalten aus Karten: links der Umfang (`scopedFixtures`, gilt
+  auch für Kelly und Quickpick), rechts, was nur die Tabelle eingrenzt, und die Anzeige. Der Kopf
+  zählt die angezeigten Spiele aus `filtered`, weil das Menü die Statuszeile verdeckt. Die
+  Tageskacheln beginnen am ersten Analysetag, nicht am Montag davor. Grün markiert im Menü die
+  Wahl nur als Linie und Schalterbahn, nie als Fläche oder Häkchen (Grün ✓ heißt in der Tabelle
+  „Empfehlenswert“); Blau ist dort nur Tastaturfokus. Seit 28.09.2026 im Leistenstil: Die Wahl
+  trägt wie der aktive Leisteneintrag eine hellere Fläche, fette Schrift und einen grünen Balken,
+  alles nicht Gewählte liegt tiefer als die Karte, und die Karten haben einen Rand. „Vorteil & Kelly-Einsatz anzeigen“ ist ab Werk aus
+  (`football-analyzer:kelly-visible-v2`). Die Heatmap (`frontend/src/HeatmapTable.tsx`, Rechnung in
   `frontend/src/heatmap.ts`) zeigt je Spiel eine Zeile mit Δ Elo, Δ Form, Δ xG, Δ Schüsse aufs
   Tor und Δ Ecken als Heim minus Auswärts, die Remis-Punkte und die Quoten für 1X2, Remis und
   BTTS (ein anderer gewählter Markt kommt als vierte Spalte dazu). Sie liest nur den Snapshot,
@@ -293,6 +315,22 @@ Spiele." Eine gekürzte Warnung, die nicht mehr warnt, ist schlimmer als der Fac
 Es gibt keine zentrale Textdatei; die Strings stehen am Fundort. Rund 140 Zusicherungen in
 `frontend/src/*.test.tsx` prüfen konkrete Formulierungen - sie gehören im selben Schritt
 nachgezogen, nicht gesammelt am Ende.
+
+## UX-Agent
+
+- Seit 27.09.2026 prüft der Subagent `betting-ux-architect` (`.claude/agents/`) Ansichten,
+  Beschriftungen, Filter und Abläufe der App und schlägt begründete Änderungen vor; Davids Wunsch:
+  bei UI/UX-Aufträgen automatisch einsetzen. Er arbeitet **nur lesend** (Read, Grep, Glob, kein
+  Bash, deshalb kein Wächter); umgesetzt wird von der Hauptsitzung nach Davids Entscheidung.
+- Sein Fachwissen steht im Skill `.claude/skills/betting-ux/` (Landkarte der App, Wett-Begriffe und
+  Projektregeln, Prioritäten und Bedienelemente, Review-Format). Der Skill ist auch für die
+  Hauptsitzung gedacht, wenn sie UI-Vorschläge umsetzt. Allgemeine UX-Regeln kommen aus
+  `ui-ux-pro-max` und werden dort nicht wiederholt.
+- **Wer eine Ansicht, eine Entscheidung zur Sichtbarkeit (etwa Value hinter dem Schalter) oder das
+  Wörterbuch ändert, zieht `references/app-landkarte.md` bzw. `wett-begriffe.md` nach** - sonst
+  prüft der Agent gegen einen veralteten Stand.
+- Handy-Breite ist dort nur Randnotiz (Davids Entscheidung vom 27.09.2026): Die App läuft lokal am
+  Desktop.
 
 ## Märkte
 

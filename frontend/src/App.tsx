@@ -1,5 +1,5 @@
 import {
-  Binoculars, Broadcast, ChartBar, CaretDoubleLeft, CaretDoubleRight, CaretLeft, CaretRight, CheckCircle, ClockCounterClockwise, Crosshair, FlagPennant, GridFour, ListBullets, RocketLaunch, Shield, ShieldCheck, Star, Table, WarningCircle, X
+  Binoculars, Crosshair, FlagPennant, RocketLaunch, Shield, ShieldCheck, WarningCircle, X
 } from "@phosphor-icons/react";
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { BetBuilderDrawer, CartAddRadial, CartBadge } from "./BetCartUI";
@@ -8,12 +8,14 @@ import { countryFlagCode } from "./countryFlags";
 import { FixtureInsightPanels, InsightsNotice, useFixtureInsights } from "./FixtureInsights";
 import { useDashboardData } from "./data";
 import { heatmapMarkets } from "./heatmap";
-import { HeatmapTable } from "./HeatmapTable";
+import { HeatmapTable, type HeatmapSort } from "./HeatmapTable";
 import { useLiveBoard } from "./liveData";
 import { LiveView } from "./LiveView";
 import { edgeOf, loadKellyAuto, loadKellySettings, loadKellyVisible, saveKellyAuto, saveKellySettings, saveKellyVisible, type KellySettings } from "./kelly";
 import { KellyButton, KellyDialog } from "./KellyUI";
+import { FilterButton, FilterChip, FilterMenu, FilterSegment, type ClassGapFilter, type FilterMenuActions, type FilterMenuValues, type LevelFilter, type SegmentOption } from "./FilterMenu";
 import { MarketProfileView } from "./MarketProfileUI";
+import { BrandMark, NavRail, type NavKey } from "./NavRail";
 import { QuickpickButton, QuickpickChip, QuickpickDialog } from "./QuickpickUI";
 import { applyQuickpick, loadQuickpickStore, saveQuickpickStore, settingsOf, withSettings, QUICKPICK_PRESETS, REJECTION_LABELS, presetOf, type QuickpickFilterReport, type QuickpickPresetId, type QuickpickRejection, type QuickpickStore } from "./quickpick";
 import { TeamCrest } from "./TeamCrest";
@@ -47,14 +49,28 @@ const COUNTER_MARKETS: DashboardMarketKey[] = [
   "bttsNo", "under15", "under25", "under35", "firstHalfUnder05", "firstHalfUnder15"
 ];
 type MarketFilter = (typeof MARKET_OPTIONS)[number]["key"];
-type LevelFilter = "all" | "strong" | "recommended";
-type ClassGapFilter = "all" | "only" | "hide";
 type RangeMode = "next48" | "custom";
 type H2hView = "outcome" | "btts" | "over" | "firstHalfOver";
 type FormView = H2hView;
 type FullTimeOverLine = 1.5 | 2.5 | 3.5;
 type FirstHalfOverLine = 0.5 | 1.5;
-type SortKey = "kickoff" | "team" | "form" | "h2h" | "expected" | "score" | "market" | "shots" | "corners";
+
+const POINTS_VIEW_OPTIONS: ReadonlyArray<SegmentOption<H2hView>> = [
+  { value: "outcome", label: "Ergebnis" },
+  { value: "btts", label: "BTTS", title: "BTTS: beide Teams treffen" },
+  { value: "over", label: "Tore" },
+  { value: "firstHalfOver", label: "Tore 1. HZ", title: "Tore in der ersten Halbzeit" }
+];
+const FULL_TIME_LINE_OPTIONS: ReadonlyArray<SegmentOption<string>> = [
+  { value: "1.5", label: "1,5" }, { value: "2.5", label: "2,5" }, { value: "3.5", label: "3,5" }
+];
+const FIRST_HALF_LINE_OPTIONS: ReadonlyArray<SegmentOption<string>> = [
+  { value: "0.5", label: "0,5" }, { value: "1.5", label: "1,5" }
+];
+const DIRECTION_OPTIONS: ReadonlyArray<SegmentOption<"over" | "under">> = [
+  { value: "over", label: "Über" }, { value: "under", label: "Unter" }
+];
+type SortKey = "kickoff" | "league" | "team" | "form" | "h2h" | "expected" | "score" | "market" | "shots" | "corners";
 
 // Entspricht config.liveCandidateTrailMs: so lange nach dem Anpfiff kann eine Partie
 // noch laufen. Nur innerhalb dieses Fensters bleiben angepfiffene Partien sichtbar.
@@ -102,71 +118,67 @@ function formatCalendarDate(value: string, options: Intl.DateTimeFormatOptions =
   return new Intl.DateTimeFormat("de-DE", { ...options, timeZone: "UTC" }).format(dateOnly(value));
 }
 
-function monthStart(value: string): string {
-  const date = dateOnly(value);
-  date.setUTCDate(1);
-  return isoDate(date);
-}
-
-function shiftMonth(value: string, offset: number): string {
-  const date = dateOnly(value);
-  date.setUTCMonth(date.getUTCMonth() + offset, 1);
-  return isoDate(date);
-}
-
-function calendarDays(month: string): Array<string | null> {
-  const first = dateOnly(month);
-  const leading = (first.getUTCDay() + 6) % 7;
-  const next = new Date(first);
-  next.setUTCMonth(next.getUTCMonth() + 1, 1);
-  next.setUTCDate(0);
-  const values: Array<string | null> = Array.from({ length: leading }, () => null);
-  for (let day = 1; day <= next.getUTCDate(); day += 1) {
-    const date = new Date(first);
-    date.setUTCDate(day);
-    values.push(isoDate(date));
+/**
+ * Die Tage der Analyse, beginnend am ersten - nicht am Montag davor. Bei kurzen Analysen standen
+ * sonst zwei Tage in zwei Wochenzeilen mit lauter Leere; jede Kachel trägt deshalb ihren
+ * Wochentag selbst.
+ */
+function analysisDays(minimum: string, maximum: string): string[] {
+  const days: string[] = [];
+  for (const cursor = dateOnly(minimum); isoDate(cursor) <= maximum; cursor.setUTCDate(cursor.getUTCDate() + 1)) {
+    days.push(isoDate(cursor));
   }
-  while (values.length % 7 !== 0) values.push(null);
-  return values;
+  return days;
 }
 
-function DateRangePopover({
-  minimum, maximum, start, end, visibleMonth, onVisibleMonthChange, onSelect, onApply, onCancel
-}: {
-  minimum: string;
-  maximum: string;
+/** "Di 29.09., 11:00" - das Ende von `next48` im Kartenkopf. */
+function formatRangeEnd(value: number, timezone: string): string {
+  const date = new Date(value);
+  const weekday = new Intl.DateTimeFormat("de-DE", { timeZone: timezone, weekday: "short" }).format(date).replace(".", "");
+  const day = new Intl.DateTimeFormat("de-DE", { timeZone: timezone, day: "2-digit", month: "2-digit" }).format(date);
+  const clock = new Intl.DateTimeFormat("de-DE", { timeZone: timezone, hour: "2-digit", minute: "2-digit" }).format(date);
+  return `${weekday} ${day}, ${clock}`;
+}
+
+/**
+ * Zeitraum ohne Kalender-Fenster: die Kachel "Nächste 48 Std." und eine Reihe Tageskacheln der
+ * Analyse. Ein Klick wählt einen Tag, ein zweiter macht daraus einen Zeitraum - sofort wirksam,
+ * ohne Übernehmen. `next48` bleibt strikt ab jetzt und ist kein Kalendertag.
+ */
+function DayRangePicker({ minimum, maximum, custom, start, end, selectingEnd, onNext48, onSelect }: {
+  minimum: string | null;
+  maximum: string | null;
+  custom: boolean;
   start: string;
   end: string;
-  visibleMonth: string;
-  onVisibleMonthChange(value: string): void;
+  /** Der erste Tag ist gewählt, der zweite Klick macht einen Zeitraum daraus. */
+  selectingEnd: boolean;
+  onNext48(): void;
   onSelect(value: string): void;
-  onApply(): void;
-  onCancel(): void;
 }) {
-  const days = calendarDays(visibleMonth);
-  const minimumMonth = monthStart(minimum);
-  const maximumMonth = monthStart(maximum);
-  return <div className="date-popover" role="dialog" aria-label="Datumsbereich auswählen">
-    <div className="date-popover-head">
-      <button aria-label="Vorheriger Monat" disabled={visibleMonth <= minimumMonth} onClick={() => onVisibleMonthChange(shiftMonth(visibleMonth, -1))}><CaretLeft /></button>
-      <strong>{formatCalendarDate(visibleMonth, { month: "long", year: "numeric" })}</strong>
-      <button aria-label="Nächster Monat" disabled={visibleMonth >= maximumMonth} onClick={() => onVisibleMonthChange(shiftMonth(visibleMonth, 1))}><CaretRight /></button>
-    </div>
-    <div className="date-weekdays" aria-hidden="true">{["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"].map((day) => <span key={day}>{day}</span>)}</div>
-    <div className="date-calendar">
-      {days.map((date, index) => date === null
-        ? <span key={`blank-${index}`} />
-        : <button
-            key={date}
-            disabled={date < minimum || date > maximum}
-            className={`${date >= start && date <= end ? "in-range" : ""} ${date === start ? "range-start" : ""} ${date === end ? "range-end" : ""}`}
-            aria-label={formatCalendarDate(date, { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
-            aria-pressed={date >= start && date <= end}
-            onClick={() => onSelect(date)}
-          >{Number(date.slice(-2))}</button>)}
-    </div>
-    <div className="date-selection" aria-live="polite"><span>Von <strong>{formatCalendarDate(start)}</strong></span><span>Bis <strong>{formatCalendarDate(end)}</strong></span></div>
-    <div className="date-actions"><button onClick={onCancel}>Abbrechen</button><button className="primary" onClick={onApply}>Übernehmen</button></div>
+  return <div className="day-range" role="group" aria-label="Zeitraum">
+    <button type="button" className={`quick-range${custom ? "" : " active"}`} aria-pressed={!custom}
+      aria-label="Nächste 48 Std." title="Ab jetzt genau 48 Stunden – kein Kalendertag" onClick={onNext48}>
+      <span>Nächste</span><span>48 Std.</span>
+    </button>
+    {minimum && maximum ? <div className="day-tiles">
+      {analysisDays(minimum, maximum).map((date) => {
+        const selected = custom && date >= start && date <= end;
+        const dayOfMonth = Number(date.slice(-2));
+        return <button type="button" key={date} className={`day-tile${selected ? " selected" : ""}`}
+          aria-label={formatCalendarDate(date, { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
+          aria-pressed={selected} onClick={() => onSelect(date)}>
+          <span className="day-weekday">{formatCalendarDate(date, { weekday: "short" }).replace(".", "")}</span>
+          {/* Am Monatsersten mit Monat, damit ein Zeitraum über den Wechsel lesbar bleibt. */}
+          <span className="day-num">{dayOfMonth === 1 ? `1.${Number(date.slice(5, 7))}` : dayOfMonth}</span>
+        </button>;
+      })}
+    </div> : <p className="filter-note">Keine Tage verfügbar.</p>}
+    {minimum && maximum && <p className="filter-note day-range-hint">
+      {custom && selectingEnd
+        ? "Noch den letzten Tag anklicken – sonst gilt nur dieser."
+        : "Ein Tag: einmal klicken. Mehrere Tage: ersten und letzten anklicken."}
+    </p>}
   </div>;
 }
 
@@ -381,6 +393,38 @@ function saveLayout(layout: TableLayout): void {
   if (typeof window === "undefined") return;
   try {
     window.localStorage.setItem(LAYOUT_STORAGE_KEY, layout);
+  } catch {
+    // Storage unavailable - the choice just doesn't persist for this session.
+  }
+}
+
+const SORT_STORAGE_KEY = "football-analyzer:sort";
+
+const SORT_KEYS: SortKey[] = ["kickoff", "league", "team", "form", "h2h", "expected", "score", "market", "shots", "corners"];
+
+type StoredSort = { key: SortKey; direction: 1 | -1 };
+
+/**
+ * Die Sortierung überlebt ein Neuladen. Anders als der aktive Quickpick-Filter blendet sie
+ * keine Zeile aus, eine gemerkte Wahl kann also nichts unbemerkt verstecken.
+ */
+function loadSort(): StoredSort {
+  const fallback: StoredSort = { key: "kickoff", direction: 1 };
+  if (typeof window === "undefined") return fallback;
+  try {
+    const stored = JSON.parse(window.localStorage.getItem(SORT_STORAGE_KEY) ?? "null") as Partial<StoredSort> | null;
+    const key = SORT_KEYS.find((candidate) => candidate === stored?.key);
+    if (!key) return fallback;
+    return { key, direction: stored?.direction === -1 ? -1 : 1 };
+  } catch {
+    return fallback;
+  }
+}
+
+function saveSort(sort: StoredSort): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(SORT_STORAGE_KEY, JSON.stringify(sort));
   } catch {
     // Storage unavailable - the choice just doesn't persist for this session.
   }
@@ -735,10 +779,6 @@ function quickpickReason(report: QuickpickFilterReport): string {
   return `${scope} Häufigster Grund: ${REJECTION_LABELS[top[0]]} (${top[1]}×).`;
 }
 
-function defaultSidebarOpen(): boolean {
-  return typeof window.matchMedia !== "function" || window.matchMedia("(min-width: 700px)").matches;
-}
-
 type StandingsRow = NonNullable<DashboardFixture["table"]>[number];
 
 function standingsWindow(table: StandingsRow[], homeTeam: string, awayTeam: string, padding = 2): Array<StandingsRow | null> {
@@ -767,22 +807,23 @@ function standingsWindow(table: StandingsRow[], homeTeam: string, awayTeam: stri
 function Dashboard({ document }: { document: DashboardDocument }) {
   const [view, setView] = useState<AppView>(loadView);
   const [layout, setLayout] = useState<TableLayout>(loadLayout);
+  const navKey: NavKey = view === "prematch" ? layout : view;
   // Zeigt die H2H- und Form-Spalte auf das Ausbleiben statt auf das Eintreten.
   const [counterDirection, setCounterDirection] = useState(false);
   const [kellyAuto, setKellyAuto] = useState(loadKellyAuto);
-  const [sidebarOpen, setSidebarOpen] = useState(defaultSidebarOpen);
-  const [mobileViewport, setMobileViewport] = useState(() => !defaultSidebarOpen());
+  // Das Filtermenü liegt über dem Inhalt und verdrängt nichts. Im Marktprofil gibt es keins -
+  // dort wirkt kein Filter, die Ansicht lädt ihre Daten selbst.
+  const [filterMenuOpen, setFilterMenuOpen] = useState(false);
+  const filterAnchorRef = useRef<HTMLDivElement>(null);
+  const filterButtonRef = useRef<HTMLButtonElement>(null);
   const [banner, setBanner] = useState(() => !loadBannerDismissed());
   const [marketFilter, setMarketFilter] = useState<MarketFilter>("all");
   const [levelFilter, setLevelFilter] = useState<LevelFilter>("all");
   const [rangeMode, setRangeMode] = useState<RangeMode>("next48");
   const [customStart, setCustomStart] = useState(document.meta.firstAvailableDate ?? "");
   const [customEnd, setCustomEnd] = useState(document.meta.lastAvailableDate ?? "");
-  const [draftStart, setDraftStart] = useState(customStart);
-  const [draftEnd, setDraftEnd] = useState(customEnd);
+  // Wartet der nächste Tagesklick auf das Ende eines Zeitraums?
   const [selectingRangeEnd, setSelectingRangeEnd] = useState(false);
-  const [calendarOpen, setCalendarOpen] = useState(false);
-  const [visibleMonth, setVisibleMonth] = useState(monthStart(customStart || "1970-01-01"));
   const [showCrossLeague, setShowCrossLeague] = useState(true);
   const [showPast, setShowPast] = useState(false);
   const [deselectedLeagues, setDeselectedLeagues] = useState<Set<string>>(new Set());
@@ -793,8 +834,12 @@ function Dashboard({ document }: { document: DashboardDocument }) {
   const [overLine, setOverLine] = useState<FullTimeOverLine>(2.5);
   const [firstHalfOverLine, setFirstHalfOverLine] = useState<FirstHalfOverLine>(0.5);
   const [classGapFilter, setClassGapFilter] = useState<ClassGapFilter>("all");
-  const [sortKey, setSortKey] = useState<SortKey>("kickoff");
-  const [sortDirection, setSortDirection] = useState<1 | -1>(1);
+  const [initialSort] = useState(loadSort);
+  const [sortKey, setSortKey] = useState<SortKey>(initialSort.key);
+  const [sortDirection, setSortDirection] = useState<1 | -1>(initialSort.direction);
+  // Eine Spaltensortierung der Heatmap geht der Tabellenreihenfolge vor, bis die Sortierauswahl
+  // sie zurücksetzt.
+  const [heatmapSort, setHeatmapSort] = useState<HeatmapSort>(null);
   const [formSortMode, setFormSortMode] = useState(0);
   const [h2hSortMode, setH2hSortMode] = useState(0);
   const [secondarySortKey, setSecondarySortKey] = useState<"form" | "h2h" | null>(null);
@@ -824,7 +869,6 @@ function Dashboard({ document }: { document: DashboardDocument }) {
     [deselectedLeagues, document, liveRatedOnly]);
   const live = useLiveBoard(view === "live", watchedFixtureIds);
   const marketProfile = useMarketProfile(showKelly && view === "prematch");
-  const dateControlRef = useRef<HTMLDivElement>(null);
   const now = Date.now();
 
   const availableLeagues = useMemo(() => {
@@ -888,38 +932,36 @@ function Dashboard({ document }: { document: DashboardDocument }) {
     if (minimum && maximum) {
       setCustomStart((value) => clampDate(value || minimum, minimum, maximum));
       setCustomEnd((value) => clampDate(value || maximum, minimum, maximum));
-      setVisibleMonth((value) => clampDate(monthStart(value), monthStart(minimum), monthStart(maximum)));
     } else {
       setCustomStart("");
       setCustomEnd("");
-      setCalendarOpen(false);
       setRangeMode("next48");
     }
+    // Ein halb gewählter Zeitraum aus dem alten Lauf soll den nächsten Klick nicht verlängern.
+    setSelectingRangeEnd(false);
     setOpenFixture((value) => value !== null && document.fixtures.some((fixture) => fixture.fixtureId === value) ? value : null);
     setRadialFixtureId((value) => value !== null && document.fixtures.some((fixture) => fixture.fixtureId === value) ? value : null);
     setMarketFilter((value) => value === "all" || document.fixtures.some((fixture) => fixture.markets.some((market) => market.key === value)) ? value : "all");
     setDeselectedLeagues((prev) => new Set([...prev].filter((key) => availableLeagues.some((item) => item.key === key))));
   }, [availableLeagues, document]);
 
+  // Schließt das Menü; auf Wunsch kehrt der Fokus zum Knopf zurück (Escape, ✕), statt im
+  // verschwundenen Menü ins Leere zu fallen.
+  const closeFilterMenu = (returnFocus: boolean) => {
+    setFilterMenuOpen(false);
+    if (returnFocus) filterButtonRef.current?.focus();
+  };
+
   useEffect(() => {
-    if (!calendarOpen) return;
+    // Solange der Wettbewerbe-Dialog offen ist, gehört jeder Klick ihm - sonst schlösse ein
+    // Häkchen dort das Menü dahinter.
+    if (!filterMenuOpen || leagueFilterOpen) return;
     const closeOutside = (event: PointerEvent) => {
-      if (!dateControlRef.current?.contains(event.target as Node)) setCalendarOpen(false);
+      if (!filterAnchorRef.current?.contains(event.target as Node)) setFilterMenuOpen(false);
     };
     window.addEventListener("pointerdown", closeOutside);
     return () => window.removeEventListener("pointerdown", closeOutside);
-  }, [calendarOpen]);
-
-  useEffect(() => {
-    if (typeof window.matchMedia !== "function") return;
-    const media = window.matchMedia("(min-width: 700px)");
-    const syncSidebar = (event: MediaQueryListEvent) => {
-      setMobileViewport(!event.matches);
-      setSidebarOpen(event.matches);
-    };
-    media.addEventListener("change", syncSidebar);
-    return () => media.removeEventListener("change", syncSidebar);
-  }, []);
+  }, [filterMenuOpen, leagueFilterOpen]);
 
   useEffect(() => {
     const closeOnEscape = (event: KeyboardEvent) => {
@@ -930,50 +972,50 @@ function Dashboard({ document }: { document: DashboardDocument }) {
       // Schließt nur das Panel und hebt den Filter nicht auf - das ist der Klick aufs ✕ im
       // Streifen, eine bewusste Handlung statt eines Nebeneffekts vom Wegklicken.
       else if (quickpickOpen) setQuickpickOpen(false);
-      else if (calendarOpen) setCalendarOpen(false);
+      // Der Wettbewerbe-Dialog liegt über dem Menü - von oben nach unten.
       else if (leagueFilterOpen) setLeagueFilterOpen(false);
+      else if (filterMenuOpen) closeFilterMenu(true);
       else if (openFixture !== null) setOpenFixture(null);
-      else setSidebarOpen(false);
     };
     window.addEventListener("keydown", closeOnEscape);
     return () => window.removeEventListener("keydown", closeOnEscape);
-  }, [builderOpen, calendarOpen, kellyOpen, leagueFilterOpen, openFixture, quickpickOpen, radialFixtureId]);
+  }, [builderOpen, filterMenuOpen, kellyOpen, leagueFilterOpen, openFixture, quickpickOpen, radialFixtureId]);
+
+  const selectNav = (key: NavKey) => {
+    if (key === "table" || key === "heatmap") {
+      setView("prematch");
+      setLayout(key);
+    } else {
+      setView(key);
+    }
+    setFilterMenuOpen(false);
+  };
 
   useEffect(() => { saveView(view); }, [view]);
   useEffect(() => { saveLayout(layout); }, [layout]);
+  useEffect(() => { saveSort({ key: sortKey, direction: sortDirection }); }, [sortKey, sortDirection]);
   useEffect(() => { saveKellySettings(kellySettings); }, [kellySettings]);
   useEffect(() => { saveQuickpickStore(quickpickStore); }, [quickpickStore]);
   useEffect(() => { saveKellyVisible(showKelly); }, [showKelly]);
   useEffect(() => { saveKellyAuto(kellyAuto); }, [kellyAuto]);
 
-  const openCalendar = () => {
-    if (!document.meta.firstAvailableDate || !document.meta.lastAvailableDate) return;
-    const start = clampDate(customStart || document.meta.firstAvailableDate, document.meta.firstAvailableDate, document.meta.lastAvailableDate);
-    const end = clampDate(customEnd || document.meta.lastAvailableDate, start, document.meta.lastAvailableDate);
-    setDraftStart(start);
-    setDraftEnd(end);
-    setSelectingRangeEnd(false);
-    setVisibleMonth(monthStart(start));
-    setCalendarOpen(true);
-  };
-
+  // Ein Klick wählt einen Tag, der nächste macht daraus einen Zeitraum - sofort wirksam. Nach
+  // "Nächste 48 Std." beginnt ein Klick immer neu, statt still an den alten Tag anzuschließen.
   const selectCalendarDate = (date: string) => {
-    if (!selectingRangeEnd) {
-      setDraftStart(date);
-      setDraftEnd(date);
+    if (rangeMode !== "custom" || !selectingRangeEnd) {
+      setCustomStart(date);
+      setCustomEnd(date);
+      setRangeMode("custom");
       setSelectingRangeEnd(true);
       return;
     }
-    setDraftStart(date < draftStart ? date : draftStart);
-    setDraftEnd(date < draftStart ? draftStart : date);
+    setCustomStart(date < customStart ? date : customStart);
+    setCustomEnd(date < customStart ? customStart : date);
     setSelectingRangeEnd(false);
   };
-
-  const applyCalendarRange = () => {
-    setCustomStart(draftStart);
-    setCustomEnd(draftEnd);
-    setRangeMode("custom");
-    setCalendarOpen(false);
+  const selectNext48 = () => {
+    setRangeMode("next48");
+    setSelectingRangeEnd(false);
   };
 
   const inSelectedRange = (fixture: DashboardFixture): boolean => {
@@ -1015,6 +1057,7 @@ function Dashboard({ document }: { document: DashboardDocument }) {
     const selectedMarket = marketFilter === "all" ? "1x2" : marketFilter;
     let comparison = 0;
     if (sortKey === "kickoff") comparison = Date.parse(left.kickoff) - Date.parse(right.kickoff);
+    else if (sortKey === "league") comparison = `${left.country} ${left.league}`.localeCompare(`${right.country} ${right.league}`, "de");
     else if (sortKey === "team") comparison = `${left.homeTeam} ${left.awayTeam}`.localeCompare(`${right.homeTeam} ${right.awayTeam}`, "de");
     else if (sortKey === "expected") {
       const firstHalf = marketFilter === "firstHalfOver05" || marketFilter === "firstHalfOver15";
@@ -1073,8 +1116,19 @@ function Dashboard({ document }: { document: DashboardDocument }) {
     if (sortKey === key) setSortDirection((value) => value === 1 ? -1 : 1);
     else {
       setSortKey(key);
-      setSortDirection(key === "kickoff" || key === "team" ? 1 : -1);
+      setSortDirection(key === "kickoff" || key === "league" || key === "team" ? 1 : -1);
     }
+  };
+  // Die Auswahl über der Tabelle setzt dieselbe Sortierung wie ein erster Klick auf den
+  // Spaltenkopf. Ein erneuter Klick dort würde bei Form und H2H die Zielgröße weiterschalten,
+  // die Auswahl wählt dagegen nur die Spalte.
+  const selectSort = (key: SortKey) => {
+    setHeatmapSort(null);
+    if (key === sortKey) return;
+    if ((key === "form" || key === "h2h") && (key === "form" ? formView : h2hView) === "outcome") cyclePairMode(key);
+    setSecondarySortKey(null);
+    setSortKey(key);
+    setSortDirection(key === "kickoff" || key === "league" || key === "team" ? 1 : -1);
   };
   const arrow = (key: SortKey) => sortKey === key ? (sortDirection === 1 ? "↑" : "↓") : "↕";
   const formSortModeKey = formSortModes[formSortMode]!;
@@ -1103,9 +1157,24 @@ function Dashboard({ document }: { document: DashboardDocument }) {
   } as CSSProperties;
   const fixtureGridClass = `fixture-grid${showScore ? " has-score" : ""}`;
   const heatmap = layout === "heatmap";
-  // H2H, Form und Linie ändern nur die Punkte der Tabelle; in der Heatmap wirken sie nicht.
-  // Abgeschaltet statt ausgeblendet, damit die Leiste beim Umschalten nicht springt.
-  const tableOnly: { disabled?: boolean; title?: string } = heatmap ? { disabled: true, title: "Nur in der Tabelle" } : {};
+  const activeSortDirection = heatmap && heatmapSort ? heatmapSort.direction : sortDirection;
+  const flipSortDirection = () => {
+    if (heatmap && heatmapSort) setHeatmapSort({ ...heatmapSort, direction: heatmapSort.direction === 1 ? -1 : 1 });
+    else setSortDirection((value) => value === 1 ? -1 : 1);
+  };
+  const sortMarketKey = marketFilter === "all" ? "1x2" : marketFilter;
+  const sortOptions: Array<[SortKey, string]> = [
+    ["kickoff", "Anstoß"],
+    ["league", "Liga"],
+    ["team", "Heimteam (A–Z)"],
+    ["form", "Form (letzte 5)"],
+    ["h2h", "H2H (direkte Duelle)"],
+    ["shots", "Schüsse aufs Tor"],
+    ["corners", "Ecken"],
+    ["expected", showFirstHalfExpected ? "Erwartete Tore 1. HZ" : "Erwartete Tore"],
+    ...(showScore || sortKey === "score" ? [["score", "Score"] as [SortKey, string]] : []),
+    ["market", `Wahrscheinlichkeit ${availableMarketOptions.find((option) => option.key === sortMarketKey)?.label ?? "1X2"}`]
+  ];
   const heatmapColumns = heatmapMarkets(marketFilter).map((key) =>
     ({ key, label: MARKET_OPTIONS.find((option) => option.key === key)?.label ?? key }));
   const emptyState = quickpickActive
@@ -1114,7 +1183,8 @@ function Dashboard({ document }: { document: DashboardDocument }) {
         action={<button className="empty-state-action" onClick={() => setQuickpickActive(false)}>
           Filter aufheben
         </button>} />
-    : <EmptyState title="Keine Partien für diese Auswahl" text="Wähle einen anderen Zeitraum oder setze den Bewertungsfilter zurück." />;
+    : <EmptyState title="Keine Spiele für diese Auswahl" text="Wähle einen anderen Zeitraum oder lockere die Filter."
+        action={<button className="empty-state-action" onClick={() => resetFilters()}>Filter zurücksetzen</button>} />;
   const rangeLabel = rangeMode === "next48"
     ? "Nächste 48 Stunden ab jetzt"
     : `${customStart ? formatCalendarDate(customStart) : "–"} – ${customEnd ? formatCalendarDate(customEnd) : "–"}`;
@@ -1126,172 +1196,214 @@ function Dashboard({ document }: { document: DashboardDocument }) {
   const valueCount = filtered.filter((fixture) =>
     fixture.markets.some((market) => (edgeOf(market) ?? 0) > 0)).length;
 
-  const kpis = [
-    { key: "all" as const, icon: ListBullets, value: counts.all, label: "Alle Partien", tone: "neutral" },
-    { key: "strong" as const, icon: Star, value: counts.strong, label: "Starke Tipps", tone: "gold" },
-    { key: "recommended" as const, icon: CheckCircle, value: counts.recommended, label: "Empfehlungen", tone: "green" }
-  ];
+  const marketLabelOf = (key: MarketFilter) => availableMarketOptions.find((option) => option.key === key)?.label ?? key;
+  const leagueCount = { selected: availableLeagues.length - deselectedLeagues.size, total: availableLeagues.length };
+  const chipDate = (value: string) => formatCalendarDate(value, { day: "2-digit", month: "2-digit" });
+  const customRangeText = !customStart || !customEnd ? "Eigener Zeitraum"
+    // Ein einzelner Tag liest sich als Tag, nicht als Zeitraum von ihm zu sich selbst.
+    : customStart === customEnd ? formatCalendarDate(customStart, { weekday: "short", day: "2-digit", month: "2-digit" }).replace(",", "")
+    : `${chipDate(customStart)} – ${chipDate(customEnd)}`;
+
+  // Jeder Filter, der Spiele ausblendet oder den Umfang ändert, steht bei geschlossenem Menü als
+  // Schildchen da - ein unbemerkter Filter wäre dieselbe Falle, vor der der Quickpick-Zustand
+  // bewahrt wird. Markt, Sortierung und Anzeige blenden nichts aus und fehlen deshalb.
+  type ActiveFilter = { key: string; label: string; clearLabel: string; clear(): void };
+  const leagueChip: ActiveFilter = {
+    key: "leagues", label: `${leagueCount.selected} von ${leagueCount.total} Wettbewerben`,
+    clearLabel: "Alle Wettbewerbe zeigen", clear: selectAllLeagues
+  };
+  const activeFilters: ActiveFilter[] = [];
+  if (view === "live") {
+    if (deselectedLeagues.size > 0) activeFilters.push(leagueChip);
+    if (liveRatedOnly) activeFilters.push({ key: "rated", label: "Nur Spiele mit Empfehlung", clearLabel: "Wieder alle Spiele beobachten", clear: () => setLiveRatedOnly(false) });
+  } else {
+    if (levelFilter !== "all") activeFilters.push({ key: "level", label: levelFilter === "strong" ? "★ Starke Tipps" : "✓ Empfehlungen", clearLabel: "Bewertungsfilter aufheben", clear: () => setLevelFilter("all") });
+    if (rangeMode === "custom") activeFilters.push({
+      key: "range",
+      label: customRangeText,
+      clearLabel: "Zurück auf die nächsten 48 Stunden",
+      clear: selectNext48
+    });
+    if (deselectedLeagues.size > 0) activeFilters.push(leagueChip);
+    if (!showCrossLeague) activeFilters.push({ key: "cross", label: "Nur Ligaspiele", clearLabel: "Pokalspiele und Spiele zwischen verschiedenen Ligen wieder zeigen", clear: () => setShowCrossLeague(true) });
+    if (classGapFilter !== "all") activeFilters.push({ key: "classGap", label: classGapFilter === "only" ? "Nur mit Klassenunterschied" : "Ohne Klassenunterschied", clearLabel: "Klassenfilter aufheben", clear: () => setClassGapFilter("all") });
+    if (showPast) activeFilters.push({ key: "past", label: "Mit angepfiffenen Spielen", clearLabel: "Angepfiffene Spiele wieder ausblenden", clear: () => setShowPast(false) });
+  }
+  const showQuickpickChip = view === "prematch" && quickpickActive;
+  const activeFilterCount = activeFilters.length + (showQuickpickChip ? 1 : 0);
+
+  // Setzt zurück, was Spiele ausblendet oder den Umfang ändert. Markt, Sortierung, H2H/Form/Linie
+  // und der Vorteil-Schalter bleiben - sie blenden nichts aus. Die Quickpick-Regler bleiben auch.
+  const resetFilters = () => {
+    selectAllLeagues();
+    if (view === "live") {
+      setLiveRatedOnly(false);
+      return;
+    }
+    setLevelFilter("all");
+    selectNext48();
+    setShowCrossLeague(true);
+    setClassGapFilter("all");
+    setShowPast(false);
+    setQuickpickActive(false);
+  };
+
+  const filterMenuValues: FilterMenuValues = {
+    variant: view === "live" ? "live" : "prematch",
+    levelFilter,
+    counts,
+    marketLabel: marketFilter === "all" ? null : marketLabelOf(marketFilter),
+    classGapFilter,
+    showCrossLeague,
+    showPast,
+    showKelly,
+    liveRatedOnly,
+    leagues: leagueCount,
+    leagueList: availableLeagues,
+    deselectedLeagues,
+    leagueFilterOpen,
+    watched: { count: watchedFixtureIds.length, total: document.fixtures.length },
+    shown: filtered.length,
+    // Dasselbe `now` wie `inSelectedRange`: Die angezeigte Grenze ist die, die filtert.
+    rangeSummary: rangeMode === "next48" ? `bis ${formatRangeEnd(now + 48 * 3_600_000, document.meta.timezone)}` : customRangeText,
+    resetDisabled: activeFilterCount === 0
+  };
+  const filterMenuActions: FilterMenuActions = {
+    setLevelFilter,
+    setClassGapFilter,
+    // Ohne Spiele zwischen Ligen gibt es keinen Klassenunterschied - ein stehengebliebenes
+    // "nur mit" ließe die Tabelle leer und das abgeschaltete Feld unbedienbar zurück.
+    setShowCrossLeague: (value) => {
+      setShowCrossLeague(value);
+      if (!value) setClassGapFilter("all");
+    },
+    setShowPast,
+    setShowKelly: (value) => {
+      setShowKelly(value);
+      if (!value) setKellyOpen(false);
+    },
+    setLiveRatedOnly,
+    openLeagueFilter: () => setLeagueFilterOpen(true),
+    toggleLeague,
+    selectOnlyLeague: (key) => setDeselectedLeagues(new Set(availableLeagues.filter((item) => item.key !== key).map((item) => item.key))),
+    reset: resetFilters,
+    close: () => closeFilterMenu(true)
+  };
+
+  const rangeControl = <DayRangePicker minimum={document.meta.firstAvailableDate ?? null}
+    maximum={document.meta.lastAvailableDate ?? null} custom={rangeMode === "custom"}
+    start={customStart} end={customEnd} selectingEnd={selectingRangeEnd} onNext48={selectNext48} onSelect={selectCalendarDate} />;
+
+  // H2H und Form zeigen dieselbe Größe: Der Markt setzt beide ohnehin gleich (`selectMarket`),
+  // getrennt einstellen war eine Kombination, die niemand brauchte. Beide Zustände bleiben, weil
+  // die Sortierung je Spalte liest. In der Heatmap wirkt der Block nicht und entfällt.
+  const setPointsView = (value: H2hView) => {
+    setH2hView(value);
+    setFormView(value);
+  };
+  const displayControls = heatmap ? undefined : <div className="filter-display">
+    <FilterSegment name="points-view" legend="Punkte in Form und H2H (direkte Duelle)" value={h2hView}
+      onChange={setPointsView} options={POINTS_VIEW_OPTIONS} />
+    {activeLineView && <div className="filter-display-line">
+      <FilterSegment name="points-line" legend="Linie"
+        value={String(activeLineView === "firstHalfOver" ? firstHalfOverLine : overLine)}
+        onChange={(value) => {
+          if (activeLineView === "firstHalfOver") setFirstHalfOverLine(Number(value) as FirstHalfOverLine);
+          else setOverLine(Number(value) as FullTimeOverLine);
+        }}
+        options={activeLineView === "firstHalfOver" ? FIRST_HALF_LINE_OPTIONS : FULL_TIME_LINE_OPTIONS} />
+      <FilterSegment name="points-direction" legend="Richtung" value={counterDirection ? "under" : "over"}
+        onChange={(value) => setCounterDirection(value === "under")} options={DIRECTION_OPTIONS} />
+    </div>}
+    <p className="filter-note">Folgt dem gewählten Markt.</p>
+  </div>;
+
+  const filterControl = <div className="filter-anchor" ref={filterAnchorRef} onBlur={(event) => {
+    // Nur echtes Wegtabben schließt. Ohne Ziel (Knopf verschwindet nach "Übernehmen" oder wird
+    // nach "Zurücksetzen" abgeschaltet) bleibt das Menü offen, ebenso während des
+    // Wettbewerbe-Dialogs darüber.
+    if (leagueFilterOpen) return;
+    const next = event.relatedTarget as Node | null;
+    if (next && !event.currentTarget.contains(next)) setFilterMenuOpen(false);
+  }}>
+    <FilterButton buttonRef={filterButtonRef} open={filterMenuOpen} activeCount={activeFilterCount}
+      onToggle={() => setFilterMenuOpen((value) => !value)} />
+    {filterMenuOpen && <FilterMenu values={filterMenuValues} actions={filterMenuActions}
+      rangeControl={view === "prematch" ? rangeControl : undefined}
+      displayControls={view === "prematch" ? displayControls : undefined} />}
+  </div>;
+
+  const marketControl = <label className="toolbar-field">
+    <span>Markt</span>
+    <select value={marketFilter} onChange={(event) => selectMarket(event.target.value as MarketFilter)}>
+      {availableMarketOptions.map((option) => <option value={option.key} key={option.key}>{option.label}</option>)}
+    </select>
+  </label>;
+
+  const clearAndRefocus = (clear: () => void) => {
+    clear();
+    // Das Schildchen verschwindet mit dem Filter; der Fokus geht an den Filter-Knopf.
+    filterButtonRef.current?.focus();
+  };
+  const filterStatusRow = (status: ReactNode) => <div className="filter-status-row">
+    {status}
+    {activeFilters.map((filter) => <FilterChip key={filter.key} label={filter.label} title="Filter öffnen"
+      clearLabel={filter.clearLabel} onOpen={() => setFilterMenuOpen(true)} onClear={() => clearAndRefocus(filter.clear)} />)}
+    {showQuickpickChip && <QuickpickChip label={quickpickLabel}
+      passed={quickpick.report.passed} evaluated={quickpick.report.evaluated}
+      onOpen={() => setQuickpickOpen(true)} onClear={() => clearAndRefocus(() => setQuickpickActive(false))} />}
+  </div>;
+
+  const liveStatus = <p className="filter-status live-status">
+    <span><strong>{liveMatches.length}</strong> {liveMatches.length === 1 ? "laufendes Spiel" : "laufende Spiele"}</span>
+    {" · "}{live.board ? `${live.board.candidates} im Zeitfenster` : "Warte auf Daten"}
+    {live.board && <>{" · "}API-Aufrufe heute: {live.board.budget.usedToday} von {live.board.budget.capToday}</>}
+    {live.board && live.board.budget.apiRequestsRemaining !== null && <>{" · "}Kontingent verbleibend: {live.board.budget.apiRequestsRemaining}</>}
+    {live.board && <>{" · "}Aktualisiert: {formatDataTimestamp(live.board.createdAt, document.meta.timezone)}
+      {" · "}{live.board.strategy === "live-all" ? "Sammelabruf" : "Bündelabruf"}</>}
+  </p>;
 
   return <>
-  <div className={`app-shell density-compact ${sidebarOpen ? "" : "sidebar-collapsed"}`}>
-    {sidebarOpen && mobileViewport && <button className="sidebar-backdrop" aria-label="Sidebar schließen" onClick={() => setSidebarOpen(false)} />}
-    <aside className="sidebar" id="dashboard-sidebar" aria-label="Dashboard-Filter" aria-hidden={mobileViewport && !sidebarOpen}>
-      <div className="sidebar-head">
-        <div className="brand"><span className="brand-mark">FA</span>{sidebarOpen && <span><strong>Fußball-Analyzer</strong><small>Modell v3.2</small></span>}</div>
-        <button className="sidebar-toggle" onClick={() => setSidebarOpen((value) => !value)} aria-controls="dashboard-sidebar" aria-expanded={sidebarOpen} aria-label={sidebarOpen ? "Sidebar einklappen" : "Sidebar ausklappen"} title={sidebarOpen ? "Sidebar einklappen" : "Sidebar ausklappen"}>{sidebarOpen ? <CaretDoubleLeft /> : <CaretDoubleRight />}</button>
-      </div>
-      {sidebarOpen && <div className="sidebar-status">
-        <span><strong>{filtered.length}</strong><small>Partien im Zeitraum</small></span>
-        <span className="value"><strong>{valueCount}</strong><small>mit Vorteil</small></span>
-      </div>}
-      <div className="view-switch" role="group" aria-label="Ansicht">
-        {([["prematch", "Pre-Match", ListBullets], ["live", "Live", Broadcast], ["profile", "Marktprofil", ChartBar]] as const).map(([key, label, Icon]) =>
-          <button key={key} className={`${key === "live" ? "live " : ""}${view === key ? "active" : ""}`} aria-pressed={view === key} title={label}
-            onClick={() => setView(key)}>{sidebarOpen ? <span>{label}</span> : <Icon size={15} weight="duotone" aria-hidden />}</button>)}
-      </div>
-      {sidebarOpen && <>
-        {view === "prematch" && <section className="sidebar-section kpi-section" aria-label="Filter &amp; Kennzahlen">
-          {kpis.map(({ key, icon: Icon, value, label, tone }) => <button key={key} className={`kpi ${tone} ${levelFilter === key ? "active" : ""}`} aria-pressed={levelFilter === key} onClick={() => setLevelFilter((current) => current === key ? "all" : key)}>
-            <span className="kpi-icon"><Icon size={15} weight="duotone" /></span><span className="kpi-label">{label}</span><strong className="kpi-value">{value}</strong>
-          </button>)}
-        </section>}
-        {view === "prematch" && <section className="sidebar-section">
-          <h2>Zeitraum</h2>
-          <div className="date-range-control" ref={dateControlRef}>
-            <button className={`date-range-trigger ${rangeMode === "custom" ? "active" : ""}`} disabled={!document.meta.firstAvailableDate || !document.meta.lastAvailableDate} aria-label="Datumsbereich auswählen" aria-haspopup="dialog" aria-expanded={calendarOpen} onClick={() => calendarOpen ? setCalendarOpen(false) : openCalendar()}>
-              <span>{customStart && customEnd ? `${formatCalendarDate(customStart, { day: "2-digit", month: "2-digit" })} – ${formatCalendarDate(customEnd, { day: "2-digit", month: "2-digit" })}` : "Keine Tage verfügbar"}</span>
-            </button>
-            <button className={`quick-range ${rangeMode === "next48" ? "active" : ""}`} aria-pressed={rangeMode === "next48"} onClick={() => { setRangeMode("next48"); setCalendarOpen(false); }}>48h</button>
-            {calendarOpen && document.meta.firstAvailableDate && document.meta.lastAvailableDate && <DateRangePopover
-              minimum={document.meta.firstAvailableDate}
-              maximum={document.meta.lastAvailableDate}
-              start={draftStart}
-              end={draftEnd}
-              visibleMonth={visibleMonth}
-              onVisibleMonthChange={setVisibleMonth}
-              onSelect={selectCalendarDate}
-              onApply={applyCalendarRange}
-              onCancel={() => setCalendarOpen(false)}
-            />}
-          </div>
-          <p>{rangeLabel} · <strong>{filtered.length}</strong> Partien</p>
-        </section>}
-        {view === "live" && <section className="sidebar-section live-section">
-          <h2>Live-Status</h2>
-          <p><strong>{liveMatches.length}</strong> laufende {liveMatches.length === 1 ? "Partie" : "Partien"}<br />
-            {live.board ? `${live.board.candidates} im Zeitfenster` : "Warte auf Daten"}</p>
-          {live.board && <p>API-Calls heute: {live.board.budget.usedToday} von {live.board.budget.capToday}
-            {live.board.budget.apiRequestsRemaining !== null && <><br />Kontingent verbleibend: {live.board.budget.apiRequestsRemaining}</>}</p>}
-          {live.board && <p>Aktualisiert: {formatDataTimestamp(live.board.createdAt, document.meta.timezone)}
-            <br />Abrufart: {live.board.strategy === "live-all" ? "Sammelabruf" : "Bündelabruf"}</p>}
-          <label className="check-row"><input type="checkbox" checked={liveRatedOnly}
-            onChange={(event) => setLiveRatedOnly(event.target.checked)} /> Nur bewertete Partien</label>
-          <p className="live-hint">Beobachtet werden {watchedFixtureIds.length} von {document.fixtures.length} Partien.
-            Abgewählte kosten keine API-Aufrufe.</p>
-        </section>}
-        <section className="sidebar-section">
-          <h2>Wettbewerbe</h2>
-          <button className={`league-filter-trigger ${deselectedLeagues.size > 0 ? "active" : ""}`}
-            aria-label="Wettbewerbe auswählen" aria-haspopup="dialog" aria-expanded={leagueFilterOpen}
-            onClick={() => setLeagueFilterOpen(true)}>
-            <span>Alle Wettbewerbe</span><strong>{availableLeagues.length - deselectedLeagues.size}/{availableLeagues.length}</strong><CaretRight size={13} weight="bold" aria-hidden />
-          </button>
-        </section>
-        <section className="sidebar-section">
-          <h2>Optionen</h2>
-          {view === "prematch" && <>
-            <label className="check-row"><input type="checkbox" checked={showCrossLeague} onChange={(event) => setShowCrossLeague(event.target.checked)} /> Pokal / Cross-League</label>
-            <label className="check-row"><input type="checkbox" checked={showPast} onChange={(event) => setShowPast(event.target.checked)} /> Laufende / beendete Partien</label>
-          </>}
-          <label className="check-row"><input type="checkbox" checked={showKelly} onChange={(event) => {
-            setShowKelly(event.target.checked);
-            if (!event.target.checked) setKellyOpen(false);
-          }} /> Vorteil & Kelly-Einsatz anzeigen</label>
-        </section>
-        {view === "prematch" && <section className="sidebar-section defense-legend" aria-label="Legende Defensivstärke">
-          <span title="Gehört zu den 20 % Mannschaften mit der besten Abwehr in der Liga – gemessen an xGA (erwartete Gegentore). Das bewertet, wie gut die Chancen des Gegners waren, nicht nur, wie viele Tore wirklich fielen."><ShieldCheck size={16} weight="fill" aria-hidden /> Top 20 %, durch xGA verifiziert</span>
-          <span title="Gehört zu den 20 % Mannschaften mit der besten Abwehr in der Liga, gemessen an den wirklich kassierten Toren. Genauere Daten (xGA) lagen nicht vor."><Shield size={16} weight="regular" aria-hidden /> Top 20 %, Torhistorie</span>
-        </section>}
-        <div className="sidebar-footer">
-          <ClockCounterClockwise size={14} weight="bold" aria-hidden />
-          <span>Datenstand: {formatDataTimestamp(document.meta.createdAt, document.meta.timezone)}</span>
-        </div>
-      </>}
-      <div className="mini-kpis" aria-hidden={sidebarOpen || mobileViewport}>{kpis.map(({ key, icon: Icon, value, label, tone }) => <button key={key} tabIndex={sidebarOpen || mobileViewport ? -1 : 0} aria-label={`${label}: ${value} Partien`} aria-pressed={levelFilter === key} title={`${label}: ${value} Partien`} className={`${tone} ${levelFilter === key ? "active" : ""}`} onClick={() => setLevelFilter((current) => current === key ? "all" : key)}><Icon /><small>{value}</small></button>)}</div>
-      <span className="mini-footer" role="img" aria-hidden={sidebarOpen || mobileViewport} aria-label={`Datenstand: ${formatDataTimestamp(document.meta.createdAt, document.meta.timezone)}`} title={`Datenstand: ${formatDataTimestamp(document.meta.createdAt, document.meta.timezone)}`}>
-        <ClockCounterClockwise size={16} weight="bold" aria-hidden />
-      </span>
-    </aside>
+  <div className="app-shell density-compact">
+    <NavRail active={navKey} onSelect={selectNav} createdAt={document.meta.createdAt} timezone={document.meta.timezone} />
 
     <main className="content">
-      <button className="mobile-sidebar-toggle" tabIndex={mobileViewport ? 0 : -1} aria-hidden={!mobileViewport} onClick={() => setSidebarOpen(true)} aria-controls="dashboard-sidebar" aria-expanded={sidebarOpen}><ListBullets size={17} weight="duotone" /> Filter & Zeitraum</button>
-      {banner && <div className="banner"><span><RocketLaunch size={20} weight="duotone" /></span><p><strong>Grün</strong> markierte Tipps erfüllen alle Modellkriterien, gelbe sind starke Kandidaten. Sortiere über die Spaltenköpfe, filtere Märkte über die Auswahl darunter.</p><button onClick={() => { setBanner(false); saveBannerDismissed(); }} aria-label="Hinweis schließen"><X /></button></div>}
+      {banner && <div className="banner"><span><RocketLaunch size={20} weight="duotone" /></span><p><strong className="gold">Gold ★</strong> heißt sehr empfehlenswert, <strong>Grün ✓</strong> empfehlenswert. Sortiere über „Sortierung“ oder die Spaltenköpfe; Zeitraum, Wettbewerbe und Stufe stellst du über „Filter“ ein.</p><button onClick={() => { setBanner(false); saveBannerDismissed(); }} aria-label="Hinweis schließen"><X /></button></div>}
       {view === "prematch" ? <>
-      <nav className="layout-nav" aria-label="Darstellung">
-        {([["table", "Tabelle", Table], ["heatmap", "Heatmap", GridFour]] as const).map(([key, label, Icon]) =>
-          <button key={key} className={layout === key ? "active" : ""} aria-pressed={layout === key} onClick={() => setLayout(key)}>
-            <Icon size={14} weight={layout === key ? "fill" : "regular"} aria-hidden />{label}
-          </button>)}
-      </nav>
       <div className="view-toolbar">
-        <label className="toolbar-field">
-          <span>Markt</span>
-          <select value={marketFilter} onChange={(event) => selectMarket(event.target.value as MarketFilter)}>
-            {availableMarketOptions.map((option) => <option value={option.key} key={option.key}>{option.label}</option>)}
-          </select>
-        </label>
-        <label className="toolbar-field">
-          <span>H2H</span>
-          <select value={h2hView} onChange={(event) => setH2hView(event.target.value as H2hView)} {...tableOnly}>
-            {([ ["outcome", "Ergebnis"], ["btts", "BTTS"], ["over", "Über"], ["firstHalfOver", "1. HZ Über"] ] as const).map(([key, label]) => <option value={key} key={key}>{label}</option>)}
-          </select>
-        </label>
-        <label className="toolbar-field">
-          <span>Form</span>
-          <select value={formView} onChange={(event) => setFormView(event.target.value as FormView)} {...tableOnly}>
-            {([ ["outcome", "Ergebnis"], ["btts", "BTTS"], ["over", "Über"], ["firstHalfOver", "1. HZ Über"] ] as const).map(([key, label]) => <option value={key} key={key}>{label}</option>)}
-          </select>
-        </label>
-        <label className="toolbar-field">
-          <span>Linie</span>
-          <select
-            aria-label={activeLineView === "firstHalfOver" ? "Linie für H2H & Form, 1. Halbzeit" : "Linie für H2H & Form"}
-            value={`${counterDirection ? "u" : "o"}:${activeLineView === "firstHalfOver" ? firstHalfOverLine : overLine}`}
-            disabled={activeLineView === null || heatmap}
-            title={tableOnly.title}
-            onChange={(event) => {
-              const [direction, line] = event.target.value.split(":");
-              setCounterDirection(direction === "u");
-              if (activeLineView === "firstHalfOver") setFirstHalfOverLine(Number(line) as FirstHalfOverLine);
-              else setOverLine(Number(line) as FullTimeOverLine);
-            }}
-          >
-            {(activeLineView === "firstHalfOver"
-              ? [[0.5, "0,5"], [1.5, "1,5"]] as const
-              : [[1.5, "1,5"], [2.5, "2,5"], [3.5, "3,5"]] as const
-            ).flatMap(([line, label]) => [
-              <option value={`o:${line}`} key={`o${line}`}>Über {label}</option>,
-              <option value={`u:${line}`} key={`u${line}`}>Unter {label}</option>
-            ])}
-          </select>
-        </label>
-        <label className="toolbar-field">
-          <span>Klasse</span>
-          <select value={classGapFilter} onChange={(event) => setClassGapFilter(event.target.value as ClassGapFilter)}>
-            {([ ["all", "Alle"], ["only", "Nur"], ["hide", "Ohne"] ] as const).map(([key, label]) => <option value={key} key={key}>{label}</option>)}
-          </select>
-        </label>
-        <div className="toolbar-actions">
-          {quickpickActive && <QuickpickChip label={quickpickLabel}
-            passed={quickpick.report.passed} evaluated={quickpick.report.evaluated}
-            onOpen={() => setQuickpickOpen(true)} onClear={() => setQuickpickActive(false)} />}
-          <QuickpickButton active={quickpickActive} onOpen={() => setQuickpickOpen(true)} />
-          {showKelly && <KellyButton onOpen={() => setKellyOpen(true)} />}
+        <div className="toolbar-row">
+          {filterControl}
+          {marketControl}
+          <div className="toolbar-field sort-field">
+            <label htmlFor="sort-select">Sortierung</label>
+            <div className="sort-control">
+              <select id="sort-select" value={heatmap && heatmapSort ? "heatmap" : sortKey} onChange={(event) => selectSort(event.target.value as SortKey)}>
+                {heatmap && heatmapSort && <option value="heatmap" disabled>Spalte der Heatmap</option>}
+                {sortOptions.map(([key, label]) => <option value={key} key={key}>{label}</option>)}
+              </select>
+              <button type="button" className="sort-direction" onClick={flipSortDirection}
+                title="Reihenfolge umdrehen"
+                aria-label={`Reihenfolge umdrehen, jetzt ${activeSortDirection === 1 ? "aufsteigend" : "absteigend"}`}>
+                {activeSortDirection === 1 ? "↑" : "↓"}
+              </button>
+            </div>
+          </div>
+          <div className="toolbar-actions">
+            <QuickpickButton active={quickpickActive} onOpen={() => setQuickpickOpen(true)} />
+            {showKelly && <KellyButton onOpen={() => setKellyOpen(true)} />}
+          </div>
         </div>
+        {filterStatusRow(<p className="filter-status">
+          <span aria-live="polite"><strong>{filtered.length}</strong> Spiele angezeigt</span>
+          {" · "}{rangeLabel}
+          {showKelly && <>{" · "}<strong>{valueCount}</strong> mit Vorteil</>}
+        </p>)}
       </div>
 
       <div className="table-with-detail">
       {heatmap ? <HeatmapTable
+        sort={heatmapSort}
+        onSortChange={setHeatmapSort}
         fixtures={sortedFixtures}
         markets={heatmapColumns}
         timezone={document.meta.timezone}
@@ -1462,12 +1574,22 @@ function Dashboard({ document }: { document: DashboardDocument }) {
             </aside>;
       })()}
       </div>
-      </> : view === "profile" ? <MarketProfileView /> : <LiveView
+      </> : view === "profile" ? <MarketProfileView /> : <>
+      {/* Der Markt wirkt auch hier auf die Markttafeln - deshalb sichtbar, nicht still geerbt. */}
+      <div className="view-toolbar">
+        <div className="toolbar-row">
+          {filterControl}
+          {marketControl}
+        </div>
+        {filterStatusRow(liveStatus)}
+      </div>
+      <LiveView
         state={live}
         marketFilter={marketFilter}
         showEdge={showKelly}
         isLeagueVisible={isLeagueVisible}
-      />}
+      />
+      </>}
     </main>
   </div>
   {leagueFilterOpen && <LeagueFilterModal
@@ -1528,7 +1650,7 @@ function Dashboard({ document }: { document: DashboardDocument }) {
 
 export function App() {
   const state = useDashboardData();
-  if (state.status === "loading") return <div className="status-screen"><span className="brand-mark">FA</span><strong>Dashboard wird geladen …</strong></div>;
-  if (!state.document) return <div className="status-screen"><span className="brand-mark">FA</span><EmptyState title="Noch keine Analyse vorhanden" text={state.message ?? "Starte npm run dashboard -- --dates next48 im Chat."} /></div>;
+  if (state.status === "loading") return <div className="status-screen"><BrandMark /><strong>Dashboard wird geladen …</strong></div>;
+  if (!state.document) return <div className="status-screen"><BrandMark /><EmptyState title="Noch keine Analyse vorhanden" text={state.message ?? "Starte npm run dashboard -- --dates next48 im Chat."} /></div>;
   return <><Dashboard document={state.document} />{state.status === "error" && <div className="connection-warning" role="status"><WarningCircle size={16} weight="duotone" aria-hidden /><span>{state.message} · Letzter erfolgreicher Stand wird weiter angezeigt.</span></div>}</>;
 }

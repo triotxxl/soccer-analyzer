@@ -3,7 +3,10 @@ import { autoDecide, AUTO_RULE } from "../../src/market-profile.ts";
 import type { DashboardFixture, DashboardMarket, DashboardMarketKey, MarketProfile } from "./types";
 
 const STORAGE_KEY = "football-analyzer:kelly-settings";
-const VISIBLE_STORAGE_KEY = "football-analyzer:kelly-visible";
+// Seit 27.09.2026 ab Werk aus (Davids Entscheidung: Value soll nicht hervorstechen). Neuer
+// Schlüssel, weil die App den alten schon beim ersten Laden als "1" geschrieben hat - eine
+// bloße Vorgabeänderung hätte keinen benutzten Browser erreicht.
+const VISIBLE_STORAGE_KEY = "football-analyzer:kelly-visible-v2";
 
 export interface KellySettings {
   budget: number;
@@ -599,11 +602,11 @@ export function saveKellySettings(settings: KellySettings): void {
 }
 
 export function loadKellyVisible(): boolean {
-  if (typeof window === "undefined") return true;
+  if (typeof window === "undefined") return false;
   try {
-    return window.localStorage.getItem(VISIBLE_STORAGE_KEY) !== "0";
+    return window.localStorage.getItem(VISIBLE_STORAGE_KEY) === "1";
   } catch {
-    return true;
+    return false;
   }
 }
 

@@ -39,77 +39,195 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
   min-height: 650px;
   margin: 16px;
   display: grid;
-  grid-template-columns: 240px minmax(0, 1fr);
+  grid-template-columns: 84px minmax(0, 1fr);
   overflow: hidden;
   border: 1px solid #333333;
   border-radius: 22px;
   background: linear-gradient(180deg, #202020, #181818);
   box-shadow: 0 30px 80px rgba(0,0,0,.55);
-  transition: grid-template-columns .2s ease;
 }
-.app-shell.sidebar-collapsed { grid-template-columns: 56px minmax(0, 1fr); }
 
-.sidebar { display: flex; flex-direction: column; min-width: 0; padding: 14px 12px 10px; border-right: 1px solid var(--line-soft); background: rgba(24,24,24,.96); overflow-y: auto; transition: padding .2s ease, transform .2s ease; }
-.sidebar-collapsed .sidebar { padding-inline: 8px; }
-.sidebar-head { display: flex; align-items: center; gap: 8px; padding-bottom: 12px; border-bottom: 1px solid var(--line-soft); }
-.sidebar-collapsed .sidebar-head { flex-direction: column; }
-.brand { display: flex; min-width: 0; flex: 1; align-items: center; gap: 9px; white-space: nowrap; }
-.sidebar-collapsed .brand { flex: none; justify-content: center; }
-.brand-mark { display: grid; place-items: center; width: 32px; height: 32px; flex: 0 0 auto; border-radius: 9px; background: #252526; color: var(--accent); font-family: var(--mono); font-size: 12px; font-weight: 700; }
-.brand strong { display: block; overflow: hidden; font-size: 13px; text-overflow: ellipsis; }
-.brand small { display: block; margin-top: 2px; color: #858585; font-size: 11px; }
-.sidebar-toggle { display: grid; place-items: center; width: 32px; height: 32px; flex: 0 0 auto; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: #b3b3b3; }
-.sidebar-toggle:hover { border-color: #5a5a5a; color: var(--accent); }
-.sidebar-section { padding: 0; border: 0; border-radius: 0; background: none; }
-.sidebar-section + .sidebar-section { margin-top: 18px; }
-.sidebar-section h2 { margin: 0 0 8px; color: #7a7a7a; font-size: 10px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; }
-/* Was die aktuelle Filterung uebrig laesst, gross und als Erstes. Die zweite Zahl ist
-   dieselbe, die die KPI-Liste unter "Empfehlungen" fuehrt - eine Quelle, zwei Orte. */
-.sidebar-status { display: flex; gap: 18px; padding: 14px 2px; border-bottom: 1px solid var(--line-soft); }
-.sidebar-status span { display: grid; gap: 3px; }
-.sidebar-status strong { color: #d4d4d4; font-family: var(--mono); font-size: 26px; font-weight: 700; line-height: 1; }
-.sidebar-status .value strong { color: #89d185; }
-.sidebar-status small { color: #8f8f8f; font-size: 11px; }
-.date-range-control { position: relative; display: flex; gap: 6px; }
-.date-range-trigger, .quick-range { min-width: 0; min-height: 34px; border: 1px solid var(--line); border-radius: 9px; background: transparent; color: #b3b3b3; }
-.date-range-trigger { flex: 1; display: flex; align-items: center; gap: 7px; padding: 0 9px; text-align: left; }
-.date-range-trigger > svg { flex: 0 0 auto; color: var(--accent); }
-.date-range-trigger span { min-width: 0; overflow: hidden; font-family: var(--mono); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
-.quick-range { flex: 0 0 auto; padding: 0 12px; font-size: 12px; font-weight: 600; }
-.date-range-trigger:hover:not(:disabled), .quick-range:hover { border-color: #5a5a5a; color: #d4d4d4; }
-.date-range-trigger.active, .quick-range.active { border-color: var(--accent); background: rgba(55,148,255,.16); color: #75beff; }
-.date-range-trigger:disabled { cursor: not-allowed; opacity: .4; }
-.date-popover { position: absolute; top: calc(100% + 8px); left: 0; z-index: 40; width: 100%; padding: 12px; border: 1px solid #4a4a4a; border-radius: 12px; background: #252526; box-shadow: 0 18px 42px rgba(0,0,0,.62); }
-.date-popover-head { display: grid; grid-template-columns: 28px minmax(0,1fr) 28px; align-items: center; gap: 5px; }
-.date-popover-head button { display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 1px solid var(--line); border-radius: 7px; background: #1e1e1e; color: #b3b3b3; }
-.date-popover-head button:disabled { cursor: default; opacity: .25; }
-.date-popover-head strong { overflow: hidden; color: #d4d4d4; font-size: 13px; font-weight: 600; text-align: center; text-overflow: ellipsis; white-space: nowrap; }
-.date-weekdays, .date-calendar { display: grid; grid-template-columns: repeat(7,minmax(0,1fr)); gap: 2px; }
-.date-weekdays { margin: 10px 0 4px; color: #737373; font-size: 10px; text-align: center; }
-.date-calendar button, .date-calendar > span { height: 30px; min-width: 0; }
-.date-calendar button { padding: 0; border: 0; border-radius: 6px; background: transparent; color: #c8c8c8; font-family: var(--mono); font-size: 11px; }
-.date-calendar button:hover:not(:disabled) { background: #2a2d2e; }
-.date-calendar button:disabled { color: #555555; cursor: not-allowed; }
-.date-calendar button.in-range { border-radius: 0; background: #264f78; color: #e6f2ff; }
-.date-calendar button.range-start, .date-calendar button.range-end { border-radius: 6px; background: #007acc; color: #ffffff; font-weight: 900; }
-.date-selection { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 10px; color: #858585; font-size: 10px; }
-.date-selection span { min-width: 0; padding: 7px 8px; border-radius: 6px; background: #1e1e1e; }
-.date-selection strong { display: block; margin-top: 3px; overflow: hidden; color: #c8c8c8; font-family: var(--mono); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
-.date-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
-.date-actions button { min-height: 34px; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: #a0a0a0; font-size: 12px; }
-.date-actions button.primary { border-color: var(--accent); background: var(--accent); color: #ffffff; font-weight: 600; }
-.sidebar-section label.check-row { display: flex; align-items: center; gap: 9px; padding: 5px 0; color: #c8c8c8; font-size: 11px; line-height: 1.4; cursor: pointer; }
-.sidebar-section input[type="checkbox"] { width: 15px; height: 15px; margin: 0; flex: 0 0 auto; accent-color: var(--accent); }
-.sidebar-section > p { margin: 8px 0 0; color: #8f8f8f; font-size: 12px; line-height: 1.5; }
-.sidebar-section > p strong { color: #c8c8c8; font-family: var(--mono); font-weight: 600; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 
-.league-filter-trigger { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 34px; padding: 0 9px; border: 1px solid var(--line); border-radius: 9px; background: transparent; color: #c8c8c8; font-size: 12px; text-align: left; }
-.league-filter-trigger span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.league-filter-trigger strong { flex: 0 0 auto; color: #8f8f8f; font-family: var(--mono); font-size: 12px; font-weight: 600; }
-.league-filter-trigger svg { flex: 0 0 auto; color: #6a6a6a; }
-.league-filter-trigger:hover { border-color: #5a5a5a; }
-.league-filter-trigger.active { border-color: var(--accent); }
-.league-filter-trigger.active strong { color: var(--accent); }
+/* Markenzeichen, auch im Lade- und Leerbildschirm. Gruen ist Davids Wahl nach der Vorlage,
+   obwohl Gruen sonst "Empfehlung" heisst - deshalb nur hier und am aktiven Leisteneintrag,
+   nie in Datenzellen. */
+.brand-mark { display: grid; place-items: center; width: 48px; height: 48px; flex: 0 0 auto; border-radius: 12px; background: var(--green); color: var(--bg); }
+
+/* Linke Navigationsleiste: nur Ansichten, keine Filter. */
+.nav-rail { display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow-y: auto; border-right: 1px solid var(--line-soft); background: var(--bg); }
+.nav-rail .brand-mark { width: 100%; height: 84px; border-radius: 0; }
+.nav-rail-items { display: grid; gap: 2px; padding: 10px 0; }
+.nav-rail button { position: relative; display: flex; flex-direction: column; align-items: center; gap: 5px; width: 100%; padding: 12px 4px 10px; border: 0; background: transparent; color: var(--muted); }
+/* Der Rahmen der App schneidet nach aussen versetzte Fokusringe ab. */
+.nav-rail button:focus-visible { outline-offset: -2px; }
+.nav-rail button:hover:not([aria-current]) { background: rgba(255,255,255,.04); color: var(--text); }
+.nav-rail button[aria-current="page"] { background: var(--surface); color: var(--text); font-weight: 600; }
+.nav-rail button[aria-current="page"]::before { content: ""; position: absolute; top: 8px; bottom: 8px; left: 0; width: 3px; border-radius: 0 3px 3px 0; background: var(--green); }
+.nav-rail button[aria-current="page"] svg { color: var(--green); }
+/* Live aktiv bleibt rot. Die Beschriftung bleibt hell: Rot auf --surface reicht fuer 11 px nicht. */
+.nav-rail button.live[aria-current="page"]::before { background: var(--red); }
+.nav-rail button.live[aria-current="page"] svg { color: var(--red); }
+.nav-rail-label { font-size: 11px; line-height: 1.2; white-space: nowrap; }
+.nav-rail-foot { display: grid; justify-items: center; gap: 2px; margin: auto 0 0; padding: 12px 4px; border-top: 1px solid var(--line-soft); color: var(--dim); font-family: var(--mono); font-size: 10px; line-height: 1.3; }
+.nav-rail-foot svg { margin-bottom: 3px; }
+
+/* Filtermenue: nicht-modales Fenster ueber der Tabelle, im Stil der Leiste (Davids Wahl vom
+   28.09.2026, Variante "Leistenstil"). Karten auf --surface mit Rand --line und hellem Titel;
+   Mulden und nicht gewaehlte Kacheln auf --bg, also TIEFER als die Karte - heller als die Karte ist
+   nur die Wahl (#37373d, dieselbe Wahl-Farbe wie .segmented button.active), mit heller fetter
+   Schrift und einem 3-px-Balken unten, eingezogen und abgerundet wie der Leistenbalken. Ueberfahren
+   (#222) bleibt unter der Karte und sieht nie wie gewaehlt aus - vorher bekamen beide --surface-2.
+   Farbregel (Davids Entscheidung vom 27.09.2026): Gruen heisst im Menue "gewaehlt", aber nur als
+   Balken an der Wahl und als Bahn eines eingeschalteten Schalters. Nie als Flaeche hinter Text oder
+   Zahl, nie als Textfarbe, nie als Haekchen: In der Tabelle heisst Gruen mit ✓ "Empfehlenswert".
+   Blau (--accent) ist hier nur Tastaturfokus, damit "gewaehlt" und "hier bin ich" unterscheidbar
+   bleiben. */
+.filter-anchor { position: relative; }
+.filter-trigger { display: flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; border: 1px solid var(--line); border-radius: 9px; background: var(--shell); color: var(--muted); font-size: 11px; font-weight: 700; }
+.filter-trigger:hover { border-color: var(--muted); color: var(--text); }
+.filter-trigger.open { background: var(--surface); color: var(--text); }
+.filter-count { display: grid; place-items: center; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 6px; background: var(--text); color: var(--bg); font-family: var(--mono); font-size: 10px; font-weight: 700; }
+.filter-menu { position: absolute; top: calc(100% + 8px); left: 0; z-index: 40; display: flex; flex-direction: column; width: min(760px, calc(100vw - 140px)); max-height: calc(100vh - 128px); overflow: hidden; border: 1px solid #4a4a4a; border-radius: 14px; background: var(--bg); box-shadow: 0 18px 42px rgba(0,0,0,.62); color: var(--text); font-size: 12px; text-align: left; }
+.filter-menu.single { width: 420px; }
+.filter-menu-head { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--line); }
+.filter-menu-head h2 { flex: 0 0 auto; margin: 0; color: var(--text); font-size: 14px; font-weight: 600; }
+.filter-menu-head h2:focus { outline: none; }
+.filter-menu-count { flex: 1; min-width: 0; margin: 0; overflow: hidden; color: var(--muted); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.filter-menu-count strong { color: var(--text); font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.filter-menu-close { display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: var(--muted); }
+.filter-menu-close:hover { border-color: var(--muted); color: var(--text); }
+/* Zwei Spalten, unter rund 880 px Fensterbreite von selbst eine. position: relative haelt die
+   versteckten Radios und Schalter an ihrer Zeile - sonst hingen sie am Menuerahmen, und beim
+   Fokussieren scrollte der Browser das ganze Menue samt Kopf weg. */
+.filter-menu-body { position: relative; display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; align-items: start; flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 14px 16px 16px; }
+.filter-column { display: grid; gap: 16px; align-content: start; min-width: 0; }
+.filter-group { display: grid; gap: 8px; min-width: 0; }
+.filter-group-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; padding: 0 2px; }
+.filter-group-head h3 { margin: 0; color: var(--muted); font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; }
+.filter-group-head span { color: var(--dim); font-size: 11px; }
+/* Rang der Ueberschriften: Gruppe leise in Grossbuchstaben, Kartentitel hell, Hinweis grau. */
+.filter-card { display: grid; gap: 12px; min-width: 0; padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+.filter-card-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; min-width: 0; }
+.filter-card-head h4 { margin: 0; color: var(--text); font-size: 12px; font-weight: 600; }
+.filter-card-aside { min-width: 0; overflow: hidden; color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; text-overflow: ellipsis; white-space: nowrap; }
+/* Durchgezogen wie die Linien der Leiste - gestrichelt heisst in der App "nicht verfuegbar". */
+.filter-card-rule { display: grid; gap: 8px; padding-top: 12px; border-top: 1px solid var(--line); }
+/* Auf --surface reicht --dim fuer 11 px nicht - Hinweise und Warnung stehen in --muted. */
+.filter-note { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.45; }
+.filter-note.warning { display: flex; align-items: flex-start; gap: 6px; }
+.filter-note.warning svg { flex: 0 0 auto; margin-top: 1px; }
+
+/* Bewertung als drei Kacheln wie die Kennzahlen der Vorlage: Wort klein, Zahl gross. ✓ und ★
+   stehen mit ihrer Datenbedeutung neben der Zahl, die Wahl traegt den gruenen Balken. */
+.filter-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; min-width: 0; margin: 0; padding: 0; border: 0; }
+.filter-tile { position: relative; display: grid; gap: 4px; min-width: 0; padding: 8px 10px 9px; border-radius: 8px; background: var(--bg); color: var(--muted); cursor: pointer; }
+.filter-tile:hover:not(.checked) { background: #222222; color: var(--text); }
+.filter-tile.checked { background: #37373d; color: var(--text); }
+.filter-tile:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: -2px; }
+.filter-tile-label { overflow: hidden; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.filter-tile.checked .filter-tile-label { font-weight: 600; }
+.filter-tile-value { display: flex; align-items: baseline; justify-content: space-between; gap: 4px; }
+.filter-tile-value strong { color: var(--text); font-size: 20px; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.filter-tile-marks { display: flex; gap: 3px; font-size: 12px; }
+.filter-tile-marks .green { color: var(--green); }
+.filter-tile-marks .gold { color: var(--gold); }
+
+.filter-field { display: grid; gap: 6px; min-width: 0; margin: 0; }
+.filter-field > span, .filter-field > legend { padding: 0; color: var(--muted); font-size: 11px; font-weight: 500; }
+fieldset.filter-field { min-width: 0; margin-inline: 0; padding: 0; border: 0; }
+.filter-field > legend { margin-bottom: 6px; }
+.filter-field > legend + .segmented { margin-top: 0; }
+
+/* Segmentschalter: 2-4 feste Werte, die sich ausschliessen, als Pillenreihe in einer Mulde. */
+.segmented.filter-seg { gap: 2px; padding: 2px; border: 1px solid transparent; border-radius: 8px; background: var(--bg); }
+.segmented.filter-seg label { position: relative; display: grid; flex: 1 1 0; place-items: center; min-width: 0; height: 28px; padding: 0 6px; border-radius: 6px; color: var(--muted); font-size: 12px; white-space: nowrap; cursor: pointer; }
+.segmented.filter-seg label:hover:not(:has(input:checked)):not(:has(input:disabled)) { background: #222222; color: var(--text); }
+.segmented.filter-seg label:has(input:checked) { background: #37373d; color: var(--text); font-weight: 600; }
+/* Der Balken der Wahl, wie am aktiven Leisteneintrag (.nav-rail ... ::before), nur unten statt links: Links saehe er
+   in einer waagrechten Reihe wie ein Trennstrich zwischen zwei Segmenten aus. Ein Pseudo-Element
+   statt Inhalt, damit label.textContent unveraendert bleibt (App.test.tsx prueft ihn). */
+.segmented.filter-seg label:has(input:checked)::after,
+.filter-tile.checked::after, .quick-range.active::after, .day-tile.selected::after
+  { content: ""; position: absolute; left: 8px; right: 8px; bottom: 0; height: 3px; border-radius: 3px 3px 0 0; background: var(--green); }
+.segmented.filter-seg label:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: -2px; }
+.segmented.filter-seg label:has(input:disabled) { cursor: default; opacity: .45; }
+
+/* Schalter wie der Kippschalter der Vorlage: an heisst ueberall "Filter aktiv" oder "Anzeige an".
+   Die ganze Zeile ist das label. */
+.filter-switch-row { display: grid; gap: 2px; margin: 0; }
+.filter-switch { position: relative; display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: center; gap: 12px; min-height: 28px; color: var(--text); font-size: 12px; line-height: 1.4; cursor: pointer; }
+.filter-switch-track { position: relative; width: 32px; height: 18px; border-radius: 9px; background: #4a4a4a; }
+.filter-switch-track::after { content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: var(--muted); }
+.filter-switch:hover .filter-switch-track::after { background: var(--text); }
+.filter-switch:has(input:checked) .filter-switch-track { background: var(--green); }
+.filter-switch:has(input:checked) .filter-switch-track::after { background: var(--bg); transform: translateX(14px); }
+.filter-switch:has(input:focus-visible) .filter-switch-track { outline: 2px solid var(--accent); outline-offset: 2px; }
+@media (prefers-reduced-motion: no-preference) {
+  .filter-switch-track, .filter-switch-track::after { transition: background .15s ease, transform .15s ease; }
+}
+.filter-display { display: grid; gap: 10px; min-width: 0; }
+/* Linie und Richtung nebeneinander, nur bei "Tore" / "Tore 1. HZ". */
+.filter-display-line { display: grid; grid-template-columns: minmax(0,3fr) minmax(0,2fr); gap: 8px; }
+
+/* Wettbewerbe als ein Feld: links suchen, rechts angesetzt die ganze Liste. Treffer erst beim
+   Tippen, hoechstens acht. */
+.league-quick { display: grid; gap: 4px; min-width: 0; }
+.league-field { display: flex; align-items: center; height: 34px; min-width: 0; overflow: hidden; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--muted); }
+.league-field:hover { border-color: var(--muted); }
+.league-field > svg { flex: 0 0 auto; margin-left: 10px; }
+.league-quick-input { flex: 1; min-width: 0; height: 100%; padding: 0 8px; border: 0; background: transparent; color: var(--text); font-size: 12px; }
+.league-quick-input::placeholder { color: var(--muted); }
+.league-quick-input:focus-visible { outline-offset: -2px; }
+.league-filter-trigger { display: flex; flex: 0 0 auto; align-items: center; gap: 6px; height: 100%; padding: 0 10px; border: 0; border-left: 1px solid var(--line); background: transparent; color: var(--muted); font-family: var(--mono); font-size: 12px; white-space: nowrap; }
+.league-filter-trigger:hover { background: rgba(255,255,255,.05); color: var(--text); }
+.league-filter-trigger:focus-visible { outline-offset: -2px; }
+/* Ohne Farbe: Dass nicht alle gewaehlt sind, meldet ohnehin das Schildchen. */
+.league-filter-trigger.active { color: var(--text); font-weight: 600; }
+.league-filter-trigger svg { color: var(--dim); }
+.league-quick-hits { display: grid; gap: 1px; margin: 0; padding: 0; list-style: none; }
+.league-quick-hits li { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.league-quick-hits label.check-row { flex: 1; min-width: 0; }
+.league-quick-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.league-quick-only { flex: 0 0 auto; height: 24px; padding: 0 8px; border: 1px solid var(--line); border-radius: 7px; background: transparent; color: var(--muted); font-size: 11px; font-weight: 600; }
+.league-quick-only:hover { background: rgba(255,255,255,.06); color: var(--text); }
+.filter-menu label.check-row { display: flex; align-items: center; gap: 9px; padding: 5px 0; color: var(--text); font-size: 12px; line-height: 1.4; cursor: pointer; }
+/* Neutral statt farbig: Ein gruenes Haekchen neben einem Liganamen saehe aus wie ✓ "Empfehlenswert". */
+.filter-menu input[type="checkbox"] { width: 15px; height: 15px; margin: 0; flex: 0 0 auto; accent-color: var(--muted); }
+/* Knopfform wie das ✕ daneben; ohne Filter lesbar in --dim statt ausgegraut auf 2:1. */
+.filter-reset { height: 28px; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: var(--text); font-size: 12px; font-weight: 600; }
+.filter-reset:hover:not(:disabled) { border-color: var(--muted); }
+.filter-reset:disabled { border-color: transparent; color: var(--dim); cursor: default; }
+
+/* Zweite Zeile der Werkzeugleiste: was die Filterung uebrig laesst und welche Filter aktiv
+   sind. Immer vorhanden, damit die Tabelle beim ersten Schildchen nicht springt. "mit Vorteil"
+   steht nur mit dem Kelly-Schalter da und ist bewusst nicht gruen (Entscheidung vom 25.09.2026). */
+.filter-status-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; min-height: 26px; }
+.filter-status { margin: 0 6px 0 0; color: var(--muted); font-size: 11px; }
+.filter-status strong { color: var(--text); font-family: var(--mono); font-weight: 700; }
+.filter-chip { display: inline-flex; align-items: center; height: 26px; overflow: hidden; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+.filter-chip-label { height: 100%; padding: 0 6px 0 10px; border: 0; background: transparent; color: var(--text); font-size: 11px; font-weight: 600; white-space: nowrap; }
+.filter-chip-clear { display: grid; place-items: center; width: 24px; height: 100%; padding: 0; border: 0; border-left: 1px solid var(--line); background: transparent; color: var(--muted); }
+.filter-chip-label:hover, .filter-chip-clear:hover { background: rgba(255,255,255,.06); color: var(--text); }
+
+/* Zeitraum: links die Kachel "Naechste 48 Std.", rechts eine Reihe Tageskacheln ab dem ersten
+   Tag der Analyse, sieben je Zeile. Jeder gewaehlte Tag traegt den gruenen Balken, ein Zeitraum
+   liest sich so als unterbrochene Linie. Kein Monatspfeil, kein Uebernehmen. */
+.day-range { display: grid; grid-template-columns: 76px minmax(0, 1fr); gap: 8px; align-items: start; min-width: 0; }
+.quick-range { position: relative; display: grid; place-content: center; gap: 1px; height: 44px; min-width: 0; padding: 0 6px; border: 0; border-radius: 8px; background: var(--bg); color: var(--muted); font-size: 11px; font-weight: 600; line-height: 1.25; text-align: center; }
+.quick-range:hover:not(.active) { background: #222222; color: var(--text); }
+.quick-range.active { background: #37373d; color: var(--text); }
+.quick-range:focus-visible { outline-offset: -2px; }
+.day-tiles { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; min-width: 0; }
+.day-tile { position: relative; display: grid; place-content: center; gap: 1px; height: 44px; min-width: 0; padding: 0; border: 0; border-radius: 8px; background: var(--bg); color: var(--text); font-family: var(--mono); text-align: center; }
+.day-tile:hover:not(.selected) { background: #222222; }
+.day-tile.selected { background: #37373d; }
+.day-tile.selected .day-weekday { color: var(--text); }
+.day-tile.selected .day-num { font-weight: 700; }
+.day-tile:focus-visible { outline-offset: -2px; }
+.day-weekday { color: var(--muted); font-size: 10px; line-height: 1.2; }
+.day-num { font-size: 13px; font-weight: 600; line-height: 1.2; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.day-range-hint { grid-column: 1 / -1; }
 .league-filter-modal { position: fixed; top: 50%; left: 50%; z-index: 61; width: min(940px, calc(100vw - 32px)); max-height: min(680px, calc(100vh - 48px)); display: flex; flex-direction: column; overflow: hidden; border: 1px solid #4a4a4a; border-radius: 14px; background: #1e1e1e; box-shadow: 0 24px 60px rgba(0,0,0,.55); transform: translate(-50%,-50%); }
 .league-modal-toolbar { flex: 0 0 auto; display: flex; gap: 8px; padding: 14px 16px 0; }
 .league-search { flex: 1; min-width: 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: #1a1a1a; color: var(--text); font-size: 12px; }
@@ -189,10 +307,6 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 /* Quickpicker: Auslöser, Streifen und Panel. Erbt bewusst die Kelly-Klassen, damit beide
    Auswahlhilfen nicht auseinanderlaufen. */
 .quickpick-trigger[aria-pressed="true"] { border-color: var(--accent); background: #26312b; color: var(--accent); }
-.quickpick-chip { display: flex; align-items: center; height: 32px; border: 1px solid var(--accent); border-radius: 9px; background: #26312b; overflow: hidden; }
-.quickpick-chip-label { padding: 0 6px 0 11px; border: 0; background: transparent; color: var(--accent); font-size: 11px; font-weight: 700; }
-.quickpick-chip-clear { display: grid; place-items: center; width: 24px; height: 100%; padding: 0; border: 0; border-left: 1px solid rgba(255,255,255,.12); background: transparent; color: var(--accent); }
-.quickpick-chip-clear:hover { background: rgba(255,255,255,.08); }
 .quickpick-apply { flex: none; height: 32px; padding: 0 14px; border: 1px solid var(--line); border-radius: 9px; background: #1e1e1e; color: #b8b8b8; font-size: 11px; font-weight: 700; }
 .quickpick-apply:hover { border-color: var(--accent); color: var(--accent); }
 .quickpick-apply.active { border-color: var(--accent); background: var(--accent); color: #10281a; }
@@ -221,41 +335,23 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .market-edge { font-size: 9px; font-weight: 700; white-space: nowrap; }
 .market-edge.pos { color: var(--green); }
 .market-edge.neg { color: #d17a7a; }
-.view-switch + .sidebar-section { margin-top: 14px; }
-.kpi-section { display: grid; gap: 1px; }
-.kpi { display: grid; grid-template-columns: 16px minmax(0,1fr) auto; align-items: center; gap: 9px; width: 100%; min-height: 34px; padding: 0 8px; border: 0; border-radius: 8px; background: transparent; color: #c8c8c8; font-size: 12px; text-align: left; }
-.kpi:hover { background: rgba(255,255,255,.04); }
-.kpi.active { background: rgba(55,148,255,.14); color: #e4e4e4; font-weight: 600; }
-.kpi-icon { display: grid; place-items: center; color: var(--accent); }
-.kpi.gold .kpi-icon { color: var(--gold); }
-.kpi.green .kpi-icon { color: var(--green); }
-.kpi-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.kpi-value { color: #8f8f8f; font-family: var(--mono); font-size: 12px; font-weight: 600; }
-.kpi.active .kpi-value { color: #e4e4e4; font-weight: 700; }
-.mini-kpis { display: none; gap: 10px; margin-top: 12px; }
-.sidebar-collapsed .mini-kpis { display: grid; }
-.mini-kpis button { display: grid; place-items: center; gap: 2px; padding: 7px 2px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); color: var(--accent); }
-.mini-kpis button:hover, .mini-kpis button.active { border-color: #5a5a5a; background: #2a2d2e; }
-.mini-kpis button.gold { color: var(--gold); }
-.mini-kpis button.green { color: var(--green); }
-.mini-kpis button.gold:hover, .mini-kpis button.gold.active { border-color: rgba(217,180,95,.5); background: rgba(217,180,95,.14); }
-.mini-kpis button.green:hover, .mini-kpis button.green.active { border-color: rgba(137,209,133,.5); background: rgba(137,209,133,.14); }
-.mini-kpis small { font-size: 8px; }
-.mini-footer { display: none; }
-.sidebar-collapsed .mini-footer { display: grid; place-items: center; margin-top: auto; padding-top: 10px; border-top: 1px solid var(--line-soft); color: var(--dim); }
-.sidebar-footer { display: flex; align-items: center; gap: 7px; margin-top: auto; padding-top: 12px; border-top: 1px solid var(--line-soft); color: #7a7a7a; font-size: 11px; }
-.sidebar-footer svg { flex: 0 0 auto; color: var(--dim); }
-.sidebar-backdrop, .mobile-sidebar-toggle { display: none; }
 
 .content { display: flex; min-width: 0; min-height: 0; flex-direction: column; padding: 26px 16px 0; }
 .banner { display: flex; align-items: center; gap: 15px; margin-bottom: 18px; padding: 14px 16px; border: 1px solid #3c3c3c; border-radius: 14px; background: linear-gradient(90deg, rgba(255,255,255,.045), rgba(255,255,255,.015)); }
 .banner > span { display: grid; place-items: center; width: 36px; height: 36px; flex: 0 0 auto; border-radius: 10px; background: var(--accent-soft); color: var(--accent); }
 .banner p { flex: 1; margin: 0; color: #cccccc; font-size: 12px; line-height: 1.55; }
 .banner p strong { color: var(--green); }
+.banner p strong.gold { color: var(--gold); }
 .banner button { display: grid; place-items: center; width: 32px; height: 32px; border: 1px solid var(--line); border-radius: 50%; background: transparent; color: #a0a0a0; }
-.view-toolbar { display: flex; align-items: flex-end; gap: 14px; padding: 15px 0; border-bottom: 1px solid var(--line-soft); color: #858585; font-size: 12px; flex-wrap: wrap; }
+/* Zwei feste Zeilen: oben die Bedienelemente, unten Stand und Schildchen. Die Schildchen
+   brechen nur in ihrer eigenen Zeile um - die Knoepfe darueber wandern nicht. */
+.view-toolbar { display: flex; flex-direction: column; gap: 10px; padding: 14px 0 12px; border-bottom: 1px solid var(--line-soft); color: #858585; font-size: 12px; }
+.toolbar-row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 14px; }
 .toolbar-field { display: grid; gap: 4px; }
-.toolbar-field > span { color: #8a8a8a; font-size: 9px; letter-spacing: .08em; text-transform: uppercase; }
+.toolbar-field > span, .toolbar-field > label { color: #8a8a8a; font-size: 9px; letter-spacing: .08em; text-transform: uppercase; }
+.sort-control { display: flex; gap: 4px; }
+.sort-direction { width: 30px; height: 30px; padding: 0; border: 1px solid var(--line); border-radius: 8px; background: #1e1e1e; color: #b8b8b8; font-size: 13px; font-weight: 700; }
+.sort-direction:hover { border-color: #5a5a5a; color: #ffffff; }
 .segmented { display: flex; padding: 3px; border: 1px solid var(--line); border-radius: 10px; background: #1e1e1e; }
 .segmented button { padding: 8px 12px; border: 0; border-radius: 7px; background: transparent; color: #a0a0a0; font-size: 11px; }
 .segmented button.active { background: #37373d; color: #ffffff; font-weight: 700; }
@@ -284,7 +380,7 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .table-head button { padding: 4px 0; border: 0; background: transparent; color: #969696; font-size: 10px; font-weight: 700; letter-spacing: .08em; text-align: left; text-transform: uppercase; white-space: nowrap; }
 .table-head > button:nth-child(n+2) { width: 100%; text-align: center; }
 .fixture-summary-head { display: grid; gap: 4px; min-width: 0; }
-.fixture-summary-head button:last-child { color: #707070; font-size: 9px; }
+.fixture-summary-head button:last-child { color: #8a8a8a; font-size: 10px; }
 .sort-mode-badge { display: inline-grid; place-items: center; width: 18px; height: 18px; margin-left: 4px; border-radius: 50%; color: #1e1e1e; font-size: 8px; font-weight: 900; letter-spacing: 0; vertical-align: middle; }
 .sort-mode-badge.win { background: var(--home); }
 .sort-mode-badge.draw { background: #858585; }
@@ -364,10 +460,6 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .defense-shield { display: inline-grid; place-items: center; flex: 0 0 auto; color: #73c991; }
 .defense-shield.verified { filter: drop-shadow(0 0 5px rgba(115,201,145,.28)); }
 .defense-shield.fallback { color: #9aa0a6; }
-.defense-legend { display: grid; gap: 6px; margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line-soft); }
-.defense-legend span { display: flex; align-items: center; gap: 7px; color: #a8a8a8; font-size: 10px; }
-.defense-legend span:first-of-type svg { color: #73c991; }
-.defense-legend span:last-of-type svg { color: #9aa0a6; }
 .fixture-meta { display: flex; align-items: center; gap: 7px; min-width: 0; color: #969696; }
 .fixture-meta strong { flex: none; color: #d4d4d4; font-size: 11px; }
 .fixture-meta strong em { color: var(--accent); font-size: 7px; font-style: normal; letter-spacing: .06em; text-transform: uppercase; }
@@ -644,15 +736,7 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 
 .density-compact .market-card { padding: 6px 8px; }
 
-/* Pre-Match / Live */
-.view-switch { display: flex; gap: 2px; margin: 14px 0 0; padding: 2px; border-radius: 10px; background: #212121; }
-.view-switch button { display: flex; flex: 1 1 auto; min-width: 0; align-items: center; justify-content: center; min-height: 32px; white-space: nowrap; border: 0; border-radius: 8px; background: transparent; color: #a0a0a0; font-size: 12px; font-weight: 500; }
-.view-switch button.active { background: var(--accent); color: #ffffff; font-weight: 600; }
-.view-switch button.live.active { background: var(--red); color: #ffffff; }
-.sidebar-collapsed .view-switch { flex-direction: column; }
-.live-section p { margin: 0 0 6px; color: #a8a8a8; font-size: 9px; line-height: 1.65; }
-.live-section p strong { color: var(--text); font-size: 13px; }
-.live-section .live-hint { color: #7a7a7a; font-size: 8px; line-height: 1.6; }
+/* Live */
 
 .live-status { display: flex; align-items: center; gap: 9px; padding: 40px 0; color: #969696; font-size: 12px; }
 .live-status svg { color: var(--accent); }
@@ -731,16 +815,17 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 }
 
 @media (max-width: 700px) {
-  .app-shell { width: 100vw; height: 100vh; min-height: 560px; margin: 0; border: 0; border-radius: 0; grid-template-columns: minmax(0, 1fr); }
-  .app-shell.sidebar-collapsed { grid-template-columns: minmax(0, 1fr); }
-  .sidebar { position: fixed; top: 0; bottom: 0; left: 0; z-index: 30; width: 248px; padding: 16px 14px; border-right-color: #454545; background: #1e1e1e; box-shadow: 18px 0 48px rgba(0,0,0,.55); transform: translateX(0); }
-  .sidebar-collapsed .sidebar { padding-inline: 14px; transform: translateX(calc(-100% - 16px)); }
-  .sidebar-collapsed .sidebar-head { flex-direction: row; }
-  .sidebar-collapsed .brand { flex: 1; justify-content: flex-start; }
-  .sidebar-collapsed .mini-kpis { display: none; }
-  .sidebar-collapsed .mini-footer { display: none; }
-  .sidebar-backdrop { position: fixed; inset: 0; z-index: 25; display: block; border: 0; background: rgba(4,4,10,.72); cursor: default; }
-  .mobile-sidebar-toggle { display: flex; align-items: center; align-self: flex-start; gap: 7px; min-height: 34px; margin-bottom: 10px; padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px; background: #252526; color: #b3b3b3; font-size: 10px; font-weight: 700; }
+  .app-shell { width: 100vw; height: 100vh; min-height: 560px; margin: 0; border: 0; border-radius: 0; }
+  .app-shell { grid-template-columns: 56px minmax(0, 1fr); }
+  .nav-rail .brand-mark { height: 56px; }
+  .nav-rail button { padding-inline: 0; }
+  .nav-rail-label { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+  .nav-rail-foot { font-size: 8px; }
+  /* Die Werkzeugleiste scrollt hier seitlich und schnitte ein absolut gesetztes Menue ab. */
+  .filter-menu, .filter-menu.single { position: fixed; top: 64px; right: 8px; left: 64px; width: auto; }
+  .day-range { grid-template-columns: minmax(0, 1fr); }
+  .quick-range { justify-self: start; min-width: 120px; }
+  .toolbar-row { gap: 8px; }
   .content { padding-top: 14px; }
   .banner { padding: 10px; }
   .banner p { font-size: 9px; }
@@ -915,12 +1000,6 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 .quickpick-footer .quickpick-cart-note { color: #c8a978; font-size: 10px; white-space: nowrap; }
 .quickpick-drawer .quickpick-kombis, .quickpick-drawer .quickpick-rejections { margin: 0; border: 0; border-radius: 0; background: transparent; }
 .quickpick-drawer .quickpick-levels { padding: 0; }
-
-/* Darstellung der Pre-Match-Liste: Tabelle oder Heatmap. Angelehnt an .segmented. */
-.layout-nav { display: flex; align-self: flex-start; gap: 2px; padding: 3px; border: 1px solid var(--line); border-radius: 10px; background: #1e1e1e; }
-.layout-nav button { display: flex; align-items: center; gap: 6px; padding: 6px 12px; border: 0; border-radius: 7px; background: transparent; color: #a0a0a0; font-size: 11px; }
-.layout-nav button:hover:not(.active) { color: #d4d4d4; }
-.layout-nav button.active { background: #37373d; color: #ffffff; font-weight: 700; }
 
 /* Heatmap: eine Zeile je Spiel, 34 px. Die Spaltenbreiten muessen zur Mindestbreite passen,
    die HeatmapTable.tsx ausrechnet - sonst klemmen die Zellen oder die Tabelle scrollt ohne Not. */

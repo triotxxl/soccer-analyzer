@@ -91,6 +91,12 @@ function stubFetch(live: () => Response, dashboardResponse: () => Response = () 
 
 const liveCalls = (calls: string[]) => calls.filter((url) => url.startsWith("/api/live/board"));
 
+/** Öffnet das Filtermenü über den Knopf in der Werkzeugleiste und gibt das Fenster zurück. */
+async function openFilters(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole("button", { name: /^Filter(, \d+ aktiv)?$/ }));
+  return screen.getByRole("dialog", { name: "Filter" });
+}
+
 describe("Live-Ansicht", () => {
   beforeEach(() => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
@@ -111,7 +117,7 @@ describe("Live-Ansicht", () => {
     render(<App />);
     expect(await screen.findByRole("button", { name: /Letzte 5 Form/ })).toBeInTheDocument();
 
-    // Im Pre-Match-Modus darf kein einziger Live-Call entstehen.
+    // In Tabelle und Heatmap darf kein einziger Live-Call entstehen.
     expect(liveCalls(calls)).toHaveLength(0);
 
     await user.click(screen.getByRole("button", { name: "Live" }));
@@ -120,7 +126,7 @@ describe("Live-Ansicht", () => {
     expect(await screen.findByText("63'")).toBeInTheDocument();
 
     const before = liveCalls(calls).length;
-    await user.click(screen.getByRole("button", { name: "Pre-Match" }));
+    await user.click(screen.getByRole("button", { name: "Tabelle" }));
     expect(await screen.findByRole("button", { name: /Letzte 5 Form/ })).toBeInTheDocument();
     vi.advanceTimersByTime(60_000);
     expect(liveCalls(calls)).toHaveLength(before);
@@ -140,10 +146,31 @@ describe("Live-Ansicht", () => {
     expect(row).toHaveTextContent("Bundesliga");
     // Die Markttafel stammt unverändert aus dem Pre-Match-Lauf.
     expect(row).toHaveTextContent("1,85");
-    const status = globalThis.document.querySelector(".live-section");
-    expect(status).toHaveTextContent("1 laufende Partie");
-    expect(status).toHaveTextContent("API-Calls heute: 12 von 2000");
+    const status = globalThis.document.querySelector(".live-status");
+    expect(status).toHaveTextContent("1 laufendes Spiel");
+    expect(status).toHaveTextContent("API-Aufrufe heute: 12 von 2000");
     expect(status).toHaveTextContent("Kontingent verbleibend: 7100");
+  });
+
+  /**
+   * Der Markt wirkt auch in Live auf die Markttafeln - er steht deshalb sichtbar da statt still
+   * aus der Tabelle geerbt. Das Menü trägt nur, was hier wirkt: keine Stufe, kein Zeitraum.
+   */
+  it("zeigt den Markt sichtbar und im Filtermenü nur, was in Live wirkt", async () => {
+    window.localStorage.setItem("football-analyzer:view", "live");
+    stubFetch(() => new Response(JSON.stringify(board()), { status: 200 }));
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(<App />);
+    await screen.findByRole("article");
+
+    expect(screen.getByLabelText("Markt")).toBeInTheDocument();
+    const menu = await openFilters(user);
+    expect(within(menu).getByRole("button", { name: "Wettbewerbe auswählen" })).toBeInTheDocument();
+    expect(within(menu).getByRole("switch", { name: "Nur Spiele mit Empfehlung" })).toBeInTheDocument();
+    expect(within(menu).queryByRole("radio")).not.toBeInTheDocument();
+    expect(within(menu).queryByRole("button", { name: "Nächste 48 Std." })).not.toBeInTheDocument();
+    expect(within(menu).getByRole("button", { name: "Alle Filter zurücksetzen" }))
+      .toHaveAttribute("title", "Danach werden wieder alle Spiele beobachtet.");
   });
 
   it("öffnet beim Hovern ein Fenster mit Live-Metriken ohne weiteren Abruf", async () => {
@@ -195,7 +222,7 @@ describe("Live-Ansicht", () => {
 
     expect(await screen.findByText("Aktuell läuft keine der analysierten Partien")).toBeInTheDocument();
     expect(screen.getByText(/kein einziger API-Call verbraucht/)).toBeInTheDocument();
-    expect(globalThis.document.querySelector(".live-section")).toHaveTextContent("API-Calls heute: 0 von 2000");
+    expect(globalThis.document.querySelector(".live-status")).toHaveTextContent("API-Aufrufe heute: 0 von 2000");
   });
 
   it("meldet einen fehlenden API-Schlüssel verständlich", async () => {
@@ -215,7 +242,7 @@ describe("Live-Ansicht", () => {
 
     expect(await screen.findAllByRole("article")).toHaveLength(2);
 
-    await user.click(screen.getByRole("button", { name: "Wettbewerbe auswählen" }));
+    await user.click(within(await openFilters(user)).getByRole("button", { name: "Wettbewerbe auswählen" }));
     await user.click(screen.getByRole("checkbox", { name: "Deutschland · 2. Bundesliga" }));
     await user.keyboard("{Escape}");
 
@@ -261,7 +288,7 @@ describe("Beobachtungsumfang", () => {
     await screen.findByRole("article");
     await waitFor(() => expect(watched(calls)).toEqual([1, 2]));
 
-    await user.click(screen.getByRole("button", { name: "Wettbewerbe auswählen" }));
+    await user.click(within(await openFilters(user)).getByRole("button", { name: "Wettbewerbe auswählen" }));
     await user.click(screen.getByRole("checkbox", { name: "Deutschland · 2. Bundesliga" }));
     await user.keyboard("{Escape}");
 
@@ -276,11 +303,13 @@ describe("Beobachtungsumfang", () => {
     await screen.findByRole("article");
     await waitFor(() => expect(watched(calls)).toEqual([1, 2]));
 
-    await user.click(screen.getByRole("checkbox", { name: /Nur bewertete Partien/i }));
+    const menu = await openFilters(user);
+    await user.click(within(menu).getByRole("switch", { name: "Nur Spiele mit Empfehlung" }));
     // Beide Testpartien tragen eine Empfehlung, der Umfang bleibt also gleich gross -
     // entscheidend ist, dass der Schalter den gemeldeten Umfang steuert.
     await waitFor(() => expect(watched(calls).length).toBeGreaterThan(0));
-    expect(globalThis.document.querySelector(".live-hint")?.textContent)
-      .toMatch(/Beobachtet werden 2 von 2 Partien/);
+    expect(within(menu).getByText(/Beobachtet werden 2 von 2 Spielen/)).toBeInTheDocument();
+    // Der Filter steht auch bei geschlossenem Menü da.
+    expect(screen.getByRole("button", { name: "Filter, 1 aktiv" })).toBeInTheDocument();
   });
 });
