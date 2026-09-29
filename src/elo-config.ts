@@ -11,7 +11,37 @@
  * Wahrscheinlichkeit.
  */
 
-export type EloSystem = "club" | "national";
+/**
+ * Jugend- und Frauen-Nationalteams (seit 29.09.2026, Davids Auftrag): je eine eigene Skala,
+ * weil sie nie gegen die A-Teams spielen - eine U21 bei 1500 neben Spanien bei 1900 sagte nichts.
+ * Sie rechnen mit denselben Parametern wie die A-Nationalteams (`ELO_CONFIG.national`).
+ */
+export type NationalCategory = "u23" | "u21" | "u20" | "u19" | "u17" | "women";
+export const NATIONAL_CATEGORIES: NationalCategory[] = ["u23", "u21", "u20", "u19", "u17", "women"];
+/**
+ * `club-women` (seit 29.09.2026): Frauen-Vereine, eigene Skala wie die Frauen-Nationalteams - sie
+ * spielen nie gegen Männer-Vereine. Nur Anzeige, wie das Vereins-Elo überhaupt.
+ */
+export type EloSystem = "club" | "club-women" | "national" | `national-${NationalCategory}`;
+export const ELO_SYSTEMS: EloSystem[] = ["club", "club-women", "national", ...NATIONAL_CATEGORIES.map((category) => `national-${category}` as const)];
+
+/** Vereine oder Nationalteams - danach richten sich Parameter, Mitnahme und Vertrauen. */
+export function eloFamily(system: EloSystem): "club" | "national" {
+  return system === "club" || system === "club-women" ? "club" : "national";
+}
+
+export function systemConfigOf(config: EloConfig, system: EloSystem): EloSystemConfig {
+  return config[eloFamily(system)];
+}
+
+/** Anzeigename einer Skala. */
+export function eloSystemLabel(system: EloSystem): string {
+  if (system === "club") return "Vereine";
+  if (system === "club-women") return "Frauen-Vereine";
+  if (system === "national") return "Nationalteams";
+  const category = system.slice("national-".length);
+  return category === "women" ? "Frauen-Nationalteams" : `${category.toUpperCase()}-Nationalteams`;
+}
 
 export type EloCompetitionKind =
   // Vereine
@@ -252,8 +282,63 @@ export const ELO_COMPETITIONS: {
     667: "clubFriendly", 26: "clubFriendly", 769: "clubFriendly", 937: "clubFriendly",
     900: "clubFriendly", 1236: "clubFriendly", 1216: "clubFriendly"
   },
-  neutral: [1, 4, 6, 7, 9, 22, 806, 21, 913, 19, 23, 24, 25, 28, 535, 804, 805, 807, 849, 859, 860, 1008, 15, 1168, 1186]
+  neutral: [
+    1, 4, 6, 7, 9, 22, 806, 21, 913, 19, 23, 24, 25, 28, 535, 804, 805, 807, 849, 859, 860, 1008, 15, 1168, 1186,
+    // Endrunden der Jugend- und Frauen-Nationalteams
+    38, 490, 493, 587, 921, 532, 8, 743, 897, 922, 1057, 926
+  ]
 };
+
+/**
+ * Wettbewerbe der Jugend- und Frauen-Nationalteams, ebenfalls aus `getAllLeagues()` vom
+ * 29.09.2026. Welche Skala ein Spiel bekommt, sagen die Teamnamen („Iceland U21", „Spain W"),
+ * nicht der Wettbewerb - so landet ein U21-Testspiel unter „Friendlies" (10) richtig.
+ * Vereins-Jugend („Premier League 2", „U19 Bundesliga") steht nie unter `World` und bleibt
+ * ausgeschlossen.
+ */
+export const ELO_NATIONAL_CATEGORY_COMPETITIONS: Record<number, EloCompetitionKind> = {
+  // U23 (Asien)
+  532: "continentalFinals", 952: "qualification",
+  // U21 (UEFA)
+  38: "continentalFinals", 850: "qualification",
+  // U20
+  490: "worldCup", 537: "continentalFinals", 538: "continentalFinals", 965: "continentalFinals", 773: "continentalFinals",
+  // U19 (UEFA)
+  493: "continentalFinals", 893: "qualification",
+  // U17
+  587: "worldCup", 921: "continentalFinals", 886: "qualification", 1012: "continentalFinals", 970: "continentalFinals",
+  963: "continentalFinals", 973: "continentalFinals",
+  // Frauen
+  8: "worldCup", 743: "continentalFinals", 1083: "qualification", 880: "qualification", 927: "qualification",
+  1040: "nationsLeague", 897: "continentalFinals", 894: "qualification", 922: "continentalFinals",
+  1057: "continentalFinals", 1046: "qualification", 1206: "nationsLeague", 926: "continentalFinals",
+  // Testspiele: „Friendlies" (10) trägt auch U21-, U20-, U19- und U17-Teams, „Friendlies Women" (666) die Frauen
+  10: "nationalFriendly", 666: "nationalFriendly"
+};
+
+/**
+ * Internationale Wettbewerbe der Frauen-Vereine (aus `getAllLeagues()` vom 29.09.2026). Nationale
+ * Frauenligen und -pokale brauchen keinen Eintrag - sie stehen nicht unter `World`.
+ */
+export const ELO_WOMEN_CLUB_COMPETITIONS: Record<number, EloCompetitionKind> = {
+  525: "championsLeague", 1191: "europaLeague", 1140: "continentalTop", 1164: "continentalTop",
+  1217: "clubWorld", 945: "clubFriendly", 667: "clubFriendly"
+};
+
+/** Jugend und Reserve - bei Frauen-Vereinen weiter ausgeschlossen. */
+export const ELO_YOUTH_PATTERN =
+  /\b(u-?1\d|u-?2\d|youth|junior|juvenil|reserves?|primavera|development|academy|olympics?)\b/i;
+
+/** Die Skala zweier Teams aus ihren Namen, oder null, wenn sie nicht zusammenpassen. */
+export function nationalCategoryOf(homeName: string, awayName: string): NationalCategory | null {
+  const of = (name: string): NationalCategory | "senior" => {
+    const age = /\sU-?(\d{2})$/i.exec(name)?.[1];
+    if (age) return NATIONAL_CATEGORIES.includes(`u${age}` as NationalCategory) ? `u${age}` as NationalCategory : "senior";
+    return /\sW$/.test(name) ? "women" : "senior";
+  };
+  const home = of(homeName);
+  return home !== "senior" && home === of(awayName) ? home : null;
+}
 
 /**
  * Ein Verein, den API-Football unter mehreren Team-IDs führt. Das Elo erkennt Mannschaften nur an

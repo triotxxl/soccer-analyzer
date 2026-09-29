@@ -1,4 +1,8 @@
-import { ELO_COMPETITIONS, ELO_EXCLUDE_PATTERN, ELO_EXCLUDE_TEAM_PATTERN, type EloCompetitionKind, type EloSystem } from "./elo-config.ts";
+import {
+  ELO_COMPETITIONS, ELO_EXCLUDE_PATTERN, ELO_EXCLUDE_TEAM_PATTERN, ELO_NATIONAL_CATEGORY_COMPETITIONS, ELO_WOMEN_CLUB_COMPETITIONS,
+  ELO_YOUTH_PATTERN, nationalCategoryOf,
+  type EloCompetitionKind, type EloSystem
+} from "./elo-config.ts";
 
 /**
  * Ein abgeschlossenes Spiel, so wie es in `elo_matches` steht. `goals` ist der Endstand nach
@@ -52,6 +56,36 @@ const NEUTRAL = new Set(ELO_COMPETITIONS.neutral);
 export function classifyMatch(
   match: Pick<EloMatch, "leagueId" | "leagueName" | "leagueType" | "country"> & Partial<Pick<EloMatch, "homeName" | "awayName">>
 ): Classification {
+  // Jugend- und Frauen-Nationalteams vor dem Ausschluss: Ihre Wettbewerbe und Namen tragen genau
+  // die Muster („U21", „Women", „ W"), an denen der Ausschluss sonst greift. Beide Teams müssen
+  // zur selben Skala gehören - „Spain U21" gegen „Spain U19" bleibt draußen.
+  const categoryKind = ELO_NATIONAL_CATEGORY_COMPETITIONS[match.leagueId];
+  const category = categoryKind && match.homeName && match.awayName
+    ? nationalCategoryOf(match.homeName, match.awayName)
+    : null;
+  if (categoryKind && category) {
+    return {
+      excluded: false, system: `national-${category}`, kind: categoryKind, isLeague: false,
+      international: true, neutral: NEUTRAL.has(match.leagueId)
+    };
+  }
+  // Frauen-Vereine: beide Teams „… W“, ein nationaler Wettbewerb oder ein internationaler aus der
+  // Liste. Jugend bleibt draußen. Eigene Skala `club-women`, sonst wie Vereine.
+  if (
+    match.homeName && match.awayName && nationalCategoryOf(match.homeName, match.awayName) === "women"
+    && !ELO_YOUTH_PATTERN.test(`${match.leagueName} ${match.homeName} ${match.awayName}`)
+    && !ELO_NATIONAL_CATEGORY_COMPETITIONS[match.leagueId]
+  ) {
+    const international = ELO_WOMEN_CLUB_COMPETITIONS[match.leagueId];
+    const base = { excluded: false as const, system: "club-women" as const, neutral: NEUTRAL.has(match.leagueId) };
+    if (international) return { ...base, kind: international, isLeague: false, international: international !== "clubFriendly" };
+    if (match.country !== "World") {
+      if (FRIENDLY_PATTERN.test(match.leagueName)) return { ...base, kind: "clubFriendly", isLeague: false, international: false };
+      const type = match.leagueType?.toLocaleLowerCase();
+      if (type === "league") return { ...base, kind: "leagueTier1", isLeague: true, international: false };
+      if (type === "cup") return { ...base, kind: SUPER_CUP_PATTERN.test(match.leagueName) ? "superCup" : "domesticCup", isLeague: false, international: false };
+    }
+  }
   if (ELO_EXCLUDE_PATTERN.test(match.leagueName)) return { excluded: true, reason: "jugendFrauen" };
   if ((match.homeName && ELO_EXCLUDE_TEAM_PATTERN.test(match.homeName)) || (match.awayName && ELO_EXCLUDE_TEAM_PATTERN.test(match.awayName))) {
     return { excluded: true, reason: "jugendFrauen" };
@@ -90,5 +124,12 @@ export const CONFEDERATION_OF_COMPETITION: Record<number, string> = {
   7: "AFC", 23: "AFC", 24: "AFC", 25: "AFC", 28: "AFC", 30: "AFC", 35: "AFC", 807: "AFC", 1008: "AFC", 1169: "AFC",
   6: "CAF", 19: "CAF", 29: "CAF", 36: "CAF", 535: "CAF", 859: "CAF", 1163: "CAF",
   22: "CONCACAF", 31: "CONCACAF", 536: "CONCACAF", 804: "CONCACAF", 805: "CONCACAF", 808: "CONCACAF", 858: "CONCACAF",
-  33: "OFC", 806: "OFC"
+  33: "OFC", 806: "OFC",
+  // Jugend und Frauen
+  38: "UEFA", 850: "UEFA", 493: "UEFA", 893: "UEFA", 921: "UEFA", 886: "UEFA", 743: "UEFA", 1083: "UEFA",
+  880: "UEFA", 1040: "UEFA",
+  773: "CONMEBOL", 970: "CONMEBOL", 1206: "CONMEBOL", 926: "CONMEBOL",
+  532: "AFC", 952: "AFC", 965: "AFC", 1012: "AFC", 897: "AFC", 894: "AFC",
+  538: "CAF", 973: "CAF", 922: "CAF",
+  537: "CONCACAF", 963: "CONCACAF", 927: "CONCACAF", 1057: "CONCACAF", 1046: "CONCACAF"
 };

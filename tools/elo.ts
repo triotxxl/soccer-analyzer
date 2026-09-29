@@ -7,7 +7,8 @@
  *   npm run elo -- update [--top-up|--no-top-up]  wie im Dashboard-Lauf: Import seit zuletzt,
  *                                              Wochenrunde falls fällig, neu rechnen
  *   npm run elo -- backfill --budget 1800      fehlende, beendete Liga-Saisons nachladen
- *                  [--from 2021] [--dry-run]
+ *                  [--from 2021] [--dry-run] [--national-categories]
+ *                  (nur Jugend- und Frauen-Nationalwettbewerbe samt Testspielen)
  *   npm run elo -- build                       beide Systeme rechnen und speichern (0 API)
  *   npm run elo -- ranking [--system club|national] [--country X] [--top 50] [--min-confidence 50]
  *   npm run elo -- team <ID oder Name> [--system national] [--games 20]
@@ -18,7 +19,7 @@ import { ApiFootballClient } from "../src/api.ts";
 import { config } from "../src/config.ts";
 import { AnalyzerDatabase } from "../src/database.ts";
 import { classifyMatch, type EloMatch } from "../src/elo-competitions.ts";
-import { ELO_COMPETITIONS, ELO_CONFIG, ELO_EXCLUDE_PATTERN, type EloSystem } from "../src/elo-config.ts";
+import { ELO_COMPETITIONS, ELO_CONFIG, ELO_EXCLUDE_PATTERN, ELO_NATIONAL_CATEGORY_COMPETITIONS, ELO_SYSTEMS, eloSystemLabel, type EloSystem } from "../src/elo-config.ts";
 import { getEloHistory, getEloRanking, getTeamElo } from "../src/elo-store.ts";
 import { autoUpdateElo, importFromCache, leagueTypeMap, rebuildElo, toEloMatch } from "../src/elo-update.ts";
 import type { ApiLeague } from "../src/types.ts";
@@ -68,6 +69,7 @@ async function backfill(database: AnalyzerDatabase): Promise<void> {
   const budget = Number(option("budget") ?? 0);
   const from = Number(option("from") ?? 2021);
   const dryRun = args.includes("--dry-run");
+  const onlyCategories = args.includes("--national-categories");
   if (!dryRun && (!Number.isInteger(budget) || budget < 1)) throw new Error("--budget <n> ist Pflicht, etwa --budget 1800.");
   const client = new ApiFootballClient();
   const { leagues, types } = await leagueTypes(client);
@@ -86,17 +88,27 @@ async function backfill(database: AnalyzerDatabase): Promise<void> {
   const todo: Array<{ league: ApiLeague; season: number }> = [];
   let alreadyFull = 0;
   for (const league of leagues) {
-    const listed = ELO_COMPETITIONS.national[league.league.id] || ELO_COMPETITIONS.club[league.league.id];
+    // Jugend- und Frauen-Nationalteams: Ihre Wettbewerbe tragen die Ausschlussmuster, die Skala
+    // ergibt sich erst aus den Teamnamen der einzelnen Spiele (`classifyMatch`).
+    const category = ELO_NATIONAL_CATEGORY_COMPETITIONS[league.league.id] !== undefined;
+    if (onlyCategories && !category) continue;
+    const listed = ELO_COMPETITIONS.national[league.league.id] || ELO_COMPETITIONS.club[league.league.id] || category;
     if (!listed && !known.has(league.league.id)) continue;
-    if (ELO_EXCLUDE_PATTERN.test(league.league.name)) continue;
-    if (classifyMatch({ leagueId: league.league.id, leagueName: league.league.name, leagueType: league.league.type, country: league.country.name }).excluded) continue;
+    if (!category) {
+      if (ELO_EXCLUDE_PATTERN.test(league.league.name)) continue;
+      if (classifyMatch({ leagueId: league.league.id, leagueName: league.league.name, leagueType: league.league.type, country: league.country.name }).excluded) continue;
+    }
     const maxSeason = Math.max(0, ...league.seasons.map((season) => counts.get(`${league.league.id}|${season.year}`) ?? 0));
     for (const season of league.seasons) {
       // Laufende Saisons kommen über die normalen Analysen; hier nur beendete.
       if (season.year < from || Date.parse(season.end) >= now) continue;
       if (database.isEloSeasonComplete(league.league.id, season.year)) continue;
       const have = counts.get(`${league.league.id}|${season.year}`) ?? 0;
-      if (maxSeason > 0 && have >= 0.8 * maxSeason) {
+      // Die Abkürzung vergleicht mit der vollsten Saison im Bestand - auch wenn keine je ganz
+      // geladen wurde. Bei den Jugend- und Frauenwettbewerben markierte sie so am 29.09.2026 drei
+      // U21-Saisons mit rund 15 % Lücke als vollständig. Dort gilt sie nicht; eine Saison ist ein
+      // Aufruf. Bei den übrigen Wettbewerben ist dieselbe Schwäche möglich, aber ungeprüft.
+      if (!category && maxSeason > 0 && have >= 0.8 * maxSeason) {
         if (!dryRun) database.markEloSeasonComplete(league.league.id, season.year, have);
         alreadyFull += 1;
         continue;
@@ -136,7 +148,7 @@ function build(database: AnalyzerDatabase): void {
   console.log(`Spiele im Bestand: ${result.matches} · gewertet: ${state.counts.used} · älter als das Fenster: ${state.counts.tooOld}`);
   console.log(`Ausgeschlossen: ${state.counts.excludedYouthWomen} Frauen/Jugend/Reserve, ${state.counts.excludedUnknown} unbekannte Wettbewerbe,`
     + ` ${state.counts.excludedMixed} Verein gegen Nationalteam, ${state.counts.excludedDuplicate} doppelt geführt`);
-  console.log(`Teams: ${bySystem("club")} Vereine, ${bySystem("national")} Nationalteams`);
+  console.log(`Teams: ${ELO_SYSTEMS.map((system) => `${bySystem(system)} ${eloSystemLabel(system)}`).filter((text) => !text.startsWith("0 ")).join(", ")}`);
 }
 
 const fmt = (value: number, digits = 0) => value.toFixed(digits).replace(".", ",");
@@ -154,7 +166,7 @@ function ranking(database: AnalyzerDatabase): void {
     console.log("Keine Einträge. Erst `npm run elo -- import` und `npm run elo -- build` ausführen.");
     return;
   }
-  console.log(`Stand ${date(rows[0]!.asOf)} · ${system === "club" ? "Vereine" : "Nationalteams"} · Elo ${rows[0]!.configVersion}`);
+  console.log(`Stand ${date(rows[0]!.asOf)} · ${eloSystemLabel(system)} · Elo ${rows[0]!.configVersion}`);
   console.log(`${"#".padStart(4)}  ${"Team".padEnd(28)}${"Elo".padStart(6)}${"Vertrauen".padStart(11)}${"Spiele".padStart(8)}${"30 T".padStart(7)}${"90 T".padStart(7)}  ${"Trend".padEnd(9)}${"Liga".padEnd(28)}Land`);
   rows.forEach((row, index) => {
     console.log(`${String(index + 1).padStart(4)}  ${row.name.slice(0, 27).padEnd(28)}${fmt(row.elo).padStart(6)}${`${fmt(row.confidence)} %`.padStart(11)}`

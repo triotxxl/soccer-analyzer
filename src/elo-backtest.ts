@@ -1,5 +1,5 @@
 import { classifyMatch, type EloMatch } from "./elo-competitions.ts";
-import { ELO_CONFIG, ELO_TEAM_MERGES, type EloConfig, type EloSystem } from "./elo-config.ts";
+import { ELO_CONFIG, ELO_SYSTEMS, ELO_TEAM_MERGES, eloFamily, systemConfigOf, type EloConfig, type EloSystem } from "./elo-config.ts";
 import { calculateHistoricalElo, expectedHome, mergeTeams, teamKey } from "./elo.ts";
 
 /**
@@ -58,7 +58,9 @@ const binOf = (expected: number) => Math.min(BINS - 1, Math.floor(Math.abs(expec
 function groupOf(match: EloMatch): BacktestGroup | null {
   const cls = classifyMatch(match);
   if (cls.excluded) return null;
-  if (cls.system === "national") return "national";
+  if (eloFamily(cls.system) === "national") return "national";
+  // Frauen-Vereine sind nur Anzeige und ungemessen - nicht in die Gruppen der Männer mischen.
+  if (cls.system === "club-women") return null;
   if (cls.isLeague) return "liga";
   if (cls.kind === "clubFriendly") return "testspiel";
   if (cls.international) return "international";
@@ -77,10 +79,8 @@ export function backtestElo(
 
   // Remis-Kurve und Vergleichsbasis nur aus der Zeit vor dem Test.
   const training = calculateHistoricalElo(matches, config, { asOf: options.testStart });
-  const drawCounts: Record<EloSystem, Array<{ draws: number; n: number }>> = {
-    club: Array.from({ length: BINS }, () => ({ draws: 0, n: 0 })),
-    national: Array.from({ length: BINS }, () => ({ draws: 0, n: 0 }))
-  };
+  const drawCounts = Object.fromEntries(ELO_SYSTEMS.map((system) =>
+    [system, Array.from({ length: BINS }, () => ({ draws: 0, n: 0 }))])) as Record<EloSystem, Array<{ draws: number; n: number }>>;
   const base = new Map<string, { home: number; draw: number; away: number; n: number }>();
   for (const row of training.history) {
     const bin = drawCounts[row.system][binOf(row.homeExpected)]!;
@@ -93,7 +93,7 @@ export function backtestElo(
     base.set(key, entry);
   }
   const drawCurve = {} as Record<EloSystem, number[]>;
-  for (const system of ["club", "national"] as const) {
+  for (const system of ELO_SYSTEMS) {
     const total = drawCounts[system].reduce((sum, bin) => ({ draws: sum.draws + bin.draws, n: sum.n + bin.n }), { draws: 0, n: 0 });
     const overall = total.n ? total.draws / total.n : 0.25;
     // Dünn besetzte Stufen fallen auf den Gesamtanteil zurück, statt mit drei Spielen zu raten.
@@ -116,7 +116,7 @@ export function backtestElo(
       const cls = classifyMatch(match);
       const group = groupOf(match);
       if (cls.excluded || group === null) continue;
-      const systemConfig = config[cls.system];
+      const systemConfig = systemConfigOf(config, cls.system);
       const home = state.teams.get(teamKey(cls.system, match.homeId));
       const away = state.teams.get(teamKey(cls.system, match.awayId));
       const homeAdvantage = cls.neutral ? systemConfig.neutralHomeAdvantage : systemConfig.homeAdvantage;

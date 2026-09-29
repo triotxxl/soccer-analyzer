@@ -4,7 +4,7 @@ import type { ApiFootballClient } from "./api.ts";
 import { CACHE_DIR } from "./config.ts";
 import type { AnalyzerDatabase } from "./database.ts";
 import { classifyMatch, type EloMatch } from "./elo-competitions.ts";
-import { ELO_COMPETITIONS, ELO_CONFIG } from "./elo-config.ts";
+import { ELO_COMPETITIONS, ELO_CONFIG, ELO_NATIONAL_CATEGORY_COMPETITIONS } from "./elo-config.ts";
 import { calculateHistoricalElo, summarizeElo } from "./elo.ts";
 import type { ApiFixture, ApiLeague } from "./types.ts";
 
@@ -172,8 +172,11 @@ export async function topUpRunningSeasons(
   let alreadyDone = 0;
   for (const league of leagues) {
     if (!known.has(league.league.id)) continue;
+    // Jugend- und Frauen-Nationalteams erkennt `classifyMatch` erst an den Teamnamen - ihre
+    // Wettbewerbe stehen deshalb ausdrücklich in der Liste.
+    const category = ELO_NATIONAL_CATEGORY_COMPETITIONS[league.league.id] !== undefined;
     const cls = classifyMatch({ leagueId: league.league.id, leagueName: league.league.name, leagueType: league.league.type, country: league.country.name });
-    if (cls.excluded) continue;
+    if (cls.excluded && !category) continue;
     const running = runningSeason(league, options.now);
     if (!running) continue;
     if (options.done?.has(league.league.id)) {

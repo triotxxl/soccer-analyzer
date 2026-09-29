@@ -1,6 +1,7 @@
 import { CONFEDERATION_OF_COMPETITION, classifyMatch, type Classification, type EloMatch } from "./elo-competitions.ts";
 import {
-  ELO_CONFIG, ELO_TEAM_MERGES, type EloCompetitionKind, type EloConfig, type EloSystem, type EloSystemConfig, type EloTeamMerge
+  ELO_CONFIG, ELO_TEAM_MERGES, eloFamily, systemConfigOf, type EloCompetitionKind, type EloConfig, type EloSystem,
+  type EloSystemConfig, type EloTeamMerge
 } from "./elo-config.ts";
 
 /**
@@ -207,11 +208,11 @@ function prepare(matches: EloMatch[], state: EloState, merges: EloTeamMerge[]): 
     if (match.cls.kind === "clubFriendly" || match.cls.kind === "nationalFriendly") continue;
     for (const teamId of [match.homeId, match.awayId]) {
       const entry = competitive.get(teamId) ?? { club: 0, national: 0 };
-      entry[match.cls.system] += 1;
+      entry[eloFamily(match.cls.system)] += 1;
       competitive.set(teamId, entry);
     }
   }
-  const systemOf = (teamId: number): EloSystem | null => {
+  const familyOf = (teamId: number): "club" | "national" | null => {
     const entry = competitive.get(teamId);
     if (!entry || entry.club === entry.national) return null;
     return entry.club > entry.national ? "club" : "national";
@@ -231,8 +232,8 @@ function prepare(matches: EloMatch[], state: EloState, merges: EloTeamMerge[]): 
       continue;
     }
     lastSeen.set(key, match.kickoff);
-    const other: EloSystem = match.cls.system === "club" ? "national" : "club";
-    if (systemOf(match.homeId) === other || systemOf(match.awayId) === other) {
+    const other = eloFamily(match.cls.system) === "club" ? "national" : "club";
+    if (familyOf(match.homeId) === other || familyOf(match.awayId) === other) {
       state.counts.excludedMixed += 1;
       continue;
     }
@@ -337,7 +338,7 @@ function run(
     const key = teamKey(system, teamId);
     const existing = state.teams.get(key);
     if (existing) return existing;
-    const systemConfig = config[system];
+    const systemConfig = systemConfigOf(config, system);
     let start = systemConfig.startRating;
     if (config.newTeamStart.mode === "competitionMean" && match.cls.isLeague) {
       const members = [...(leagueMembers.get(match.leagueId) ?? [])]
@@ -359,7 +360,7 @@ function run(
     if (match.kickoff >= state.asOf) break;
     while (pendingSnapshots.length > 0 && match.kickoff > pendingSnapshots[0]!) takeSnapshot();
     const system = match.cls.system;
-    const systemConfig = config[system];
+    const systemConfig = systemConfigOf(config, system);
     const ageMonths = (state.asOf - match.kickoff) / MONTH_MS;
     const decay = decayFactor(systemConfig, ageMonths);
     if (decay <= 0) {
@@ -376,7 +377,7 @@ function run(
     away.name = match.awayName;
     state.leagues.set(match.leagueId, { name: match.leagueName, country: match.country });
 
-    if (match.cls.isLeague && system === "club") {
+    if (match.cls.isLeague && eloFamily(system) === "club") {
       moveTo(teamKey(system, home.teamId), match.leagueId, match.kickoff);
       moveTo(teamKey(system, away.teamId), match.leagueId, match.kickoff);
     }
@@ -442,7 +443,7 @@ function run(
     // Mitgenommen wird die Grundänderung ohne Einstiegsfaktor - dass ein Team neu ist, sagt
     // nichts über seine Liga. Wer über 400 Tage nicht gespielt hat, bleibt unberührt.
     const share = config.leaguePropagation.share;
-    if (share > 0 && system === "club") {
+    if (share > 0 && eloFamily(system) === "club") {
       const homeLeague = currentLeague.get(teamKey(system, home.teamId));
       const awayLeague = currentLeague.get(teamKey(system, away.teamId));
       if (homeLeague !== undefined && awayLeague !== undefined && homeLeague !== awayLeague) {
@@ -495,7 +496,8 @@ function deriveTiers(
   tiersConfig: EloConfig["tiers"]
 ): Map<string, 1 | 2 | 3> {
   const countryOf = new Map<string, string>();
-  for (const match of prepared) if (match.cls.isLeague) countryOf.set(`${match.leagueId}|${match.season}`, `${match.country}|${match.season}`);
+  // Je Skala: Frauenligen eines Landes stehen auf einer anderen Skala als die Männerligen.
+  for (const match of prepared) if (match.cls.isLeague) countryOf.set(`${match.leagueId}|${match.season}`, `${match.cls.system}|${match.country}|${match.season}`);
   const groups = new Map<string, Array<{ bucket: string; mean: number }>>();
   const tiers = new Map<string, 1 | 2 | 3>();
   for (const [bucket, entry] of firstRatings) {
@@ -598,24 +600,31 @@ export function summarizeElo(state: EloState): EloRankingRow[] {
   const homeLeague = new Map<string, number | null>();
   const confederation = new Map<string, string | null>();
   for (const [key, team] of state.teams) {
-    if (team.system === "club") {
+    if (eloFamily(team.system) === "club") {
       let latest: number | null = null;
       for (const game of team.log) if (game.isLeague) latest = game.leagueId;
       homeLeague.set(key, latest);
       continue;
     }
-    const recent = team.log.filter((game) => game.kickoff >= windowStart);
-    const confCounts = new Map<string, number>();
-    for (const game of recent.length ? recent : team.log) {
-      const conf = CONFEDERATION_OF_COMPETITION[game.leagueId];
-      if (conf) confCounts.set(conf, (confCounts.get(conf) ?? 0) + 1);
-    }
+    // Zurück auf alle Spiele, wenn das Fenster keinen Verbandswettbewerb enthält - nicht erst, wenn
+    // es ganz leer ist. Albanien U21 spielt als EM-Gastgeber 2027 nur Testspiele und stand bis
+    // 29.09.2026 ohne Verband da, also auch in der Endrunde ohne Faktor.
+    const countIn = (games: TeamGame[]) => {
+      const counts = new Map<string, number>();
+      for (const game of games) {
+        const conf = CONFEDERATION_OF_COMPETITION[game.leagueId];
+        if (conf) counts.set(conf, (counts.get(conf) ?? 0) + 1);
+      }
+      return counts;
+    };
+    const recentCounts = countIn(team.log.filter((game) => game.kickoff >= windowStart));
+    const confCounts = recentCounts.size > 0 ? recentCounts : countIn(team.log);
     confederation.set(key, [...confCounts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null);
   }
 
   const rows: EloRankingRow[] = [];
   for (const [key, team] of state.teams) {
-    const systemConfig = config[team.system];
+    const systemConfig = systemConfigOf(config, team.system);
     let weight = 0;
     let cross = 0;
     const opponents = new Set<number>();
@@ -625,7 +634,7 @@ export function summarizeElo(state: EloState): EloRankingRow[] {
       weight += decay;
       opponents.add(game.opponentId);
       const opponentKey = teamKey(team.system, game.opponentId);
-      const isCross = team.system === "club"
+      const isCross = eloFamily(team.system) === "club"
         ? game.international
           || (homeLeague.get(key) != null && homeLeague.get(opponentKey) != null && homeLeague.get(key) !== homeLeague.get(opponentKey))
         : confederation.get(key) != null && confederation.get(opponentKey) != null && confederation.get(key) !== confederation.get(opponentKey);
@@ -643,8 +652,8 @@ export function summarizeElo(state: EloState): EloRankingRow[] {
       system: team.system, teamId: team.teamId, name: team.name, elo: team.rating, games: team.games,
       lastChange: team.lastChange, change30, change90, peak: team.peak, low: team.low,
       trend: change90 > 15 ? "steigend" : change90 < -15 ? "fallend" : "stabil",
-      league: team.system === "club" ? league?.name ?? null : confederation.get(key) ?? null,
-      country: team.system === "club" ? league?.country ?? null : team.name,
+      league: eloFamily(team.system) === "club" ? league?.name ?? null : confederation.get(key) ?? null,
+      country: eloFamily(team.system) === "club" ? league?.country ?? null : team.name,
       confidence,
       lastPlayed: team.log.at(-1)?.kickoff ?? 0
     });

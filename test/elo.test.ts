@@ -427,3 +427,59 @@ test("mainLeague: ein Nebenwettbewerb zieht einen Verein nicht aus seiner Liga",
   assert.equal(relegated.serieA, 0);
   assert.ok(Math.abs(relegated.stateOnly - 0.3) < 1e-9, String(relegated.stateOnly));
 });
+
+test("Jugend- und Frauen-Nationalteams bekommen je eine eigene Skala", () => {
+  const world = { leagueType: "Cup", country: "World" } as const;
+  const state = calculateHistoricalElo([
+    match({ ...world, homeId: 60, awayId: 61, homeGoals: 2, awayGoals: 0, leagueId: 850, leagueName: "UEFA U21 Championship - Qualification", homeName: "Iceland U21", awayName: "Switzerland U21" }),
+    // U21-Testspiel unter „Friendlies" (10): die Namen entscheiden, nicht der Wettbewerb.
+    match({ ...world, homeId: 60, awayId: 62, homeGoals: 1, awayGoals: 1, leagueId: 10, leagueName: "Friendlies", homeName: "Iceland U21", awayName: "Norway U21" }),
+    match({ ...world, homeId: 70, awayId: 71, homeGoals: 1, awayGoals: 0, leagueId: 666, leagueName: "Friendlies Women", homeName: "Spain W", awayName: "Italy W" }),
+    match({ ...world, homeId: 50, awayId: 51, homeGoals: 2, awayGoals: 1, leagueId: 10, leagueName: "Friendlies", homeName: "Iceland", awayName: "Norway" })
+  ], PLAIN, { asOf: NOW });
+  assert.ok(state.teams.has(teamKey("national-u21", 60)));
+  assert.ok(state.teams.has(teamKey("national-u21", 62)));
+  assert.ok(state.teams.has(teamKey("national-women", 70)));
+  assert.ok(state.teams.has(teamKey("national", 50)));
+  assert.ok(!state.teams.has(teamKey("national", 60)));
+  // Die U21-Quali ist UEFA - das Vertrauen und die Rangliste kennen den Verband.
+  assert.equal(summarizeElo(state).find((row) => row.teamId === 61)?.league, "UEFA");
+});
+
+test("gemischte Altersklassen und Vereins-Jugend bleiben ausgeschlossen", () => {
+  const world = { leagueType: "Cup", country: "World" } as const;
+  // U21 gegen U19 passt auf keine Skala.
+  assert.equal(classifyMatch({ ...world, leagueId: 10, leagueName: "Friendlies", homeName: "Spain U21", awayName: "France U19" }).excluded, true);
+  // Vereins-Jugend steht nie unter einem Wettbewerb der Liste.
+  assert.equal(classifyMatch({ leagueId: 702, leagueName: "Premier League 2 Division One", leagueType: "League", country: "England", homeName: "Arsenal U21", awayName: "Chelsea U21" }).excluded, true);
+  // Ein U18-Team hat keine Skala und fällt weiter heraus.
+  assert.equal(classifyMatch({ ...world, leagueId: 10, leagueName: "Friendlies", homeName: "Spain U18", awayName: "France U18" }).excluded, true);
+  // Ein Jugendwettbewerb ohne Namenszusatz der Teams wird nicht geraten.
+  assert.equal(classifyMatch({ ...world, leagueId: 850, leagueName: "UEFA U21 Championship - Qualification", homeName: "Iceland", awayName: "Norway" }).excluded, true);
+});
+
+test("ohne Verbandsspiel im Fenster gilt der Verband aus älteren Spielen", () => {
+  const world = { leagueType: "Cup", country: "World" } as const;
+  // Albanien U21 spielt als Gastgeber nur Testspiele - zuletzt vor drei Jahren in der Quali.
+  const state = calculateHistoricalElo([
+    match({ ...world, homeId: 80, awayId: 81, homeGoals: 1, awayGoals: 0, leagueId: 850, leagueName: "UEFA U21 Championship - Qualification", homeName: "Albania U21", awayName: "Malta U21", kickoff: NOW - 36 * 30 * DAY }),
+    match({ ...world, homeId: 80, awayId: 82, homeGoals: 2, awayGoals: 2, leagueId: 10, leagueName: "Friendlies", homeName: "Albania U21", awayName: "Georgia U21", kickoff: NOW - 30 * DAY })
+  ], PLAIN, { asOf: NOW });
+  assert.equal(summarizeElo(state).find((row) => row.teamId === 80)?.league, "UEFA");
+});
+
+test("Frauen-Vereine bekommen eine eigene Skala, getrennt von Männer-Vereinen und Frauen-Nationalteams", () => {
+  const state = calculateHistoricalElo([
+    match({ homeId: 90, awayId: 91, homeGoals: 2, awayGoals: 1, leagueId: 549, leagueName: "Damallsvenskan", country: "Sweden", homeName: "Häcken W", awayName: "Hammarby W" }),
+    match({ homeId: 90, awayId: 92, homeGoals: 1, awayGoals: 1, leagueId: 525, leagueName: "UEFA Champions League Women", leagueType: "Cup", country: "World", homeName: "Häcken W", awayName: "Juventus W" }),
+    match({ homeId: 70, awayId: 71, homeGoals: 1, awayGoals: 0, leagueId: 666, leagueName: "Friendlies Women", leagueType: "Cup", country: "World", homeName: "Spain W", awayName: "Italy W" }),
+    match({ homeId: 1, awayId: 2, homeGoals: 2, awayGoals: 1, leagueName: "Allsvenskan", country: "Sweden" })
+  ], PLAIN, { asOf: NOW });
+  assert.ok(state.teams.has(teamKey("club-women", 90)));
+  assert.ok(state.teams.has(teamKey("club-women", 92)));
+  assert.ok(state.teams.has(teamKey("national-women", 70)));
+  assert.ok(state.teams.has(teamKey("club", 1)));
+  assert.ok(!state.teams.has(teamKey("club", 90)));
+  // Frauen-Jugend bleibt draußen.
+  assert.equal(classifyMatch({ leagueId: 1, leagueName: "U19 Frauen-Bundesliga", leagueType: "League", country: "Germany", homeName: "Bayern U19 W", awayName: "Wolfsburg U19 W" }).excluded, true);
+});
