@@ -10,6 +10,7 @@ import {
   rebuildStrengthSnapshots,
   relevantCompetitions
 } from "../src/strength-builder.ts";
+import { strengthPool } from "../src/league-strength.ts";
 import type { ApiFixture, ApiLeague } from "../src/types.ts";
 import { fixture } from "./helpers.ts";
 
@@ -70,6 +71,41 @@ test("Ligastärke-Builder lädt bei Bedarf nur ausgewählte Wettbewerbe", async 
   assert.deepEqual(seasonCalls, [81]);
   assert.equal(result.apiRequests, 2);
   assert.equal(result.competitions, 1);
+  database.close();
+});
+
+test("Ligastärke-Builder lädt die neueste Saison zuerst", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "football-strength-order-"));
+  const database = new AnalyzerDatabase(path.join(directory, "test.sqlite"));
+  const season = (year: number) => ({ year, start: `${year}-07-01`, end: `${year + 1}-06-30`, current: false });
+  const seasonCalls: number[] = [];
+  const fake = {
+    requestCount: 0,
+    requestsRemaining: 1_000,
+    getAllLeagues: async () => {
+      fake.requestCount += 1;
+      return [{
+        league: { id: 347, name: "Cup", type: "Cup" },
+        country: { name: "Czech-Republic" },
+        seasons: [season(2023), season(2024), season(2025), season(2026)]
+      }] satisfies ApiLeague[];
+    },
+    getSeasonFixtures: async (_leagueId: number, year: number) => {
+      fake.requestCount += 1;
+      seasonCalls.push(year);
+      return [];
+    }
+  } as unknown as ApiFootballClient;
+  // Budget für genau zwei Saisons: Es müssen die laufende und die davor sein, nicht die ältesten.
+  await buildLeagueStrength({
+    client: fake,
+    database,
+    seasons: 3,
+    requestBudget: 3,
+    competitionIds: [347],
+    now: new Date("2026-09-29T00:00:00.000Z")
+  });
+  assert.deepEqual(seasonCalls, [2026, 2025]);
   database.close();
 });
 
@@ -211,5 +247,76 @@ test("Ligastärke-Builder nutzt nur das konfigurierte API-Budget und speichert F
   });
   assert.equal(resumedResult.apiRequests, 1);
   assert.equal(resumedResult.fixturesStored, 0);
+  database.close();
+});
+
+test("Frauenwettbewerbe bekommen einen eigenen Pool", () => {
+  const women = fixture({ id: 1, timestamp: 1_700_000_000, homeId: 1, awayId: 2, leagueName: "UEFA Champions League Women", country: "World" });
+  const men = fixture({ id: 2, timestamp: 1_700_000_000, homeId: 1, awayId: 2, leagueName: "UEFA Europa League", country: "World" });
+  // "SWPL Cup" sagt am Namen nichts - die Teams tragen das " W".
+  const scottish = fixture({ id: 3, timestamp: 1_700_000_000, homeId: 1, awayId: 2, leagueName: "SWPL Cup", country: "Scotland" });
+  scottish.teams.home.name = "Rangers W";
+  scottish.teams.away.name = "Hearts W";
+  const national = fixture({ id: 4, timestamp: 1_700_000_000, homeId: 1, awayId: 2, leagueName: "DFB Pokal Frauen", country: "Germany" });
+  assert.equal(strengthPool(women), "uefa:women");
+  assert.equal(strengthPool(men), "uefa");
+  assert.equal(strengthPool(scottish), "country:scotland:women");
+  assert.equal(strengthPool(national), "country:germany:women");
+});
+
+test("Frauenligen sind ab 3 Vereinen belastbar, Männerligen erst ab 5", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "football-strength-women-"));
+  const database = new AnalyzerDatabase(path.join(directory, "test.sqlite"));
+  // Je Pool 30 Duelle zweier Ligen mit genau 4 Vereinen auf jeder Seite.
+  for (const [offset, pool] of [[0, "uefa:women"], [1000, "uefa"]] as const) {
+    for (let index = 0; index < 30; index += 1) {
+      database.saveStrengthMatch({
+        fixtureId: 40_000 + offset + index,
+        pool,
+        season: 2026,
+        kickoff: new Date(Date.UTC(2026, 0, index + 1)).toISOString(),
+        homeLeagueId: 82,
+        awayLeagueId: 44,
+        homeClubId: 1 + index % 4,
+        awayClubId: 101 + index % 4,
+        homeGoals: 1,
+        awayGoals: 1
+      });
+    }
+  }
+  rebuildStrengthSnapshots(database);
+  const cutoff = "2026-03-01T00:00:00.000Z";
+  assert.equal(database.getLeagueStrength("uefa:women", 82, 2026, cutoff)?.reliable, true);
+  assert.equal(database.getLeagueStrength("uefa", 82, 2026, cutoff)?.reliable, false);
+  // Der Boden kommt nur aus dem eigenen Pool.
+  assert.equal(database.getPoolRatingFloor("uefa", 2026, cutoff), null);
+  assert.ok(database.getPoolRatingFloor("uefa:women", 2026, cutoff) !== null);
+  database.close();
+});
+
+test("Der Neuaufbau ersetzt alle Ratings - verschobene Duelle hinterlassen keine alten Zeilen", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "football-strength-replace-"));
+  const database = new AnalyzerDatabase(path.join(directory, "test.sqlite"));
+  for (let index = 0; index < 30; index += 1) {
+    database.saveStrengthMatch({
+      fixtureId: 50_000 + index,
+      pool: "uefa",
+      season: 2026,
+      kickoff: new Date(Date.UTC(2026, 0, index + 1)).toISOString(),
+      homeLeagueId: 82,
+      awayLeagueId: 44,
+      homeClubId: 1 + index % 5,
+      awayClubId: 101 + index % 5,
+      homeGoals: 2,
+      awayGoals: 0
+    });
+  }
+  rebuildStrengthSnapshots(database);
+  const cutoff = "2026-03-01T00:00:00.000Z";
+  assert.ok(database.getLeagueStrength("uefa", 82, 2026, cutoff));
+  database.moveStrengthMatches(Array.from({ length: 30 }, (_unused, index) => 50_000 + index), "uefa:women");
+  rebuildStrengthSnapshots(database);
+  assert.equal(database.getLeagueStrength("uefa", 82, 2026, cutoff), null);
+  assert.equal(database.getLeagueStrength("uefa:women", 82, 2026, cutoff)?.reliable, true);
   database.close();
 });

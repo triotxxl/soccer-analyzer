@@ -17,7 +17,9 @@ import {
   type LeagueBaseline,
   type SideBaselines
 } from "./model.ts";
-import { compareStrength, type StrengthComparison } from "./strength-factor.ts";
+import { compareStrength, ratingFor, sameLeagueComparison, teamEloComparison, type StrengthComparison } from "./strength-factor.ts";
+import { getTeamElo } from "./elo-store.ts";
+import { eloSystemLabel, nationalCategoryOf, type EloSystem } from "./elo-config.ts";
 import { buildLeagueStrength } from "./strength-builder.ts";
 import { resolveLeagues, saveAlias } from "./resolver.ts";
 import {
@@ -506,6 +508,10 @@ export async function runGoalLineAnalysis(
         if (reference) domesticByTeam.set(teamId, reference);
       }
     }
+    // Vor `strengthFor`: Diese Analyse ist die einzige, die die Ligastärke liest. Bis 29.09.2026
+    // luden nur Remis- und Favoritenanalyse nach, die im Dashboard danach laufen - neue
+    // Pokaldaten wirkten so immer erst eine Analyse später.
+    await buildMissingLeagueStrength(fixtures, crossLeagueFixtureIds, domesticByTeam, client, database, now);
     const domesticKeys = [...new Map([...domesticByTeam.values()].map((reference) => [`${reference.leagueId}:${reference.season}`, reference])).values()];
     const domesticEntries = await mapLimit(domesticKeys, 2, async ({ leagueId, season }) => {
       const prior = season > 1900 ? season - 1 : null;
@@ -598,8 +604,12 @@ export async function runGoalLineAnalysis(
       homeReference: DomesticLeagueReference,
       awayReference: DomesticLeagueReference
     ): StrengthComparison | null => {
-      if (homeReference.leagueId === awayReference.leagueId) return null;
       const pool = strengthPool(fixture);
+      if (homeReference.leagueId === awayReference.leagueId) {
+        return sameLeagueComparison(homeReference.leagueId, ratingFor(
+          database, pool, homeReference.leagueId, homeReference.season, fixture.fixture.date, null
+        ));
+      }
       const floorKey = `${pool}|${fixture.league.season}|${fixture.fixture.date}`;
       if (!floorCache.has(floorKey)) {
         floorCache.set(floorKey, database.getPoolRatingFloor(
@@ -649,14 +659,26 @@ export async function runGoalLineAnalysis(
       const firstHalfSideBaselines = homeRef && awayRef
         ? baselinesFor(homeRef, awayRef, fixture.fixture.timestamp, true)
         : undefined;
-      const strength = homeRef && awayRef
-        ? strengthFor(fixture, homeRef, awayRef)
-        : null;
+      // Ohne Liga-Vergleich trägt bei Länderspielen das Team-Elo den Klassenunterschied - bei
+      // A-Teams und seit 29.09.2026 bei der U21 (`config.strength.teamEloSystems`). Welche Skala,
+      // sagen die Teamnamen. Vereine bekommen hier nichts: Deren Elo-Skala ist ungemessen.
+      const category = crossLeague ? nationalCategoryOf(fixture.teams.home.name, fixture.teams.away.name) : null;
+      const eloSystem: EloSystem = category ? `national-${category}` : "national";
+      const eloEnabled = config.strength.teamEloSystems.includes(eloSystem);
+      const homeNational = crossLeague && eloEnabled ? getTeamElo(database, fixture.teams.home.id, eloSystem) : null;
+      const awayNational = crossLeague && eloEnabled ? getTeamElo(database, fixture.teams.away.id, eloSystem) : null;
+      const strength = (homeRef && awayRef ? strengthFor(fixture, homeRef, awayRef) : null)
+        ?? teamEloComparison(homeNational, awayNational);
+      // Die eigene Torkorrektur gilt für jedes Spiel zweier Nationalteams mit Elo, auch
+      // zwischen Verbänden (dort ohne Faktor) - gemessen wurde über alle. Jugendteams ohne
+      // Elo bleiben beim Liga-Satz, für sie gibt es keine Messung.
+      const national = homeNational !== null && awayNational !== null;
       const model = analyzeFixture(fixture, history, teamHistory, {
         expectedGoals: enriched.values,
         rankings,
         sideBaselines,
-        strengthFactor: strength?.factor
+        strengthFactor: strength?.factor,
+        ...(national ? { goalCalibration: config.goalLineCalibrationNational } : {})
       });
       const firstHalfModel = analyzeFirstHalfGoals(fixture, history, teamHistory, {
         sideBaselines: firstHalfSideBaselines,
@@ -679,8 +701,15 @@ export async function runGoalLineAnalysis(
         if (!sideBaselines) {
           warnings.push("Keine eigene Ligabasis je Team; Stärke gegen den Wettbewerbsschnitt gemessen");
         }
+        // Die Texte ordnen im Report die Gruppen zu (cohortOf in src/database.ts) - "Kein
+        // Ligastärke-Vergleich" und "geschätzt statt gemessen" dürfen hier nicht vorkommen.
         if (!strength) {
           warnings.push("Kein Ligastärke-Vergleich verfügbar");
+        } else if (strength.source === "teamElo") {
+          // Der Text ordnet im Report die Gruppe zu - U21 bekommt eine eigene.
+          warnings.push(`Stärke aus dem Team-Elo der ${eloSystemLabel(eloSystem)}, nicht aus einer Liga`);
+        } else if (strength.source === "sameLeague") {
+          warnings.push("Beide Teams aus derselben Liga; kein Klassenunterschied");
         } else if (!strength.home.reliable || !strength.away.reliable) {
           const estimated = strength.home.reliable ? fixture.teams.away.name : fixture.teams.home.name;
           warnings.push(`Ligastärke für ${estimated} geschätzt statt gemessen`);

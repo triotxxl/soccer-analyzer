@@ -313,3 +313,46 @@ test("das Team-Elo steht über die Team-ID im Spiel, nur zur Anzeige", () => {
   // Unverbindlich: Märkte und Wahrscheinlichkeiten bleiben exakt gleich.
   assert.deepEqual(with_.markets, without.markets);
 });
+
+test("Länderspiele bekommen die Stärke aus dem Team-Elo und zeigen 1X2 wieder", () => {
+  const input = dashboardInput(1.75, false);
+  input.goals.rows[0]!.strength = {
+    home: { leagueId: 0, rating: 1700, reliable: true },
+    away: { leagueId: 0, rating: 1400, reliable: true },
+    factor: 10 ** (300 / 1400),
+    source: "teamElo"
+  };
+  const fixture = buildDashboardDocument(input).fixtures[0]!;
+  const outcome = fixture.markets.find((market) => market.key === "1x2")!;
+  assert.equal(outcome.probabilityReliable, undefined);
+  assert.ok(outcome.details.some((detail) => /Stärke aus dem Team-Elo: .* 1700 vs\. .* 1400/.test(detail)));
+  // Faktor 1,64: deutlicher Klassenunterschied, Quelle ist das Elo, nicht das Quotenbild.
+  assert.equal(fixture.classGap?.source, "elo");
+  assert.equal(fixture.classGap?.level, "clear");
+  assert.match(fixture.classGap!.label, /Team-Elo 1700 gegen 1400/);
+});
+
+test("Ein Pokalspiel zweier Teams derselben Liga zeigt 1X2 und keinen Klassenunterschied", () => {
+  const input = dashboardInput(1.24, false);
+  input.tipicoOdds[0]!.away = 12;
+  const side = { leagueId: 305, rating: 1480, reliable: true };
+  input.goals.rows[0]!.strength = { home: side, away: side, factor: 1, source: "sameLeague" };
+  const fixture = buildDashboardDocument(input).fixtures[0]!;
+  const outcome = fixture.markets.find((market) => market.key === "1x2")!;
+  assert.equal(fixture.crossLeague, true);
+  assert.equal(outcome.probabilityReliable, undefined);
+  assert.ok(outcome.details.some((detail) => /derselben Liga/.test(detail)));
+  // Auch das Quotenbild darf dann keine Klasse behaupten - beide spielen in derselben Liga.
+  assert.equal(fixture.classGap, undefined);
+});
+
+test("Tipico-Quoten kommen über die Fixture-ID, nicht über den Namensvergleich", () => {
+  const input = dashboardInput();
+  // Tipico schreibt die Namen anders, als API-Football sie führt - der Namensvergleich findet nichts.
+  const tipico = { ...input.tipicoOdds[0]!, homeTeam: "Olympique Lyonnais (F)", awayTeam: "Chelsea Women", home: 2.1 };
+  const oneXTwo = (document: ReturnType<typeof buildDashboardDocument>) =>
+    document.fixtures[0]!.markets.find((market) => market.key === "1x2")!;
+  assert.notEqual(oneXTwo(buildDashboardDocument({ ...input, tipicoOdds: [tipico] })).oddsHome, 2.1);
+  const document = buildDashboardDocument({ ...input, tipicoOdds: [tipico], tipicoOddsByFixture: new Map([[1, tipico]]) });
+  assert.equal(oneXTwo(document).oddsHome, 2.1);
+});

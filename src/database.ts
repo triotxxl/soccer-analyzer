@@ -152,7 +152,7 @@ export interface OutcomeProbabilityPerformanceRow {
 }
 
 export interface LeagueStrengthPerformanceRow {
-  cohort: "Ligapartie" | "gemessen" | "geschätzt" | "ohne Rating";
+  cohort: "Ligapartie" | "gemessen" | "geschätzt" | "Team-Elo" | "Team-Elo U21" | "gleiche Liga" | "ohne Rating";
   total: number;
   hits: number;
   hitRate: number;
@@ -1262,11 +1262,23 @@ export class AnalyzerDatabase {
   settleFixture(fixture: ApiFixture, actualXg?: { home: number | null; away: number | null }): number {
     const status = fixture.fixture.status.short;
     if (!["FT", "AET", "PEN"].includes(status)) return 0;
-    const home = fixture.score.fulltime?.home ?? fixture.goals.home;
-    const away = fixture.score.fulltime?.away ?? fixture.goals.away;
-    if (home === null || away === null) return 0;
+    const apiHome = fixture.score.fulltime?.home ?? fixture.goals.home;
+    const apiAway = fixture.score.fulltime?.away ?? fixture.goals.away;
+    if (apiHome === null || apiAway === null) return 0;
+    // API-Football dreht gelegentlich nachträglich Heim und Gast (Senegal - Mozambique wurde
+    // am 26.09.2026 zu Mozambique - Senegal, dazu PSG - Rennes). Die Prognosen stehen in der
+    // Ausrichtung zum Zeitpunkt der Analyse, und nur Teamnamen sind gespeichert. Steht das
+    // Paar gespiegelt da, werden auch Tore, Pausenstand und xG gespiegelt - sonst würde ein
+    // Heimsieg als Auswärtssieg abgerechnet.
+    const swappedFor = (storedHome: string, storedAway: string) =>
+      storedHome !== storedAway
+      && storedHome === fixture.teams.away.name
+      && storedAway === fixture.teams.home.name;
+    const scoreFor = (storedHome: string, storedAway: string) => swappedFor(storedHome, storedAway)
+      ? { home: apiAway, away: apiHome, halfHome: fixture.score.halftime?.away ?? null, halfAway: fixture.score.halftime?.home ?? null, xgHome: actualXg?.away ?? null, xgAway: actualXg?.home ?? null }
+      : { home: apiHome, away: apiAway, halfHome: fixture.score.halftime?.home ?? null, halfAway: fixture.score.halftime?.away ?? null, xgHome: actualXg?.home ?? null, xgAway: actualXg?.away ?? null };
     const rows = this.db.prepare(`
-      SELECT id, market, selection, probability
+      SELECT id, market, selection, probability, home_team, away_team
       FROM candidates
       WHERE fixture_id = ? AND settled_at IS NULL
     `).all(fixture.fixture.id) as Array<{
@@ -1274,6 +1286,8 @@ export class AnalyzerDatabase {
       market: Market;
       selection: string;
       probability: number;
+      home_team: string;
+      away_team: string;
     }>;
     const update = this.db.prepare(`
       UPDATE candidates
@@ -1281,6 +1295,7 @@ export class AnalyzerDatabase {
       WHERE id = ?
     `);
     for (const row of rows) {
+      const { home, away } = scoreFor(row.home_team, row.away_team);
       let hit = false;
       if (row.market === "draw") hit = home === away;
       else if (row.market === "btts") hit = home > 0 && away > 0;
@@ -1299,13 +1314,15 @@ export class AnalyzerDatabase {
       );
     }
     const profileRows = this.db.prepare(`
-      SELECT id, market, selection
+      SELECT id, market, selection, home_team, away_team
       FROM profile_predictions
       WHERE fixture_id = ? AND settled_at IS NULL
     `).all(fixture.fixture.id) as Array<{
       id: number;
       market: "draw" | "1x2";
       selection: "X" | "1" | "2";
+      home_team: string;
+      away_team: string;
     }>;
     const updateProfile = this.db.prepare(`
       UPDATE profile_predictions
@@ -1313,6 +1330,7 @@ export class AnalyzerDatabase {
       WHERE id = ?
     `);
     for (const row of profileRows) {
+      const { home, away } = scoreFor(row.home_team, row.away_team);
       const hit =
         row.selection === "X"
           ? home === away
@@ -1327,23 +1345,32 @@ export class AnalyzerDatabase {
         row.id
       );
     }
-    const goalLineResult = this.db.prepare(`
+    const goalLineRows = this.db.prepare(`
+      SELECT id, home_team, away_team
+      FROM goal_line_predictions
+      WHERE fixture_id = ? AND settled_at IS NULL
+    `).all(fixture.fixture.id) as Array<{ id: number; home_team: string; away_team: string }>;
+    const updateGoalLine = this.db.prepare(`
       UPDATE goal_line_predictions
       SET settled_at = ?, actual_home_goals = ?, actual_away_goals = ?,
           actual_halftime_home_goals = ?, actual_halftime_away_goals = ?,
           actual_home_xg = ?, actual_away_xg = ?
-      WHERE fixture_id = ? AND settled_at IS NULL
-    `).run(
-      new Date().toISOString(),
-      home,
-      away,
-      fixture.score.halftime?.home ?? null,
-      fixture.score.halftime?.away ?? null,
-      actualXg?.home ?? null,
-      actualXg?.away ?? null,
-      fixture.fixture.id
-    );
-    return rows.length + profileRows.length + Number(goalLineResult.changes);
+      WHERE id = ?
+    `);
+    for (const row of goalLineRows) {
+      const score = scoreFor(row.home_team, row.away_team);
+      updateGoalLine.run(
+        new Date().toISOString(),
+        score.home,
+        score.away,
+        score.halfHome,
+        score.halfAway,
+        score.xgHome,
+        score.xgAway,
+        row.id
+      );
+    }
+    return rows.length + profileRows.length + goalLineRows.length;
   }
 
   defenseBadgeReport(): DefenseBadgePerformanceRow[] {
@@ -1599,6 +1626,9 @@ export class AnalyzerDatabase {
     }>;
     const cohortOf = (warnings: string): LeagueStrengthPerformanceRow["cohort"] => {
       if (/Kein Ligastärke-Vergleich/.test(warnings)) return "ohne Rating";
+      if (/Team-Elo der U21-Nationalteams/.test(warnings)) return "Team-Elo U21";
+      if (/Team-Elo der Nationalteams/.test(warnings)) return "Team-Elo";
+      if (/aus derselben Liga/.test(warnings)) return "gleiche Liga";
       if (/geschätzt statt gemessen/.test(warnings)) return "geschätzt";
       if (/Cross-League/.test(warnings)) return "gemessen";
       return "Ligapartie";
@@ -1624,7 +1654,7 @@ export class AnalyzerDatabase {
       groups.set(cohort, group);
     }
     const order: Array<LeagueStrengthPerformanceRow["cohort"]> =
-      ["Ligapartie", "gemessen", "geschätzt", "ohne Rating"];
+      ["Ligapartie", "gemessen", "geschätzt", "Team-Elo", "Team-Elo U21", "gleiche Liga", "ohne Rating"];
     return order.flatMap((cohort) => {
       const samples = groups.get(cohort);
       if (!samples || samples.length === 0) return [];
@@ -1858,6 +1888,31 @@ export class AnalyzerDatabase {
       snapshot.clubs,
       snapshot.reliable ? 1 : 0
     );
+  }
+
+  /**
+   * Ersetzt alle Liga-Ratings in einem Zug. Der Aufbau rechnet sie ohnehin vollständig aus
+   * `strength_matches` neu; ein bloßes Überschreiben ließe Zeilen stehen, die es nicht mehr
+   * gibt - etwa Frauenligen im Pool "uefa" nach deren Umzug in "uefa:women".
+   */
+  replaceLeagueStrength(snapshots: LeagueStrengthSnapshot[]): void {
+    this.db.exec("BEGIN IMMEDIATE");
+    try {
+      this.db.exec("DELETE FROM league_strength_snapshots");
+      for (const snapshot of snapshots) this.saveLeagueStrength(snapshot);
+      this.db.exec("COMMIT");
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      throw error;
+    }
+  }
+
+  /** Legt gespeicherte Pokalduelle in einen anderen Pool (einmalige Trennung der Frauen). */
+  moveStrengthMatches(fixtureIds: number[], pool: string): number {
+    const statement = this.db.prepare("UPDATE strength_matches SET pool = ? WHERE fixture_id = ?");
+    let moved = 0;
+    for (const fixtureId of fixtureIds) moved += Number(statement.run(pool, fixtureId).changes);
+    return moved;
   }
 
   getStrengthTeamLeague(teamId: number, season: number): number | null {
@@ -2148,6 +2203,25 @@ export class AnalyzerDatabase {
     `).run(value.leagueId, value.country, value.league, value.source, tipicoCompetitionId);
   }
 
+  /** Die API-Liga-ID zu einem Wettbewerb, wie ihn die Analyse nennt (Land und Liga von API-Football). */
+  apiLeagueIdByName(country: string, league: string): number | null {
+    const row = this.db.prepare(`SELECT api_league_id FROM tipico_competitions
+      WHERE api_country_name = ? AND api_league_name = ? AND api_league_id IS NOT NULL LIMIT 1`)
+      .get(country, league) as { api_league_id: number } | undefined;
+    return row?.api_league_id ?? null;
+  }
+
+  /** Die API-Fixture je Tipico-Ereignis, soweit die Analyse sie zugeordnet hat. */
+  apiFixtureIdsForTipicoEvents(eventIds: string[]): Map<string, number> {
+    const statement = this.db.prepare("SELECT api_fixture_id FROM tipico_fixtures WHERE tipico_event_id = ? AND api_fixture_id IS NOT NULL");
+    const result = new Map<string, number>();
+    for (const eventId of eventIds) {
+      const row = statement.get(eventId) as { api_fixture_id: number } | undefined;
+      if (row) result.set(eventId, row.api_fixture_id);
+    }
+    return result;
+  }
+
   saveTipicoFixtureMapping(
     match: LiveMatchSelection,
     fixture: ApiFixture
@@ -2191,9 +2265,14 @@ export class AnalyzerDatabase {
     return inserted;
   }
 
-  eloMatches(): EloMatch[] {
-    const rows = this.db.prepare(`SELECT fixture_id, kickoff, league_id, league_name, league_type, country, season,
-        home_id, home_name, away_id, away_name, home_goals, away_goals FROM elo_matches`).all() as Array<Record<string, number | string | null>>;
+  /** Ohne Team-ID alle Spiele, sonst nur die dieses Teams (für `npm run coverage`). */
+  eloMatches(teamId?: number): EloMatch[] {
+    const columns = `fixture_id, kickoff, league_id, league_name, league_type, country, season,
+        home_id, home_name, away_id, away_name, home_goals, away_goals`;
+    const rows = (teamId === undefined
+      ? this.db.prepare(`SELECT ${columns} FROM elo_matches`).all()
+      : this.db.prepare(`SELECT ${columns} FROM elo_matches WHERE home_id = ? OR away_id = ?`).all(teamId, teamId)
+    ) as Array<Record<string, number | string | null>>;
     return rows.map((row) => ({
       fixtureId: Number(row.fixture_id), kickoff: Number(row.kickoff), leagueId: Number(row.league_id),
       leagueName: String(row.league_name), leagueType: row.league_type === null ? null : String(row.league_type),
@@ -2227,6 +2306,18 @@ export class AnalyzerDatabase {
   setEloMeta(key: string, value: string): void {
     this.db.prepare(`INSERT INTO elo_meta(key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value`)
       .run(key, value);
+  }
+
+  /**
+   * Hebt die Markierung „vollständig“ für diese Wettbewerbe auf. Einmalig am 29.09.2026 für die
+   * Jugend- und Frauenwettbewerbe, bei denen die 80-%-Regel des Nachladens Saisons markiert hatte,
+   * die nie geladen waren (U21-Quali 2023 und 2025, U21-EM 2021).
+   */
+  reopenEloSeasons(leagueIds: number[]): number {
+    const statement = this.db.prepare(`DELETE FROM elo_league_seasons WHERE league_id = ?`);
+    let reopened = 0;
+    for (const leagueId of leagueIds) reopened += Number(statement.run(leagueId).changes);
+    return reopened;
   }
 
   isEloSeasonComplete(leagueId: number, season: number): boolean {

@@ -468,3 +468,21 @@ test("analyzeFirstHalfGoals nutzt die eigenen Halbzeitkoeffizienten", () => {
   // Die Halbzeitgerade ist eine andere als die für das ganze Spiel.
   assert.notEqual(intercept, config.goalLineCalibration.intercept);
 });
+
+test("eine eigene Torkorrektur ändert nur die Summe, nicht die Aufteilung", () => {
+  const target = Math.floor(Date.UTC(2026, 7, 23, 13, 30) / 1000);
+  const { upcoming, cupHistory, teamHistory } = crossLeagueScenario(target);
+  const league = analyzeFixture(upcoming, cupHistory, teamHistory);
+  const explicit = analyzeFixture(upcoming, cupHistory, teamHistory, { goalCalibration: config.goalLineCalibration });
+  // Ohne Angabe gilt der Liga-Satz - bestehende Spiele rechnen unverändert.
+  assert.deepEqual(explicit, league);
+
+  const national = analyzeFixture(upcoming, cupHistory, teamHistory, { goalCalibration: config.goalLineCalibrationNational });
+  const leagueTotal = league.expectedHomeGoals + league.expectedAwayGoals;
+  const nationalTotal = national.expectedHomeGoals + national.expectedAwayGoals;
+  // Rohsumme aus dem Liga-Satz zurückrechnen und mit dem Länder-Satz neu abbilden.
+  const raw = (leagueTotal - config.goalLineCalibration.intercept) / config.goalLineCalibration.slope;
+  const expected = config.goalLineCalibrationNational.intercept + config.goalLineCalibrationNational.slope * raw;
+  assert.ok(Math.abs(nationalTotal - expected) < 1e-9, `Summe ${nationalTotal}, erwartet ${expected}`);
+  assert.ok(Math.abs(national.expectedHomeGoals / nationalTotal - league.expectedHomeGoals / leagueTotal) < 1e-12);
+});

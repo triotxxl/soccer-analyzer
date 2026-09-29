@@ -1,7 +1,10 @@
 import path from "node:path";
+import type { EloSystem } from "./elo-config.ts";
 
+// Eine Pokalsaison braucht rund 100 bis 150 Aufrufe (einer je teilnehmendem Verein). Mit 25 je
+// Analyse blieben Lücken wochenlang offen (29.09.2026: Slowakei ohne Rating, Tschechien bei 2024).
 const strengthOnDemandRequestBudget = Number(
-  process.env.STRENGTH_ON_DEMAND_REQUEST_BUDGET ?? 25
+  process.env.STRENGTH_ON_DEMAND_REQUEST_BUDGET ?? 100
 );
 const settleRequestBudget = Number(
   process.env.SETTLE_REQUEST_BUDGET ?? 200
@@ -79,7 +82,11 @@ export const config = {
   apiTransportRetryMs: 1_000,
   modelVersion: "1.3.0",
   activeProfileVersion: "1.3.0",
-  goalLineModelVersion: "3.2.0",
+  // 3.3.0 (28.09.2026): Stärkefaktor aus dem Team-Elo bei Länderspielen, eigene
+  // Torkorrektur für Nationalteams, Faktor 1 bei Pokalspielen zweier Teams derselben Liga.
+  // 3.4.0 (29.09.2026): dasselbe für U21-Nationalteams (`teamEloSystems`), dazu eigene Pools
+  // und die 3-Vereine-Grenze für Frauenwettbewerbe in der Ligastärke.
+  goalLineModelVersion: "3.4.0",
   xgEnrichmentRequestBudget: 250,
   // Torschüsse und Ecken der letzten fünf Partien. Ein Aufruf deckt zwanzig Partien ab, und
   // jede geholte wird gespeichert - ein 48-Stunden-Lauf braucht damit etwa zwanzig Aufrufe,
@@ -104,14 +111,31 @@ export const config = {
   // weil mehr Tore weniger Remis bedeuten, und der 1X2-Brier bewegt sich um +0.0003.
   // Beides ist gegen sechs deutlich besser kalibrierte Tormärkte abgewogen.
   //
-  // Der Fit stammt aus Ligapartien; Cross-League-Partien lagen mit 188 Stück zu dünn für
-  // einen eigenen Wert und laufen vorerst über denselben. Bei genügend abgerechneten
-  // Cross-League-Partien gehört das getrennt nachgezogen.
+  // Der Fit stammt aus Ligapartien. Vereinsspiele zwischen verschiedenen Ligen passen damit
+  // (Prüfung vom 28.09.2026, n ≈ 700: 2,97 Tore erwartet, 3,09 gefallen; eine eigene Gerade
+  // hätte Steigung 0,77 ± 0,10) und brauchen keinen eigenen Satz. Länderspiele schon, siehe
+  // goalLineCalibrationNational.
   goalLineCalibration: {
     intercept: 0.4951,
     slope: 0.8638,
     firstHalfIntercept: 0.3002,
     firstHalfSlope: 0.7984
+  },
+  // Eigene Torkorrektur für Spiele zweier Nationalteams mit Elo (seit 28.09.2026). Mit dem
+  // Liga-Satz erwartete das Modell dort rund 0,3 Tore zu viel (2,93 gegen 2,67), in
+  // torreichen Paarungen fast ein Tor. Kleinste Quadrate wie beim Liga-Satz, tatsächliche
+  // Torsumme gegen rohe Erwartung mit Elo-Faktor, über 3.763 nachgebaute Länderspiele
+  // 01/2023-09/2026; einzeln auf 2023-24 bzw. 2025-26 bestimmt fast gleich (1,124/0,548 und
+  // 1,172/0,552). Auf dem jeweils anderen Zeitraum gemessen, Summe der vier Tormärkte
+  // (Ü1,5/2,5/3,5, BTTS) je Spiel: -0,050 ± 0,011 und -0,043 ± 0,007 Log-Loss; 1X2
+  // +0,002 ± 0,001 bzw. -0,000 ± 0,001, also gleich. BTTS bleibt danach rund 5 Punkte zu hoch -
+  // das liegt an der Aufteilung (die schwächere Seite bleibt öfter torlos, 45 % statt 38 %),
+  // nicht an der Summe, und ist mit diesem Satz nicht zu beheben.
+  // Nur fürs ganze Spiel: Für die erste Halbzeit fehlen historische Pausenstände
+  // (live 1,30 erwartet, 1,33 gefallen, n = 66), dort gilt weiter der Liga-Satz.
+  goalLineCalibrationNational: {
+    intercept: 1.135,
+    slope: 0.553
   },
   // Abrechnung fälliger Prognosen am Ende jedes Dashboard-Laufs. Klein gehalten, weil im
   // laufenden Betrieb pro Tag nur Dutzende Partien anfallen; ein Rückstand wird über
@@ -138,7 +162,7 @@ export const config = {
     Number.isInteger(strengthOnDemandRequestBudget) &&
     strengthOnDemandRequestBudget > 0
       ? strengthOnDemandRequestBudget
-      : 25,
+      : 100,
   strength: {
     // Elo-Differenz zweier Ligen -> Torfaktor je Seite: 10 ** (delta / factorDivisor).
     // Seit dem neutralen Maßstab im Modell trägt dieser Faktor den Klassenunterschied
@@ -171,7 +195,41 @@ export const config = {
     // 120 und 300 ist die Abweichung praktisch flach; gewählt ist der konservative Rand,
     // damit das Modell eher unter- als überschätzt - Überschätzung schlägt unmittelbar auf
     // die Kelly-Einsätze durch.
-    unratedPenalty: 120
+    unratedPenalty: 120,
+    // Belastbar ist ein Liga-Rating ab so vielen Duellen gegen andere Ligen und so vielen
+    // verschiedenen Vereinen - ein einzelner starker Verein soll nicht allein seine Liga
+    // bestimmen. Frauenligen erreichen 5 Vereine fast nie (aus jedem Land spielen 2-4 Teams
+    // europäisch). Prüfung vom 29.09.2026 an 78 nachgebauten Frauen-Europapokalspielen: mit 3
+    // Vereinen 1X2-Log-Loss -0,156 ± 0,060 gegen "ohne Faktor", in beiden Zeithälften; der
+    // Gewinn steckt in Spielen großer gegen kleine Liga. Nur für Frauen-Pools: global gesenkt
+    // würden fünf Männerligen belastbar, das ist ungemessen.
+    reliableMinMatches: 30,
+    reliableMinClubs: 5,
+    reliableMinClubsWomen: 3,
+    // Länderspiele haben keine Heimatliga und damit kein Liga-Rating. Seit 28.09.2026 trägt
+    // dort das Team-Elo der Nationalteams (src/elo.ts, System "national") den
+    // Klassenunterschied: Torfaktor 10 ** (ΔElo / teamEloDivisor), dieselben Klemmen.
+    // Gemessen an nachgebauten Länderspielen (Prüfung vom 28.09.2026, 0 Aufrufe): Teiler auf
+    // 2023-24 bestimmt, auf 01.2025-09.2026 getestet, 1X2-Log-Loss -0,083 ± 0,008 gegen das
+    // Modell ohne Faktor (n = 1.629); Gegenprobe umgekehrt -0,049 ± 0,008 (n = 2.134). Die
+    // Kurve ist zwischen 1200 und 1500 flach. Ohne Faktor gab das Modell dem Favoriten 46 %,
+    // er gewann 54 %; mit Faktor 58 zu 58 %.
+    // Nur innerhalb eines Kontinentalverbands: Die Verbände spielen fast nur unter sich, ihre
+    // Elo-Skalen sind schlecht verbunden (Vietnam vor Italien). Zwischen Verbänden traf der
+    // Elo-Favorit 5-11 Punkte seltener als erwartet und der Faktor half nicht messbar.
+    teamEloDivisor: 1400,
+    // Skalen, deren Elo den Faktor und die Torkorrektur der Länderspiele trägt - beide Teams auf
+    // derselben Skala, im selben Verband. U21 seit 29.09.2026 (Davids Entscheidung nach der
+    // Prüfung vom selben Tag, derselbe Teiler 1400 vorab festgelegt): 1X2-Log-Loss gegen „ohne
+    // Faktor“ -0,129 ± 0,022 (2023-24, n = 288) und -0,136 ± 0,024 (01.2025-09.2026, n = 256);
+    // Favorit vorher 45-47 % vorhergesagt gegen 54-59 % eingetreten, mit Faktor 60-63 gegen
+    // 62-64 %. Erst mit der Länder-Torkorrektur passt auch die Torsumme (ohne sie bis 0,47 Tore
+    // zu viel), und die falschen BTTS-Empfehlungen der U21 verschwinden fast ganz.
+    // **U19 und U17** messen ebenfalls klar besser (U19 -0,081/-0,088, U17 -0,050/-0,084), sind
+    // aber nicht eingeschaltet, weil Tipico sie seit Beginn der Exporte (11.08.2026) nie führte.
+    // Tauchen sie auf, gehören sie hier dazu. U20, U23 und Frauen-Nationalteams: nein (zu wenige
+    // Spiele bzw. Favorit weiter deutlich unterschätzt).
+    teamEloSystems: ["national", "national-u21"] as EloSystem[]
   },
   // Detailansicht einer aufgeklappten Partie. Die Grenzen bestimmen unmittelbar die Kosten:
   // Team- und H2H-Historien liegen aus dem Lauf bereits im Cache, neu sind nur die Bündel

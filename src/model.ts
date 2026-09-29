@@ -554,6 +554,8 @@ export function analyzeFixture(
     rankings?: DefenseRankings;
     sideBaselines?: SideBaselines;
     strengthFactor?: number;
+    /** Korrektur der Torsumme; ohne Angabe der Liga-Satz. Länderspiele haben einen eigenen. */
+    goalCalibration?: { intercept: number; slope: number };
   } = {}
 ): ModelResult {
   const matches = playedMatches(history).filter(
@@ -624,7 +626,7 @@ export function analyzeFixture(
   const { homeGoals: expectedHomeGoals, awayGoals: expectedAwayGoals } = recalibrateGoals(
     clamp(homeBase.homeGoals * homeAttack * awayDefense * strength, 0.2, 4.5),
     clamp(awayBase.awayGoals * awayAttack * homeDefense / strength, 0.2, 4.5),
-    config.goalLineCalibration,
+    options.goalCalibration ?? config.goalLineCalibration,
     0.2,
     4.5
   );

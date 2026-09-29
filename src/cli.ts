@@ -40,7 +40,8 @@ import type {
   FavoriteAnalysisResult,
   GoalLineAnalysisResult,
   LeagueSelection,
-  LiveMatchSelection
+  LiveMatchSelection,
+  TipicoOdds
 } from "./types.ts";
 import { aliasKey, parseMarkets, percent } from "./util.ts";
 
@@ -430,7 +431,17 @@ async function strength(args: ParsedArgs): Promise<void> {
   if (!Number.isInteger(requestBudget) || requestBudget < 1) {
     throw new Error("--request-budget muss eine positive ganze Zahl sein.");
   }
-  const result = await buildLeagueStrength({ seasons, requestBudget });
+  // Gezielt nachladen statt alle Pokale weltweit: `--competition <API-Liga-ID>`, mehrfach möglich.
+  const competitionIds = (args.options.get("competition") ?? []).map((value) => {
+    const id = Number(value);
+    if (!Number.isInteger(id) || id <= 0) throw new Error(`--competition muss eine API-Liga-ID sein, nicht "${value}".`);
+    return id;
+  });
+  const result = await buildLeagueStrength({
+    seasons,
+    requestBudget,
+    ...(competitionIds.length > 0 ? { competitionIds } : {})
+  });
   console.log(JSON.stringify(result, null, 2));
 }
 
@@ -515,6 +526,25 @@ async function dashboard(args: ParsedArgs): Promise<void> {
       apiRequestsRemaining: null,
       leagues: []
     };
+    // Team-Elo nachziehen: neue Ergebnisse aus dem Cache (kostenlos), einmal pro Woche die
+    // laufenden Saisons aller aktiven Ligen. Scheitert das, bleibt der gespeicherte Stand -
+    // das Dashboard entsteht trotzdem. Seit 28.09.2026 vor den Analysen: Bei Länderspielen
+    // rechnet das Modell mit dem Team-Elo, und es soll dasselbe sein, das die App anzeigt.
+    // Ergebnisse, die diese Analyse neu in den Cache legt, kommen mit der nächsten dazu.
+    if (client && config.eloAutoUpdate) {
+      try {
+        const update = await autoUpdateElo(client, database, { topUpBudget: config.eloTopUpRequestBudget });
+        const topUp = update.topUp
+          ? `Wochenrunde ${update.topUp.loaded} von ${update.topUp.leagues} Ligen, ${update.topUp.apiRequests} Aufrufe`
+            + (update.topUp.alreadyDone ? ` (${update.topUp.alreadyDone} schon bei einer früheren Analyse)` : "")
+            + (update.topUp.budgetReached ? " (Budget erreicht, Rest bei der nächsten Analyse)" : "")
+          : `Wochenrunde fällig ab ${new Date(update.nextTopUp ?? Date.now()).toLocaleDateString("de-DE")}`;
+        console.log(`Elo: ${update.imported.inserted} neue Spiele (${update.imported.read} Cache-Dateien), ${topUp},`
+          + ` neu gerechnet in ${update.rebuilt.seconds.toFixed(0)} s`);
+      } catch (error) {
+        console.error(`Elo nicht aktualisiert, es gilt der gespeicherte Stand: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
     const goalsResult = client
       ? await runGoalLineAnalysis(input, { client, database })
       : emptyBase;
@@ -548,34 +578,26 @@ async function dashboard(args: ParsedArgs): Promise<void> {
         console.error(`Schüsse und Ecken übersprungen: ${error instanceof Error ? error.message : String(error)}`);
       }
     }
-    // Team-Elo nachziehen: neue Ergebnisse aus dem Cache (kostenlos), einmal pro Woche die
-    // laufenden Saisons aller aktiven Ligen. Scheitert das, bleibt der gespeicherte Stand -
-    // das Dashboard entsteht trotzdem.
-    if (client && config.eloAutoUpdate) {
-      try {
-        const update = await autoUpdateElo(client, database, { topUpBudget: config.eloTopUpRequestBudget });
-        const topUp = update.topUp
-          ? `Wochenrunde ${update.topUp.loaded} von ${update.topUp.leagues} Ligen, ${update.topUp.apiRequests} Aufrufe`
-            + (update.topUp.alreadyDone ? ` (${update.topUp.alreadyDone} schon bei einer früheren Analyse)` : "")
-            + (update.topUp.budgetReached ? " (Budget erreicht, Rest bei der nächsten Analyse)" : "")
-          : `Wochenrunde fällig ab ${new Date(update.nextTopUp ?? Date.now()).toLocaleDateString("de-DE")}`;
-        console.log(`Elo: ${update.imported.inserted} neue Spiele (${update.imported.read} Cache-Dateien), ${topUp},`
-          + ` neu gerechnet in ${update.rebuilt.seconds.toFixed(0)} s`);
-      } catch (error) {
-        console.error(`Elo nicht aktualisiert, es gilt der gespeicherte Stand: ${error instanceof Error ? error.message : String(error)}`);
-      }
-    }
     // Team-Elo nur zur Anzeige neben dem Namen.
     const elo = new Map<number, TeamElo>();
     for (const [teamId, row] of getEloByTeam(database)) {
       elo.set(teamId, {
         elo: row.elo,
         confidence: row.confidence,
-        system: row.system === "national" ? "national" : "club",
+        system: row.system,
         asOf: new Date(row.asOf).toISOString()
       });
     }
+    // Die Analyse hat jedes Tipico-Ereignis schon seiner Fixture zugeordnet - diese Zuordnung
+    // trägt die Quoten, nicht noch einmal der Namensvergleich.
+    const fixtureByEvent = database.apiFixtureIdsForTipicoEvents(imported.events.map((event) => event.tipicoEventId));
+    const tipicoOddsByFixture = new Map<number, TipicoOdds>();
+    for (const event of imported.events) {
+      const fixtureId = fixtureByEvent.get(event.tipicoEventId);
+      if (fixtureId !== undefined) tipicoOddsByFixture.set(fixtureId, event.odds);
+    }
     const files = await writeDashboard({
+      tipicoOddsByFixture,
       recentStats,
       elo,
       createdAt: goalsResult.createdAt,

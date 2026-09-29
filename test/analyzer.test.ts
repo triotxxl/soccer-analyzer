@@ -538,10 +538,14 @@ test("Cross-League-Partien messen jede Seite an ihrer eigenen Liga und Ligastär
   const byLeague: Record<number, ApiFixture[]> = {
     81: cupHistory, 747: amateurHistory, 79: proHistory
   };
+  // Die Oberliga hat kein belastbares Rating - die Analyse versucht deshalb, es vor der Rechnung
+  // nachzuladen (seit 29.09.2026; vorher erst in den Remis- und Favoritenanalysen danach).
+  let strengthLookups = 0;
   const fake = {
     requestCount: 0,
     requestsRemaining: 7_500,
     getLeagues: async () => leagues,
+    getAllLeagues: async () => { strengthLookups += 1; return []; },
     getFixturesForDate: async (date: string): Promise<ApiFixture[]> =>
       date === "2026-08-23" ? [upcoming] : [],
     getSeasonFixtures: async (leagueId: number) => byLeague[leagueId] ?? [],
@@ -579,5 +583,6 @@ test("Cross-League-Partien messen jede Seite an ihrer eigenen Liga und Ligastär
     `Gast muss Favorit sein, war ${JSON.stringify(row.outcomeProbabilities)}`
   );
   assert.ok(row.warnings.some((warning) => warning.includes("Ligastärke für")));
+  assert.equal(strengthLookups, 1, "die Ligastärke muss vor der 1X2-Rechnung nachgeladen werden");
   database.close();
 });

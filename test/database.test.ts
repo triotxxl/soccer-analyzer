@@ -552,3 +552,58 @@ test("Ligastärke-Bericht trennt gemessen, geschätzt und ohne Rating", async ()
   assert.equal(byCohort.get("Ligapartie")!.total, 1);
   database.close();
 });
+
+test("rechnet richtig ab, wenn API-Football Heim und Gast nachträglich tauscht", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "football-swapped-"));
+  const filename = path.join(directory, "test.sqlite");
+  const database = new AnalyzerDatabase(filename);
+  const row: GoalLineRow = {
+    fixtureId: 702,
+    kickoff: "2026-09-26T18:00:00.000Z",
+    country: "World",
+    league: "Africa Cup of Nations - Qualification",
+    homeTeam: "Team 1",
+    awayTeam: "Team 2",
+    modelVersion: "3.3.0",
+    expectedHomeGoals: 1.8,
+    expectedAwayGoals: 0.7,
+    expectedTotalGoals: 2.5,
+    dataConfidence: 80,
+    outcomeProbabilities: { home: 0.6, draw: 0.24, away: 0.16, btts: 0.4 },
+    probabilities: { over15: 0.7, under15: 0.3, over25: 0.5, under25: 0.5, over35: 0.3, under35: 0.7 },
+    firstHalf: {
+      expectedHomeGoals: 0.8, expectedAwayGoals: 0.3, expectedTotalGoals: 1.1, dataConfidence: 78,
+      probabilities: { over05: 0.67, under05: 0.33, over15: 0.3, under15: 0.7 },
+      warnings: []
+    },
+    warnings: []
+  };
+  database.saveGoalLinePredictions("2026-09-26T10:00:00.000Z", [row], {
+    dates: ["2026-09-26"], selections: [], matches: []
+  });
+  // Analysiert als Team 1 gegen Team 2; API-Football führt das Spiel inzwischen andersherum.
+  // Team 1 hat 3:0 gewonnen, die API meldet deshalb 0:3 aus Sicht ihres neuen Heimteams.
+  assert.equal(database.settleFixture(fixture({
+    id: 702,
+    timestamp: Date.parse(row.kickoff) / 1000,
+    homeId: 2,
+    awayId: 1,
+    homeGoals: 0,
+    awayGoals: 3,
+    halfTimeHomeGoals: 0,
+    halfTimeAwayGoals: 2
+  }), { home: 0.4, away: 2.1 }), 1);
+  const reader = new DatabaseSync(filename);
+  const stored = reader.prepare(`
+    SELECT actual_home_goals, actual_away_goals, actual_halftime_home_goals, actual_halftime_away_goals,
+      actual_home_xg, actual_away_xg
+    FROM goal_line_predictions WHERE fixture_id = 702
+  `).get() as Record<string, number>;
+  reader.close();
+  assert.deepEqual(
+    [stored.actual_home_goals, stored.actual_away_goals, stored.actual_halftime_home_goals,
+      stored.actual_halftime_away_goals, stored.actual_home_xg, stored.actual_away_xg],
+    [3, 0, 2, 0, 2.1, 0.4]
+  );
+  database.close();
+});

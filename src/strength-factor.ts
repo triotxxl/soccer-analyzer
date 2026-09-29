@@ -1,5 +1,6 @@
 import { config } from "./config.ts";
 import type { AnalyzerDatabase } from "./database.ts";
+import type { EloSystem } from "./elo-config.ts";
 import { clamp } from "./util.ts";
 
 export interface LeagueRating {
@@ -13,6 +14,12 @@ export interface StrengthComparison {
   home: LeagueRating;
   away: LeagueRating;
   factor: number;
+  /**
+   * Woher der Faktor kommt. "league": Liga-Elo beider Heimatligen. "sameLeague": beide Teams
+   * aus derselben Liga, also kein Klassenunterschied und Faktor 1. "teamElo": Team-Elo der
+   * Nationalteams; `rating` trägt dann das Team-Elo, `leagueId` ist 0.
+   */
+  source: "league" | "sameLeague" | "teamElo";
 }
 
 /**
@@ -70,6 +77,50 @@ export function compareStrength(
   return {
     home: homeRating,
     away: awayRating,
-    factor: strengthFactor(homeRating.rating, awayRating.rating)
+    factor: strengthFactor(homeRating.rating, awayRating.rating),
+    source: "league"
   };
+}
+
+/** Das Nötigste aus dem gespeicherten Team-Elo (`StoredElo` in src/elo-store.ts). */
+export interface TeamEloInput {
+  /** Nur die Skalen aus `config.strength.teamEloSystems` tragen einen Faktor. */
+  system: EloSystem;
+  elo: number;
+  /** Bei Nationalteams der Kontinentalverband (UEFA, CAF, AFC, CONCACAF, CONMEBOL, OFC). */
+  league: string | null;
+}
+
+/**
+ * Torfaktor aus dem Team-Elo zweier Nationalteams, oder null. Nur, wenn beide Seiten ein
+ * Nationalteam-Elo haben und demselben Verband angehören - zwischen Verbänden sind die
+ * Elo-Skalen schlecht verbunden, dort half der Faktor gemessen nicht (siehe
+ * `config.strength.teamEloDivisor`). Die Differenz geht ohne Elo-Heimvorteil ein, weil die
+ * erwarteten Tore des Modells den Heimvorteil schon tragen.
+ */
+export function teamEloComparison(home: TeamEloInput | null, away: TeamEloInput | null): StrengthComparison | null {
+  if (!home || !away) return null;
+  if (home.system !== away.system || !config.strength.teamEloSystems.includes(home.system)) return null;
+  if (!home.league || !away.league || home.league !== away.league) return null;
+  return {
+    home: { leagueId: 0, rating: home.elo, reliable: true },
+    away: { leagueId: 0, rating: away.elo, reliable: true },
+    factor: clamp(
+      10 ** ((home.elo - away.elo) / config.strength.teamEloDivisor),
+      config.strength.factorMin,
+      config.strength.factorMax
+    ),
+    source: "teamElo"
+  };
+}
+
+/**
+ * Zwei Teams derselben Liga, etwa in einem Pokal: Es gibt keinen Klassenunterschied, der
+ * Faktor ist 1. Bis 28.09.2026 lieferte dieser Fall null, und die 1X2-Wahrscheinlichkeit
+ * wurde als "Ligastärke unbekannt" versteckt, obwohl sie gemessen gut passte (90 Spiele in
+ * den archivierten Läufen, Favorit 44,1 % vorhergesagt gegen 42,2 % eingetreten).
+ */
+export function sameLeagueComparison(leagueId: number, rating: LeagueRating | null): StrengthComparison {
+  const side = rating ?? { leagueId, rating: 0, reliable: false };
+  return { home: side, away: side, factor: 1, source: "sameLeague" };
 }

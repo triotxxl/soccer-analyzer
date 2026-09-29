@@ -4,6 +4,7 @@ import { config, ROOT_DIR } from "./config.ts";
 import { recentAverage, type MatchSideStats, type RecentAverage } from "./recent-stats.ts";
 import { teamNameSimilarity } from "./team-resolver.ts";
 import type { DefensiveProfile, DrawAnalysisResult, FavoriteAnalysisResult, GoalLineAnalysisResult, GoalLineRow, LeagueStats, LeagueStrengthComparison, RecentMatchSummary, TipicoOdds } from "./types.ts";
+import type { EloSystem } from "./elo-config.ts";
 
 export interface DashboardInput {
   createdAt: string;
@@ -15,6 +16,11 @@ export interface DashboardInput {
   favorites: FavoriteAnalysisResult;
   goals: GoalLineAnalysisResult;
   tipicoOdds: TipicoOdds[];
+  /**
+   * Tipico-Quoten je Fixture-ID, zugeordnet über `tipico_fixtures.api_fixture_id`. Vorrang vor
+   * dem Namensabgleich, der 6 % der Spiele verlor ("Lyon W" gegen "Olympique Lyon (F)").
+   */
+  tipicoOddsByFixture?: Map<number, TipicoOdds>;
   /**
    * Torschüsse und Ecken der jüngsten Partien, gesammelt von `collectRecentStats`. Fehlt die
    * Angabe, bleiben die beiden Spalten leer - das Dokument entsteht trotzdem.
@@ -32,7 +38,7 @@ export interface TeamElo {
   elo: number;
   /** 0-100, wie belastbar der Wert ist - getrennt vom Elo selbst. */
   confidence: number;
-  system: "club" | "national";
+  system: EloSystem;
   asOf: string;
 }
 
@@ -80,15 +86,16 @@ export interface DashboardMarket {
 
 /**
  * Deutlicher Klassenunterschied zweier Teams aus verschiedenen Ligen. `rating` stammt aus
- * dem Ligastärke-Vergleich des Modells, `market` aus dem Verhältnis der Tipico-Quoten für
- * 1 und 2 - Letzteres nur, wenn kein Rating existiert. Die Quelle steht bewusst im Feld:
+ * dem Ligastärke-Vergleich des Modells, `elo` aus dem Team-Elo zweier Nationalteams (seit
+ * 28.09.2026, derselbe Torfaktor, den das Modell dann rechnet), `market` aus dem Verhältnis
+ * der Tipico-Quoten für 1 und 2 - Letzteres nur, wenn beides fehlt. Die Quelle steht bewusst im Feld:
  * eine Markierung aus dem Quotenbild ist eine nachgelagerte Kennzeichnung und ändert weder
  * den sportlichen Tipp noch eine Wahrscheinlichkeit.
  */
 export interface ClassGap {
   level: "clear" | "extreme";
   stronger: "home" | "away";
-  source: "rating" | "market";
+  source: "rating" | "elo" | "market";
   label: string;
 }
 
@@ -105,6 +112,9 @@ export interface DashboardFixture {
    */
   homeCrest?: string;
   awayCrest?: string;
+  /** API-Football-Team-IDs - für `npm run coverage`, das Lücken bei Elo und Ligastärke sucht. */
+  homeTeamId?: number;
+  awayTeamId?: number;
   /**
    * Team-Elo beider Seiten, nur zur Anzeige. Fehlt, wenn das Team im Elo nicht vorkommt oder
    * der Lauf vor dieser Ergänzung entstand.
@@ -244,6 +254,21 @@ function classGapOf(
 ): ClassGap | undefined {
   if (!crossLeague) return undefined;
   const asOdd = (value: number) => value.toFixed(2).replace(".", ",");
+  // Zwei Teams derselben Liga haben keinen Klassenunterschied - auch kein Quotenbild dafür.
+  if (strength?.source === "sameLeague") return undefined;
+  if (strength?.source === "teamElo") {
+    // Dieselben Grenzen wie beim Liga-Rating: Faktor 1,5 bzw. 2,2 entspricht bei Teiler 1400
+    // rund 247 bzw. 479 Elo-Punkten. Es gibt keine geschätzte Seite, also keinen Aufschlag.
+    const ratio = Math.max(strength.factor, 1 / strength.factor);
+    const level = ratio >= CLASS_GAP_RATING.extreme ? "extreme" : ratio >= CLASS_GAP_RATING.clear ? "clear" : null;
+    if (!level) return undefined;
+    return {
+      level,
+      stronger: strength.factor >= 1 ? "home" : "away",
+      source: "elo",
+      label: `Team-Elo ${Math.round(strength.home.rating)} gegen ${Math.round(strength.away.rating)} · Torfaktor ${asOdd(strength.factor)}`
+    };
+  }
   if (strength) {
     const ratio = Math.max(strength.factor, 1 / strength.factor);
     // Eine geschätzte Seite hat kein eigenes Rating und liegt deshalb am Pool-Floor: Wer in
@@ -323,7 +348,7 @@ export function buildDashboardDocument(input: DashboardInput): DashboardDocument
   const fixtures: DashboardFixture[] = input.goals.rows.map((row) => {
     const draw = drawByFixture.get(row.fixtureId);
     const favorite = favoriteByFixture.get(row.fixtureId);
-    const tipico = matchingOdds(row, input.tipicoOdds);
+    const tipico = input.tipicoOddsByFixture?.get(row.fixtureId) ?? matchingOdds(row, input.tipicoOdds);
     const crossLeague = draw?.model === "cross-league" || favorite?.model === "cross-league";
     const selection = favorite?.selection ?? (row.outcomeProbabilities.home >= row.outcomeProbabilities.away ? "1" : "2");
     const selectedTeam = selection === "1" ? row.homeTeam : row.awayTeam;
@@ -334,12 +359,21 @@ export function buildDashboardDocument(input: DashboardInput): DashboardDocument
       ? `Remis auffällig: ${h2h.consecutiveDraws} direkte Duelle in Folge remis${h2h.allDraws ? `; alle ${h2h.matches} verfügbaren H2H endeten remis` : ""}`
       : null;
     // Ohne Ligastärke-Vergleich fehlt bei einer Cross-League-Partie genau der Faktor, der
-    // den Klassenunterschied trägt. Torsumme und BTTS bleiben davon nahezu unberührt, weil
-    // der Faktor die Heimtore multipliziert und die Auswärtstore teilt; die Richtung des
-    // Ergebnisses kippt dagegen. Betroffen ist deshalb allein die 1X2-Wahrscheinlichkeit.
+    // den Klassenunterschied trägt. Am stärksten kippt die Richtung des Ergebnisses; deshalb
+    // wird allein die 1X2-Wahrscheinlichkeit versteckt. Torsumme und BTTS verschieben sich
+    // ebenfalls, aber weniger: H·f + A/f wächst bei H = A um (f + 1/f)/2 vor der
+    // Kalibrierung (+8 % bei f = 1,5, +33 % bei 2,2), gemessen an Länderspielen im Mittel
+    // +0,16 Tore; BTTS ohne Faktor ist in einseitigen Spielen messbar schlechter
+    // (Prüfung vom 28.09.2026). Länderspiele bekommen den Faktor seither aus dem Team-Elo,
+    // Pokalspiele zweier Teams derselben Liga den Faktor 1.
     const outcomeUnreliable = crossLeague && !row.strength;
     const classGap = classGapOf(crossLeague, row.strength, tipico?.home, tipico?.away);
-    const strengthDetail = row.strength
+    const strengthDetail = row.strength?.source === "teamElo"
+      ? `Stärke aus dem Team-Elo: ${row.homeTeam} ${Math.round(row.strength.home.rating)} vs. ${row.awayTeam} ${Math.round(row.strength.away.rating)}`
+        + ` · Torfaktor ${row.strength.factor.toFixed(2)}`
+      : row.strength?.source === "sameLeague"
+        ? "Beide Teams aus derselben Liga · kein Klassenunterschied"
+      : row.strength
       ? `Ligastärke: ${row.homeTeam} ${Math.round(row.strength.home.rating)}${row.strength.home.reliable ? "" : " (geschätzt)"}`
         + ` vs. ${row.awayTeam} ${Math.round(row.strength.away.rating)}${row.strength.away.reliable ? "" : " (geschätzt)"}`
         + ` · Torfaktor ${row.strength.factor.toFixed(2)}`
@@ -446,6 +480,8 @@ export function buildDashboardDocument(input: DashboardInput): DashboardDocument
       ...(row.awayTeamId !== undefined && input.elo?.has(row.awayTeamId) ? { awayElo: input.elo.get(row.awayTeamId)! } : {}),
       ...(row.homeCrest ? { homeCrest: row.homeCrest } : {}),
       ...(row.awayCrest ? { awayCrest: row.awayCrest } : {}),
+      ...(row.homeTeamId !== undefined ? { homeTeamId: row.homeTeamId } : {}),
+      ...(row.awayTeamId !== undefined ? { awayTeamId: row.awayTeamId } : {}),
       ...(classGap ? { classGap } : {}),
       dataConfidence: row.dataConfidence, warnings, h2hNotice,
       form: {

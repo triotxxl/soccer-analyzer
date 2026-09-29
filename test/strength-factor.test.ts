@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { config } from "../src/config.ts";
-import { compareStrength, ratingFor, strengthFactor } from "../src/strength-factor.ts";
+import { compareStrength, ratingFor, sameLeagueComparison, strengthFactor, teamEloComparison } from "../src/strength-factor.ts";
 import type { LeagueStrengthSnapshot } from "../src/types.ts";
 
 function snapshotDatabase(entries: Record<number, { rating: number; reliable: boolean }>) {
@@ -118,4 +118,45 @@ test("zwei geschätzte Ratings liefern keinen Vergleich", () => {
     ),
     null
   );
+});
+
+test("Team-Elo gibt Länderspielen desselben Verbands einen Faktor, sonst keinen", () => {
+  const national = (elo: number, league: string | null = "UEFA") => ({ system: "national" as const, elo, league });
+  const comparison = teamEloComparison(national(1700), national(1420))!;
+  assert.equal(comparison.source, "teamElo");
+  assert.equal(comparison.home.rating, 1700);
+  assert.ok(Math.abs(comparison.factor - 10 ** (280 / config.strength.teamEloDivisor)) < 1e-12);
+  // Symmetrisch wie der Liga-Faktor.
+  const back = teamEloComparison(national(1420), national(1700))!;
+  assert.ok(Math.abs(comparison.factor * back.factor - 1) < 1e-12);
+  // Zwischen Verbänden sind die Skalen schlecht verbunden - dort half der Faktor nicht.
+  assert.equal(teamEloComparison(national(1700, "UEFA"), national(1400, "AFC")), null);
+  assert.equal(teamEloComparison(national(1700, null), national(1400, null)), null);
+  assert.equal(teamEloComparison(national(1700), null), null);
+  // Vereine haben eine andere, ungemessene Skala.
+  assert.equal(teamEloComparison(
+    { system: "club", elo: 1900, league: "Bundesliga" },
+    { system: "club", elo: 1500, league: "Bundesliga" }
+  ), null);
+  assert.equal(teamEloComparison(national(3200), national(1000))!.factor, config.strength.factorMax);
+});
+
+test("Zwei Teams derselben Liga haben keinen Klassenunterschied", () => {
+  const comparison = sameLeagueComparison(78, { leagueId: 78, rating: 1717, reliable: true });
+  assert.equal(comparison.factor, 1);
+  assert.equal(comparison.source, "sameLeague");
+  assert.equal(sameLeagueComparison(305, null).factor, 1);
+});
+
+test("Die U21 trägt den Elo-Faktor, andere Jugend- und Frauenskalen noch nicht", () => {
+  const team = (system: "national" | "national-u21" | "national-u19" | "national-women", elo: number) =>
+    ({ system, elo, league: "UEFA" });
+  const u21 = teamEloComparison(team("national-u21", 1706), team("national-u21", 1292))!;
+  assert.equal(u21.source, "teamElo");
+  assert.ok(Math.abs(u21.factor - 10 ** (414 / config.strength.teamEloDivisor)) < 1e-12);
+  // Verschiedene Skalen gehören nie zusammen - ein A-Team gegen eine U21 hat keinen Faktor.
+  assert.equal(teamEloComparison(team("national", 1700), team("national-u21", 1400)), null);
+  // U19 und Frauen sind gemessen bzw. unterschätzt, aber nicht freigegeben (config.strength.teamEloSystems).
+  assert.equal(teamEloComparison(team("national-u19", 1700), team("national-u19", 1400)), null);
+  assert.equal(teamEloComparison(team("national-women", 1700), team("national-women", 1400)), null);
 });

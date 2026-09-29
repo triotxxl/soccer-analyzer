@@ -1,8 +1,9 @@
 import { ApiFootballClient } from "./api.ts";
 import { AnalyzerDatabase } from "./database.ts";
 import { completedScore } from "./draw-criteria.ts";
-import { strengthPool } from "./league-strength.ts";
-import type { ApiFixture, ApiLeague } from "./types.ts";
+import { config } from "./config.ts";
+import { isWomenPool, strengthPool } from "./league-strength.ts";
+import type { ApiFixture, ApiLeague, LeagueStrengthSnapshot } from "./types.ts";
 
 const CLUB_CUP_PATTERN =
   /\b(champions league|europa league|conference league|libertadores|sudamericana|concacaf|leagues cup|afc cup|caf confederation cup|ofc champions)\b/i;
@@ -45,6 +46,13 @@ export function relevantCompetitions(leagues: ApiLeague[]): ApiLeague[] {
     });
 }
 
+/**
+ * Neueste Saison zuerst. Das Budget je Analyse reicht selten für mehrere Pokalsaisons; aufsteigend
+ * ging es an alte Saisons, und die laufende, die das Modell gerade braucht, kam zuletzt dran (am
+ * 29.09.2026 stand Tschechien noch bei 2024, die Slowakei ganz ohne Rating). Die Reihenfolge des
+ * Ladens ändert die Ratings nicht: `rebuildStrengthSnapshots` rechnet chronologisch über alle
+ * gespeicherten Spiele.
+ */
 function seasonsFor(
   competition: ApiLeague,
   count: number,
@@ -57,8 +65,7 @@ function seasonsFor(
     )
     .map((season) => season.year)
     .sort((left, right) => right - left)
-    .slice(0, count)
-    .sort((left, right) => left - right);
+    .slice(0, count);
 }
 
 function completedFixtures(fixtures: ApiFixture[]): ApiFixture[] {
@@ -224,7 +231,9 @@ export async function buildLeagueStrength(options: {
         competitionsProcessed += 1;
       }
     }
-    const snapshotsWritten = rebuildStrengthSnapshots(database);
+    // Nur bei neuen Duellen: Der Aufbau ersetzt alle Ratings, und ohne neue Daten käme dasselbe
+    // heraus - bei jeder Analyse bis zu dreimal rund 10.000 Zeilen umsonst.
+    const snapshotsWritten = fixturesStored > 0 ? rebuildStrengthSnapshots(database) : 0;
     return {
       competitions: competitionsProcessed,
       fixturesCollected,
@@ -244,7 +253,7 @@ export function rebuildStrengthSnapshots(database: AnalyzerDatabase): number {
   const matchCounts = new Map<string, number>();
   const clubs = new Map<string, Set<number>>();
   const currentSeason = new Map<string, number>();
-  let written = 0;
+  const snapshots: LeagueStrengthSnapshot[] = [];
   const ratingKey = (pool: string, leagueId: number) => `${pool}|${leagueId}`;
   for (const match of matches) {
     const priorSeason = currentSeason.get(match.pool);
@@ -287,7 +296,10 @@ export function rebuildStrengthSnapshots(database: AnalyzerDatabase): number {
     ] as const) {
       const count = matchCounts.get(key) ?? 0;
       const clubCount = clubs.get(key)?.size ?? 0;
-      database.saveLeagueStrength({
+      const minClubs = isWomenPool(match.pool)
+        ? config.strength.reliableMinClubsWomen
+        : config.strength.reliableMinClubs;
+      snapshots.push({
         pool: match.pool,
         leagueId,
         season: match.season,
@@ -295,10 +307,10 @@ export function rebuildStrengthSnapshots(database: AnalyzerDatabase): number {
         rating: ratings.get(key) ?? 1500,
         matches: count,
         clubs: clubCount,
-        reliable: count >= 30 && clubCount >= 5
+        reliable: count >= config.strength.reliableMinMatches && clubCount >= minClubs
       });
-      written += 1;
     }
   }
-  return written;
+  database.replaceLeagueStrength(snapshots);
+  return snapshots.length;
 }
