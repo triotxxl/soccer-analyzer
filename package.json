@@ -33,7 +33,8 @@
     "elo-backtest": "node --env-file-if-exists=.env tools/elo-backtest.ts",
     "draw-signals-report": "node --env-file-if-exists=.env tools/draw-signals-report.ts",
     "backfill-results": "node tools/backfill-results.ts",
-    "backfill-half-stats": "node --env-file-if-exists=.env tools/backfill-half-stats.ts"
+    "backfill-half-stats": "node --env-file-if-exists=.env tools/backfill-half-stats.ts",
+    "coverage": "node --env-file-if-exists=.env tools/coverage.ts"
   },
   "engines": {
     "node": ">=24.0.0"
