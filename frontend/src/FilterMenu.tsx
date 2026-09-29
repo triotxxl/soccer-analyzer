@@ -93,7 +93,7 @@ export interface SegmentOption<T extends string> {
 }
 
 /** Segmentschalter für 2-4 feste Werte, die sich ausschließen - statt einer Auswahlliste. */
-export function FilterSegment<T extends string>({ name, legend, options, value, onChange, disabled, note }: {
+export function FilterSegment<T extends string>({ name, legend, options, value, onChange, disabled, note, className }: {
   name: string;
   legend: string;
   options: ReadonlyArray<SegmentOption<T>>;
@@ -101,8 +101,10 @@ export function FilterSegment<T extends string>({ name, legend, options, value, 
   onChange(value: T): void;
   disabled?: boolean;
   note?: ReactNode;
+  /** Zusatzklasse, etwa für die kleinere Fassung in der Werkzeugleiste. */
+  className?: string;
 }) {
-  return <fieldset className="filter-field" disabled={disabled}>
+  return <fieldset className={className ? `filter-field ${className}` : "filter-field"} disabled={disabled}>
     <legend>{legend}</legend>
     <div className="segmented filter-seg">
       {options.map((option) => <label key={option.value} title={option.title}>
@@ -183,7 +185,6 @@ export interface FilterMenuValues {
   classGapFilter: ClassGapFilter;
   showCrossLeague: boolean;
   showPast: boolean;
-  showKelly: boolean;
   liveRatedOnly: boolean;
   leagues: { selected: number; total: number };
   leagueList: ReadonlyArray<LeagueEntry>;
@@ -202,7 +203,6 @@ export interface FilterMenuActions {
   setClassGapFilter(value: ClassGapFilter): void;
   setShowCrossLeague(value: boolean): void;
   setShowPast(value: boolean): void;
-  setShowKelly(value: boolean): void;
   setLiveRatedOnly(value: boolean): void;
   openLeagueFilter(): void;
   toggleLeague(key: string): void;
@@ -256,9 +256,6 @@ export function FilterMenu({ values, actions, rangeControl, displayControls }: {
   const leagueField = <LeagueQuickSearch leagues={values.leagueList} deselected={values.deselectedLeagues}
     selected={values.leagues} hideHits={values.leagueFilterOpen} onToggle={actions.toggleLeague}
     onOnly={actions.selectOnlyLeague} onOpenList={actions.openLeagueFilter} />;
-  const kellyToggle = <FilterSwitch label="Vorteil & Kelly-Einsatz anzeigen" warning
-    note="Ein großer Vorteil ist meist ein Fehler des Modells."
-    checked={values.showKelly} onChange={actions.setShowKelly} />;
   const live = values.variant === "live";
 
   return <div className={`filter-menu${live ? " single" : ""}`} id={FILTER_MENU_ID} role="dialog" aria-label="Filter">
@@ -330,13 +327,12 @@ export function FilterMenu({ values, actions, rangeControl, displayControls }: {
               </div>
             </FilterCard>
           </section>
-          <section className="filter-group">
-            <div className="filter-group-head"><h3>Anzeige</h3></div>
-            <FilterCard>
-              {displayControls}
-              {displayControls ? <div className="filter-card-rule">{kellyToggle}</div> : kellyToggle}
-            </FilterCard>
-          </section>
+          {/* "Vorteil & Kelly" steht seit 28.09.2026 als Segment in der Werkzeugleiste: Es blendet
+              nichts aus und gehört deshalb wie Markt und Sortierung dorthin. */}
+          {displayControls && <section className="filter-group">
+            <div className="filter-group-head"><h3>Form und H2H</h3></div>
+            <FilterCard>{displayControls}</FilterCard>
+          </section>}
         </div>
       </> : <div className="filter-column">
         <section className="filter-group">
@@ -349,10 +345,6 @@ export function FilterMenu({ values, actions, rangeControl, displayControls }: {
               <p className="filter-note">Abgewählte kosten keine API-Aufrufe.</p>
             </div>
           </FilterCard>
-        </section>
-        <section className="filter-group">
-          <div className="filter-group-head"><h3>Anzeige</h3></div>
-          <FilterCard>{kellyToggle}</FilterCard>
         </section>
       </div>}
     </div>

@@ -1,9 +1,9 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { afterEach, describe, expect, it } from "vitest";
-import { KellyDialog } from "./KellyUI";
-import { DEFAULT_KELLY_SETTINGS, type KellySettings } from "./kelly";
+import { KellyDialog, kellyProfileNote } from "./KellyUI";
+import { DEFAULT_KELLY_SETTINGS, selectKelly, type KellySettings } from "./kelly";
 import { buildMarketProfile } from "../../src/market-profile";
 import type { DashboardFixture, MarketProfile } from "./types";
 
@@ -34,12 +34,16 @@ function Harness({ initial, onChange, profile = null, auto = false }: {
 }) {
   const [settings, setSettings] = useState<KellySettings>({ ...DEFAULT_KELLY_SETTINGS, ...initial });
   const [automatic, setAutomatic] = useState(auto);
+  // Wie im Dashboard: gerechnet wird außerhalb, der Dialog zeigt nur an.
+  const selection = selectKelly([fixture()], "all", settings, automatic, profile);
   return <KellyDialog
-    fixtures={[fixture()]}
+    selection={selection}
+    profileState={profile === null
+      ? { status: "error", profile: null, message: null }
+      : { status: "ready", profile, message: null }}
     marketFilter="all"
     marketLabel="Alle Märkte"
     settings={settings}
-    profile={profile}
     auto={automatic}
     onAutoChange={setAutomatic}
     onSettingsChange={(next) => { setSettings(next); onChange?.(next); }}
@@ -64,7 +68,7 @@ describe("Kelly-Eingabefelder", () => {
     const user = userEvent.setup();
     render(<Harness initial={{ minEdge: 0 }} />);
     await openSettings();
-    const input = field("Mindest-Vorsprung (Edge, Punkte)");
+    const input = field("Mindest-Vorteil (Edge, Prozentpunkte)");
     expect(input.value).toBe("0");
 
     await user.clear(input);
@@ -114,7 +118,7 @@ describe("Kelly-Eingabefelder", () => {
     let latest: KellySettings | null = null;
     render(<Harness initial={{ maxRiskPerGame: 0.05 }} onChange={(next) => { latest = next; }} />);
     await openSettings();
-    const input = field("Max. Risiko/Spiel (%)");
+    const input = field("Grenze je Spiel (% vom Budget)");
     expect(input.value).toBe("5");
 
     await user.clear(input);
@@ -128,13 +132,13 @@ describe("Kelly-Eingabefelder", () => {
     render(<Harness initial={{ maxRiskPerGame: 0.07 }} />);
     await openSettings();
     // 0.07 * 100 ergibt 7.000000000000001 - im Feld darf das nicht auftauchen.
-    expect(field("Max. Risiko/Spiel (%)").value).toBe("7");
+    expect(field("Grenze je Spiel (% vom Budget)").value).toBe("7");
   });
 
-  it("sperrt das Spiel-Limit-Feld, solange das Limit aus ist", async () => {
+  it("sperrt das Feld der Grenze je Spiel, solange sie aus ist", async () => {
     render(<Harness initial={{ enableGameRiskLimit: false }} />);
     await openSettings();
-    expect(field("Max. Risiko/Spiel (%)")).toBeDisabled();
+    expect(field("Grenze je Spiel (% vom Budget)")).toBeDisabled();
   });
 });
 
@@ -156,9 +160,29 @@ describe("Aufbau des Dialogs", () => {
 
   it("erklärt die Begriffe erst auf Nachfrage", async () => {
     render(<Harness />);
-    expect(screen.queryByText(/Wert ohne Grenzen/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/nach allen deinen Grenzen/)).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Was bedeuten diese Zahlen?" }));
-    expect(screen.getByText(/Wert ohne Grenzen/)).toBeInTheDocument();
+    expect(screen.getByText(/nach allen deinen Grenzen/)).toBeInTheDocument();
+  });
+
+  /**
+   * Die Wetten stehen im Dialog, nicht in der Übersicht (Davids Entscheidung vom 29.09.2026;
+   * vom 28.09. an standen sie einen Tag lang in der Tabelle).
+   */
+  it("führt die Liste der Wetten selbst", () => {
+    render(<Harness initial={{ minEdge: 0 }} />);
+    const table = screen.getByRole("table");
+    expect(within(table).getByRole("button", { name: /^Einsatz/ })).toBeInTheDocument();
+    expect(within(table).getAllByRole("row").length).toBeGreaterThan(1);
+    expect(screen.queryByText(/Spalte „Kelly-Einsatz“/)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Auswahl als JSON exportieren" })).toBeEnabled();
+  });
+
+  it("färbt den erwarteten Ertrag nicht und sagt, dass die Auswahl gemessen im Minus lag", () => {
+    render(<Harness initial={{ minEdge: 0 }} />);
+    const value = screen.getByText("Erwarteter Ertrag").parentElement!;
+    expect(value.querySelector(".kelly-metric-good, .kelly-metric-bad")).toBeNull();
+    expect(value).toHaveTextContent("Gemessen lag die Auswahl bisher im Minus.");
   });
 });
 
@@ -218,32 +242,45 @@ describe("Automatik-Modus", () => {
     expect(field("Budget (€)")).toBeInTheDocument();
     // Das Feld traegt einen Erklaertext, der in den zugaenglichen Namen einfliesst.
     expect(screen.getByLabelText(/Kelly-Anteil/)).toBeInTheDocument();
-    expect(screen.queryByLabelText("Mindest-Vorsprung (Edge, Punkte)")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Mindest-Vorteil (Edge, Prozentpunkte)")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Cross-League ausschließen")).not.toBeInTheDocument();
   });
 
   it("lässt sich auf die manuelle Einstellung zurückschalten", async () => {
     render(<Harness profile={profileFor("btts")} auto />);
     await openSettings();
-    expect(screen.queryByLabelText("Mindest-Vorsprung (Edge, Punkte)")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Mindest-Vorteil (Edge, Prozentpunkte)")).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Manuell" }));
-    expect(screen.getByLabelText("Mindest-Vorsprung (Edge, Punkte)")).toBeInTheDocument();
+    expect(screen.getByLabelText("Mindest-Vorteil (Edge, Prozentpunkte)")).toBeInTheDocument();
   });
 
   it("begründet, warum die Korrektur greift", async () => {
     render(<Harness profile={profileFor("btts")} auto />);
     expect(screen.getByText(/alten Wetten wirklich eingetreten/)).toBeInTheDocument();
     // Wie belastbar die Korrektur ist, steht hinter einem eigenen Aufklapper.
-    expect(screen.queryByText(/dass sie gewinnt, ist/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/rechne\s+nicht mit Gewinn/)).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Woher die Korrektur kommt" }));
-    expect(screen.getByText(/dass sie gewinnt, ist/)).toBeInTheDocument();
+    // Stand 21.09.2026: im Minus, nicht "etwa bei null".
+    expect(screen.getByText(/liegt diese Auswahl im Minus/)).toBeInTheDocument();
+    expect(screen.getByText(/rechne\s+nicht mit Gewinn/)).toBeInTheDocument();
+  });
+
+  it("unterscheidet Laden, Fehler und fehlende Messung", () => {
+    expect(kellyProfileNote(true, { status: "loading", profile: null, message: null })).toBe("Automatik wird geladen …");
+    expect(kellyProfileNote(true, { status: "error", profile: null, message: "Es gibt noch keine Datenbank." }))
+      .toBe("Manuell – Es gibt noch keine Datenbank.");
+    expect(kellyProfileNote(true, { status: "error", profile: null, message: null }))
+      .toBe("Manuell – für die Automatik fehlen abgerechnete Spiele.");
+    // Manuell gewählt: kein Hinweis, es fehlt ja nichts.
+    expect(kellyProfileNote(false, { status: "error", profile: null, message: null })).toBeNull();
   });
 
   it("sperrt die Automatik, solange kein Profil vorliegt", async () => {
     render(<Harness profile={null} auto />);
     expect(screen.getByRole("button", { name: "Automatik" })).toBeDisabled();
+    expect(screen.getByText("Manuell – für die Automatik fehlen abgerechnete Spiele.")).toBeInTheDocument();
     // Ohne Messung bleibt der manuelle Modus aktiv, statt eine Empfehlung vorzutäuschen.
     await openSettings();
-    expect(screen.getByLabelText("Mindest-Vorsprung (Edge, Punkte)")).toBeInTheDocument();
+    expect(screen.getByLabelText("Mindest-Vorteil (Edge, Prozentpunkte)")).toBeInTheDocument();
   });
 });

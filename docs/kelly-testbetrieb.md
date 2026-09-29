@@ -339,7 +339,9 @@ aussortieren** — sonst wird nicht die Regel gemessen, sondern die Regel plus B
 # 1. Analyse - morgen und übermorgen, ohne heute
 npm run dashboard -- --dates tomorrow2 --skip-unresolved
 
-# 2. Auswahl in der App erzeugen und als docs/kelly-all-JJJJ-MM-TT.json ablegen
+# 2. Auswahl in der App erzeugen und als docs/kelly-all-JJJJ-MM-TT.json ablegen:
+#    Anzeige "Vorteil & Kelly", Markt "Alle Märkte", Kelly-Knopf, Export (Pfeil nach unten).
+#    Der Export nimmt immer den ganzen Umfang, nie nur die Zeilen, die ein Tabellenfilter zeigt.
 npm run app
 
 # 3. Nach den Partien: abrechnen, bis nichts mehr offen ist
@@ -358,7 +360,9 @@ liefert `bets`, `staked`, `profit`, `roi`, `wins`, `expectedHitRate`, `calibrati
 
 Meldet der Dialog **„… passten nicht mehr in den Einsatzrahmen"**, hat der Rahmen
 abgeschnitten — die Zahl gehört ins Protokoll. Passiert das regelmäßig, geht der Rahmen auf
-0,90. Die Kopfzeile der Einstellungen nennt die verfügbaren Plätze im Klartext.
+0,90. Die Kopfzeile der Einstellungen und die Kelly-Zeile unter der Werkzeugleiste nennen die
+verfügbaren Plätze im Klartext. Die einzelnen Wetten stehen im Dialog „Kelly-Auswahl“ (vom
+28. bis 29.09.2026 standen sie kurz in der Tabelle).
 
 ## Was diese Zahlen nicht hergeben
 

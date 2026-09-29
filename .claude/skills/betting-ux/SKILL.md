@@ -35,8 +35,10 @@ verfolgen.
    einmal einen Zusatz in Klartext.
 3. **Warnungen kürzen, nie entschärfen.** Entfernen darf man Wiederholungen und Statistik-Begründung,
    nicht Richtung und Urteil einer Warnung.
-4. **Vorteil (Value/Edge) wird nicht hervorgehoben.** Sichtbar nur mit „Vorteil & Kelly-Einsatz
-   anzeigen" (Davids Entscheidung vom 25.09.2026). Kein Vorschlag, der ihn dauerhaft sichtbar macht.
+4. **Vorteil (Value/Edge) wird nicht hervorgehoben.** Sichtbar nur in der Anzeige „Vorteil & Kelly“
+   (Segment in der Werkzeugleiste, ab Werk „Kennzahlen“; Davids Entscheidung vom 25.09.2026, seit
+   28.09.2026 als Segment statt Schalter im Filtermenü), dort grau und immer mit Warnzeile. Kein
+   Vorschlag, der ihn dauerhaft sichtbar macht. Live zeigt ihn nie.
 5. **Kein Vorschlag verändert Tipp, Wahrscheinlichkeit oder Empfehlungsstufe.** Die UI zeigt, was das
    Modell rechnet; sie rechnet nichts um.
 6. **Textänderungen ziehen Tests nach.** Rund 360 Text- und Rollenabfragen in

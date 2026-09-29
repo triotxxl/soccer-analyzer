@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildKellyExport, computeKellyCandidates, DEFAULT_KELLY_SETTINGS, edgeOf, impliedProbability, kellyExportFileName, loadKellySettings, type KellySettings } from "./kelly";
+import { buildKellyExport, computeKellyCandidates, DEFAULT_KELLY_SETTINGS, edgeOf, expectedValueOf, impliedProbability, kellyExportFileName, kellyKey, loadKellySettings, selectKelly, type KellySettings } from "./kelly";
 import type { DashboardFixture, DashboardMarket, DashboardMarketKey } from "./types";
 
 function market(key: DashboardMarketKey, probability: number, odds: number | null): DashboardMarket {
@@ -454,5 +454,38 @@ describe("Kelly-Export", () => {
     expect(game.limit).toBe(6.34);
     expect(game.stakeAfter).toBe(6.34);
     expect(game.scaleFactor).toBe(0.528125);
+  });
+});
+
+describe("selectKelly", () => {
+  it("liefert dieselbe Auswahl wie computeKellyCandidates, dazu Summen und Schlüssel", () => {
+    const fixtures = [
+      fixture(1, "Alpha", [market("btts", 0.6, 1.9), market("over25", 0.58, 2)]),
+      fixture(2, "Beta", [market("btts", 0.4, 1.9)])
+    ];
+    const base = settings({ minEdge: 0, allowMultipleMarketsPerGame: true });
+    const selection = selectKelly(fixtures, "all", base, false, null);
+    const direct = computeKellyCandidates(fixtures, "all", base);
+
+    expect(selection.automatic).toBe(false);
+    expect(selection.candidates).toEqual(direct.candidates);
+    expect(selection.evaluated).toBe(direct.evaluated);
+    expect(selection.totalStake).toBeCloseTo(direct.candidates.reduce((sum, candidate) => sum + candidate.stake, 0));
+    expect(selection.expected).toBeCloseTo(expectedValueOf(direct.candidates));
+    expect(selection.byKey.get(kellyKey(1, "btts"))?.homeTeam).toBe("Alpha");
+    expect(selection.byKey.has(kellyKey(2, "btts"))).toBe(false);
+  });
+
+  it("fällt ohne Profil auf die manuelle Einstellung zurück, auch wenn die Automatik gewählt ist", () => {
+    const fixtures = [fixture(1, "Alpha", [market("btts", 0.6, 1.9)])];
+    const base = settings({ minEdge: 0 });
+    const selection = selectKelly(fixtures, "all", base, true, null);
+    expect(selection.automatic).toBe(false);
+    expect(selection.effectiveSettings).toEqual(base);
+  });
+
+  it("zählt die Plätze aus den Einstellungen des Nutzers", () => {
+    const selection = selectKelly([], "all", settings({ maxStakePercent: 0.02, maxExposurePercent: 0.7 }), false, null);
+    expect(selection.slots.plaetze).toBe(35);
   });
 });

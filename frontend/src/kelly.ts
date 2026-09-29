@@ -476,6 +476,58 @@ export function computeKellyCandidates(
   return { candidates: scaled, evaluated, scaleFactor, gameRiskLimits: limited.games, filtered };
 }
 
+/** Schlüssel einer Marktzeile: dieselbe Partie kann mehrere Märkte in der Auswahl haben. */
+export function kellyKey(fixtureId: number, marketKey: DashboardMarketKey): string {
+  return `${fixtureId}:${marketKey}`;
+}
+
+export interface KellySelection {
+  /** Läuft die Automatik tatsächlich? Ohne Profil fällt sie auf die manuelle Einstellung zurück. */
+  automatic: boolean;
+  effectiveSettings: KellySettings;
+  candidates: KellyCandidate[];
+  evaluated: number;
+  scaleFactor: number;
+  gameRiskLimits: GameRiskLimit[];
+  filtered: KellyFilterReport;
+  byKey: Map<string, KellyCandidate>;
+  totalStake: number;
+  expected: number;
+  slots: { plaetze: number; hoechstens: number };
+}
+
+/**
+ * Die Kelly-Auswahl in einem Zug - für Tabelle, Statuszeile und Dialog dieselbe Rechnung.
+ *
+ * Gerechnet wird immer über den Umfang (`scopedFixtures` im Dashboard), nie über die Zeilen,
+ * die ein Tabellenfilter übrig lässt: Kelly ist eine eigene Regel mit eigener Rückrechnung,
+ * und der Export des Testbetriebs darf nicht von Hand aussortiert sein.
+ *
+ * Ohne Profil ist die Automatik nicht möglich - dann gilt die manuelle Einstellung, statt eine
+ * Empfehlung vorzutäuschen, hinter der keine Messung steht.
+ */
+export function selectKelly(
+  fixtures: DashboardFixture[],
+  marketFilter: "all" | DashboardMarketKey,
+  settings: KellySettings,
+  auto: boolean,
+  profile: MarketProfile | null
+): KellySelection {
+  const automatic = auto && profile !== null;
+  const effectiveSettings = automatic ? recommendedSettings(settings) : settings;
+  const result = computeKellyCandidates(fixtures, marketFilter, effectiveSettings, automatic ? profile : null);
+  return {
+    automatic,
+    effectiveSettings,
+    ...result,
+    byKey: new Map(result.candidates.map((candidate) => [kellyKey(candidate.fixtureId, candidate.marketKey), candidate])),
+    totalStake: result.candidates.reduce((sum, candidate) => sum + candidate.stake, 0),
+    expected: expectedValueOf(result.candidates),
+    // Aus den Einstellungen des Nutzers: Die Automatik lässt Budget und Deckel unberührt.
+    slots: stakeSlots(settings)
+  };
+}
+
 export interface KellyExport {
   generatedAt: string;
   marketFilter: "all" | DashboardMarketKey;

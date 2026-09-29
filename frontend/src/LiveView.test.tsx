@@ -153,6 +153,25 @@ describe("Live-Ansicht", () => {
   });
 
   /**
+   * Davids Entscheidung vom 28.09.2026: Der Vorteil stammt aus Quote und Wahrscheinlichkeit vor
+   * dem Anpfiff und ist im laufenden Spiel veraltet - Live zeigt ihn nie, auch nicht im Modus
+   * "Vorteil & Kelly", und bietet den Umschalter gar nicht erst an.
+   */
+  it("zeigt in Live nie einen Vorteil, auch im Modus Vorteil & Kelly", async () => {
+    window.localStorage.setItem("football-analyzer:view", "live");
+    window.localStorage.setItem("football-analyzer:kelly-visible-v2", "1");
+    stubFetch(() => new Response(JSON.stringify(board()), { status: 200 }));
+    render(<App />);
+
+    const row = await screen.findByRole("article");
+    expect(row).toHaveTextContent("1,85");
+    expect(row).not.toHaveTextContent("PP");
+    expect(row.querySelector(".market-edge")).toBeNull();
+    expect(screen.queryByRole("group", { name: "Anzeige" })).not.toBeInTheDocument();
+    expect(globalThis.document.querySelector(".kelly-status")).not.toBeInTheDocument();
+  });
+
+  /**
    * Der Markt wirkt auch in Live auf die Markttafeln - er steht deshalb sichtbar da statt still
    * aus der Tabelle geerbt. Das Menü trägt nur, was hier wirkt: keine Stufe, kein Zeitraum.
    */

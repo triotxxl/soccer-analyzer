@@ -2,7 +2,8 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testi
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App, MarketCard } from "./App";
-import type { DashboardDocument, DashboardFixture, DashboardMarket, FixtureInsights } from "./types";
+import { buildMarketProfile } from "../../src/market-profile";
+import type { DashboardDocument, DashboardFixture, DashboardMarket, FixtureInsights, MarketProfile } from "./types";
 
 /**
  * Ein leerer, aber gültiger Kennzahlenbestand. Die Detailpanels rendern damit, ohne dass
@@ -21,13 +22,22 @@ function emptyInsights(fixtureId: number): FixtureInsights {
   };
 }
 
-/** Beantwortet beide Endpunkte der App: den Dashboard-Lauf und die Detailkennzahlen. */
+/**
+ * Beantwortet die Endpunkte der App: den Dashboard-Lauf, die Detailkennzahlen und das
+ * Marktprofil. Ohne Profil meldet der Dienst wie in echt "noch nichts abgerechnet".
+ */
 function dashboardFetch(
   read: () => DashboardDocument,
-  insights: (fixtureId: number) => unknown = emptyInsights
+  insights: (fixtureId: number) => unknown = emptyInsights,
+  profile: MarketProfile | null = null
 ) {
   return vi.fn((url: string) => {
     const target = String(url);
+    if (target.startsWith("/api/market-profile")) {
+      return Promise.resolve(profile
+        ? new Response(JSON.stringify(profile), { status: 200 })
+        : new Response(JSON.stringify({ error: "insufficient_data" }), { status: 503 }));
+    }
     if (!target.startsWith("/api/fixture/insights")) {
       return Promise.resolve(new Response(JSON.stringify(read()), { status: 200 }));
     }
@@ -146,32 +156,37 @@ describe("React-Dashboard", () => {
     expect(within(screen.getByLabelText("Markt")).queryByRole("option", { name: "1. HZ Ü0,5" })).not.toBeInTheDocument();
     const summary = globalThis.document.querySelector(".fixture-summary-cell");
     expect(summary).toHaveTextContent("Alpha FC");
-    expect(summary).toHaveTextContent("20:00");
-    expect(summary).toHaveTextContent("Deutschland · Bundesliga");
+    // Anstoß und Liga stehen seit 28.09.2026 in einer eigenen Spalte.
+    const kickoff = globalThis.document.querySelector(".kickoff-cell");
+    expect(kickoff).toHaveTextContent("20:00");
+    expect(kickoff).toHaveTextContent("Deutschland · Bundesliga");
+    // "Alle Märkte": 1X2 und die empfohlenen Märkte statt vierzehn Kästchen.
+    expect(globalThis.document.querySelector(".table-head")).toHaveAttribute("data-columns",
+      "match kickoff form h2h expected points market recommended data");
     expect(globalThis.document.querySelector(".fixture-row > .time-cell")).not.toBeInTheDocument();
     expect(globalThis.document.querySelector(".fixture-row > .teams-cell")).not.toBeInTheDocument();
     const formLabels = globalThis.document.querySelector(".form-labels");
-    expect(formLabels).toHaveTextContent("HomeAway");
+    expect(formLabels).toHaveTextContent("HeimAusw.");
     expect(formLabels).not.toHaveTextContent("H/A");
 
     await user.click(within(await openFilters(user)).getByRole("radio", { name: /Starke Tipps/ }));
     expect(screen.queryByText("Zulu FC")).not.toBeInTheDocument();
     await user.selectOptions(screen.getByLabelText("Markt"), "draw");
     expect(globalThis.document.querySelector(".table-head")?.textContent).toContain("Remis");
-    expect(globalThis.document.querySelector(".table-head")).toHaveClass("has-score");
+    expect(globalThis.document.querySelector(".table-head")).toHaveAttribute("data-columns",
+      "match kickoff form h2h expected points market data");
 
+    // Bei BTTS keine Punkte, dafür Schüsse aufs Tor - je Markt nur, was zu ihm passt.
     await user.selectOptions(screen.getByLabelText("Markt"), "btts");
-    const bttsHeader = globalThis.document.querySelector<HTMLElement>(".table-head");
-    expect(bttsHeader).not.toHaveClass("has-score");
-    expect(bttsHeader?.style.getPropertyValue("--market-count")).toBe("1");
-    expect(globalThis.document.querySelector(".fixture-row")).not.toHaveClass("has-score");
+    expect(globalThis.document.querySelector(".table-head")).toHaveAttribute("data-columns",
+      "match kickoff form h2h expected shots market data");
 
     await user.click(screen.getByRole("button", { name: /Alpha FCGast FC/i }));
     expect(await within(screen.getByLabelText("Details")).findByText("Direkte Begegnungen")).toBeInTheDocument();
     expect(screen.getAllByText(/Testbegründung/)).toHaveLength(5);
   });
 
-  it("schreibt bei Pokal- und Länderspielen Alle statt Home und Away über die Form", async () => {
+  it("schreibt bei Pokal- und Länderspielen Alle statt Heim und Ausw. über die Form", async () => {
     const current = document();
     current.fixtures[0] = {
       ...current.fixtures[0]!,
@@ -183,7 +198,7 @@ describe("React-Dashboard", () => {
     expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
     const formLabels = globalThis.document.querySelector(".form-labels");
     expect(formLabels).toHaveTextContent("AlleAlle");
-    expect(formLabels).not.toHaveTextContent("Home");
+    expect(formLabels).not.toHaveTextContent("Heim");
     expect(formLabels).toHaveAttribute("title", expect.stringContaining("zu Hause und auswärts zusammen"));
   });
 
@@ -219,6 +234,27 @@ describe("React-Dashboard", () => {
     expect(home).toHaveAttribute("title", expect.stringContaining("Spielen der letzten fünf Jahre"));
     // Auf dünner Grundlage blasser.
     expect(screen.getByText("1612")).toHaveClass("unsicher");
+  });
+
+  /**
+   * Die Leiste seit 28.09.2026: links, was Spiele ausblendet (Filter, Quickpick), rechts der Linie
+   * Markt, Sortierung und Anzeige. Die Marktliste gliedert sich in Gruppen; eine Gruppe ohne
+   * verfügbaren Markt fehlt, „Alle Märkte“ steht ohne Überschrift darüber.
+   */
+  it("ordnet die Leiste neu und gruppiert die Marktliste", async () => {
+    vi.stubGlobal("fetch", dashboardFetch(() => document()));
+    render(<App />);
+    expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
+    const markets = screen.getByLabelText("Markt");
+    const quickpick = screen.getByRole("button", { name: "Quickpicker öffnen" });
+    expect(quickpick.compareDocumentPosition(markets) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+    const groups = within(markets).getAllByRole("group").map((group) => group.getAttribute("label"));
+    expect(groups).toEqual(["Ergebnis", "BTTS (beide treffen)", "Tore im Spiel"]);
+    expect(within(markets).getAllByRole("option")[0]).toHaveTextContent("Alle Märkte");
+    expect(within(markets).getByRole("option", { name: "Alle Märkte" }).closest("optgroup")).toBeNull();
+    const goals = within(markets).getByRole("group", { name: "Tore im Spiel" });
+    expect(within(goals).getAllByRole("option").map((option) => option.textContent)).toEqual(["Über 1,5", "Über 2,5"]);
   });
 
   it("synchronisiert die H2H-Ansicht mit dem ausgewählten Markt", async () => {
@@ -288,14 +324,20 @@ describe("React-Dashboard", () => {
     render(<App />);
     expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
 
-    expect(screen.queryByRole("button", { name: /Kelly-Kriterium öffnen/ })).not.toBeInTheDocument();
-    expect(within(await openFilters(user)).getByRole("switch", { name: /Vorteil & Kelly-Einsatz anzeigen/i })).not.toBeChecked();
+    expect(screen.queryByRole("button", { name: /Kelly-Auswahl öffnen/ })).not.toBeInTheDocument();
+    const mode = screen.getByRole("group", { name: "Anzeige" });
+    expect(within(mode).getByRole("radio", { name: "Kennzahlen" })).toBeChecked();
+    expect(within(mode).getByRole("radio", { name: "Vorteil & Kelly" })).not.toBeChecked();
+    // Der Schalter steht nicht mehr im Filtermenü - ein Zustand, ein Bedienelement.
+    expect(within(await openFilters(user)).queryByRole("switch", { name: /Vorteil/ })).not.toBeInTheDocument();
+    expect(globalThis.document.querySelector(".kelly-status")).not.toBeInTheDocument();
+    void user;
   });
 
   /**
-   * Die Schalter stehen im Filtermenü in den Gruppen "Umfang" und "Anzeige", die Statuszeile
-   * unter der Werkzeugleiste zählt, was die aktuelle Filterung übrig lässt. Die Zahl "mit
-   * Vorteil" ist Value und steht deshalb nur mit dem Kelly-Schalter da.
+   * Die Schalter stehen im Filtermenü in den Gruppen "Umfang" und "Form und H2H", die Statuszeile
+   * unter der Werkzeugleiste zählt, was die aktuelle Filterung übrig lässt. Die Kelly-Zeile und
+   * die Warnung stehen nur im Modus "Vorteil & Kelly", der in der Werkzeugleiste gewählt wird.
    */
   it("bündelt die Schalter im Filtermenü und zählt den gefilterten Stand", async () => {
     window.localStorage.setItem("football-analyzer:kelly-visible-v2", "1");
@@ -305,30 +347,40 @@ describe("React-Dashboard", () => {
     expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
 
     const status = globalThis.document.querySelector(".filter-status");
-    expect(screen.getByRole("button", { name: /Kelly-Kriterium öffnen/ })).toBeInTheDocument();
-    expect(status).toHaveTextContent("mit Vorteil");
+    expect(screen.getByRole("button", { name: /Kelly-Auswahl öffnen/ })).toBeInTheDocument();
+    const kelly = globalThis.document.querySelector(".kelly-status");
+    expect(kelly).toHaveTextContent("Kelly-Auswahl · Alle Märkte:");
+    // Der geerbte Einsatzrahmen steht sichtbar da - er blieb bis 15.09.2026 unbemerkt auf 100 %.
+    await waitFor(() => expect(kelly).toHaveTextContent("Einsatzrahmen 25,0 % (≈ 8 Plätze)"));
+    expect(kelly).toHaveTextContent("Ein großer Vorteil ist meist ein Fehler des Modells.");
+    expect(kelly).toHaveTextContent("rechne nicht mit Gewinn");
 
     const menu = await openFilters(user);
     expect(within(menu).getByRole("heading", { name: "Umfang" })).toBeInTheDocument();
-    expect(within(menu).getByRole("heading", { name: "Anzeige" })).toBeInTheDocument();
+    // Auch im Modus "Vorteil & Kelly" bleiben Form und H2H in der Tabelle, also auch ihre Anzeige.
+    expect(within(menu).getByRole("heading", { name: "Form und H2H" })).toBeInTheDocument();
     // Ab Werk ist kein Schalter an - "an" heißt im Menü immer "Filter aktiv" oder "Anzeige an".
     expect(within(menu).getByRole("switch", { name: "Nur Ligaspiele" })).not.toBeChecked();
     expect(within(menu).getByRole("switch", { name: "Angepfiffene Spiele zeigen" })).not.toBeChecked();
-    await user.click(within(menu).getByRole("switch", { name: /Vorteil & Kelly-Einsatz anzeigen/i }));
-    expect(screen.queryByRole("button", { name: /Kelly-Kriterium öffnen/ })).not.toBeInTheDocument();
-    expect(status).not.toHaveTextContent("mit Vorteil");
+    await user.click(within(screen.getByRole("group", { name: "Anzeige" })).getByRole("radio", { name: "Kennzahlen" }));
+    expect(screen.queryByRole("button", { name: /Kelly-Auswahl öffnen/ })).not.toBeInTheDocument();
+    expect(globalThis.document.querySelector(".kelly-status")).not.toBeInTheDocument();
+    expect(status).toHaveTextContent("Nächste 48 Stunden ab jetzt");
+    const reopened = await openFilters(user);
+    expect(within(reopened).getByRole("heading", { name: "Form und H2H" })).toBeInTheDocument();
 
     expect(status).toHaveTextContent("Spiele angezeigt");
     expect(status?.querySelector("strong")).toHaveTextContent("2");
 
     // Die erste Zahl folgt dem Tabellenfilter, die Zähler im Menü bleiben beim vollen Umfang.
-    const headCount = menu.querySelector(".filter-menu-count");
+    const headCount = reopened.querySelector(".filter-menu-count");
     expect(headCount).toHaveTextContent("2 Spiele angezeigt");
-    await user.click(within(menu).getByRole("radio", { name: /Starke Tipps/ }));
+    await user.click(within(reopened).getByRole("radio", { name: /Starke Tipps/ }));
     expect(status?.querySelector("strong")).toHaveTextContent("1");
     // Die Statuszeile liegt unter dem Menü - der Kopf zeigt dieselbe Zahl, wo man hinschaut.
     expect(headCount).toHaveTextContent("1 Spiel angezeigt");
-    expect(within(menu).getByRole("radio", { name: /Alle Spiele/ }).closest("label")).toHaveTextContent("2");
+    expect(within(reopened).getByRole("radio", { name: /Alle Spiele/ }).closest("label")).toHaveTextContent("2");
+    void menu;
   });
 
   it("kennzeichnet besonders defensiv starke Teams mit einem Shield", async () => {
@@ -391,9 +443,47 @@ describe("React-Dashboard", () => {
     await user.selectOptions(screen.getByLabelText("Markt"), "firstHalfOver05");
     expect(globalThis.document.querySelector(".table-head")?.textContent).toContain("Erw. Tore 1. HZ");
     const firstRow = globalThis.document.querySelector(".fixture-row");
-    expect(firstRow?.textContent).toContain("0,70:0,40");
+    // Die Summe der Halbzeit groß, darunter die des ganzen Spiels.
+    expect(firstRow?.querySelector(".expected-cell strong")?.textContent).toBe("Σ 1,10");
+    expect(firstRow?.textContent).toContain("Spiel Σ 2,70");
     expect(firstRow?.textContent).toContain("78,0 %");
     expect(firstRow?.textContent).toContain("–");
+  });
+
+  it("zeigt auch bei HZ-Unter-Märkten die Torerwartung der Halbzeit, fehlend als Strich", async () => {
+    // Schema 1 führt keine Halbzeitwerte - dann darf keine 0,00 dastehen.
+    const current = document();
+    current.fixtures = current.fixtures.map((item) => ({
+      ...item,
+      markets: [...item.markets, { ...item.markets[3]!, key: "firstHalfUnder05", label: "1. HZ U0,5", selection: "1. Halbzeit: kein Tor" }]
+    }));
+    vi.stubGlobal("fetch", dashboardFetch(() => current));
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(<App />);
+    expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
+
+    await user.selectOptions(screen.getByLabelText("Markt"), "firstHalfUnder05");
+    expect(globalThis.document.querySelector(".table-head")?.textContent).toContain("Erw. Tore 1. HZ");
+    const expected = globalThis.document.querySelector(".fixture-row .expected-cell");
+    expect(expected?.querySelector("strong")?.textContent).toBe("Σ –");
+    expect(expected?.textContent).toContain("Spiel Σ 2,70");
+  });
+
+  it("zeigt Datenvertrauen und Hinweise in einer eigenen Spalte, die Remis-Serie unter H2H", async () => {
+    const current = document();
+    current.fixtures[0] = { ...current.fixtures[0]!, warnings: ["Wenige Spiele in der Saison"], h2hNotice: "3 Remis in Folge" };
+    vi.stubGlobal("fetch", dashboardFetch(() => current));
+    render(<App />);
+    expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
+
+    const data = globalThis.document.querySelector(".fixture-row .data-cell")!;
+    expect(data).toHaveTextContent("85 %");
+    expect(data).toHaveTextContent("1 Hinweis");
+    expect(data).toHaveAttribute("title", expect.stringContaining("Wenige Spiele in der Saison"));
+    // Eine Auffälligkeit, kein Tipp-Grund: grau unter den H2H-Punkten.
+    const notice = globalThis.document.querySelector(".fixture-row .h2h-notice")!;
+    expect(notice).toHaveTextContent("Remis-Serie");
+    expect(notice).toHaveAttribute("title", expect.stringContaining("3 Remis in Folge"));
   });
 
   it("zeigt die letzten fünf H2H nach Halbzeit-Über 0,5 und 1,5", async () => {
@@ -1131,7 +1221,7 @@ describe("Klassenunterschied", () => {
 
     await applyQuickpick(user);
 
-    expect(screen.getByText(/Daves 1x2-Filter lässt keine Partie übrig/)).toBeInTheDocument();
+    expect(screen.getByText(/Daves 1x2-Filter lässt kein Spiel übrig/)).toBeInTheDocument();
     expect(screen.getByText(/keine Mannschaft ist in der Form klar besser/)).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Filter aufheben" }));
     expect(screen.getByText("Alpha FC")).toBeInTheDocument();
@@ -1176,20 +1266,32 @@ describe("Schüsse und Ecken", () => {
       mitZahlen(2, "Ohne Zahlen", undefined, undefined)
     ];
     current.meta.fixtureCount = 2;
-    vi.stubGlobal("fetch", dashboardFetch(() => current));
+    // Die Kennzahlen kommen nie zurück: Die Zeile aus dem Lauf muss schon beim Laden stehen.
+    vi.stubGlobal("fetch", vi.fn((url: string) => String(url).startsWith("/api/fixture/insights")
+      ? new Promise<Response>(() => {})
+      : Promise.resolve(new Response(JSON.stringify(current), { status: 200 }))));
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     render(<App />);
     expect(await screen.findByText("Mit Zahlen")).toBeInTheDocument();
+    // Schüsse aufs Tor stehen nur bei Tor- und BTTS-Märkten in der Zeile.
+    expect(globalThis.document.querySelector(".recent-stat-cell")).not.toBeInTheDocument();
+    await user.selectOptions(screen.getByLabelText("Markt"), "over25");
 
     const zeilen = globalThis.document.querySelectorAll(".fixture-row");
     expect(zeilen[0]?.textContent).toContain("5,2");
-    expect(zeilen[0]?.textContent).toContain("6,4");
+    expect(zeilen[0]?.textContent).not.toContain("6,4");
     // Ohne Zahlen steht ein Strich - nicht 0,0, das wäre eine Aussage, die niemand geprüft hat.
     const leer = zeilen[1]?.querySelectorAll(".recent-stat-cell strong");
-    expect(leer?.length).toBe(4);
+    expect(leer?.length).toBe(2);
     for (const feld of Array.from(leer ?? [])) expect(feld.textContent).toBe("–");
+
+    // Die Ecken sind in die Detailansicht gewandert.
+    await user.click(screen.getByRole("button", { name: /Mit ZahlenGast FC/ }));
+    expect(screen.getByRole("status")).toHaveTextContent("werden geladen");
+    expect(globalThis.document.querySelector(".detail-recent")).toHaveTextContent("Schüsse aufs Tor 5,2 : 3,0 · Ecken 6,4 : 2,0");
   });
 
-  it("sortiert nach Schüssen und nach Ecken getrennt", async () => {
+  it("sortiert nach Schüssen; Ecken nur noch in Detailansicht und Heatmap", async () => {
     const current = document();
     current.fixtures = [
       mitZahlen(1, "Wenig Schüsse", { shotsOnGoal: 1, corners: 9 }, { shotsOnGoal: 1, corners: 9 }),
@@ -1200,20 +1302,23 @@ describe("Schüsse und Ecken", () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     render(<App />);
     expect(await screen.findByText("Viele Schüsse")).toBeInTheDocument();
+    await user.selectOptions(screen.getByLabelText("Markt"), "over25");
 
     await user.click(screen.getByRole("button", { name: /Schüsse aufs Tor/i }));
     expect(globalThis.document.querySelector(".fixture-row")?.textContent).toContain("Viele Schüsse");
 
-    await user.click(screen.getByRole("button", { name: /Ecken/i }));
-    expect(globalThis.document.querySelector(".fixture-row")?.textContent).toContain("Wenig Schüsse");
+    expect(screen.queryByRole("button", { name: /^Ecken/ })).not.toBeInTheDocument();
+    expect(within(screen.getByLabelText("Sortierung")).queryByRole("option", { name: "Ecken" })).not.toBeInTheDocument();
   });
 
   it("verträgt Läufe von vor dieser Ergänzung", async () => {
     // Ältere Snapshots führen form.homeStats gar nicht - das darf nicht werfen.
     const current = document();
     vi.stubGlobal("fetch", dashboardFetch(() => current));
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     render(<App />);
     expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
+    await user.selectOptions(screen.getByLabelText("Markt"), "btts");
     expect(globalThis.document.querySelectorAll(".recent-stat-cell").length).toBeGreaterThan(0);
   });
 });
@@ -1250,7 +1355,9 @@ describe("Heatmap", () => {
     const menu = await openFilters(user);
     // In der Heatmap wirken die Punkte nicht - der Block entfällt, statt grau dazustehen.
     expect(within(menu).queryByRole("group", { name: /Punkte in Form und H2H/ })).not.toBeInTheDocument();
-    expect(within(menu).getByRole("switch", { name: /Vorteil & Kelly-Einsatz anzeigen/ })).toBeInTheDocument();
+    // Ohne Punkte bleibt die Karte "Form und H2H" leer und entfällt; die Anzeige steht in der Leiste.
+    expect(within(menu).queryByRole("heading", { name: "Form und H2H" })).not.toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "Vorteil & Kelly" })).toBeInTheDocument();
     expect(screen.getByLabelText("Markt")).toBeEnabled();
 
     unmount();
@@ -1281,7 +1388,7 @@ describe("Heatmap", () => {
     expect(cells[3]).toHaveTextContent("–");
     expect(row.querySelectorAll(".odds-cell.value")).toHaveLength(3);
 
-    await user.click(within(await openFilters(user)).getByRole("switch", { name: /Vorteil & Kelly-Einsatz anzeigen/i }));
+    await user.click(screen.getByRole("radio", { name: "Kennzahlen" }));
     expect(globalThis.document.querySelectorAll(".odds-cell.value")).toHaveLength(0);
     expect(screen.getByText(/Value-Färbung/)).toBeInTheDocument();
   });
@@ -1379,7 +1486,7 @@ describe("Sortierauswahl", () => {
     const { unmount } = render(<App />);
     expect(await screen.findByText("Früh FC")).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: /^Partie,/ }));
+    await user.click(screen.getByRole("button", { name: /^Spiel,/ }));
     expect(screen.getByLabelText("Sortierung")).toHaveValue("team");
     unmount();
 
@@ -1403,5 +1510,240 @@ describe("Sortierauswahl", () => {
     await user.selectOptions(screen.getByLabelText("Sortierung"), "league");
     expect(screen.getByLabelText("Sortierung")).toHaveValue("league");
     expect(reihenfolge(".heatmap-row")).toEqual(["Spät FC", "Mitte FC", "Früh FC"]);
+  });
+});
+
+describe("Tabelle: Anzeige Kennzahlen", () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date("2026-08-16T12:00:00.000Z"));
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+    window.localStorage.clear();
+  });
+
+  it("zeigt bei Alle Märkte die empfohlenen Märkte, ★ zuerst und höchstens drei", async () => {
+    const current = document();
+    current.fixtures[0]!.markets = current.fixtures[0]!.markets.map((market) => market.key === "draw"
+      ? { ...market, recommendation: { level: "recommended", label: "Empfehlenswert" } }
+      : market);
+    vi.stubGlobal("fetch", dashboardFetch(() => current));
+    render(<App />);
+    expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
+
+    const [first, second] = [...globalThis.document.querySelectorAll(".fixture-row .recommended-cell")];
+    const chips = [...first!.querySelectorAll(".rec-chip")];
+    // 1X2 steht in seiner eigenen Zelle; von den vier übrigen die drei stärksten, Remis (✓) hinten.
+    expect(chips.map((chip) => chip.textContent)).toEqual(["★BTTS · 1,80 · 72 %", "★Ü1,5 · 1,80 · 72 %", "★Ü2,5 · 1,80 · 72 %"]);
+    expect(first!.querySelector(".rec-more")).toHaveTextContent("+1");
+    expect(first!.querySelector(".rec-more")).toHaveAttribute("title", expect.stringContaining("Remis"));
+    expect(second).toHaveTextContent("–");
+  });
+
+  it("trennt bei Sortierung nach Anstoß die Tage, in beide Richtungen", async () => {
+    vi.stubGlobal("fetch", dashboardFetch(() => document()));
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(<App />);
+    expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
+
+    const tage = () => [...globalThis.document.querySelectorAll(".day-divider h3")].map((head) => head.textContent);
+    expect(tage()).toEqual(["So 16.08.", "Mo 17.08."]);
+    expect(globalThis.document.querySelector(".day-divider")).toHaveTextContent("1 Spiel");
+    // Mit Trennzeile steht das Datum nicht noch einmal in jeder Zeile.
+    expect(globalThis.document.querySelector(".kickoff-cell")).not.toHaveTextContent("16.08.");
+
+    await user.click(screen.getByRole("button", { name: /Reihenfolge umdrehen/ }));
+    expect(tage()).toEqual(["Mo 17.08.", "So 16.08."]);
+
+    await user.selectOptions(screen.getByLabelText("Sortierung"), "league");
+    expect(tage()).toEqual([]);
+    expect(globalThis.document.querySelector(".kickoff-cell")).toHaveTextContent("16.08.");
+  });
+
+  it("fällt bei einer ausgeblendeten Sortierung auf den Anstoß zurück, ohne die Wahl zu vergessen", async () => {
+    window.localStorage.setItem("football-analyzer:sort", JSON.stringify({ key: "shots", direction: -1 }));
+    vi.stubGlobal("fetch", dashboardFetch(() => document()));
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(<App />);
+    expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
+
+    // Bei "Alle Märkte" gibt es keine Schuss-Spalte - sortiert wird nach Anstoß.
+    expect(screen.getByLabelText("Sortierung")).toHaveValue("kickoff");
+    await user.selectOptions(screen.getByLabelText("Markt"), "over25");
+    expect(screen.getByLabelText("Sortierung")).toHaveValue("shots");
+    expect(JSON.parse(window.localStorage.getItem("football-analyzer:sort") ?? "null")).toEqual({ key: "shots", direction: -1 });
+  });
+});
+
+describe("Tabelle: Anzeige Vorteil & Kelly", () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date("2026-08-16T12:00:00.000Z"));
+    window.localStorage.setItem("football-analyzer:kelly-visible-v2", "1");
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+    window.localStorage.clear();
+  });
+
+  /** BTTS mit 60 % zu 1,90: 7,4 PP Vorteil, unter dem Deckel der manuellen Vorgabe (12 PP). */
+  function kellyDocument(bttsProbabilities: [number, number] = [0.6, 0.6]): DashboardDocument {
+    const current = document();
+    current.fixtures = current.fixtures.map((item, index) => ({
+      ...item,
+      markets: item.markets.map((market) => market.key === "btts"
+        ? { ...market, probability: bttsProbabilities[index]!, odds: 1.9 }
+        : market)
+    }));
+    return current;
+  }
+
+  const manual = () => window.localStorage.setItem("football-analyzer:kelly-auto", "0");
+
+  /**
+   * Seit 29.09.2026 wieder wie vor dem 28.09.: Die Tabelle behält in beiden Anzeigen ihre Spalten,
+   * "Vorteil & Kelly" blendet nur den Vorteil in der Marktspalte ein. Die Wetten stehen im Dialog.
+   */
+  it("behält die Spalten der Tabelle und zeigt den Vorteil grau in der Marktspalte", async () => {
+    manual();
+    vi.stubGlobal("fetch", dashboardFetch(() => kellyDocument()));
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(<App />);
+    expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
+    await user.selectOptions(screen.getByLabelText("Markt"), "btts");
+
+    expect(globalThis.document.querySelector(".table-head")).toHaveAttribute("data-columns",
+      "match kickoff form h2h expected shots market data");
+    const row = globalThis.document.querySelector(".fixture-row")!;
+    expect(row.querySelector(".form-cell")).toBeInTheDocument();
+    expect(row.querySelector(".market-edge")).toHaveTextContent("+7,4 PP");
+    expect(row).not.toHaveTextContent("€");
+    // Nach Einsätzen lässt sich in der Übersicht nicht sortieren - sie stehen dort nicht.
+    expect(within(screen.getByLabelText("Sortierung")).queryByRole("option", { name: "Kelly-Einsatz" })).not.toBeInTheDocument();
+
+    await user.click(within(screen.getByRole("group", { name: "Anzeige" })).getByRole("radio", { name: "Kennzahlen" }));
+    expect(globalThis.document.querySelector(".fixture-row .market-edge")).toBeNull();
+  });
+
+  it("zeigt ohne Ligastärke-Vergleich keinen Vorteil", async () => {
+    manual();
+    const current = kellyDocument();
+    current.fixtures[0]!.markets = current.fixtures[0]!.markets.map((market) =>
+      market.key === "1x2" ? { ...market, probabilityReliable: false } : market);
+    vi.stubGlobal("fetch", dashboardFetch(() => current));
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(<App />);
+    expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
+
+    await user.selectOptions(screen.getByLabelText("Markt"), "1x2");
+    const row = globalThis.document.querySelector(".fixture-row")!;
+    expect(row.querySelector(".market-card")).toHaveTextContent("Ligastärke unbekannt");
+    expect(row.querySelector(".market-edge")).toBeNull();
+    // Nur 1X2 ist betroffen - BTTS desselben Spiels bleibt bewertbar.
+    await user.selectOptions(screen.getByLabelText("Markt"), "btts");
+    expect(globalThis.document.querySelector(".fixture-row .market-edge")).toHaveTextContent("PP");
+  });
+
+  it("listet die Wetten im Dialog, sortierbar", async () => {
+    manual();
+    vi.stubGlobal("fetch", dashboardFetch(() => kellyDocument()));
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(<App />);
+    expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
+    await user.selectOptions(screen.getByLabelText("Markt"), "btts");
+
+    await user.click(screen.getByRole("button", { name: "Kelly-Auswahl öffnen" }));
+    const dialog = screen.getByRole("dialog", { name: "Kelly-Auswahl" });
+    const rows = within(dialog).getAllByRole("row").slice(1);
+    expect(rows).toHaveLength(2);
+    const alpha = rows.find((row) => row.textContent?.includes("Alpha FC"))!;
+    expect(alpha).toHaveTextContent("BTTS");
+    expect(alpha).toHaveTextContent("60,0 %");
+    expect(alpha).toHaveTextContent("+7,4 PP");
+    expect(alpha).toHaveTextContent("3,00 €");
+    // Der Vorteil erklärt sich im Kopf und warnt dort.
+    expect(within(dialog).getByRole("button", { name: /^Vorteil/ })).toHaveAttribute("title", expect.stringContaining("desto eher ein Fehler des Modells"));
+    await user.click(within(dialog).getByRole("button", { name: /^Spiel/ }));
+    expect(within(dialog).getAllByRole("row")[1]).toHaveTextContent("Alpha FC");
+    await user.click(within(dialog).getByRole("button", { name: /^Spiel/ }));
+    expect(within(dialog).getAllByRole("row")[1]).toHaveTextContent("Zulu FC");
+  });
+
+  it("nennt es im Dialog, wenn keine Wette in der Auswahl ist", async () => {
+    manual();
+    vi.stubGlobal("fetch", dashboardFetch(() => kellyDocument([0.4, 0.4])));
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(<App />);
+    expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
+    await user.selectOptions(screen.getByLabelText("Markt"), "btts");
+
+    await user.click(screen.getByRole("button", { name: "Kelly-Auswahl öffnen" }));
+    expect(within(screen.getByRole("dialog", { name: "Kelly-Auswahl" })).getByText("Keine Wette in der Auswahl für diesen Markt.")).toBeInTheDocument();
+  });
+
+  it("rechnet auf dem Umfang - ein Tabellenfilter ändert die Auswahl nicht", async () => {
+    manual();
+    vi.stubGlobal("fetch", dashboardFetch(() => kellyDocument()));
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(<App />);
+    expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
+    await user.selectOptions(screen.getByLabelText("Markt"), "btts");
+
+    const status = globalThis.document.querySelector(".kelly-status")!;
+    expect(status).toHaveTextContent("Kelly-Auswahl · BTTS: 2 Wetten");
+    await user.click(within(await openFilters(user)).getByRole("radio", { name: /Starke Tipps/ }));
+    // Zulu FC ist ohne Stufe ausgeblendet, sein Einsatz gehört aber weiter zur Auswahl.
+    expect(status).toHaveTextContent("2 Wetten");
+  });
+
+  it("zeigt keine Beträge, solange die Automatik lädt", async () => {
+    vi.stubGlobal("fetch", vi.fn((url: string) => String(url).startsWith("/api/market-profile")
+      ? new Promise<Response>(() => {})
+      : Promise.resolve(new Response(JSON.stringify(kellyDocument()), { status: 200 }))));
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(<App />);
+    expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
+    await user.selectOptions(screen.getByLabelText("Markt"), "btts");
+
+    expect(globalThis.document.querySelector(".kelly-status")).toHaveTextContent("Automatik wird geladen …");
+    await user.click(screen.getByRole("button", { name: "Kelly-Auswahl öffnen" }));
+    const table = within(screen.getByRole("dialog", { name: "Kelly-Auswahl" })).getByRole("table");
+    expect(table).toHaveTextContent("Automatik wird geladen …");
+    expect(table.querySelector(".kelly-stake")).toBeNull();
+  });
+
+  it("zeigt in der Automatik die korrigierte Wahrscheinlichkeit", async () => {
+    // BTTS behauptet 60 % und trifft 65 % - die Korrektur hebt die Chance an.
+    const profile = buildMarketProfile(Array.from({ length: 200 }, (_unused, index) => ({
+      marketKey: "btts",
+      marketLabel: "BTTS",
+      kickoff: `2026-03-${String(1 + Math.floor(index / 40)).padStart(2, "0")}T18:00:00+01:00`,
+      probability: 0.6,
+      odds: 1.9,
+      edge: 0.6 - 1 / 1.9,
+      hit: ((index * 130) % 200 < 130 ? 1 : 0) as 0 | 1
+    })));
+    vi.stubGlobal("fetch", dashboardFetch(() => kellyDocument(), emptyInsights, profile));
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(<App />);
+    expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
+    await user.selectOptions(screen.getByLabelText("Markt"), "btts");
+
+    await waitFor(() => expect(globalThis.document.querySelector(".kelly-status")).toHaveTextContent("Automatik"));
+    await user.click(screen.getByRole("button", { name: "Kelly-Auswahl öffnen" }));
+    const dialog = screen.getByRole("dialog", { name: "Kelly-Auswahl" });
+    expect(within(dialog).getByRole("button", { name: /^Korrigiert/ })).toBeInTheDocument();
+    const row = within(dialog).getAllByRole("row")[1]!;
+    expect(row.querySelector(".kelly-edge")).toHaveTextContent("nach Korr.");
+    expect(row.querySelector(".kelly-stake strong")?.textContent).toMatch(/€$/);
   });
 });

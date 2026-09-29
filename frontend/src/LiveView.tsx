@@ -140,10 +140,9 @@ function visibleMarkets(markets: DashboardMarket[], filter: "all" | DashboardMar
   return filter === "all" ? markets : markets.filter((market) => market.key === filter);
 }
 
-function LiveRow({ match, marketFilter, showEdge, onHover, onLeave }: {
+function LiveRow({ match, marketFilter, onHover, onLeave }: {
   match: LiveBoardMatch;
   marketFilter: "all" | DashboardMarketKey;
-  showEdge: boolean;
   onHover(fixtureId: number, rect: DOMRect): void;
   onLeave(fixtureId: number): void;
 }) {
@@ -184,14 +183,15 @@ function LiveRow({ match, marketFilter, showEdge, onHover, onLeave }: {
           : <><i className="home" style={{ width: `${possession * 100}%` }} /><i className="away" style={{ width: `${(1 - possession) * 100}%` }} /></>}
       </span>
     </span>
-    {markets.map((market) => <MarketCard market={market} showEdge={showEdge} key={market.key} />)}
+    {/* Nie mit Vorteil: Er stammt aus Quote und Wahrscheinlichkeit vor dem Anpfiff und ist
+        während des Spiels veraltet (Davids Entscheidung vom 28.09.2026). */}
+    {markets.map((market) => <MarketCard market={market} showEdge={false} key={market.key} />)}
   </article>;
 }
 
-export function LiveView({ state, marketFilter, showEdge, isLeagueVisible }: {
+export function LiveView({ state, marketFilter, isLeagueVisible }: {
   state: LiveLoadState;
   marketFilter: "all" | DashboardMarketKey;
-  showEdge: boolean;
   isLeagueVisible(country: string, league: string): boolean;
 }) {
   const [hovered, setHovered] = useState<{ fixtureId: number; rect: DOMRect } | null>(null);
@@ -223,7 +223,6 @@ export function LiveView({ state, marketFilter, showEdge, isLeagueVisible }: {
         key={match.fixtureId}
         match={match}
         marketFilter={marketFilter}
-        showEdge={showEdge}
         onHover={(fixtureId, rect) => setHovered({ fixtureId, rect })}
         onLeave={(fixtureId) => setHovered((value) => value?.fixtureId === fixtureId ? null : value)}
       />)}

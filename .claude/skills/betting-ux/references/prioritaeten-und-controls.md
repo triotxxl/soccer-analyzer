@@ -41,7 +41,8 @@ Ausgenommen: Warnungen und Ehrlichkeitshinweise - die werden gekürzt, nicht ent
 |---|---|---|
 | 2-4 einander ausschließende Optionen, oft gewechselt | Segmentschalter | wie „Daves Filter / Modell-Filter"; im Filtermenü `FilterSegment` (Klassenunterschied, Punkte in Form und H2H, Linie, Richtung) statt Auswahlliste |
 | Wechsel zwischen ganzen Ansichten | Eintrag der linken Navigationsleiste | wie Tabelle, Heatmap, Live, Marktprofil; `aria-current`, kein Segmentschalter |
-| viele einander ausschließende Optionen | Auswahlliste (Select) | wie Markt, Sortierung |
+| andere Spalten derselben Ansicht, blendet nichts aus | Segmentschalter in der Werkzeugleiste | wie „Anzeige: Kennzahlen | Vorteil & Kelly“ (`FilterSegment` mit `toolbar-segment`); kein Ansichtswechsel, deshalb nicht in die Navigationsleiste |
+| viele einander ausschließende Optionen | Auswahlliste (Select) | wie Markt, Sortierung; eingebautes `<select>`, in Chromium per `appearance: base-select` im Leistenstil (Wahl mit Balken links, kein Häkchen), lange Listen mit `optgroup`-Zwischenüberschriften wie die Marktliste - kein eigener Listbox-Baustein |
 | mehrere gleichzeitig | Mehrfachauswahl / Checkliste | wie Wettbewerbe-Dialog |
 | stufenloser Wert, grobe Wahl reicht | Schieberegler | |
 | exakter Zahlenwert (Budget, Mindestquote) | Zahlenfeld, ggf. Regler + Zahlenfeld | Geldbeträge nie nur per Regler |

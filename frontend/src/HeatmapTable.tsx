@@ -183,7 +183,7 @@ export function HeatmapTable({ fixtures, markets, timezone, now, showEdge, openF
       <span><b className="home">blau</b> = Heim vorn, <b className="away">orange</b> = Auswärts vorn</span>
       {showEdge
         ? <span>Quoten: <b className="value">grüner</b> = mehr Value (Modell sieht die Chance höher als die Quote)</span>
-        : <span>Value-Färbung: „Vorteil &amp; Kelly-Einsatz anzeigen“ einschalten</span>}
+        : <span>Value-Färbung: oben unter Anzeige „Vorteil &amp; Kelly“ wählen</span>}
       <span>Details beim Drüberfahren</span>
     </p>
   </div>;

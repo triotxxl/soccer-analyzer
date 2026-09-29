@@ -84,9 +84,12 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
    Blau (--accent) ist hier nur Tastaturfokus, damit "gewaehlt" und "hier bin ich" unterscheidbar
    bleiben. */
 .filter-anchor { position: relative; }
-.filter-trigger { display: flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; border: 1px solid var(--line); border-radius: 9px; background: var(--shell); color: var(--muted); font-size: 11px; font-weight: 700; }
-.filter-trigger:hover { border-color: var(--muted); color: var(--text); }
-.filter-trigger.open { background: var(--surface); color: var(--text); }
+/* Knoepfe der Werkzeugleiste (Filter, Quickpick, Kelly) in derselben Sprache wie Leiste und Menue:
+   ruhend auf --bg, ueberfahren #222, offen oder aktiv #37373d mit heller fetter Schrift. */
+.filter-trigger, .kelly-trigger { position: relative; display: flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--muted); font-size: 12px; font-weight: 600; white-space: nowrap; }
+.filter-trigger:hover, .kelly-trigger:hover { border-color: var(--muted); background: #222222; color: var(--text); }
+/* Offen ist keine Wahl - deshalb ohne gruenen Balken. */
+.filter-trigger.open { background: #37373d; color: var(--text); }
 .filter-count { display: grid; place-items: center; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 6px; background: var(--text); color: var(--bg); font-family: var(--mono); font-size: 10px; font-weight: 700; }
 .filter-menu { position: absolute; top: calc(100% + 8px); left: 0; z-index: 40; display: flex; flex-direction: column; width: min(760px, calc(100vw - 140px)); max-height: calc(100vh - 128px); overflow: hidden; border: 1px solid #4a4a4a; border-radius: 14px; background: var(--bg); box-shadow: 0 18px 42px rgba(0,0,0,.62); color: var(--text); font-size: 12px; text-align: left; }
 .filter-menu.single { width: 420px; }
@@ -200,11 +203,22 @@ fieldset.filter-field { min-width: 0; margin-inline: 0; padding: 0; border: 0; }
 .filter-reset:disabled { border-color: transparent; color: var(--dim); cursor: default; }
 
 /* Zweite Zeile der Werkzeugleiste: was die Filterung uebrig laesst und welche Filter aktiv
-   sind. Immer vorhanden, damit die Tabelle beim ersten Schildchen nicht springt. "mit Vorteil"
-   steht nur mit dem Kelly-Schalter da und ist bewusst nicht gruen (Entscheidung vom 25.09.2026). */
+   sind. Immer vorhanden, damit die Tabelle beim ersten Schildchen nicht springt. */
 .filter-status-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; min-height: 26px; }
 .filter-status { margin: 0 6px 0 0; color: var(--muted); font-size: 11px; }
 .filter-status strong { color: var(--text); font-family: var(--mono); font-weight: 700; }
+/* Nur im Modus "Vorteil & Kelly": was die Auswahl setzt, und darunter immer die Warnung. */
+.kelly-status { display: grid; gap: 4px; }
+.kelly-status-line { margin: 0; color: var(--muted); font-size: 11px; }
+.kelly-status-line strong { color: var(--text); font-family: var(--mono); font-weight: 700; }
+/* Der Segmentschalter in der Leiste: dieselbe Wahl-Sprache wie im Menü, aber so hoch wie die
+   Auswahllisten daneben und mit der Beschriftung der Leiste. */
+.toolbar-segment { gap: 4px; }
+.toolbar-segment > legend { margin-bottom: 4px; color: var(--muted); font-size: 10px; font-weight: 400; letter-spacing: .06em; text-transform: uppercase; }
+/* 26 px + 2 x 2 px Mulde + 2 px Rand = 32 px, so hoch wie Knoepfe und Auswahllisten daneben. */
+.toolbar-segment .segmented.filter-seg { border-color: var(--line); }
+/* Breite nach Inhalt statt gleich verteilt - sonst stoesst "Vorteil & Kelly" an den Rand. */
+.toolbar-segment .segmented.filter-seg label { flex: 0 0 auto; height: 26px; padding: 0 12px; font-size: 12px; }
 .filter-chip { display: inline-flex; align-items: center; height: 26px; overflow: hidden; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
 .filter-chip-label { height: 100%; padding: 0 6px 0 10px; border: 0; background: transparent; color: var(--text); font-size: 11px; font-weight: 600; white-space: nowrap; }
 .filter-chip-clear { display: grid; place-items: center; width: 24px; height: 100%; padding: 0; border: 0; border-left: 1px solid var(--line); background: transparent; color: var(--muted); }
@@ -245,8 +259,6 @@ fieldset.filter-field { min-width: 0; margin-inline: 0; padding: 0; border: 0; }
 .league-table input[type="checkbox"] { width: 16px; height: 16px; margin: 0; accent-color: var(--accent); }
 .league-empty { padding: 20px 8px; color: #737373; font-size: 10px; text-align: center; }
 
-.kelly-trigger { display: flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; border: 1px solid var(--line); border-radius: 9px; background: #1e1e1e; color: #b8b8b8; font-size: 11px; font-weight: 700; }
-.kelly-trigger:hover { border-color: var(--accent); color: var(--accent); }
 .kelly-dialog { position: fixed; top: 50%; left: 50%; z-index: 61; width: min(960px, calc(100vw - 32px)); max-height: min(720px, calc(100vh - 48px)); display: flex; flex-direction: column; overflow: hidden; border: 1px solid #4a4a4a; border-radius: 14px; background: #1e1e1e; box-shadow: 0 24px 60px rgba(0,0,0,.55); transform: translate(-50%,-50%); }
 .kelly-head strong { font-size: 15px; }
 .kelly-head-market { margin-left: 8px; color: #8f8f8f; font-weight: 400; }
@@ -282,6 +294,7 @@ fieldset.filter-field { min-width: 0; margin-inline: 0; padding: 0; border: 0; }
 .kelly-market-toggles input[type="checkbox"] { width: 14px; height: 14px; margin: 0; }
 .kelly-settings-grid > .kelly-setting-field:has(.kelly-market-toggles) { grid-column: 1 / -1; }
 
+/* Die Liste der Wetten steht im Dialog, nicht in der Übersicht (Davids Entscheidung vom 29.09.2026). */
 .kelly-table-wrap { margin-top: 14px; overflow: hidden; border: 1px solid #383838; border-radius: 10px; }
 .kelly-table { width: 100%; border-collapse: collapse; font-size: 12px; }
 .kelly-table thead th { position: sticky; top: 0; z-index: 1; padding: 9px 10px; background: #232324; color: #8f8f8f; font-size: 10px; font-weight: 700; letter-spacing: .06em; text-align: left; text-transform: uppercase; }
@@ -292,7 +305,9 @@ fieldset.filter-field { min-width: 0; margin-inline: 0; padding: 0; border: 0; }
 .kelly-table tbody tr:nth-child(even) td { background: rgba(255,255,255,.022); }
 .kelly-table td strong { display: block; font-size: 12px; font-weight: 700; }
 .kelly-table td small { display: block; margin-top: 3px; color: #8f8f8f; font-size: 11px; }
-.kelly-table td.kelly-edge strong { color: #89d185; }
+/* Der Vorteil grau, nicht grün - Grün heißt in der App „Empfehlenswert“. */
+.kelly-table td.kelly-edge strong { color: var(--muted); }
+.kelly-table td.kelly-calibrated small { color: var(--gold); }
 .kelly-table td.kelly-stake strong { color: #f0f0f0; font-size: 15px; font-weight: 800; }
 .kelly-table td.kelly-stake small { color: #d9a05b; }
 .kelly-empty { padding: 22px 10px; color: #8f8f8f; font-size: 12px; text-align: center; }
@@ -306,7 +321,10 @@ fieldset.filter-field { min-width: 0; margin-inline: 0; padding: 0; border: 0; }
 
 /* Quickpicker: Auslöser, Streifen und Panel. Erbt bewusst die Kelly-Klassen, damit beide
    Auswahlhilfen nicht auseinanderlaufen. */
-.quickpick-trigger[aria-pressed="true"] { border-color: var(--accent); background: #26312b; color: var(--accent); }
+/* Aktiv ist eine Wahl: helle Flaeche und der gruene Balken unten wie im Filtermenue - kein Blau,
+   das nur Tastaturfokus heisst. */
+.quickpick-trigger[aria-pressed="true"] { background: #37373d; color: var(--text); }
+.quickpick-trigger[aria-pressed="true"]::after { content: ""; position: absolute; left: 8px; right: 8px; bottom: 0; height: 3px; border-radius: 3px 3px 0 0; background: var(--green); }
 .quickpick-apply { flex: none; height: 32px; padding: 0 14px; border: 1px solid var(--line); border-radius: 9px; background: #1e1e1e; color: #b8b8b8; font-size: 11px; font-weight: 700; }
 .quickpick-apply:hover { border-color: var(--accent); color: var(--accent); }
 .quickpick-apply.active { border-color: var(--accent); background: var(--accent); color: #10281a; }
@@ -333,8 +351,9 @@ fieldset.filter-field { min-width: 0; margin-inline: 0; padding: 0; border: 0; }
 .empty-state-action { margin-top: 4px; height: 30px; padding: 0 14px; border: 1px solid var(--line); border-radius: 9px; background: #1e1e1e; color: #b8b8b8; font-size: 11px; font-weight: 700; }
 .empty-state-action:hover { border-color: var(--accent); color: var(--accent); }
 .market-edge { font-size: 9px; font-weight: 700; white-space: nowrap; }
-.market-edge.pos { color: var(--green); }
-.market-edge.neg { color: #d17a7a; }
+/* Grau in beide Richtungen: Grün heißt in der Tabelle „Empfehlenswert“, und ein großer Vorteil
+   ist meist ein Fehler des Modells, keine Empfehlung. */
+.market-edge.pos, .market-edge.neg { color: var(--muted); font-weight: 600; }
 
 .content { display: flex; min-width: 0; min-height: 0; flex-direction: column; padding: 26px 16px 0; }
 .banner { display: flex; align-items: center; gap: 15px; margin-bottom: 18px; padding: 14px 16px; border: 1px solid #3c3c3c; border-radius: 14px; background: linear-gradient(90deg, rgba(255,255,255,.045), rgba(255,255,255,.015)); }
@@ -347,50 +366,81 @@ fieldset.filter-field { min-width: 0; margin-inline: 0; padding: 0; border: 0; }
    brechen nur in ihrer eigenen Zeile um - die Knoepfe darueber wandern nicht. */
 .view-toolbar { display: flex; flex-direction: column; gap: 10px; padding: 14px 0 12px; border-bottom: 1px solid var(--line-soft); color: #858585; font-size: 12px; }
 .toolbar-row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 14px; }
+/* Reihenfolge seit 28.09.2026: [Filter] [Quickpick] | Markt, Sortierung, Anzeige [Kelly-Auswahl].
+   Was ausblendet, steht links beisammen; Kelly direkt neben dem Umschalter, der ihn einblendet. */
+.toolbar-group { display: flex; align-items: flex-end; gap: 8px; }
+.toolbar-divider { flex: 0 0 auto; width: 1px; height: 32px; background: var(--line); }
 .toolbar-field { display: grid; gap: 4px; }
-.toolbar-field > span, .toolbar-field > label { color: #8a8a8a; font-size: 9px; letter-spacing: .08em; text-transform: uppercase; }
-.sort-control { display: flex; gap: 4px; }
-.sort-direction { width: 30px; height: 30px; padding: 0; border: 1px solid var(--line); border-radius: 8px; background: #1e1e1e; color: #b8b8b8; font-size: 13px; font-weight: 700; }
-.sort-direction:hover { border-color: #5a5a5a; color: #ffffff; }
+.toolbar-field > span, .toolbar-field > label { color: var(--muted); font-size: 10px; letter-spacing: .06em; text-transform: uppercase; }
+/* Auswahlliste und Richtung als ein Baustein. */
+.sort-control { display: flex; }
+.view-toolbar .sort-control select { border-radius: 8px 0 0 8px; }
+.sort-direction { width: 32px; height: 32px; padding: 0; border: 1px solid var(--line); border-left: 0; border-radius: 0 8px 8px 0; background: var(--bg); color: var(--text); font-size: 13px; font-weight: 700; }
+.sort-direction:hover { background: #222222; }
 .segmented { display: flex; padding: 3px; border: 1px solid var(--line); border-radius: 10px; background: #1e1e1e; }
 .segmented button { padding: 8px 12px; border: 0; border-radius: 7px; background: transparent; color: #a0a0a0; font-size: 11px; }
 .segmented button.active { background: #37373d; color: #ffffff; font-weight: 700; }
-.view-toolbar select { height: 30px; padding: 0 8px; border: 1px solid var(--line); border-radius: 8px; background: #1e1e1e; color: #b8b8b8; font-size: 11px; }
+.view-toolbar select { height: 32px; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--text); font-size: 12px; }
+.view-toolbar select:hover:not(:disabled) { border-color: var(--muted); background: #222222; }
 .view-toolbar select:disabled { opacity: .35; }
-/* Die Auslöser rücken als Gruppe nach rechts - ein margin-left am einzelnen Knopf würde
-   die Gruppe auseinanderreißen, sobald ein zweiter danebensteht. */
-.view-toolbar .toolbar-actions { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+
+/* Auswahllisten im Leistenstil (seit 28.09.2026): das eingebaute <select> bleibt - Tastatur,
+   Tippsuche und Screenreader kommen vom Browser, die Liste liegt in der obersten Ebene und wird
+   von .app-shell nicht abgeschnitten -, Chromium gestaltet es ueber appearance: base-select.
+   Andere Browser zeigen die gewohnte Liste. Farbregel wie im Filtermenue: Die Wahl traegt
+   #37373d, fette Schrift und den gruenen Balken LINKS wie der aktive Leisteneintrag (die Liste
+   ist senkrecht); kein Haekchen, denn ✓ heisst in der Tabelle "Empfehlenswert". Blau nur Fokus. */
+@supports (appearance: base-select) {
+  .view-toolbar select, .view-toolbar select::picker(select) { appearance: base-select; }
+  .view-toolbar select { display: flex; align-items: center; gap: 8px; }
+  .view-toolbar select:open { background: #37373d; font-weight: 600; }
+  .view-toolbar select::picker-icon { color: var(--muted); }
+  .view-toolbar select::picker(select) { max-height: min(460px, 70vh); margin-block: 6px; padding: 4px; overflow-y: auto; border: 1px solid #4a4a4a; border-radius: 10px; background: var(--bg); box-shadow: 0 18px 42px rgba(0,0,0,.62); color: var(--text); }
+  .view-toolbar option { position: relative; display: flex; align-items: center; min-height: 28px; padding: 0 12px 0 14px; border-radius: 6px; color: var(--muted); font-size: 12px; font-weight: 400; letter-spacing: 0; text-transform: none; white-space: nowrap; }
+  .view-toolbar option::checkmark { display: none; }
+  .view-toolbar option:hover:not(:checked):not(:disabled) { background: #222222; color: var(--text); }
+  .view-toolbar option:checked { background: #37373d; color: var(--text); font-weight: 600; }
+  .view-toolbar option:checked::before { content: ""; position: absolute; top: 6px; bottom: 6px; left: 0; width: 3px; border-radius: 0 3px 3px 0; background: var(--green); }
+  .view-toolbar option:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+  .view-toolbar option:disabled { color: var(--dim); }
+  /* Gruppenueberschrift leise wie die Gruppen im Filtermenue; die Eintraege setzen die Schrift zurueck. */
+  .view-toolbar optgroup { padding: 8px 0 0; color: var(--muted); font-size: 10px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
+  .view-toolbar optgroup + optgroup, .view-toolbar option + optgroup { margin-top: 4px; border-top: 1px solid var(--line); }
+  .view-toolbar optgroup option { margin-top: 2px; }
+}
 
 .table-with-detail { display: flex; min-height: 0; flex: 1; }
-.table-scroll { min-width: 0; min-height: 0; flex: 1; margin: 0 0 16px; padding: 0; border: 1px solid var(--line-soft); border-radius: 18px; background: rgba(255,255,255,.02); overflow: auto; }
-/* Die Minima sind am tatsaechlichen Inhalt gemessen (Raster auf max-content gestellt und
-   abgelesen), nicht geschaetzt: Form 183, H2H 131, Erw. Tore 79, Score 48, Marktkarte 124.
-   Ein Minimum unter dem Inhalt laesst die Spalte klemmen, waehrend die fr-Anteile den
-   Ueberschuss anderswo verteilen - genau so hing der Platz vorher in Score und Erw. Tore
-   fest, obwohl die Formspalte ueberlief. Die Partie-Spalte darf darunter bleiben, sie
-   kuerzt per Ellipse und bekommt dafuer den groessten fr-Anteil. */
-.fixture-grid { --market-count: 5; --table-min-width: 1440px; display: grid; grid-template-columns: minmax(280px,1.7fr) minmax(184px,1fr) minmax(134px,.8fr) minmax(46px,.3fr) minmax(46px,.3fr) minmax(82px,.5fr) repeat(var(--market-count),minmax(126px,.8fr)); gap: 10px; width: 100%; min-width: max(100%,var(--table-min-width)); align-items: center; }
-.fixture-grid.has-score { grid-template-columns: minmax(280px,1.7fr) minmax(184px,1fr) minmax(134px,.8fr) minmax(46px,.3fr) minmax(46px,.3fr) minmax(82px,.5fr) minmax(52px,.34fr) repeat(var(--market-count),minmax(126px,.8fr)); }
+/* Rahmen wie die Karten des Filtermenüs: Rand --line, Radius 10. */
+.table-scroll { min-width: 0; min-height: 0; flex: 1; margin: 0 0 16px; padding: 0; border: 1px solid var(--line); border-radius: 10px; background: var(--shell); overflow: auto; }
+/* Die Spaltenliste samt Minima steht in tableColumns.ts; das Raster kommt inline aus derselben
+   Liste wie die Mindestbreite, damit beide nicht mehr auseinanderlaufen koennen. */
+.fixture-grid { display: grid; gap: 10px; width: 100%; min-width: max(100%,var(--table-min-width, 1100px)); align-items: center; }
 /* Schuesse und Ecken: zwei Zeilen wie die Formspalte, oben Heim, unten Gast. */
 .recent-stat-cell { display: grid; gap: 4px; justify-items: center; font-variant-numeric: tabular-nums; }
 .recent-stat-cell strong { font-size: 12px; font-weight: 600; color: #d4d4d4; }
 .recent-stat-cell strong.missing { color: #6a6a6a; font-weight: 400; }
 .table-head button.icon-head { display: flex; align-items: center; justify-content: center; gap: 3px; }
-.table-head { position: sticky; top: 0; z-index: 5; margin: 0; padding: 11px 10px 9px 40px; border-bottom: 1px solid var(--line); background: #252526; }
-.table-head button { padding: 4px 0; border: 0; background: transparent; color: #969696; font-size: 10px; font-weight: 700; letter-spacing: .08em; text-align: left; text-transform: uppercase; white-space: nowrap; }
-.table-head > button:nth-child(n+2) { width: 100%; text-align: center; }
+.table-head { position: sticky; top: 0; z-index: 5; margin: 0; padding: 11px 10px 9px 40px; border-bottom: 1px solid var(--line); background: var(--surface); }
+.table-head button { padding: 4px 0; border: 0; background: transparent; color: var(--muted); font-size: 11px; font-weight: 600; letter-spacing: .08em; text-align: left; text-transform: uppercase; white-space: nowrap; }
+.table-head button:hover { color: var(--text); }
+.table-head > *:nth-child(n+2) { width: 100%; text-align: center; }
+.table-head button.sorted { color: var(--text); font-weight: 700; }
+/* Nicht sortierbare Köpfe (Tipp, Vorteil, Korrigiert, Empfohlene Märkte): gleiche Schrift, Erklärung im Tooltip. */
+.table-head .head-label { padding: 4px 0; color: var(--muted); font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; white-space: nowrap; cursor: help; }
 .fixture-summary-head { display: grid; gap: 4px; min-width: 0; }
-.fixture-summary-head button:last-child { color: #8a8a8a; font-size: 10px; }
+.fixture-summary-head button:last-child { color: var(--dim); font-size: 10px; }
 .sort-mode-badge { display: inline-grid; place-items: center; width: 18px; height: 18px; margin-left: 4px; border-radius: 50%; color: #1e1e1e; font-size: 8px; font-weight: 900; letter-spacing: 0; vertical-align: middle; }
 .sort-mode-badge.win { background: var(--home); }
 .sort-mode-badge.draw { background: #858585; }
 .sort-mode-badge.loss { background: var(--away); }
 .sort-mode-badge.secondary { background: transparent; border: 1px solid #6a6a6a; color: #a0a0a0; }
-.fixture-wrap { min-width: max(100%,var(--table-min-width, 1440px)); border-bottom: 1px solid var(--line-soft); background: rgba(30,30,30,.72); }
+.fixture-wrap { min-width: max(100%,var(--table-min-width, 1440px)); border-bottom: 1px solid var(--line-soft); background: transparent; }
 .fixture-row-wrap { position: relative; }
-.fixture-wrap:nth-child(odd) { background: rgba(37,37,38,.78); }
-.fixture-wrap.open { background: #252526; box-shadow: inset 3px 0 0 var(--accent); }
-.fixture-row { width: 100%; min-height: 64px; padding: 6px 10px 6px 40px; border: 0; background: transparent; text-align: left; }
+/* Kein Zebra: Trennlinien reichen, und das Muster verschob sich mit jeder Trennzeile.
+   Die aufgeklappte Zeile trägt die Wahl-Fläche von Leiste und Menü; der Balken ist hell statt
+   blau (Blau ist nur Tastaturfokus) und nicht grün (Grün heißt in der Tabelle „Empfehlenswert“). */
+.fixture-wrap.open { background: #37373d; box-shadow: inset 3px 0 0 var(--text); }
+.fixture-row { width: 100%; min-height: 56px; padding: 6px 10px 6px 40px; border: 0; background: transparent; text-align: left; }
 /* Die Nabe trägt das Wort "Add" statt eines Plus. Gestrichelte Kontur und die drei Punkte,
    die sie umlaufen, kündigen den Ring an; angeklickt wird sie nur für Tastatur und Touch. */
 /* Zwei Fallen auf einmal, beide betreffen den Ring, nicht die Nabe selbst:
@@ -440,7 +490,8 @@ fieldset.filter-field { min-width: 0; margin-inline: 0; padding: 0; border: 0; }
   .fixture-row-wrap:hover .cart-add-orbit i { animation: none; }
   .insight-loading i { animation: none; }
 }
-.fixture-row:hover { background: rgba(255,255,255,.035); }
+.fixture-row:hover { background: #222222; }
+.fixture-wrap.open .fixture-row:hover { background: transparent; }
 .fixture-row > span { min-width: 0; }
 .fixture-summary-cell { display: grid; gap: 8px; }
 .teams-cell { display: grid; gap: 6px; }
@@ -460,15 +511,10 @@ fieldset.filter-field { min-width: 0; margin-inline: 0; padding: 0; border: 0; }
 .defense-shield { display: inline-grid; place-items: center; flex: 0 0 auto; color: #73c991; }
 .defense-shield.verified { filter: drop-shadow(0 0 5px rgba(115,201,145,.28)); }
 .defense-shield.fallback { color: #9aa0a6; }
-.fixture-meta { display: flex; align-items: center; gap: 7px; min-width: 0; color: #969696; }
-.fixture-meta strong { flex: none; color: #d4d4d4; font-size: 11px; }
-.fixture-meta strong em { color: var(--accent); font-size: 7px; font-style: normal; letter-spacing: .06em; text-transform: uppercase; }
-.fixture-meta small { overflow: hidden; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
 .country-flag { width: 1.2em; margin-bottom: -.1em; border-radius: 2px; vertical-align: middle; }
-.fixture-meta i { flex: none; padding: 2px 6px; border-radius: 5px; background: var(--accent-soft); color: #9cdcfe; font-size: 7px; font-style: normal; }
 .form-cell { display: grid; grid-template-columns: 43px 1fr; align-items: center; gap: 9px; }
 .form-labels { display: grid; min-width: 43px; gap: 5px; }
-.form-labels small { display: flex; height: 23px; align-items: center; justify-content: flex-end; color: #a7a7a7; font-size: 7px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+.form-labels small { display: flex; height: 23px; align-items: center; justify-content: flex-end; color: var(--muted); font-size: 9px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
 .form-cell > span:last-child { display: grid; justify-items: center; gap: 5px; }
 .dot-row { display: flex; gap: 4px; }
 .result-dot { display: grid; place-items: center; width: 23px; height: 23px; flex: 0 0 auto; border-radius: 50%; color: #1e1e1e; font-size: 8px; font-weight: 800; }
@@ -477,7 +523,35 @@ fieldset.filter-field { min-width: 0; margin-inline: 0; padding: 0; border: 0; }
 .result-dot.loss { background: var(--red); }
 .h2h-cell .result-dot.win { background: var(--home); }
 .h2h-cell .result-dot.loss { background: var(--away); }
-.h2h-cell { display: flex; justify-content: center; }
+.h2h-cell { display: grid; justify-items: center; gap: 4px; }
+.h2h-notice { color: var(--muted); font-size: 10px; cursor: help; }
+/* Anstoß als eigene Spalte: Uhrzeit (und Klassenunterschied), darunter Land und Liga. */
+.kickoff-cell { display: grid; gap: 4px; min-width: 0; }
+.kickoff-line { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.kickoff-cell strong { flex: none; color: var(--text); font-size: 12px; }
+.kickoff-cell strong em { color: var(--muted); font-size: 9px; font-style: normal; letter-spacing: .06em; text-transform: uppercase; }
+.kickoff-cell small { overflow: hidden; color: var(--muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+/* Bei Torlinien die Summe gross, Heim : Auswärts klein darunter. */
+.expected-cell.total { display: grid; justify-items: center; gap: 3px; }
+.expected-cell.total strong { font-size: 13px; }
+.expected-cell.total small { color: var(--muted); font-size: 10px; }
+.data-cell { display: grid; justify-items: center; gap: 3px; font-variant-numeric: tabular-nums; cursor: help; }
+.data-cell strong { color: var(--muted); font-size: 12px; font-weight: 600; }
+.data-cell small { display: flex; align-items: center; gap: 3px; color: var(--muted); font-size: 10px; white-space: nowrap; }
+/* Empfohlene Märkte: Stufenfarbe nur am Rand, wie die Marktkarte - kein grüner Text. */
+.recommended-cell { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; min-width: 0; }
+.recommended-cell.empty { justify-content: center; color: var(--dim); }
+.rec-chip { display: inline-flex; align-items: center; gap: 4px; padding: 3px 7px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); color: var(--text); font-size: 11px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.rec-chip.recommended { border-color: rgba(95,191,139,.56); }
+.rec-chip.strong { border-color: rgba(217,180,95,.65); }
+.rec-chip .level-glyph { width: auto; }
+.rec-more { color: var(--muted); font-size: 11px; cursor: help; }
+.market-card.missing { display: grid; place-items: center; color: var(--dim); }
+/* Tages-Trennzeile bei Sortierung nach Anstoss: leise wie die Gruppenköpfe des Filtermenüs. */
+.day-divider { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; min-width: max(100%,var(--table-min-width, 1100px)); padding: 12px 10px 6px 40px; border-bottom: 1px solid var(--line-soft); }
+.day-divider h3 { margin: 0; color: var(--muted); font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; }
+.day-divider span { color: var(--dim); font-size: 11px; }
+.detail-recent { color: var(--muted); }
 .result-dot.hit { background: var(--green); }
 .result-dot.miss { background: var(--red); }
 .result-dot.missing { background: #333333; color: #858585; }
@@ -486,11 +560,12 @@ fieldset.filter-field { min-width: 0; margin-inline: 0; padding: 0; border: 0; }
 .expected-cell i { color: #737373; font-style: normal; }
 .score-cell { display: grid; justify-items: center; gap: 5px; }
 .score-cell span { display: flex; align-items: center; justify-content: center; gap: 6px; }
-.score-cell small { color: #858585; font-size: 7px; }
-.score-cell strong { color: #b8b8b8; font-size: 11px; }
-.market-card { min-width: 0; padding: 9px 10px; border: 1px solid #3c3c3c; border-radius: 10px; background: #252526; opacity: .72; }
-.market-card.recommended { border-color: rgba(95,191,139,.56); background: rgba(95,191,139,.07); opacity: 1; }
-.market-card.strong { border-color: rgba(217,180,95,.65); background: rgba(217,180,95,.07); opacity: 1; }
+.score-cell small { color: var(--dim); font-size: 9px; }
+.score-cell strong { color: var(--text); font-size: 12px; }
+/* Ohne Stufe grau statt durchscheinend: Die Deckkraft senkte den Kontrast der Zahlen, die man lesen will. */
+.market-card { min-width: 0; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: var(--muted); }
+.market-card.recommended { border-color: rgba(95,191,139,.56); background: rgba(95,191,139,.07); color: var(--text); }
+.market-card.strong { border-color: rgba(217,180,95,.65); background: rgba(217,180,95,.07); color: var(--text); }
 /* Cross-League ohne Ligastärke-Vergleich: Der Markt bleibt sichtbar, aber ohne Zahl,
    damit keine Wahrscheinlichkeit gelesen wird, die den Klassenunterschied nicht kennt. */
 .market-card.unreliable { border-style: dashed; border-color: #4a4a4a; opacity: .55; }
@@ -505,16 +580,16 @@ fieldset.filter-field { min-width: 0; margin-inline: 0; padding: 0; border: 0; }
 .level-glyph { width: 12px; color: #737373; font-size: 11px; }
 .recommended .level-glyph { color: var(--green); }
 .strong .level-glyph { color: var(--gold); }
-.pick { font-size: 10px; }
+.pick { font-size: 12px; }
 .pick.home { color: var(--home); }
 .pick.away { color: var(--away); }
-.odd { margin-left: auto; font-size: 11px; }
-.probability-line { display: flex; align-items: center; gap: 6px; margin-top: 7px; color: #969696; font-size: 8px; white-space: nowrap; }
+.odd { margin-left: auto; font-size: 12px; }
+.probability-line { display: flex; align-items: center; gap: 6px; margin-top: 6px; color: inherit; font-size: 12px; white-space: nowrap; }
 .probability-track { height: 3px; flex: 1; overflow: hidden; border-radius: 3px; background: #3c3c3c; }
 .probability-track span { display: block; height: 100%; border-radius: 3px; background: #858585; }
 .recommended .probability-track span { background: var(--green); }
 .strong .probability-track span { background: var(--gold); }
-.fixture-detail-panel { display: grid; gap: 12px; width: min(430px, 44%); min-width: 300px; min-height: 0; flex: 0 0 auto; align-content: start; padding: 18px 28px 24px 20px; border-left: 1px solid var(--line); background: var(--surface); overflow-y: auto; }
+.fixture-detail-panel { display: grid; gap: 12px; width: min(430px, 44%); min-width: 300px; min-height: 0; flex: 0 0 auto; align-content: start; padding: 18px 28px 24px 20px; border-left: 1px solid var(--line); background: var(--bg); overflow-y: auto; }
 .fixture-detail-head { display: flex; align-items: flex-start; gap: 10px; }
 .fixture-detail-teams { display: grid; gap: 2px; min-width: 0; flex: 1; }
 .fixture-detail-teams strong { overflow: hidden; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
@@ -523,7 +598,7 @@ fieldset.filter-field { min-width: 0; margin-inline: 0; padding: 0; border: 0; }
 .fixture-detail-teams small { display: flex; align-items: center; gap: 4px; margin-top: 3px; color: #8a8a8a; font-size: 9px; }
 .fixture-detail-close { display: grid; place-items: center; width: 26px; height: 26px; flex: 0 0 auto; border: 1px solid var(--line); border-radius: 50%; background: transparent; color: #a0a0a0; }
 .fixture-detail-close:hover { color: var(--text); }
-.insight-panel { min-width: 0; padding: 13px 14px 14px; border: 1px solid #383838; border-radius: 10px; background: #1f1f20; }
+.insight-panel { min-width: 0; padding: 13px 14px 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
 .insight-scope { margin-left: 8px; color: var(--dim); font-size: 8px; font-weight: 400; letter-spacing: .04em; text-transform: none; }
 .insight-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; min-width: 0; margin-bottom: 10px; }
 /* Drei Steuerelemente passen nur umbrechend und linksbündig in die Breite der Detailspalte. */
@@ -655,7 +730,7 @@ fieldset.filter-field { min-width: 0; margin-inline: 0; padding: 0; border: 0; }
 .standings-table tr.away td { color: var(--away); font-weight: 700; }
 .standings-table tr.home td:nth-child(1), .standings-table tr.away td:nth-child(1) { color: inherit; }
 .standings-gap td { padding: 2px 6px; color: #616161; text-align: center; }
-.fixture-detail-panel h3 { margin: 0 0 9px; color: var(--accent); font-size: 9px; letter-spacing: .1em; text-transform: uppercase; }
+.fixture-detail-panel h3 { margin: 0 0 9px; color: var(--text); font-size: 12px; font-weight: 600; }
 .fixture-detail-panel p { margin: 4px 0; color: #b3b3b3; font-size: 9px; line-height: 1.5; }
 .h2h-match-list { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
 .h2h-match-row { display: grid; grid-template-columns: 72px 1fr 20px 46px; align-items: center; gap: 10px; padding: 7px 9px; border-radius: 7px; background: rgba(255,255,255,.035); }
@@ -897,9 +972,6 @@ fieldset.filter-field { min-width: 0; margin-inline: 0; padding: 0; border: 0; }
 .kelly-auto-chip-idle { background: #2d2d30; color: #8f8f8f; }
 .kelly-auto-detail { margin: 8px 0 0 !important; color: #9c9c9c; }
 
-.kelly-calibrated strong { color: var(--text); }
-.kelly-calibrated small { color: var(--gold); }
-.kelly-edge small { color: #8f8f8f !important; font-weight: 400; }
 
 /* Abgeleitete Marktzeilen: gespiegelt, nicht gemessen. */
 .verdict-derived { background: rgba(55,148,255,.14); color: #9ac8f5; }

@@ -1,26 +1,22 @@
 import { CaretDown, CaretRight, Calculator, DownloadSimple, X } from "@phosphor-icons/react";
 import { useState, type ReactNode } from "react";
 import { formatOdd, formatPercent, sortStateLabel } from "./App";
-import { TEST_RUN_SETTINGS, buildKellyExport, computeKellyCandidates, expectedValueOf, kellyExportFileName, recommendedSettings, stakeSlots, type KellyCandidate, type KellySettings } from "./kelly";
-import { formatPoints, formatRoi } from "./marketProfile";
-import type { DashboardFixture, DashboardMarketKey, MarketProfile } from "./types";
+import { TEST_RUN_SETTINGS, buildKellyExport, kellyExportFileName, stakeSlots, type KellyCandidate, type KellySelection, type KellySettings } from "./kelly";
+import { formatPoints, formatRoi, type MarketProfileState } from "./marketProfile";
+import type { DashboardMarketKey, MarketProfile } from "./types";
 
 export function KellyButton({ onOpen }: { onOpen(): void }) {
-  return <button className="kelly-trigger" aria-label="Kelly-Kriterium öffnen" title="Kelly-Kriterium" onClick={onOpen}>
-    <Calculator size={15} weight="bold" /> Kelly
+  // Heißt wie der Dialog, den er öffnet.
+  return <button className="kelly-trigger" aria-label="Kelly-Auswahl öffnen" title="Kelly-Auswahl" onClick={onOpen}>
+    <Calculator size={15} weight="bold" /> Kelly-Auswahl
   </button>;
 }
 
-function formatEdge(edge: number): string {
-  const sign = edge >= 0 ? "+" : "";
-  return `${sign}${(edge * 100).toFixed(1).replace(".", ",")} %`;
-}
-
-function formatEuro(value: number): string {
+export function formatEuro(value: number): string {
   return `${value.toFixed(2).replace(".", ",")} €`;
 }
 
-function formatSignedEuro(value: number): string {
+export function formatSignedEuro(value: number): string {
   return `${value >= 0 ? "+" : "−"}${Math.abs(value).toFixed(2).replace(".", ",")} €`;
 }
 
@@ -28,7 +24,7 @@ const FRACTION_LABELS: Record<string, string> = {
   "1": "Full Kelly", "0.5": "1/2 Kelly", "0.25": "1/4 Kelly", "0.125": "1/8 Kelly"
 };
 
-function fractionLabel(fraction: number): string {
+export function fractionLabel(fraction: number): string {
   return FRACTION_LABELS[String(fraction)] ?? `${fraction}× Kelly`;
 }
 
@@ -211,22 +207,33 @@ function AutoSummary({ profile, candidates }: { profile: MarketProfile; candidat
     <Disclosure open={showDetail} onToggle={() => setShowDetail((value) => !value)}
       label="Woher die Korrektur kommt" openLabel="Weniger anzeigen" />
     {showDetail && <p className="kelly-auto-detail">
-      An Spielen geprüft, die die Korrektur nicht kannte, liegt diese Auswahl etwa bei null,
-      die frühere Vorgabe bei rund −6 %. Der Abstand kann auch Zufall sein. Lässt man das
-      Unentschieden weg, ist auch diese Auswahl im Minus – ihr ganzer Vorsprung hängt an
-      diesem einen Markt. Sie verliert also weniger als vorher, aber dass sie gewinnt, ist
-      nicht belegt.
+      An Spielen geprüft, die die Korrektur nicht kannte, liegt diese Auswahl im Minus – rechne
+      nicht mit Gewinn. Ob sie weniger verliert als die frühere Vorgabe, kann auch Zufall sein.
+      Ohne das Unentschieden verliert sie deutlich mehr.
     </p>}
   </div>;
 }
 
-export function KellyDialog({ fixtures, marketFilter, marketLabel, settings, profile, auto, onAutoChange, onSettingsChange, onClose }: {
-  fixtures: DashboardFixture[];
+/**
+ * Warum die Automatik gerade nicht rechnet. Drei Fälle, weil sie Verschiedenes bedeuten: Beim
+ * Laden kommt sie gleich, ein Fehler hat einen Grund, und ohne abgerechnete Spiele gibt es
+ * schlicht nichts zu messen. Früher sahen alle drei gleich aus.
+ */
+export function kellyProfileNote(auto: boolean, profileState: MarketProfileState): string | null {
+  if (!auto || profileState.profile !== null) return null;
+  if (profileState.status === "loading" || profileState.status === "idle") return "Automatik wird geladen …";
+  if (profileState.message) return `Manuell – ${profileState.message}`;
+  return "Manuell – für die Automatik fehlen abgerechnete Spiele.";
+}
+
+export function KellyDialog({ selection, profileState, marketFilter, marketLabel, settings, auto, onAutoChange, onSettingsChange, onClose }: {
+  /** Die Auswahl aus dem Dashboard - dieselbe Rechnung, die die Kelly-Zeile zählt. */
+  selection: KellySelection;
+  /** Die gemessene Historie. Fehlt sie, bleibt nur der manuelle Modus. */
+  profileState: MarketProfileState;
   marketFilter: "all" | DashboardMarketKey;
   marketLabel: string;
   settings: KellySettings;
-  /** Die gemessene Historie. Fehlt sie, bleibt nur der manuelle Modus. */
-  profile: MarketProfile | null;
   auto: boolean;
   onAutoChange(auto: boolean): void;
   onSettingsChange(settings: KellySettings): void;
@@ -237,12 +244,11 @@ export function KellyDialog({ fixtures, marketFilter, marketLabel, settings, pro
   const [showSettings, setShowSettings] = useState(false);
   const [showGlossary, setShowGlossary] = useState(false);
 
-  // Ohne Profil ist die Automatik nicht moeglich - dann bleibt der Dialog manuell, statt eine
-  // Empfehlung vorzutaeuschen, hinter der keine Messung steht.
-  const automatic = auto && profile !== null;
-  const effectiveSettings = automatic ? recommendedSettings(settings) : settings;
-  const { candidates, evaluated, scaleFactor, gameRiskLimits, filtered } =
-    computeKellyCandidates(fixtures, marketFilter, effectiveSettings, automatic ? profile : null);
+  const profile = profileState.profile;
+  const { automatic, effectiveSettings, candidates, evaluated, scaleFactor, gameRiskLimits, filtered } = selection;
+  const profileNote = kellyProfileNote(auto, profileState);
+  // Solange das Marktprofil lädt, stünden sonst kurz manuelle Beträge da, die gleich umspringen.
+  const loading = auto && profile === null && (profileState.status === "loading" || profileState.status === "idle");
   const limitedGames = gameRiskLimits.filter((game) => game.scaleFactor < 1);
   const sorted = [...candidates].sort((left, right) => {
     const leftValue = sortValue(left, sortKey);
@@ -252,23 +258,27 @@ export function KellyDialog({ fixtures, marketFilter, marketLabel, settings, pro
       : (leftValue as number) - (rightValue as number);
     return comparison * sortDirection;
   });
-
   const sort = (key: KellySortKey) => {
     if (sortKey === key) { setSortDirection((value) => value === 1 ? -1 : 1); return; }
     setSortKey(key);
     setSortDirection(key === "team" || key === "market" ? 1 : -1);
   };
   const arrow = (key: KellySortKey) => sortKey === key ? (sortDirection === 1 ? "↑" : "↓") : "↕";
+  const sortHead = (key: KellySortKey, label: string, title?: string) =>
+    <button onClick={() => sort(key)} title={title} aria-label={sortStateLabel(label, sortKey === key, sortDirection)}>
+      {label} {arrow(key)}
+    </button>;
 
-  const totalStake = sorted.reduce((sum, candidate) => sum + candidate.stake, 0);
-  const expected = expectedValueOf(sorted);
+  const { totalStake, expected, slots } = selection;
   const set = <K extends keyof KellySettings>(key: K, value: KellySettings[K]) =>
     onSettingsChange({ ...settings, [key]: value });
 
-  // Exportiert die Liste genau so, wie sie gerade gefiltert und sortiert angezeigt wird.
+  // Exportiert die ganze Auswahl in der Reihenfolge des Dashboards - immer über den Umfang,
+  // nie über die Zeilen, die ein Tabellenfilter übrig lässt: Der Testbetrieb verlangt, dass
+  // nichts von Hand aussortiert ist (docs/kelly-testbetrieb.md).
   const exportList = () => downloadJson(
     kellyExportFileName(marketFilter),
-    buildKellyExport({ candidates: sorted, evaluated, scaleFactor, gameRiskLimits },
+    buildKellyExport({ candidates, evaluated, scaleFactor, gameRiskLimits },
       { marketFilter, marketLabel, settings: effectiveSettings })
   );
 
@@ -277,7 +287,6 @@ export function KellyDialog({ fixtures, marketFilter, marketLabel, settings, pro
   // Läufen bis zum 15.09.2026 stand er auf 100 % statt der Vorgabe 25 %, ohne dass es
   // irgendwo aufgefallen wäre. Dazu die Zahl der Plätze, weil der Prozentsatz allein seine
   // Wirkung als Stückzahlgrenze nicht verrät.
-  const slots = stakeSlots(settings);
   const slotLabel = Number.isFinite(slots.plaetze) ? `≈ ${slots.plaetze} Plätze` : "ohne Grenze";
   const isTestRun = (Object.keys(TEST_RUN_SETTINGS) as Array<keyof typeof TEST_RUN_SETTINGS>)
     .every((key) => settings[key] === TEST_RUN_SETTINGS[key]);
@@ -290,13 +299,13 @@ export function KellyDialog({ fixtures, marketFilter, marketLabel, settings, pro
       + ` · ${formatPercent(settings.maxExposurePercent)} gesamt (${slotLabel})`;
 
   const notices: string[] = [];
-  if (filtered.crossLeague > 0) notices.push(`${filtered.crossLeague} Cross-League-Partien aussortiert`);
-  if (filtered.overMaxEdge > 0) notices.push(`${filtered.overMaxEdge} Kandidaten über dem Edge-Deckel aussortiert`);
+  if (filtered.crossLeague > 0) notices.push(`${filtered.crossLeague} Spiele zwischen verschiedenen Ligen aussortiert`);
+  if (filtered.overMaxEdge > 0) notices.push(`${filtered.overMaxEdge} Auswahlen über dem höchsten Vorteil (Edge) aussortiert`);
   if (filtered.belowMinStake > 0) {
     // Maßgeblich ist die Zahl der Plätze am Höchsteinsatz, nicht am Mindesteinsatz: Die
     // meisten Auswahlen sitzen am Deckel. Die frühere Anzeige nannte allein die optimistische
     // Grenze und war damit rund doppelt so groß wie die, die tatsächlich bindet.
-    notices.push(`${filtered.belowMinStake} weitere Auswahlen mit Value passten nicht mehr in den Einsatzrahmen`
+    notices.push(`${filtered.belowMinStake} weitere Auswahlen mit Vorteil passten nicht mehr in den Einsatzrahmen`
       + ` – bei ${formatPercent(settings.maxStakePercent)} je Wette und ${formatPercent(settings.maxExposurePercent)}`
       + ` Rahmen passen rund ${slots.plaetze} Wetten hinein`
       + (slots.hoechstens > slots.plaetze
@@ -305,18 +314,18 @@ export function KellyDialog({ fixtures, marketFilter, marketLabel, settings, pro
   }
   if (scaleFactor < 1) notices.push(`Gesamtrisiko-Limit erreicht – alle Einsätze auf ${(scaleFactor * 100).toFixed(0)} % skaliert`);
   if (limitedGames.length > 0) {
-    notices.push(`Game-Risk-Limit ${formatPercent(settings.maxRiskPerGame)}`
-      + ` (${formatEuro(limitedGames[0]!.limit)} je Spiel) greift bei ${limitedGames.length}`
-      + ` Partie${limitedGames.length === 1 ? "" : "n"}`);
+    notices.push(`Grenze je Spiel ${formatPercent(settings.maxRiskPerGame)}`
+      + ` (${formatEuro(limitedGames[0]!.limit)}) greift bei ${limitedGames.length}`
+      + ` Spiel${limitedGames.length === 1 ? "" : "en"}`);
   }
 
   return <div className="overlay-backdrop" onClick={onClose}>
-    <div className="kelly-dialog" role="dialog" aria-label="Kelly-Kriterium" onClick={(event) => event.stopPropagation()}>
+    <div className="kelly-dialog" role="dialog" aria-label="Kelly-Auswahl" onClick={(event) => event.stopPropagation()}>
       <div className="overlay-head kelly-head">
-        <strong>Kelly-Kriterium <span className="kelly-head-market">{marketLabel}</span></strong>
+        <strong>Kelly-Auswahl <span className="kelly-head-market">{marketLabel}</span></strong>
         <span className="overlay-head-actions">
-          <button aria-label="Liste als JSON exportieren" title="Liste als JSON exportieren"
-            disabled={sorted.length === 0} onClick={exportList}><DownloadSimple /></button>
+          <button aria-label="Auswahl als JSON exportieren" title="Auswahl als JSON exportieren"
+            disabled={candidates.length === 0} onClick={exportList}><DownloadSimple /></button>
           <button aria-label="Schließen" onClick={onClose}><X /></button>
         </span>
       </div>
@@ -331,9 +340,7 @@ export function KellyDialog({ fixtures, marketFilter, marketLabel, settings, pro
             <button className={automatic ? "" : "active"} aria-pressed={!automatic}
               onClick={() => onAutoChange(false)}>Manuell</button>
           </div>
-          {auto && profile === null && <small className="kelly-mode-note">
-            Für die Automatik fehlen abgerechnete Partien – es gilt die manuelle Einstellung.
-          </small>}
+          {profileNote && <small className="kelly-mode-note">{profileNote}</small>}
           {/*
             Ein Knopf statt einer Liste in einem Dokument: Die Messung der alten Kette ist
             daran gescheitert, dass eine einzelne Einstellung im Browser still abwich.
@@ -351,21 +358,22 @@ export function KellyDialog({ fixtures, marketFilter, marketLabel, settings, pro
         <div className="kelly-metrics">
           <MetricCard label="Einsatz gesamt" value={formatEuro(totalStake)}
             note={`von ${formatEuro(settings.budget)} Budget`} />
-          <MetricCard label="Wetten" value={String(sorted.length)}
+          <MetricCard label="Wetten" value={String(candidates.length)}
             note={`aus ${evaluated} geprüften Spielen`}
             title={"Geprüft werden die Spiele aus Zeitraum und Wettbewerben im Filter, samt „Nur"
               + " Ligaspiele“ und angepfiffenen Spielen, und der gewählte Markt. Bewertung und"
               + " Klassenunterschied grenzen nur die Tabelle ein."} />
+          {/* Neutral, nicht grün: Die Zahl ist eine Rechnung, keine Messung - und gemessen lag
+              die Auswahl im Minus (Stand 21.09.2026, AGENTS.md). */}
           <MetricCard label="Erwarteter Ertrag" value={formatSignedEuro(expected)}
-            tone={expected >= 0 ? "good" : "bad"}
-            note={automatic ? "auf Basis der Korrektur" : "auf Basis der Modellwerte"} />
+            note={`${automatic ? "auf Basis der Korrektur" : "auf Basis der Modellwerte"}. Gemessen lag die Auswahl bisher im Minus.`} />
         </div>
 
         {notices.length > 0 && <ul className="kelly-notices">
           {notices.map((notice) => <li key={notice}>{notice}</li>)}
         </ul>}
 
-        {automatic && profile !== null && <AutoSummary profile={profile} candidates={sorted} />}
+        {automatic && profile !== null && <AutoSummary profile={profile} candidates={candidates} />}
 
         <section className="kelly-panel">
           <button className="kelly-panel-head" aria-expanded={showSettings}
@@ -416,17 +424,17 @@ export function KellyDialog({ fixtures, marketFilter, marketLabel, settings, pro
                 </SettingField>
                 <NumberField label="Höchster Einsatz je Wette (%)" value={settings.maxStakePercent} scale={100} min={0} max={100} step={0.5}
                   onCommit={(value) => set("maxStakePercent", value)} />
-                <NumberField label="Höchstens im Spiel (% vom Budget)" value={settings.maxExposurePercent} scale={100} min={0} max={100} step={1}
+                <NumberField label="Einsatzrahmen (% vom Budget)" value={settings.maxExposurePercent} scale={100} min={0} max={100} step={1}
                   onCommit={(value) => set("maxExposurePercent", value)} />
-                <NumberField label="Mindest-Vorsprung (Edge, Punkte)" value={settings.minEdge} scale={100} min={0} step={0.5}
+                <NumberField label="Mindest-Vorteil (Edge, Prozentpunkte)" value={settings.minEdge} scale={100} min={0} step={0.5}
                   onCommit={(value) => set("minEdge", value)} />
-                <SettingField label="Vorsprung begrenzen"
-                  hint="Begrenzt, wie viel Vorsprung (Edge) eine Wette höchstens behaupten darf. Geprüft gilt: Je größer der behauptete Vorsprung, desto stärker überschätzt sich das Modell. Ein sehr hoher Wert ist ein Warnzeichen, kein guter Fund.">
+                <SettingField label="Vorteil begrenzen"
+                  hint="Begrenzt, wie viel Vorteil (Edge) eine Wette höchstens behaupten darf. Geprüft gilt: Je größer der behauptete Vorteil, desto stärker überschätzt sich das Modell. Ein sehr hoher Wert ist ein Warnzeichen, kein guter Fund.">
                   <input type="checkbox" checked={settings.maxEdge !== null}
-                    aria-label="Vorsprung begrenzen aktiv"
+                    aria-label="Vorteil begrenzen aktiv"
                     onChange={(event) => set("maxEdge", event.target.checked ? 0.12 : null)} />
                 </SettingField>
-                <NumberField label="Höchster Vorsprung (Edge, Punkte)" value={settings.maxEdge ?? 0.12} scale={100} min={0} step={0.5}
+                <NumberField label="Höchster Vorteil (Edge, Prozentpunkte)" value={settings.maxEdge ?? 0.12} scale={100} min={0} step={0.5}
                   disabled={settings.maxEdge === null}
                   onCommit={(value) => set("maxEdge", value)} />
                 <NumberField label="Mindest-Datenvertrauen (%)" value={settings.minConfidence} min={0} max={100} step={5}
@@ -453,11 +461,12 @@ export function KellyDialog({ fixtures, marketFilter, marketLabel, settings, pro
                   <input type="checkbox" checked={settings.allowMultipleMarketsPerGame}
                     onChange={(event) => set("allowMultipleMarketsPerGame", event.target.checked)} />
                 </SettingField>
-                <SettingField label="Game-Risk-Limit">
+                <SettingField label="Grenze je Spiel"
+                  hint="Begrenzt, wie viel Geld insgesamt auf ein einzelnes Spiel läuft, wenn dort mehrere Wetten liegen.">
                   <input type="checkbox" checked={settings.enableGameRiskLimit}
                     onChange={(event) => set("enableGameRiskLimit", event.target.checked)} />
                 </SettingField>
-                <NumberField label="Max. Risiko/Spiel (%)" value={settings.maxRiskPerGame} scale={100} min={0} max={100} step={0.5}
+                <NumberField label="Grenze je Spiel (% vom Budget)" value={settings.maxRiskPerGame} scale={100} min={0} max={100} step={0.5}
                   disabled={!settings.enableGameRiskLimit}
                   onCommit={(value) => set("maxRiskPerGame", value)} />
                 <NumberField label="Mindesteinsatz (€)" value={settings.minStake} min={0} step={0.5}
@@ -469,30 +478,26 @@ export function KellyDialog({ fixtures, marketFilter, marketLabel, settings, pro
               </div>)}
         </section>
 
+        {/* Die Wetten stehen hier und nicht in der Übersicht (Davids Entscheidung vom 29.09.2026):
+            Die Tabelle bleibt zum Finden da, die Einsatzplanung hat ihr eigenes Fenster. */}
         <div className="kelly-table-wrap">
           <table className="kelly-table">
             <thead>
               <tr>
-                <th><button onClick={() => sort("team")} aria-label={sortStateLabel("Partie", sortKey === "team", sortDirection)}>Partie {arrow("team")}</button></th>
-                <th><button onClick={() => sort("market")} aria-label={sortStateLabel("Markt", sortKey === "market", sortDirection)}>Markt {arrow("market")}</button></th>
-                <th><button onClick={() => sort("odds")} aria-label={sortStateLabel("Quote", sortKey === "odds", sortDirection)}>Quote {arrow("odds")}</button></th>
-                <th><button onClick={() => sort("probability")} aria-label={sortStateLabel("Modell", sortKey === "probability", sortDirection)}>Modell {arrow("probability")}</button></th>
-                {automatic && <th><button onClick={() => sort("calibrated")}
-                  aria-label={sortStateLabel("Korrigierte Wahrscheinlichkeit", sortKey === "calibrated", sortDirection)}
-                  title="Die Modellwahrscheinlichkeit abzüglich der gemessenen Selbstüberschätzung dieses Marktes. Mit diesem Wert rechnet der Einsatz.">
-                  Korrigiert {arrow("calibrated")}
-                </button></th>}
-                <th><button onClick={() => sort("edge")} aria-label={sortStateLabel("Value", sortKey === "edge", sortDirection)}>Value {arrow("edge")}</button></th>
-                <th><button onClick={() => sort("kelly")}
-                  aria-label={sortStateLabel("Einsatzanteil nach Caps", sortKey === "kelly", sortDirection)}
-                  title="Fractional Kelly, begrenzt durch Max-Einsatz/Wette und ggf. Game-Risk- und Gesamtrisiko-Skalierung">
-                  Kelly {arrow("kelly")}
-                </button></th>
-                <th><button onClick={() => sort("stake")} aria-label={sortStateLabel("Einsatz", sortKey === "stake", sortDirection)}>Einsatz {arrow("stake")}</button></th>
+                <th>{sortHead("team", "Spiel")}</th>
+                <th>{sortHead("market", "Markt")}</th>
+                <th>{sortHead("odds", "Quote")}</th>
+                <th>{sortHead("probability", "Modell", "Wahrscheinlichkeit laut Modell")}</th>
+                {automatic && <th>{sortHead("calibrated", "Korrigiert",
+                  "Die Chance laut Modell, abzüglich dessen, worum es sich bei dieser Wettart bisher verschätzt hat. Mit diesem Wert rechnet der Einsatz.")}</th>}
+                <th>{sortHead("edge", "Vorteil",
+                  "Vorteil (Value): wie viel höher das Modell die Chance sieht, als die Quote hergibt, in Prozentpunkten. Je größer, desto eher ein Fehler des Modells.")}</th>
+                <th>{sortHead("kelly", "Kelly", "Anteil vom Budget nach allen deinen Grenzen; darunter der Wert ohne Grenzen")}</th>
+                <th>{sortHead("stake", "Einsatz")}</th>
               </tr>
             </thead>
             <tbody>
-              {sorted.map((candidate) => <tr key={`${candidate.fixtureId}:${candidate.marketKey}`}>
+              {!loading && sorted.map((candidate) => <tr key={`${candidate.fixtureId}:${candidate.marketKey}`}>
                 <td><strong>{candidate.homeTeam} – {candidate.awayTeam}</strong><small>{candidate.country} · {candidate.league}</small></td>
                 <td><strong>{candidate.marketLabel}</strong><small>{candidate.selection}</small></td>
                 <td>{formatOdd(candidate.odds)}</td>
@@ -502,16 +507,17 @@ export function KellyDialog({ fixtures, marketFilter, marketLabel, settings, pro
                   {candidate.calibrationBias !== null && <small>{formatPoints(candidate.calibrationBias)}</small>}
                 </td>}
                 <td className="kelly-edge">
-                  {automatic && candidate.calibratedEdge !== null
-                    ? <><strong>{formatEdge(candidate.calibratedEdge)}</strong><small>roh {formatEdge(candidate.edge)}</small></>
-                    : <strong>{formatEdge(candidate.edge)}</strong>}
+                  <strong>{formatPoints(candidate.edge)}</strong>
+                  {automatic && candidate.calibratedEdge !== null && <small>nach Korr. {formatPoints(candidate.calibratedEdge)}</small>}
                 </td>
-                <td><strong>{formatPercent(candidate.stakePercent)}</strong><small>Full: {formatPercent(candidate.fullKelly)}</small></td>
+                <td><strong>{formatPercent(candidate.stakePercent)}</strong><small>ohne Grenzen: {formatPercent(candidate.fullKelly)}</small></td>
                 <td className="kelly-stake"><strong>{formatEuro(candidate.stake)}</strong>
-                  {candidate.gameScaleFactor < 1 && <small>Spiel-Limit: {(candidate.gameScaleFactor * 100).toFixed(0)} %</small>}
+                  {candidate.gameScaleFactor < 1 && <small>Grenze je Spiel: {(candidate.gameScaleFactor * 100).toFixed(0)} %</small>}
                 </td>
               </tr>)}
-              {sorted.length === 0 && <tr><td className="kelly-empty" colSpan={automatic ? 8 : 7}>Keine Value-Wetten im aktuellen Markt gefunden.</td></tr>}
+              {(loading || sorted.length === 0) && <tr><td className="kelly-empty" colSpan={automatic ? 8 : 7}>
+                {loading ? "Automatik wird geladen …" : "Keine Wette in der Auswahl für diesen Markt."}
+              </td></tr>}
             </tbody>
           </table>
         </div>
@@ -522,8 +528,8 @@ export function KellyDialog({ fixtures, marketFilter, marketLabel, settings, pro
           <div>
             <dt>Kelly</dt>
             <dd>ein Rechenweg, der aus Quote und Trefferchance den passenden Einsatz bestimmt.
-              Hier steht der Einsatz, der nach allen deinen Grenzen übrig bleibt; „Full"
-              darunter ist der Wert ohne Grenzen</dd>
+              In der Liste steht der Einsatz, der nach allen deinen Grenzen übrig bleibt;
+              „ohne Grenzen“ darunter ist der Wert ohne sie</dd>
           </div>
           <div>
             <dt>Korrigiert</dt>
@@ -531,7 +537,7 @@ export function KellyDialog({ fixtures, marketFilter, marketLabel, settings, pro
               Wettart bisher verschätzt hat. Gerechnet wird mit diesem Wert</dd>
           </div>
           <div>
-            <dt>Spiel-Limit</dt>
+            <dt>Grenze je Spiel</dt>
             <dd>begrenzt, wie viel Geld insgesamt auf ein einzelnes Spiel läuft, wenn du dort
               mehrere Wetten hast. Verkleinert nur die Einsätze, ändert nichts an der Rechnung</dd>
           </div>

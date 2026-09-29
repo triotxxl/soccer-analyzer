@@ -27,8 +27,9 @@ Markt (z. B. Über 2,5)
 
 1. **Vorteil wird nicht hervorgehoben.** Gemessen: Das Modell ist im Ganzen gut kalibriert; auf den
    Zeilen mit großem Vorteil sagt es 55,5 % voraus, 40,0 % treten ein. Ein großer Vorteil ist meist
-   ein Ausrutscher des Modells. Deshalb Vorteil und Value-Färbung nur hinter dem Schalter
-   „Vorteil & Kelly-Einsatz anzeigen" (Davids Entscheidung vom 25.09.2026). Ein Vorschlag, der
+   ein Ausrutscher des Modells. Deshalb Vorteil und Value-Färbung nur in der Anzeige
+   „Vorteil & Kelly“ (Segment in der Werkzeugleiste, ab Werk „Kennzahlen“; Davids Entscheidung vom
+   25.09.2026), dort grau statt grün und mit fester Warnzeile; Live zeigt ihn nie. Ein Vorschlag, der
    Vorteil in die Standardansicht holt, nach Vorteil sortiert voreinstellt oder ihn farblich betont,
    widerspricht dem - höchstens als Frage an David mit diesem Hinweis.
 2. **`probabilityReliable: false`** (Spiel zwischen Ligen ohne Ligastärke-Vergleich): keine

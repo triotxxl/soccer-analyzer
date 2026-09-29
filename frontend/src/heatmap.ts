@@ -124,7 +124,7 @@ export function drawScoreLabel(score: number): string {
 
 /**
  * Wie grün eine Quote wird, 0 bis 1, oder null für "nicht färben". Nur mit dem Schalter
- * "Vorteil & Kelly-Einsatz anzeigen" - Davids Entscheidung vom 25.09.2026: Ein großer Value ist
+ * "Vorteil & Kelly" (Anzeige in der Werkzeugleiste) - Davids Entscheidung vom 25.09.2026: Ein großer Value ist
  * laut Messung meist ein Ausrutscher des Modells, eine immer sichtbare Färbung höbe gerade die
  * schwächsten Wetten hervor. `edgeOf` gibt für einen unsicheren 1X2-Markt schon null zurück.
  */

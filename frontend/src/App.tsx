@@ -1,7 +1,7 @@
 import {
-  Binoculars, Crosshair, FlagPennant, RocketLaunch, Shield, ShieldCheck, WarningCircle, X
+  Binoculars, Crosshair, Info, RocketLaunch, Shield, ShieldCheck, WarningCircle, X
 } from "@phosphor-icons/react";
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { BetBuilderDrawer, CartAddRadial, CartBadge } from "./BetCartUI";
 import { toCartEntry, toQuickpickCartEntry, useBetCart } from "./betCart";
 import { countryFlagCode } from "./countryFlags";
@@ -11,8 +11,8 @@ import { heatmapMarkets } from "./heatmap";
 import { HeatmapTable, type HeatmapSort } from "./HeatmapTable";
 import { useLiveBoard } from "./liveData";
 import { LiveView } from "./LiveView";
-import { edgeOf, loadKellyAuto, loadKellySettings, loadKellyVisible, saveKellyAuto, saveKellySettings, saveKellyVisible, type KellySettings } from "./kelly";
-import { KellyButton, KellyDialog } from "./KellyUI";
+import { edgeOf, loadKellyAuto, loadKellySettings, loadKellyVisible, saveKellyAuto, saveKellySettings, saveKellyVisible, selectKelly, type KellySettings } from "./kelly";
+import { KellyButton, KellyDialog, formatEuro, kellyProfileNote } from "./KellyUI";
 import { FilterButton, FilterChip, FilterMenu, FilterSegment, type ClassGapFilter, type FilterMenuActions, type FilterMenuValues, type LevelFilter, type SegmentOption } from "./FilterMenu";
 import { MarketProfileView } from "./MarketProfileUI";
 import { BrandMark, NavRail, type NavKey } from "./NavRail";
@@ -20,24 +20,30 @@ import { QuickpickButton, QuickpickChip, QuickpickDialog } from "./QuickpickUI";
 import { applyQuickpick, loadQuickpickStore, saveQuickpickStore, settingsOf, withSettings, QUICKPICK_PRESETS, REJECTION_LABELS, presetOf, type QuickpickFilterReport, type QuickpickPresetId, type QuickpickRejection, type QuickpickStore } from "./quickpick";
 import { TeamCrest } from "./TeamCrest";
 import { useMarketProfile } from "./marketProfile";
+import { eloSystemLabel } from "../../src/elo-config.ts";
+import { gridTemplate, isFirstHalfMarket, isGoalLineMarket, minimumWidth, showsPoints, tableColumns, type TableColumn, type TableColumnId } from "./tableColumns";
 import type { ClassGap, DashboardDocument, DashboardFixture, DashboardMarket, DashboardMarketKey, FormResult, LeagueStats, RecommendationLevel } from "./types";
 
-const MARKET_OPTIONS: Array<{ key: "all" | DashboardMarketKey; label: string }> = [
+/**
+ * Die Märkte der Auswahlliste. `group` ist die Zwischenüberschrift in der geöffneten Liste
+ * (optgroup); „Alle Märkte“ steht ohne Überschrift darüber. Reine Anzeige, keine Regel liest sie.
+ */
+const MARKET_OPTIONS: Array<{ key: "all" | DashboardMarketKey; label: string; group?: string }> = [
   { key: "all", label: "Alle Märkte" },
-  { key: "1x2", label: "1X2" },
-  { key: "draw", label: "Remis" },
-  { key: "btts", label: "BTTS" },
-  { key: "bttsNo", label: "BTTS Nein" },
-  { key: "over15", label: "Über 1,5" },
-  { key: "under15", label: "Unter 1,5" },
-  { key: "over25", label: "Über 2,5" },
-  { key: "under25", label: "Unter 2,5" },
-  { key: "over35", label: "Über 3,5" },
-  { key: "under35", label: "Unter 3,5" },
-  { key: "firstHalfOver05", label: "1. HZ Ü0,5" },
-  { key: "firstHalfUnder05", label: "1. HZ U0,5" },
-  { key: "firstHalfOver15", label: "1. HZ Ü1,5" },
-  { key: "firstHalfUnder15", label: "1. HZ U1,5" }
+  { key: "1x2", label: "1X2", group: "Ergebnis" },
+  { key: "draw", label: "Remis", group: "Ergebnis" },
+  { key: "btts", label: "BTTS", group: "BTTS (beide treffen)" },
+  { key: "bttsNo", label: "BTTS Nein", group: "BTTS (beide treffen)" },
+  { key: "over15", label: "Über 1,5", group: "Tore im Spiel" },
+  { key: "under15", label: "Unter 1,5", group: "Tore im Spiel" },
+  { key: "over25", label: "Über 2,5", group: "Tore im Spiel" },
+  { key: "under25", label: "Unter 2,5", group: "Tore im Spiel" },
+  { key: "over35", label: "Über 3,5", group: "Tore im Spiel" },
+  { key: "under35", label: "Unter 3,5", group: "Tore im Spiel" },
+  { key: "firstHalfOver05", label: "1. HZ Ü0,5", group: "Tore 1. Halbzeit" },
+  { key: "firstHalfUnder05", label: "1. HZ U0,5", group: "Tore 1. Halbzeit" },
+  { key: "firstHalfOver15", label: "1. HZ Ü1,5", group: "Tore 1. Halbzeit" },
+  { key: "firstHalfUnder15", label: "1. HZ U1,5", group: "Tore 1. Halbzeit" }
 ];
 
 /**
@@ -49,6 +55,13 @@ const COUNTER_MARKETS: DashboardMarketKey[] = [
   "bttsNo", "under15", "under25", "under35", "firstHalfUnder05", "firstHalfUnder15"
 ];
 type MarketFilter = (typeof MARKET_OPTIONS)[number]["key"];
+
+/** Kurznamen für die Kästchen „Empfohlene Märkte“ - dieselben wie in den Kelly-Einstellungen. */
+const SHORT_MARKET_LABELS: Record<DashboardMarketKey, string> = {
+  "1x2": "1X2", draw: "Remis", btts: "BTTS", bttsNo: "BTTS Nein",
+  over15: "Ü1,5", under15: "U1,5", over25: "Ü2,5", under25: "U2,5", over35: "Ü3,5", under35: "U3,5",
+  firstHalfOver05: "HZ Ü0,5", firstHalfUnder05: "HZ U0,5", firstHalfOver15: "HZ Ü1,5", firstHalfUnder15: "HZ U1,5"
+};
 type RangeMode = "next48" | "custom";
 type H2hView = "outcome" | "btts" | "over" | "firstHalfOver";
 type FormView = H2hView;
@@ -70,7 +83,31 @@ const FIRST_HALF_LINE_OPTIONS: ReadonlyArray<SegmentOption<string>> = [
 const DIRECTION_OPTIONS: ReadonlyArray<SegmentOption<"over" | "under">> = [
   { value: "over", label: "Über" }, { value: "under", label: "Unter" }
 ];
-type SortKey = "kickoff" | "league" | "team" | "form" | "h2h" | "expected" | "score" | "market" | "shots" | "corners";
+
+/**
+ * Die zwei Anzeigen der Pre-Match-Liste. Steht in der Werkzeugleiste und nicht im Filtermenü:
+ * Sie blendet kein Spiel aus, genau wie Markt und Sortierung. Ab Werk "Kennzahlen" - Vorteil und
+ * Kelly bleiben hinter der Wahl, weil ein großer Vorteil laut Messung meist ein Fehler des
+ * Modells ist (Davids Entscheidung vom 25.09.2026). Die Spalten der Tabelle bleiben in beiden
+ * gleich; die Kelly-Wetten stehen im eigenen Fenster (Davids Entscheidung vom 29.09.2026).
+ */
+type DisplayMode = "stats" | "kelly";
+const TABLE_MODE_OPTIONS: ReadonlyArray<SegmentOption<DisplayMode>> = [
+  { value: "stats", label: "Kennzahlen", title: "Wahrscheinlichkeit, Quote und Kennzahlen je Markt" },
+  { value: "kelly", label: "Vorteil & Kelly", title: "Zeigt den Vorteil (Value) in der Marktspalte und öffnet die Kelly-Auswahl im eigenen Fenster; in der Heatmap die Value-Färbung – ein großer Vorteil ist meist ein Fehler des Modells" }
+];
+
+/** Der Satz, der im Modus "Vorteil & Kelly" immer unter der Leiste steht. Nicht wegklickbar. */
+export const KELLY_WARNING = "Ein großer Vorteil ist meist ein Fehler des Modells. Auch die Kelly-Auswahl lag,"
+  + " an alten Spielen geprüft, im Minus – rechne nicht mit Gewinn.";
+type SortKey = "kickoff" | "league" | "team" | "form" | "h2h" | "expected" | "score" | "market" | "shots" | "corners" | "confidence";
+
+/** Welche Sortierung ein Spaltenkopf setzt. Spalten ohne Eintrag sind nicht sortierbar. */
+const COLUMN_SORT: Partial<Record<TableColumnId, SortKey>> = {
+  match: "team", kickoff: "kickoff", form: "form", h2h: "h2h", expected: "expected", points: "score",
+  shots: "shots", market: "market", data: "confidence"
+};
+const SORT_ORDER: SortKey[] = ["kickoff", "league", "team", "form", "h2h", "shots", "corners", "expected", "score", "market", "confidence"];
 
 // Entspricht config.liveCandidateTrailMs: so lange nach dem Anpfiff kann eine Partie
 // noch laufen. Nur innerhalb dieses Fensters bleiben angepfiffene Partien sichtbar.
@@ -401,7 +438,7 @@ function saveLayout(layout: TableLayout): void {
 
 const SORT_STORAGE_KEY = "football-analyzer:sort";
 
-const SORT_KEYS: SortKey[] = ["kickoff", "league", "team", "form", "h2h", "expected", "score", "market", "shots", "corners"];
+const SORT_KEYS: SortKey[] = SORT_ORDER;
 
 type StoredSort = { key: SortKey; direction: 1 | -1 };
 
@@ -531,6 +568,14 @@ function recentSortValue(fixture: DashboardFixture, field: RecentStatField): num
   return (home ?? 0) + (away ?? 0);
 }
 
+/**
+ * Erwartete Tore mit zwei Nachkommastellen. Läufe vor Schema 2 führen keine Halbzeitwerte -
+ * dann steht ein Strich, keine 0,00, die eine torlose Halbzeit behauptete.
+ */
+function goalLabel(value: number | undefined): string {
+  return value === undefined ? "–" : value.toFixed(2).replace(".", ",");
+}
+
 /** Eine Zahl mit einer Nachkommastelle, Komma wie im Rest der Ansicht. */
 function recentLabel(value: number | null): string {
   return value === null ? "–" : value.toFixed(1).replace(".", ",");
@@ -571,7 +616,7 @@ function EloTag({ value, team }: { value: DashboardFixture["homeElo"]; team: str
   const confidence = Math.round(value.confidence);
   const stand = new Date(value.asOf).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" });
   return <small className={confidence < 50 ? "elo-tag unsicher" : "elo-tag"}
-    title={`Elo ${elo} (${value.system === "national" ? "Nationalteams" : "Vereine"}): Stärkewert von ${team} aus den Spielen der letzten fünf Jahre.`
+    title={`Elo ${elo} (${eloSystemLabel(value.system)}): Stärkewert von ${team} aus den Spielen der letzten fünf Jahre.`
       + ` Vertrauen ${confidence} %, Stand ${stand}. Nur zur Einordnung – geht in keinen Tipp ein.`}>
     {elo}
   </small>;
@@ -736,7 +781,7 @@ export function MarketCard({ market, showEdge }: { market: DashboardMarket; show
       : `${market.selection} · ohne Ligastärke-Vergleich keine belastbare Wahrscheinlichkeit`}
   >
     <div className="market-line">
-      <span className="level-glyph">{market.recommendation.level === "strong" ? "★" : market.recommendation.level === "recommended" ? "✓" : "·"}</span>
+      <span className="level-glyph">{levelGlyph(market.recommendation.level)}</span>
       {market.pick && <strong className={`pick ${market.selectionTone}`}>{market.pick}</strong>}
       <strong className="odd">{formatOdd(market.odds)}</strong>
       {edge !== null && <span className={`market-edge ${edge >= 0 ? "pos" : "neg"}`} title="Value: um wie viel besser das Modell die Chance sieht, als die Quote es hergibt. Angegeben in Prozentpunkten.">{edge >= 0 ? "+" : ""}{(edge * 100).toFixed(1).replace(".", ",")} PP</span>}
@@ -750,10 +795,53 @@ export function MarketCard({ market, showEdge }: { market: DashboardMarket; show
   </div>;
 }
 
+function levelGlyph(level: RecommendationLevel): string {
+  return level === "strong" ? "★" : level === "recommended" ? "✓" : "·";
+}
+
+/**
+ * Bei „Alle Märkte“ steht neben der 1X2-Zelle nur, was eine Empfehlung trägt - statt vierzehn
+ * Kästchen, für die die Tabelle seitlich scrollte. ★ vor ✓, damit sichtbar bleibt, warum ein
+ * Spiel den Stufenfilter besteht. Höchstens drei, der Rest als Zahl mit den Namen im Tooltip;
+ * alle Märkte stehen aufgeklappt unter „Bewertung je Markt“. Ohne belastbare Wahrscheinlichkeit
+ * erscheint ein Markt hier nie. Nur title, kein Knopf: Die ganze Zeile ist schon einer.
+ */
+function RecommendedMarkets({ fixture }: { fixture: DashboardFixture }) {
+  const picks = fixture.markets
+    .filter((market) => market.key !== "1x2" && market.recommendation.level !== "none" && market.probabilityReliable !== false)
+    .sort((left, right) => levelRank[right.recommendation.level] - levelRank[left.recommendation.level]);
+  if (picks.length === 0) return <span className="recommended-cell empty" title="Kein weiterer Markt mit Empfehlung">–</span>;
+  const rest = picks.slice(3);
+  return <span className="recommended-cell">
+    {picks.slice(0, 3).map((market) => <span key={market.key} className={`rec-chip ${market.recommendation.level}`}
+      title={`${market.label} · ${market.selection} · Quote ${formatOdd(market.odds)} · ${formatPercent(market.probability)} · ${market.recommendation.label}`}>
+      <span className="level-glyph">{levelGlyph(market.recommendation.level)}</span>
+      {SHORT_MARKET_LABELS[market.key]} · {formatOdd(market.odds)} · {Math.round(market.probability * 100)} %
+    </span>)}
+    {rest.length > 0 && <span className="rec-more" title={rest.map((market) => `${market.label} (${market.recommendation.label})`).join(" · ")}>
+      +{rest.length}
+    </span>}
+  </span>;
+}
+
+/**
+ * Das Datenvertrauen stand früher nirgends in der Zeile, obwohl es die Empfehlung mitbestimmt.
+ * Darunter die Zahl der Hinweise, der Wortlaut im Tooltip - früher ein blaues Kürzel „Daten“.
+ */
+function DataCell({ fixture, market }: { fixture: DashboardFixture; market: DashboardMarket | undefined }) {
+  const confidence = Math.round(market ? market.confidence : fixture.dataConfidence);
+  const count = fixture.warnings.length;
+  return <span className="data-cell"
+    title={count > 0 ? `Datenvertrauen ${confidence} % · Hinweise zu den Daten: ${fixture.warnings.join(" · ")}` : `Datenvertrauen ${confidence} %`}>
+    <strong>{confidence} %</strong>
+    {count > 0 && <small><WarningCircle size={11} weight="bold" aria-hidden />{count} {count === 1 ? "Hinweis" : "Hinweise"}</small>}
+  </span>;
+}
+
 export function ClassGapBadge({ gap, homeTeam, awayTeam }: { gap: ClassGap; homeTeam: string; awayTeam: string }) {
   const stronger = gap.stronger === "home" ? homeTeam : awayTeam;
   const title = `${gap.level === "extreme" ? "Sehr großer" : "Deutlicher"} Klassenunterschied · ${stronger} ist die höhere Klasse · `
-    + `${gap.source === "rating" ? "Modell" : "Markt"}: ${gap.label}`;
+    + `${gap.source === "rating" ? "Modell" : gap.source === "elo" ? "Team-Elo" : "Markt"}: ${gap.label}`;
   return <i className={`class-gap ${gap.level} ${gap.source}`} title={title} aria-label={title}>
     Klasse {gap.stronger === "home" ? "↑" : "↓"}
   </i>;
@@ -1045,6 +1133,11 @@ function Dashboard({ document }: { document: DashboardDocument }) {
   // eigene Regel mit eigener Rückrechnung und darf von einem Tabellenfilter nicht
   // beschnitten werden.
   const quickpick = applyQuickpick(quickpickActive ? scopedFixtures : [], quickpickSettings);
+  // Eine Rechnung für Kelly-Zeile und Dialog - auf dem Umfang, nicht auf `filtered`.
+  // Ohne useMemo: `scopedFixtures` und `now` entstehen je Render neu, und die Rechnung ist billig.
+  const kellySelection = showKelly && view === "prematch"
+    ? selectKelly(scopedFixtures, marketFilter, kellySettings, kellyAuto, marketProfile.profile)
+    : null;
   const quickpickLabel = presetOf(quickpickSettings).label;
   const filtered = scopedFixtures.filter((fixture) => {
     if (quickpickActive && !quickpick.passing.has(fixture.fixtureId)) return false;
@@ -1054,29 +1147,45 @@ function Dashboard({ document }: { document: DashboardDocument }) {
     return levelFilter === "all" || (levelFilter === "strong" ? level === "strong" : levelRank[level] >= levelRank.recommended);
   });
 
-  const sortedFixtures = useMemo(() => [...filtered].sort((left, right) => {
-    const selectedMarket = marketFilter === "all" ? "1x2" : marketFilter;
+  const heatmap = layout === "heatmap";
+  const columns = tableColumns(marketFilter);
+  const selectedMarketKey: DashboardMarketKey = marketFilter === "all" ? "1x2" : marketFilter;
+  // Das Datenvertrauen des gezeigten Marktes; bei „Alle Märkte“ das des Spiels.
+  const dataMarketOf = (fixture: DashboardFixture): DashboardMarket | undefined =>
+    marketFilter !== "all" ? marketFor(fixture, selectedMarketKey) : undefined;
+  const confidenceOf = (fixture: DashboardFixture): number => dataMarketOf(fixture)?.confidence ?? fixture.dataConfidence;
+  // Sortierbar ist nur, was zu sehen ist. Eine gemerkte Wahl auf eine ausgeblendete Spalte fällt
+  // auf den Anstoß zurück, wird aber nicht überschrieben - beim Zurückwechseln ist sie wieder da.
+  const sortableKeys: SortKey[] = heatmap
+    ? ["kickoff", "league", "team", "form", "h2h", "shots", "corners", "expected", ...(showsPoints(marketFilter) ? ["score" as const] : []), "market"]
+    : (["kickoff", "league", ...columns.flatMap((column) => COLUMN_SORT[column.id] ?? [])] as SortKey[]);
+  const effectiveSortKey: SortKey = sortableKeys.includes(sortKey) ? sortKey : "kickoff";
+  const effectiveDirection: 1 | -1 = effectiveSortKey === sortKey ? sortDirection : 1;
+
+  const sortedFixtures = [...filtered].sort((left, right) => {
+    const byKickoff = Date.parse(left.kickoff) - Date.parse(right.kickoff);
     let comparison = 0;
-    if (sortKey === "kickoff") comparison = Date.parse(left.kickoff) - Date.parse(right.kickoff);
-    else if (sortKey === "league") comparison = `${left.country} ${left.league}`.localeCompare(`${right.country} ${right.league}`, "de");
-    else if (sortKey === "team") comparison = `${left.homeTeam} ${left.awayTeam}`.localeCompare(`${right.homeTeam} ${right.awayTeam}`, "de");
-    else if (sortKey === "expected") {
-      const firstHalf = marketFilter === "firstHalfOver05" || marketFilter === "firstHalfOver15";
+    if (effectiveSortKey === "kickoff") comparison = byKickoff;
+    else if (effectiveSortKey === "league") comparison = `${left.country} ${left.league}`.localeCompare(`${right.country} ${right.league}`, "de");
+    else if (effectiveSortKey === "team") comparison = `${left.homeTeam} ${left.awayTeam}`.localeCompare(`${right.homeTeam} ${right.awayTeam}`, "de");
+    else if (effectiveSortKey === "expected") {
+      const firstHalf = isFirstHalfMarket(marketFilter);
       comparison = (firstHalf ? left.expectedFirstHalfGoals?.total ?? -1 : left.expectedGoals.total) -
         (firstHalf ? right.expectedFirstHalfGoals?.total ?? -1 : right.expectedGoals.total);
     }
-    else if (sortKey === "shots") comparison = recentSortValue(left, "shotsOnGoal") - recentSortValue(right, "shotsOnGoal");
-    else if (sortKey === "corners") comparison = recentSortValue(left, "corners") - recentSortValue(right, "corners");
-    else if (sortKey === "score") comparison = (marketFilter === "draw" ? left.scores.draw ?? -1 : left.scores.favorite ?? -1) - (marketFilter === "draw" ? right.scores.draw ?? -1 : right.scores.favorite ?? -1);
-    else if (sortKey === "market") comparison = (marketFor(left, selectedMarket)?.probability ?? -1) - (marketFor(right, selectedMarket)?.probability ?? -1);
-    else if (sortKey === "form" || sortKey === "h2h") {
-      comparison = columnComparison(sortKey, left, right, formView, h2hView, formSortMode, h2hSortMode, overLine, firstHalfOverLine, counterDirection);
+    else if (effectiveSortKey === "shots") comparison = recentSortValue(left, "shotsOnGoal") - recentSortValue(right, "shotsOnGoal");
+    else if (effectiveSortKey === "corners") comparison = recentSortValue(left, "corners") - recentSortValue(right, "corners");
+    else if (effectiveSortKey === "score") comparison = (marketFilter === "draw" ? left.scores.draw ?? -1 : left.scores.favorite ?? -1) - (marketFilter === "draw" ? right.scores.draw ?? -1 : right.scores.favorite ?? -1);
+    else if (effectiveSortKey === "market") comparison = (marketFor(left, selectedMarketKey)?.probability ?? -1) - (marketFor(right, selectedMarketKey)?.probability ?? -1);
+    else if (effectiveSortKey === "confidence") comparison = confidenceOf(left) - confidenceOf(right);
+    else if (effectiveSortKey === "form" || effectiveSortKey === "h2h") {
+      comparison = columnComparison(effectiveSortKey, left, right, formView, h2hView, formSortMode, h2hSortMode, overLine, firstHalfOverLine, counterDirection);
       if (comparison === 0 && secondarySortKey) {
         comparison = columnComparison(secondarySortKey, left, right, formView, h2hView, formSortMode, h2hSortMode, overLine, firstHalfOverLine, counterDirection);
       }
     }
-    return comparison * sortDirection || Date.parse(left.kickoff) - Date.parse(right.kickoff);
-  }), [filtered, firstHalfOverLine, formSortMode, formView, h2hSortMode, h2hView, marketFilter, overLine, secondarySortKey, sortDirection, sortKey]);
+    return comparison * effectiveDirection || byKickoff;
+  });
 
   const cyclePairMode = (key: "form" | "h2h") => {
     if (key === "form") setFormSortMode((value) => (value + 1) % 3);
@@ -1131,7 +1240,7 @@ function Dashboard({ document }: { document: DashboardDocument }) {
     setSortKey(key);
     setSortDirection(key === "kickoff" || key === "league" || key === "team" ? 1 : -1);
   };
-  const arrow = (key: SortKey) => sortKey === key ? (sortDirection === 1 ? "↑" : "↓") : "↕";
+  const arrow = (key: SortKey) => effectiveSortKey === key ? (effectiveDirection === 1 ? "↑" : "↓") : "↕";
   const formSortModeKey = formSortModes[formSortMode]!;
   const formSortLabel = formSortLabels[formSortModeKey];
   const h2hSortTarget = h2hSortTargets[h2hSortMode]!;
@@ -1140,62 +1249,55 @@ function Dashboard({ document }: { document: DashboardDocument }) {
     ? h2hView
     : formView === "over" || formView === "firstHalfOver" ? formView : null;
   const availableMarketOptions = MARKET_OPTIONS.filter((option) => option.key === "all" || document.fixtures.some((fixture) => fixture.markets.some((market) => market.key === option.key)));
-  const shownMarkets = marketFilter === "all" ? availableMarketOptions.slice(1) : availableMarketOptions.filter((option) => option.key === marketFilter);
-  const showFirstHalfExpected = marketFilter === "firstHalfOver05" || marketFilter === "firstHalfOver15";
-  const showScore = marketFilter === "all" || marketFilter === "1x2" || marketFilter === "draw";
-  // Vier Basisspalten, dazu der Score, wenn der Markt ihn zeigt, und die Marktspalten.
-  // Die Summe muss zur Spaltenliste in styles.css passen, sonst scrollt die Tabelle
-  // entweder zu frueh oder laesst die letzte Spalte abschneiden.
-  // Partie, Form, H2H, Schüsse, Ecken, Erwartete Tore - dazu Score und die Märkte.
-  const columnCount = 6 + (showScore ? 1 : 0) + shownMarkets.length;
-  // 822 = die sechs Basisminima (280+184+134+46+46+82) plus den Innenabstand der Zeile
-  // (40+10); der Score kommt mit seinem eigenen Minimum dazu. Die Summe muss zur Spaltenliste
-  // in styles.css passen, sonst klemmen die Spalten oder die Tabelle scrollt ohne Not.
-  const minimumWidth = 822 + (showScore ? 52 : 0) + shownMarkets.length * 126 + (columnCount - 1) * 10;
-  const gridStyle = {
-    "--market-count": shownMarkets.length,
-    "--table-min-width": `${minimumWidth}px`
-  } as CSSProperties;
-  const fixtureGridClass = `fixture-grid${showScore ? " has-score" : ""}`;
-  const heatmap = layout === "heatmap";
-  const activeSortDirection = heatmap && heatmapSort ? heatmapSort.direction : sortDirection;
+  // Aufeinanderfolgende Märkte derselben Gruppe; eine Gruppe ohne verfügbaren Markt entsteht gar nicht.
+  const marketOptionGroups = availableMarketOptions.reduce<Array<{ group?: string; options: typeof availableMarketOptions }>>((groups, option) => {
+    const last = groups.at(-1);
+    if (last && last.group === option.group) last.options.push(option);
+    else groups.push({ group: option.group, options: [option] });
+    return groups;
+  }, []);
+  const showFirstHalfExpected = isFirstHalfMarket(marketFilter);
+  // Raster und Mindestbreite kommen aus derselben Spaltenliste (tableColumns.ts).
+  const tableWidth = { "--table-min-width": `${minimumWidth(columns)}px` } as CSSProperties;
+  const gridStyle = { ...tableWidth, gridTemplateColumns: gridTemplate(columns) } as CSSProperties;
+  const fixtureGridClass = "fixture-grid";
+  const activeSortDirection = heatmap && heatmapSort ? heatmapSort.direction : effectiveDirection;
   const flipSortDirection = () => {
     if (heatmap && heatmapSort) setHeatmapSort({ ...heatmapSort, direction: heatmapSort.direction === 1 ? -1 : 1 });
+    // Steht die Wahl gerade auf dem Rückfall, dreht der Knopf den Anstoß um, den man sieht.
+    else if (effectiveSortKey !== sortKey) { setSortKey(effectiveSortKey); setSortDirection(-1); }
     else setSortDirection((value) => value === 1 ? -1 : 1);
   };
-  const sortMarketKey = marketFilter === "all" ? "1x2" : marketFilter;
-  const sortOptions: Array<[SortKey, string]> = [
-    ["kickoff", "Anstoß"],
-    ["league", "Liga"],
-    ["team", "Heimteam (A–Z)"],
-    ["form", "Form (letzte 5)"],
-    ["h2h", "H2H (direkte Duelle)"],
-    ["shots", "Schüsse aufs Tor"],
-    ["corners", "Ecken"],
-    ["expected", showFirstHalfExpected ? "Erwartete Tore 1. HZ" : "Erwartete Tore"],
-    ...(showScore || sortKey === "score" ? [["score", "Score"] as [SortKey, string]] : []),
-    ["market", `Wahrscheinlichkeit ${availableMarketOptions.find((option) => option.key === sortMarketKey)?.label ?? "1X2"}`]
-  ];
+  const sortLabels: Record<SortKey, string> = {
+    kickoff: "Anstoß",
+    league: "Liga",
+    team: "Heimteam (A–Z)",
+    form: "Form (letzte 5)",
+    h2h: "H2H (direkte Duelle)",
+    shots: "Schüsse aufs Tor",
+    corners: "Ecken",
+    expected: showFirstHalfExpected ? "Erwartete Tore 1. HZ" : "Erwartete Tore",
+    score: "Punkte",
+    market: `Wahrscheinlichkeit ${availableMarketOptions.find((option) => option.key === selectedMarketKey)?.label ?? "1X2"}`,
+    confidence: "Datenvertrauen"
+  };
+  const sortOptions: Array<[SortKey, string]> = SORT_ORDER
+    .filter((key) => sortableKeys.includes(key))
+    .map((key) => [key, sortLabels[key]]);
   const heatmapColumns = heatmapMarkets(marketFilter).map((key) =>
     ({ key, label: MARKET_OPTIONS.find((option) => option.key === key)?.label ?? key }));
   const emptyState = quickpickActive
-    ? <EmptyState title={`${quickpickLabel} lässt keine Partie übrig`}
+    ? <EmptyState title={`${quickpickLabel} lässt kein Spiel übrig`}
         text={quickpickReason(quickpick.report)}
         action={<button className="empty-state-action" onClick={() => setQuickpickActive(false)}>
           Filter aufheben
         </button>} />
     : <EmptyState title="Keine Spiele für diese Auswahl" text="Wähle einen anderen Zeitraum oder lockere die Filter."
         action={<button className="empty-state-action" onClick={() => resetFilters()}>Filter zurücksetzen</button>} />;
-  const rangeLabel = rangeMode === "next48"
-    ? "Nächste 48 Stunden ab jetzt"
-    : `${customStart ? formatCalendarDate(customStart) : "–"} – ${customEnd ? formatCalendarDate(customEnd) : "–"}`;
 
   const isLeagueVisible = (country: string, league: string) =>
     !deselectedLeagues.has(leagueKey(country, league));
   const liveMatches = (live.board?.matches ?? []).filter((match) => isLeagueVisible(match.country, match.league));
-
-  const valueCount = filtered.filter((fixture) =>
-    fixture.markets.some((market) => (edgeOf(market) ?? 0) > 0)).length;
 
   const marketLabelOf = (key: MarketFilter) => availableMarketOptions.find((option) => option.key === key)?.label ?? key;
   const leagueCount = { selected: availableLeagues.length - deselectedLeagues.size, total: availableLeagues.length };
@@ -1257,7 +1359,6 @@ function Dashboard({ document }: { document: DashboardDocument }) {
     classGapFilter,
     showCrossLeague,
     showPast,
-    showKelly,
     liveRatedOnly,
     leagues: leagueCount,
     leagueList: availableLeagues,
@@ -1279,10 +1380,6 @@ function Dashboard({ document }: { document: DashboardDocument }) {
       if (!value) setClassGapFilter("all");
     },
     setShowPast,
-    setShowKelly: (value) => {
-      setShowKelly(value);
-      if (!value) setKellyOpen(false);
-    },
     setLiveRatedOnly,
     openLeagueFilter: () => setLeagueFilterOpen(true),
     toggleLeague,
@@ -1336,9 +1433,45 @@ function Dashboard({ document }: { document: DashboardDocument }) {
   const marketControl = <label className="toolbar-field">
     <span>Markt</span>
     <select value={marketFilter} onChange={(event) => selectMarket(event.target.value as MarketFilter)}>
-      {availableMarketOptions.map((option) => <option value={option.key} key={option.key}>{option.label}</option>)}
+      {marketOptionGroups.map(({ group, options }) => {
+        const items = options.map((option) => <option value={option.key} key={option.key}>{option.label}</option>);
+        return group ? <optgroup label={group} key={group}>{items}</optgroup> : <Fragment key="ungrouped">{items}</Fragment>;
+      })}
     </select>
   </label>;
+
+  const selectTableMode = (mode: DisplayMode) => {
+    setShowKelly(mode === "kelly");
+    if (mode !== "kelly") setKellyOpen(false);
+  };
+  const tableModeControl = <FilterSegment className="toolbar-segment" name="table-mode" legend="Anzeige"
+    value={showKelly ? "kelly" : "stats"} onChange={selectTableMode} options={TABLE_MODE_OPTIONS} />;
+
+  // Die Kelly-Zeile nennt, was der Dialog sonst erst nach dem Öffnen zeigt - auch den
+  // Einsatzrahmen, der bis zum 15.09.2026 unbemerkt auf 100 % stand.
+  const kellyStatus = (() => {
+    if (!kellySelection) return null;
+    const note = kellyProfileNote(kellyAuto, marketProfile);
+    const loading = kellyAuto && marketProfile.profile === null && (marketProfile.status === "loading" || marketProfile.status === "idle");
+    const count = kellySelection.candidates.length;
+    const slots = kellySelection.slots;
+    return <div className="kelly-status">
+      <p className="kelly-status-line">
+        <span title={"Geprüft werden die Spiele aus Zeitraum und Wettbewerben im Filter, samt „Nur"
+          + " Ligaspiele“ und angepfiffenen Spielen, und der gewählte Markt. Bewertung und"
+          + " Klassenunterschied grenzen nur die Tabelle ein."}>
+          Kelly-Auswahl · {marketLabelOf(marketFilter)}:
+        </span>
+        {loading ? <> {note}</> : <>
+          {" "}<strong>{count}</strong> {count === 1 ? "Wette" : "Wetten"}
+          {" · "}<strong>{formatEuro(kellySelection.totalStake)}</strong> von {formatEuro(kellySettings.budget)}
+          {" · "}{kellySelection.automatic ? "Automatik" : note ?? "Manuell"}
+          {" · "}Einsatzrahmen {formatPercent(kellySettings.maxExposurePercent)}
+          {" "}({Number.isFinite(slots.plaetze) ? `≈ ${slots.plaetze} Plätze` : "ohne Grenze"})        </>}
+      </p>
+      <p className="filter-note warning"><Info size={13} weight="bold" aria-hidden />{KELLY_WARNING}</p>
+    </div>;
+  })();
 
   const clearAndRefocus = (clear: () => void) => {
     clear();
@@ -1363,6 +1496,136 @@ function Dashboard({ document }: { document: DashboardDocument }) {
       {" · "}{live.board.strategy === "live-all" ? "Sammelabruf" : "Bündelabruf"}</>}
   </p>;
 
+  // Kopf und Zeilen der Tabelle folgen der Spaltenliste (tableColumns.ts): je Modus und Markt nur,
+  // was dazu passt. Der Kopf markiert die wirksame Sortierung, nicht eine gemerkte ausgeblendete.
+  const sortButton = (key: SortKey, label: string, options: { title?: string; className?: string; content?: ReactNode } = {}) =>
+    <button className={[options.className, effectiveSortKey === key ? "sorted" : ""].filter(Boolean).join(" ") || undefined}
+      title={options.title} onClick={() => sort(key)}
+      aria-label={sortStateLabel(label, effectiveSortKey === key, effectiveDirection)}>
+      {options.content ?? label} {arrow(key)}
+    </button>;
+  const headLabel = (label: string, title: string) => <span className="head-label" title={title}>{label}</span>;
+  const pairSortBadge = (key: "form" | "h2h") => {
+    const outcome = key === "form" ? formView === "outcome" : h2hView === "outcome";
+    if (outcome && effectiveSortKey === key) {
+      return key === "form"
+        ? <span className={`sort-mode-badge ${formSortLabel.className}`} aria-label={`Sortierung: ${formSortLabel.label}`} title={formSortLabel.label}>{formSortLabel.badge}</span>
+        : <span className={`sort-mode-badge ${h2hSortTarget}`} aria-label={`Sortierung: ${h2hSortLabel.label}`} title={h2hSortLabel.label}>{h2hSortLabel.badge}</span>;
+    }
+    if (secondarySortKey === key) return <span className="sort-mode-badge secondary" aria-label="Sekundäre Sortierung" title="Sekundäre Sortierung">2</span>;
+    return arrow(key);
+  };
+  const headCell = (column: TableColumn): ReactNode => {
+    switch (column.id) {
+      case "match": return sortButton("team", "Spiel");
+      case "kickoff": return sortButton("kickoff", "Anstoß", { title: "Anstoß, Land und Liga" });
+      case "form": return <button className={effectiveSortKey === "form" ? "sorted" : undefined} onClick={() => sort("form")}>Letzte 5 Form {pairSortBadge("form")}</button>;
+      case "h2h": return <button className={effectiveSortKey === "h2h" ? "sorted" : undefined} onClick={() => sort("h2h")} title="H2H: die direkten Duelle beider Mannschaften">Letzte 5 H2H {pairSortBadge("h2h")}</button>;
+      case "expected": return sortButton("expected", showFirstHalfExpected ? "Erw. Tore 1. HZ" : "Erw. Tore", {
+        title: isGoalLineMarket(marketFilter) || showFirstHalfExpected
+          ? "Erwartete Tore laut Modell, groß die Summe beider Mannschaften"
+          : "Erwartete Tore laut Modell, Heim : Auswärts"
+      });
+      case "points": return sortButton("score", "Punkte", { title: "1X2- und Remis-Punkte aus dem 100-Punkte-System" });
+      case "shots": return sortButton("shots", "Schüsse aufs Tor", {
+        className: "icon-head", title: "Schüsse aufs Tor im Schnitt der letzten fünf Spiele",
+        content: <Crosshair size={15} weight="bold" aria-hidden="true" />
+      });
+      case "market": return sortButton("market", marketFilter === "all" ? "1X2" : marketLabelOf(marketFilter), { title: "Tipp, Quote und Wahrscheinlichkeit laut Modell" });
+      case "recommended": return headLabel("Empfohlene Märkte", "Weitere Märkte mit ✓ oder ★, höchstens drei. Alle Märkte stehen aufgeklappt unter „Bewertung je Markt“.");
+      case "data": return sortButton("confidence", "Daten", { title: "Datenvertrauen – wie verlässlich die Daten zu diesem Spiel sind. Fließt in die Empfehlung ein." });
+    }
+  };
+
+  const rowCells = (fixture: DashboardFixture, showDay: boolean): ReactNode[] => {
+    const time = kickoffParts(fixture.kickoff, document.meta.timezone);
+    const isPast = Date.parse(fixture.kickoff) < now;
+    const cells: ReactNode[] = [];
+    for (const column of columns) {
+      switch (column.id) {
+        case "match": cells.push(<span className="fixture-summary-cell" key="match">
+          <span className="teams-cell">
+            <span className="team-name"><TeamCrest name={fixture.homeTeam} logo={fixture.homeCrest} /><strong>{fixture.homeTeam}</strong><EloTag value={fixture.homeElo} team={fixture.homeTeam} /><DefenseShield profile={fixture.defense?.home} team={fixture.homeTeam} /></span>
+            <span className="team-name"><TeamCrest name={fixture.awayTeam} logo={fixture.awayCrest} /><strong>{fixture.awayTeam}</strong><EloTag value={fixture.awayElo} team={fixture.awayTeam} /><DefenseShield profile={fixture.defense?.away} team={fixture.awayTeam} /></span>
+          </span>
+        </span>); break;
+        case "kickoff": cells.push(<span className="kickoff-cell" key="kickoff">
+          <span className="kickoff-line">
+            <strong>{time.clock}{isPast && <em> angepfiffen</em>}</strong>
+            {fixture.classGap && <ClassGapBadge gap={fixture.classGap} homeTeam={fixture.homeTeam} awayTeam={fixture.awayTeam} />}
+          </span>
+          {/* Das Datum nur ohne Tages-Trennzeile - sonst stünde es in jeder Zeile doppelt. */}
+          <small title={`${fixture.country} · ${fixture.league}`}>{showDay && `${time.day} · `}<CountryFlag country={fixture.country} /> {fixture.country} · {fixture.league}</small>
+        </span>); break;
+        case "form": cells.push(<span className="form-cell" key="form">
+          {/*
+            * Bei Pokal- und Länderspielen zählt der Lauf die letzten Spiele insgesamt
+            * (src/dashboard.ts setzt dann scope "overall"). "Heim"/"Ausw." hätte dort
+            * eine Trennung nach Ort behauptet, die in den Punkten gar nicht steckt.
+            */}
+          <span
+            className="form-labels"
+            title={fixture.form.scope === "overall"
+              ? `Alle Spiele der letzten Zeit, zu Hause und auswärts zusammen – oben ${fixture.homeTeam}, unten ${fixture.awayTeam}`
+              : `Nur die Heimspiele von ${fixture.homeTeam} gegen die Auswärtsspiele von ${fixture.awayTeam}`}
+            aria-label={fixture.form.scope === "overall" ? "Form aus allen Spielen" : "Heim- und Auswärtsform"}
+          >
+            {fixture.form.scope === "overall"
+              ? <><small>Alle</small><small>Alle</small></>
+              : <><small>Heim</small><small>Ausw.</small></>}
+          </span>
+          <span>{formView === "outcome"
+            ? <><FormDots results={fixture.form.home} /><FormDots results={fixture.form.away} /></>
+            : <>
+              <FormMatchDots matches={fixture.form.homeMatches} view={formView} overLine={overLine} firstHalfOverLine={firstHalfOverLine} inverted={counterDirection} />
+              <FormMatchDots matches={fixture.form.awayMatches} view={formView} overLine={overLine} firstHalfOverLine={firstHalfOverLine} inverted={counterDirection} />
+            </>}</span>
+        </span>); break;
+        case "h2h": cells.push(<span className="h2h-cell" key="h2h">
+          <H2hDots fixture={fixture} view={h2hView} overLine={overLine} firstHalfOverLine={firstHalfOverLine} inverted={counterDirection} />
+          {/* Eine Auffälligkeit, kein Grund für einen Tipp - deshalb grau, nie grün oder gold. */}
+          {fixture.h2hNotice && <small className="h2h-notice" title={`${fixture.h2hNotice} · eine Auffälligkeit, kein Grund für einen Tipp`}>Remis-Serie</small>}
+        </span>); break;
+        case "expected": {
+          const title = `Erwartete Tore laut Modell · ${fixture.homeTeam} ${goalLabel(fixture.expectedGoals.home)} · ${fixture.awayTeam} ${goalLabel(fixture.expectedGoals.away)}`;
+          if (showFirstHalfExpected) cells.push(<span className="expected-cell total" key="expected" title={title}>
+            <strong>Σ {goalLabel(fixture.expectedFirstHalfGoals?.total)}</strong><small>Spiel Σ {goalLabel(fixture.expectedGoals.total)}</small>
+          </span>);
+          else if (isGoalLineMarket(marketFilter)) cells.push(<span className="expected-cell total" key="expected" title={title}>
+            <strong>Σ {goalLabel(fixture.expectedGoals.total)}</strong><small>{goalLabel(fixture.expectedGoals.home)} : {goalLabel(fixture.expectedGoals.away)}</small>
+          </span>);
+          else cells.push(<span className="expected-cell" key="expected" title={title}>
+            <strong>{goalLabel(fixture.expectedGoals.home)}</strong><i>:</i><strong>{goalLabel(fixture.expectedGoals.away)}</strong>
+          </span>);
+          break;
+        }
+        case "points": cells.push(<span className="score-cell" key="points">
+          {marketFilter !== "draw" && <span><small>1X2</small><strong>{fixture.scores.favorite ?? "–"}</strong></span>}
+          {marketFilter !== "1x2" && <span><small>X</small><strong>{fixture.scores.draw ?? "–"}</strong></span>}
+        </span>); break;
+        case "shots": cells.push(<RecentStatCell fixture={fixture} field="shotsOnGoal" label="Schüsse aufs Tor" key="shots" />); break;
+        case "market": {
+          const market = marketFor(fixture, selectedMarketKey);
+          cells.push(market
+            ? <MarketCard market={market} showEdge={showKelly} key="market" />
+            : <span className="market-card missing" key="market">–</span>);
+          break;
+        }
+        case "recommended": cells.push(<RecommendedMarkets fixture={fixture} key="recommended" />); break;
+        case "data": cells.push(<DataCell fixture={fixture} market={dataMarketOf(fixture)} key="data" />); break;
+      }
+    }
+    return cells;
+  };
+
+  // Trennzeilen je Tag nur, wenn nach Anstoß sortiert ist - in beide Richtungen. Der Tag kommt
+  // aus der Berliner Zeit, nicht aus UTC; angepfiffene Spiele gehören zu ihrem Tag.
+  const groupedByDay = effectiveSortKey === "kickoff";
+  const dayOf = (fixture: DashboardFixture) => berlinDate(fixture.kickoff, document.meta.timezone);
+  const dayCounts = new Map<string, number>();
+  for (const fixture of sortedFixtures) dayCounts.set(dayOf(fixture), (dayCounts.get(dayOf(fixture)) ?? 0) + 1);
+  const dayLabel = (day: string) => `${formatCalendarDate(day, { weekday: "short" }).replace(".", "")} ${formatCalendarDate(day, { day: "2-digit", month: "2-digit" })}`;
+
   return <>
   <div className="app-shell density-compact">
     <NavRail active={navKey} onSelect={selectNav} createdAt={document.meta.createdAt} timezone={document.meta.timezone} />
@@ -1372,12 +1635,17 @@ function Dashboard({ document }: { document: DashboardDocument }) {
       {view === "prematch" ? <>
       <div className="view-toolbar">
         <div className="toolbar-row">
-          {filterControl}
+          {/* Links, was Spiele ausblendet; rechts der Linie, was nur die Darstellung ändert. */}
+          <div className="toolbar-group">
+            {filterControl}
+            <QuickpickButton active={quickpickActive} onOpen={() => setQuickpickOpen(true)} />
+          </div>
+          <span className="toolbar-divider" aria-hidden />
           {marketControl}
           <div className="toolbar-field sort-field">
             <label htmlFor="sort-select">Sortierung</label>
             <div className="sort-control">
-              <select id="sort-select" value={heatmap && heatmapSort ? "heatmap" : sortKey} onChange={(event) => selectSort(event.target.value as SortKey)}>
+              <select id="sort-select" value={heatmap && heatmapSort ? "heatmap" : effectiveSortKey} onChange={(event) => selectSort(event.target.value as SortKey)}>
                 {heatmap && heatmapSort && <option value="heatmap" disabled>Spalte der Heatmap</option>}
                 {sortOptions.map(([key, label]) => <option value={key} key={key}>{label}</option>)}
               </select>
@@ -1388,16 +1656,17 @@ function Dashboard({ document }: { document: DashboardDocument }) {
               </button>
             </div>
           </div>
-          <div className="toolbar-actions">
-            <QuickpickButton active={quickpickActive} onOpen={() => setQuickpickOpen(true)} />
+          <div className="toolbar-group">
+            {tableModeControl}
             {showKelly && <KellyButton onOpen={() => setKellyOpen(true)} />}
           </div>
         </div>
         {filterStatusRow(<p className="filter-status">
           <span aria-live="polite"><strong>{filtered.length}</strong> Spiele angezeigt</span>
-          {" · "}{rangeLabel}
-          {showKelly && <>{" · "}<strong>{valueCount}</strong> mit Vorteil</>}
+          {/* Ein eigener Zeitraum steht schon im Schildchen daneben. */}
+          {rangeMode === "next48" && <>{" · "}Nächste 48 Stunden ab jetzt</>}
         </p>)}
+        {kellyStatus}
       </div>
 
       <div className="table-with-detail">
@@ -1422,91 +1691,38 @@ function Dashboard({ document }: { document: DashboardDocument }) {
         />}
         empty={emptyState}
       /> : <div className="table-scroll">
-        <div className={`table-head ${fixtureGridClass}`} style={gridStyle}>
-          <span className="fixture-summary-head">
-            <button onClick={() => sort("team")} aria-label={sortStateLabel("Partie", sortKey === "team", sortDirection)}>Partie {arrow("team")}</button>
-            <button onClick={() => sort("kickoff")} aria-label={sortStateLabel("Anstoß & Liga", sortKey === "kickoff", sortDirection)}>Anstoß & Liga {arrow("kickoff")}</button>
-          </span>
-          <button onClick={() => sort("form")}>
-            Letzte 5 Form {formView === "outcome" && sortKey === "form"
-              ? <span className={`sort-mode-badge ${formSortLabel.className}`} aria-label={`Sortierung: ${formSortLabel.label}`} title={formSortLabel.label}>{formSortLabel.badge}</span>
-              : secondarySortKey === "form"
-                ? <span className="sort-mode-badge secondary" aria-label="Sekundäre Sortierung" title="Sekundäre Sortierung">2</span>
-                : arrow("form")}
-          </button>
-          <button onClick={() => sort("h2h")}>
-            Letzte 5 H2H {h2hView === "outcome" && sortKey === "h2h"
-              ? <span className={`sort-mode-badge ${h2hSortTarget}`} aria-label={`Sortierung: ${h2hSortLabel.label}`} title={h2hSortLabel.label}>{h2hSortLabel.badge}</span>
-              : secondarySortKey === "h2h"
-                ? <span className="sort-mode-badge secondary" aria-label="Sekundäre Sortierung" title="Sekundäre Sortierung">2</span>
-                : arrow("h2h")}
-          </button>
-          <button className="icon-head" onClick={() => sort("shots")} title="Schüsse aufs Tor im Schnitt der letzten fünf Spiele" aria-label={sortStateLabel("Schüsse aufs Tor", sortKey === "shots", sortDirection)}>
-            <Crosshair size={15} weight="bold" aria-hidden="true" /> {arrow("shots")}
-          </button>
-          <button className="icon-head" onClick={() => sort("corners")} title="Ecken im Schnitt der letzten fünf Spiele" aria-label={sortStateLabel("Ecken", sortKey === "corners", sortDirection)}>
-            <FlagPennant size={15} weight="bold" aria-hidden="true" /> {arrow("corners")}
-          </button>
-          <button onClick={() => sort("expected")} aria-label={sortStateLabel(showFirstHalfExpected ? "Erw. Tore 1. HZ" : "Erw. Tore", sortKey === "expected", sortDirection)}>{showFirstHalfExpected ? "Erw. Tore 1. HZ" : "Erw. Tore"} {arrow("expected")}</button>
-          {showScore && <button onClick={() => sort("score")} aria-label={sortStateLabel("Score", sortKey === "score", sortDirection)}>Score {arrow("score")}</button>}
-          {shownMarkets.map((option) => <button key={option.key} onClick={() => sort("market")} aria-label={sortStateLabel(option.label, sortKey === "market", sortDirection)}>{option.label} {arrow("market")}</button>)}
+        <div className={`table-head ${fixtureGridClass}`} style={gridStyle} data-columns={columns.map((column) => column.id).join(" ")}>
+          {columns.map((column) => <Fragment key={column.id}>{headCell(column)}</Fragment>)}
         </div>
-        {sortedFixtures.map((fixture) => {
-          const time = kickoffParts(fixture.kickoff, document.meta.timezone);
-          const isPast = Date.parse(fixture.kickoff) < now;
-          const markets = visibleMarkets(fixture, marketFilter);
-          return <article className={`fixture-wrap level-${bestLevel(fixture, marketFilter)} ${openFixture === fixture.fixtureId ? "open" : ""}`} style={gridStyle} key={fixture.fixtureId}>
-            <div className="fixture-row-wrap">
-            <CartAddRadial
-              fixture={fixture}
-              cart={cart}
-              open={radialFixtureId === fixture.fixtureId}
-              onOpen={() => setRadialFixtureId(fixture.fixtureId)}
-              onClose={() => setRadialFixtureId((current) => current === fixture.fixtureId ? null : current)}
-              onSelect={(market) => addEntry(toCartEntry(fixture, market))}
-            />
-            <button className={`${fixtureGridClass} fixture-row`} style={gridStyle} onClick={() => setOpenFixture((value) => value === fixture.fixtureId ? null : fixture.fixtureId)} aria-expanded={openFixture === fixture.fixtureId}>
-              <span className="fixture-summary-cell">
-                <span className="teams-cell">
-                  <span className="team-name"><TeamCrest name={fixture.homeTeam} logo={fixture.homeCrest} /><strong>{fixture.homeTeam}</strong><EloTag value={fixture.homeElo} team={fixture.homeTeam} /><DefenseShield profile={fixture.defense?.home} team={fixture.homeTeam} /></span>
-                  <span className="team-name"><TeamCrest name={fixture.awayTeam} logo={fixture.awayCrest} /><strong>{fixture.awayTeam}</strong><EloTag value={fixture.awayElo} team={fixture.awayTeam} /><DefenseShield profile={fixture.defense?.away} team={fixture.awayTeam} /></span>
-                </span>
-                <span className="fixture-meta"><strong>{time.clock}{isPast && <em> angepfiffen</em>}</strong><small>{time.day} · <CountryFlag country={fixture.country} /> {fixture.country} · {fixture.league}</small>{(fixture.h2hNotice || fixture.warnings.length > 0) && <i>{fixture.h2hNotice ? "H2H" : "Daten"}</i>}{fixture.classGap && <ClassGapBadge gap={fixture.classGap} homeTeam={fixture.homeTeam} awayTeam={fixture.awayTeam} />}</span>
-              </span>
-              <span className="form-cell">
-                {/*
-                  * Bei Pokal- und Länderspielen zählt der Lauf die letzten Spiele insgesamt
-                  * (src/dashboard.ts setzt dann scope "overall"). "Home"/"Away" hätte dort
-                  * eine Trennung nach Ort behauptet, die in den Punkten gar nicht steckt.
-                  */}
-                <span
-                  className="form-labels"
-                  title={fixture.form.scope === "overall"
-                    ? `Alle Spiele der letzten Zeit, zu Hause und auswärts zusammen – oben ${fixture.homeTeam}, unten ${fixture.awayTeam}`
-                    : `Nur die Heimspiele von ${fixture.homeTeam} gegen die Auswärtsspiele von ${fixture.awayTeam}`}
-                  aria-label={fixture.form.scope === "overall" ? "Form aus allen Spielen" : "Heim- und Auswärtsform"}
-                >
-                  {fixture.form.scope === "overall"
-                    ? <><small>Alle</small><small>Alle</small></>
-                    : <><small>Home</small><small>Away</small></>}
-                </span>
-                <span>{formView === "outcome"
-                  ? <><FormDots results={fixture.form.home} /><FormDots results={fixture.form.away} /></>
-                  : <>
-                    <FormMatchDots matches={fixture.form.homeMatches} view={formView} overLine={overLine} firstHalfOverLine={firstHalfOverLine} inverted={counterDirection} />
-                    <FormMatchDots matches={fixture.form.awayMatches} view={formView} overLine={overLine} firstHalfOverLine={firstHalfOverLine} inverted={counterDirection} />
-                  </>}</span>
-              </span>
-              <span className="h2h-cell"><H2hDots fixture={fixture} view={h2hView} overLine={overLine} firstHalfOverLine={firstHalfOverLine} inverted={counterDirection} /></span>
-              <RecentStatCell fixture={fixture} field="shotsOnGoal" label="Schüsse aufs Tor" />
-              <RecentStatCell fixture={fixture} field="corners" label="Ecken" />
-              <span className="expected-cell"><strong>{(showFirstHalfExpected ? fixture.expectedFirstHalfGoals?.home ?? 0 : fixture.expectedGoals.home).toFixed(2).replace(".", ",")}</strong><i>:</i><strong>{(showFirstHalfExpected ? fixture.expectedFirstHalfGoals?.away ?? 0 : fixture.expectedGoals.away).toFixed(2).replace(".", ",")}</strong></span>
-              {showScore && <span className="score-cell">{marketFilter !== "draw" && <span><small>1X2</small><strong>{fixture.scores.favorite ?? "–"}</strong></span>}{marketFilter !== "1x2" && <span><small>X</small><strong>{fixture.scores.draw ?? "–"}</strong></span>}</span>}
-              {markets.map((item) => <MarketCard market={item} showEdge={showKelly} key={item.key} />)}
-            </button>
-            </div>
-          </article>;
-        })}
+        {(() => {
+          let previousDay: string | null = null;
+          return sortedFixtures.map((fixture) => {
+            const day = dayOf(fixture);
+            const divider = groupedByDay && day !== previousDay;
+            previousDay = day;
+            const count = dayCounts.get(day) ?? 0;
+            return <Fragment key={fixture.fixtureId}>
+              {divider && <div className="day-divider" style={tableWidth}>
+                <h3>{dayLabel(day)}</h3><span>{count} {count === 1 ? "Spiel" : "Spiele"}</span>
+              </div>}
+              <article className={`fixture-wrap level-${bestLevel(fixture, marketFilter)} ${openFixture === fixture.fixtureId ? "open" : ""}`} style={tableWidth}>
+                <div className="fixture-row-wrap">
+                <CartAddRadial
+                  fixture={fixture}
+                  cart={cart}
+                  open={radialFixtureId === fixture.fixtureId}
+                  onOpen={() => setRadialFixtureId(fixture.fixtureId)}
+                  onClose={() => setRadialFixtureId((current) => current === fixture.fixtureId ? null : current)}
+                  onSelect={(market) => addEntry(toCartEntry(fixture, market))}
+                />
+                <button className={`${fixtureGridClass} fixture-row`} style={gridStyle} onClick={() => setOpenFixture((value) => value === fixture.fixtureId ? null : fixture.fixtureId)} aria-expanded={openFixture === fixture.fixtureId}>
+                  {rowCells(fixture, !groupedByDay)}
+                </button>
+                </div>
+              </article>
+            </Fragment>;
+          });
+        })()}
         {sortedFixtures.length === 0 && emptyState}
       </div>}
       {openFixture !== null && (() => {
@@ -1522,6 +1738,12 @@ function Dashboard({ document }: { document: DashboardDocument }) {
                   <strong className="home">{fixture.homeTeam}</strong>
                   <strong className="away">{fixture.awayTeam}</strong>
                   <small>{time.clock} · {time.day} · <CountryFlag country={fixture.country} /> {fixture.country} · {fixture.league}</small>
+                  {/* Aus dem Lauf, ohne Abruf - steht deshalb schon, während die Kennzahlen laden.
+                      Ecken und (bei 1X2/Remis) Schüsse sind aus der Zeile hierher gewandert. */}
+                  <small className="detail-recent" title="Schnitt der letzten fünf Spiele, Heim : Auswärts">
+                    Schnitt letzte 5 · Schüsse aufs Tor {recentLabel(recentValue(fixture, "home", "shotsOnGoal"))} : {recentLabel(recentValue(fixture, "away", "shotsOnGoal"))}
+                    {" · "}Ecken {recentLabel(recentValue(fixture, "home", "corners"))} : {recentLabel(recentValue(fixture, "away", "corners"))}
+                  </small>
                 </span>
                 <button className="fixture-detail-close" aria-label="Details schließen" onClick={() => setOpenFixture(null)}><X /></button>
               </header>
@@ -1579,6 +1801,7 @@ function Dashboard({ document }: { document: DashboardDocument }) {
       <div className="view-toolbar">
         <div className="toolbar-row">
           {filterControl}
+          <span className="toolbar-divider" aria-hidden />
           {marketControl}
         </div>
         {filterStatusRow(liveStatus)}
@@ -1586,7 +1809,6 @@ function Dashboard({ document }: { document: DashboardDocument }) {
       <LiveView
         state={live}
         marketFilter={marketFilter}
-        showEdge={showKelly}
         isLeagueVisible={isLeagueVisible}
       />
       </>}
@@ -1605,12 +1827,12 @@ function Dashboard({ document }: { document: DashboardDocument }) {
   />}
   <CartBadge count={cart.length} onClick={() => setBuilderOpen(true)} />
   {builderOpen && <BetBuilderDrawer cart={cart} onRemove={removeEntry} onClear={clearCart} onClose={() => setBuilderOpen(false)} />}
-  {showKelly && kellyOpen && <KellyDialog
-    fixtures={scopedFixtures}
+  {kellySelection && kellyOpen && <KellyDialog
+    selection={kellySelection}
+    profileState={marketProfile}
     marketFilter={marketFilter}
     marketLabel={MARKET_OPTIONS.find((option) => option.key === marketFilter)?.label ?? "Alle Märkte"}
     settings={kellySettings}
-    profile={marketProfile.profile}
     auto={kellyAuto}
     onAutoChange={setKellyAuto}
     onSettingsChange={setKellySettings}
