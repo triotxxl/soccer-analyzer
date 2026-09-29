@@ -108,14 +108,15 @@ Pokalspielen. Es liegt in `league_strength_snapshots` und wird von
 
 Aus der Differenz entsteht ein Torfaktor:
 
-`Faktor = 10 ** ((Rating Heimliga − Rating Gastliga) / 900)`
+`Faktor = 10 ** ((Rating Heimliga − Rating Gastliga) / 1500)` (bis 31.08.2026: 900)
 
 begrenzt auf 0,3 bis 3,5. Er wird auf die erwarteten Heimtore multipliziert und von den
 Auswärtstoren geteilt, ist also symmetrisch: `Faktor(a, b) = 1 / Faktor(b, a)`.
 
 ### Ligen ohne eigenes Rating
 
-Unterklassige Ligen erreichen die Belastbarkeitsschwelle (30 Begegnungen, 5 Vereine) nie,
+Unterklassige Ligen erreichen die Belastbarkeitsschwelle (30 Begegnungen, 5 Vereine; in den
+eigenen Frauen-Pools 3 Vereine) nie,
 weil sie pro Saison nur ein oder zwei Pokalteilnehmer stellen. Die Oberliga Westfalen hat
 gar keinen Eintrag. Solche Ligen bekommen deshalb das **schwächste belastbare Rating ihres
 Pools abzüglich 120 Punkte** — für Deutschland also 1461 − 120 = 1341. Die Begründung:

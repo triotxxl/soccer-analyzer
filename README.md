@@ -606,7 +606,7 @@ Gastgeber selten treffen, und teilt man die Torrate des Außenseiters durch gena
 niedrigen Wert, wird er zum vermeintlichen Favoriten.
 
 Der tatsächliche Klassenunterschied kommt separat über das Ligarating dazu. Aus der
-Differenz beider Ligaratings entsteht ein Torfaktor `10 ** (Δ / 900)`, der auf die
+Differenz beider Ligaratings entsteht ein Torfaktor `10 ** (Δ / 1500)`, der auf die
 erwarteten Heimtore multipliziert und von den Auswärtstoren geteilt wird; er ist auf
 0,3 bis 3,5 begrenzt. Ligen ohne belastbares eigenes Rating erhalten das schwächste
 belastbare Rating ihres Pools abzüglich 120 Punkten — wer in der Elo-Kette aus
@@ -621,14 +621,25 @@ Kalibrierung stehen in [docs/TORLINIEN-MODELL.md](docs/TORLINIEN-MODELL.md).
 Enthält eine reine Remis- oder 1X2-Analyse tatsächlich Cross-League-Partien, baut
 die CLI die Ligastärke bedarfsgesteuert nur für die ausgewählten Pokal- und
 Qualifikationswettbewerbe auf. Reine Ligaspiele lösen keine Strength-Abfragen aus.
-Pro Analyse sind dafür standardmäßig höchstens 25 zusätzliche API-Anfragen erlaubt;
-die Grenze kann über `STRENGTH_ON_DEMAND_REQUEST_BUDGET` angepasst werden.
+Pro Analyse sind dafür standardmäßig höchstens 100 zusätzliche API-Anfragen erlaubt
+(bis 29.09.2026 waren es 25 - zu wenig, eine Pokalsaison kostet rund einen Aufruf je
+teilnehmendem Verein); die Grenze kann über `STRENGTH_ON_DEMAND_REQUEST_BUDGET` angepasst
+werden. Die neueste Saison wird zuerst geladen, weil das Modell sie gerade braucht.
 
-Ein weltweiter Vorabaufbau bleibt als optionale Wartungsfunktion verfügbar:
+Ein weltweiter Vorabaufbau bleibt als optionale Wartungsfunktion verfügbar, ebenso das
+gezielte Nachladen einzelner Pokale über ihre API-Liga-ID:
 
 ```powershell
 npm run strength -- --seasons 3 --request-budget 100
+npm run strength -- --competition 680 --competition 347 --request-budget 300
 ```
+
+Pokale mit vielen Amateurvereinen in den frühen Runden sind teuer: Der slowakische Pokal
+2026 hatte 387 Spiele, 300 Aufrufe ergaben dort erst 18 verwertbare Duelle zwischen Ligen.
+Belastbar wird eine Liga ab 30 solcher Duelle und 5 Vereinen, eine Frauenliga ab 3 Vereinen:
+aus jedem Land spielen nur 2 bis 4 Frauenteams europäisch. Frauenwettbewerbe haben eigene Pools
+(`uefa:women`, `country:x:women`), weil Frauen- und Männerligen nie gegeneinander spielen
+(Prüfung und Umstellung vom 29.09.2026).
 
 ## Entwicklung
 

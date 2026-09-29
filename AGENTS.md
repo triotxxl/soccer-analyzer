@@ -26,13 +26,43 @@ Benutzer auf Deutsch und führe Analyseaufträge selbstständig über die vorhan
    den Klassenunterschied. Der 1X2-Markt wird dann mit `probabilityReliable: false` markiert:
    Das Dashboard zeigt weder Wahrscheinlichkeit noch Value, die Empfehlungsstufe ist immer
    „Nicht empfehlenswert“, und der Markt taucht in der Kelly-Auswahl nicht auf. Torlinien und
-   BTTS bleiben bewertbar, weil der Torfaktor die Heimtore multipliziert und die Auswärtstore
-   teilt und die Torsumme dadurch nahezu unverändert lässt.
+   BTTS bleiben sichtbar; sie verschieben sich ohne Faktor weniger als die Richtung, aber
+   **nicht vernachlässigbar**: H·f + A/f wächst bei H = A um (f + 1/f)/2 (+8 % bei f = 1,5,
+   +33 % bei 2,2), an Länderspielen gemessen im Mittel +0,16 Tore, und BTTS ohne Faktor ist
+   in einseitigen Spielen messbar schlechter (Prüfung vom 28.09.2026).
+   Seit 28.09.2026 gibt es zwei weitere Quellen für den Faktor (`source` in
+   `LeagueStrengthComparison`): **Länderspiele** zweier Nationalteams desselben
+   Kontinentalverbands bekommen ihn aus dem **Team-Elo** (`teamEloComparison`,
+   `config.strength.teamEloDivisor` 1400, Abschnitt „Team-Elo“), und ein **Pokalspiel zweier
+   Teams derselben Liga** bekommt Faktor 1 (`sameLeagueComparison`) - bis dahin wurde dort
+   1X2 grundlos versteckt, obwohl die Wahrscheinlichkeit gemessen passte (90 Spiele in den
+   archivierten Läufen). Seit 29.09.2026 bekommt auch die **U21** den Faktor aus ihrem eigenen
+   Team-Elo (Abschnitt „Team-Elo“). Versteckt bleiben Länderspiele zwischen Verbänden, übrige Jugend-Nationalteams
+   ohne Elo und Vereinsspiele verschiedener Ligen ohne Liga-Rating. Im Lauf vom 28.09.2026
+   wären so 47 der 51 versteckten 1X2-Märkte sichtbar geworden.
+   **Frauenwettbewerbe haben seit 29.09.2026 eigene Pools** (`uefa:women`, `country:x:women`,
+   `isWomenFixture` in `src/league-strength.ts`) und gelten ab **3 Vereinen** als belastbar
+   statt 5 (`config.strength.reliableMinClubsWomen`). Grund (Prüfung vom 29.09.2026): Im
+   gemeinsamen Pool bekam eine unbewertete Frauenliga den Boden der schwächsten Männerliga
+   (Häcken W gegen Juventus W 83 % statt rund 39 % laut Tipico), und 5 Vereine erreicht eine
+   Frauenliga europäisch fast nie. Gemessen an 78 nachgebauten Frauen-Europapokalspielen:
+   1X2-Log-Loss −0,156 ± 0,060 gegen „ohne Faktor“, der Gewinn steckt in Spielen großer gegen
+   kleine Liga. **Gegen Tipico ist das nicht belegt** (10 Spiele) - bei Frauen liegt das Modell
+   weiter deutlich neben dem Markt und schätzt den Favoriten zu niedrig; ein großer Vorteil ist
+   dort erst recht ein Modellfehler. Nachmessen nach rund 90 abgerechneten Frauen-Europapokal-
+   spielen mit Quote. Schottland, Griechenland und die Ukraine führt API-Football ohne
+   Frauenliga - dort bleibt 1X2 verborgen. Die Ligastärke lädt seit demselben Tag **vor** der
+   1X2-Rechnung nach (`runGoalLineAnalysis`), vorher wirkte sie erst eine Analyse später, und
+   die Tipico-Quoten gehen über `tipico_fixtures.api_fixture_id` an die Spiele statt über den
+   Namensvergleich (der 6 % der Spiele ohne Quote ließ). Offen: `strengthFor` schlägt mit der
+   Saison der Heimatliga nach statt der des Wettbewerbs - erst an Männer-Pokalspielen messen.
 6. Cross-League-Partien mit deutlichem Klassenunterschied tragen das Feld `classGap`
    (`clear` oder `extreme`) und in der App ein Kürzel „Klasse“ mit Pfeil zur stärkeren
    Seite. Quelle ist bevorzugt das Ligarating (Torfaktor ab 1,5 beziehungsweise 2,2, eine
-   nur geschätzte Seite genügt für die untere Stufe); fehlt es, das Verhältnis der
-   Tipico-Quoten für 1 und 2 (ab 4 beziehungsweise 8). Die Quelle steht im Feld und im
+   nur geschätzte Seite genügt für die untere Stufe), bei Länderspielen das Team-Elo
+   (`source: "elo"`, derselbe Faktor, rund 247 bzw. 479 Elo-Punkte); fehlt beides, das
+   Verhältnis der Tipico-Quoten für 1 und 2 (ab 4 beziehungsweise 8). Zwei Teams derselben
+   Liga bekommen nie eine Markierung, auch nicht aus dem Quotenbild. Die Quelle steht im Feld und im
    Tooltip. Eine Markierung aus dem Quotenbild bleibt eine nachgelagerte Kennzeichnung
    und ändert weder Tipp noch Wahrscheinlichkeit.
 7. H2H-Remisserie-Hinweise sind Auffälligkeiten und kein alleiniger Empfehlungsgrund.
@@ -131,6 +161,36 @@ Benutzer auf Deutsch und führe Analyseaufträge selbstständig über die vorhan
 
 ## Pflege
 
+- **Grundregel für neue Ligen, Mannschaften und Namensänderungen** (Davids Anweisung vom
+  29.09.2026): Taucht in einer Analyse ein neuer Wettbewerb oder eine neue Mannschaft auf, oder
+  ändert sich ein Name, wird das **referenziert und die Datengrundlage nachgezogen**, damit
+  Modelle wie Elo und Ligastärke rechnen können. **Arbeitsliste: `npm run coverage`** (seit
+  29.09.2026, `src/coverage.ts`, kein API-Budget) - listet für `output/dashboard-latest.json`
+  jedes Team ohne Elo, jedes Elo unter 30 % Vertrauen und jedes 1X2 ohne Ligastärke, jeweils mit
+  Ursache und Maßnahme, und trennt Offenes von bewusst Gewolltem (verschiedene Verbände, nicht
+  freigegebene Elo-Skala). Der Snapshot trägt dafür `homeTeamId`/`awayTeamId`; ältere lesen die
+  ID aus dem Wappen-Link. Nach jeder Analyse gehört dazu:
+  1. **Zuordnung:** fehlende Liga- und Team-Aliase setzen (`npm run aliases`,
+     `npm run team-aliases`), unklare Namen recherchieren (Umbenennung, Umzug, Lizenzübernahme).
+  2. **Gleiche Mannschaft, neue ID:** Führt API-Football einen Verein nach einer Umbenennung unter
+     einer neuen Team-ID, gehört er in `ELO_TEAM_MERGES` (`src/elo-config.ts`), damit seine
+     Geschichte zusammengeführt wird - nur mit Beleg (gleiche Liga, gleiche Gegner, nahtlos
+     anschließende Spielpläne). Umbenennungen mit derselben ID brauchen nichts.
+  3. **Elo:** Jedes Spiel der Analyse ohne `homeElo`/`awayElo` oder mit sehr niedrigem
+     Vertrauen prüfen. Fehlen die Spiele in `elo_matches`, die Saisons nachladen
+     (`npm run elo -- backfill`, bei Jugend/Frauen `--national-categories`). Ist der Wettbewerb
+     unbekannt oder ausgeschlossen, in die Listen in `src/elo-config.ts` aufnehmen
+     (`ELO_COMPETITIONS`, `ELO_NATIONAL_CATEGORY_COMPETITIONS`, `ELO_WOMEN_CLUB_COMPETITIONS`,
+     Verband in `CONFEDERATION_OF_COMPETITION`), dann `npm run elo -- build`.
+  4. **Ligastärke:** Jedes Spiel mit „Kein Ligastärke-Vergleich verfügbar“ prüfen und den Pokal
+     gezielt nachladen (`npm run strength -- --competition <id>`).
+  5. **Prüfen, dass Bestehendes gleich bleibt:** Nach einer Änderung an Listen oder Einordnung
+     müssen die Werte der übrigen Teams unverändert sein (so am 29.09.2026 für Vereine und
+     A-Nationalteams nachgewiesen) - sonst ist es kein Nachziehen, sondern eine Modelländerung.
+  Kleine Nachladungen (bis einige hundert Aufrufe) ungefragt, mit Kosten im Bericht; größere
+  vorher mit David abstimmen. **Ob ein neu abgedecktes Elo auch Wahrscheinlichkeiten beeinflusst,
+  bleibt eine eigene Entscheidung** mit Messung durch den Prüfer-Agenten
+  (`config.strength.teamEloSystems`) - das Nachziehen der Daten allein ändert keinen Tipp.
 - Nacheinander gestartete Analysemethoden verwenden denselben Rohdatenstand: Fixtures
   und Quoten 6 Stunden, Saison- und Teamhistorien 24 Stunden, H2H und Ligadaten 7 Tage.
 - Ein abgelaufener Cacheeintrag wird nicht gelöscht, sondern nur bei erneutem Bedarf
@@ -159,7 +219,13 @@ Benutzer auf Deutsch und führe Analyseaufträge selbstständig über die vorhan
 - Alle Filter stehen im **Filtermenü** (`frontend/src/FilterMenu.tsx`, seit 27.09.2026 statt der
   Filterspalte): ein nicht-modales Fenster unter dem Filter-Knopf links in der Werkzeugleiste, das
   über der Tabelle liegt und nichts verdrängt. Markt und Sortierung bleiben sichtbar in der Leiste,
-  weil sie nichts ausblenden. Jeder Filter, der Spiele ausblendet oder den Umfang ändert, steht bei
+  weil sie nichts ausblenden. **Werkzeugleiste seit 28.09.2026 im Leistenstil** (Entwurf des
+  UX-Agenten, Davids Entscheidung): links Filter und Quickpick (beide blenden aus), eine Trennlinie,
+  dann Markt, Sortierung, Anzeige und direkt daneben „Kelly-Auswahl“ (nur im Kelly-Modus).
+  Markt und Sortierung bleiben **eingebaute `<select>`** und werden in Chromium über
+  `appearance: base-select` gestaltet (Wahl mit grünem Balken links, kein Häkchen, Marktliste mit
+  `optgroup`-Gruppen) - bewusst kein eigener Listbox-Baustein: Tastatur, Screenreader und die rund
+  35 `selectOptions`-Tests bleiben so unverändert. Jeder Filter, der Spiele ausblendet oder den Umfang ändert, steht bei
   geschlossenem Menü als Schildchen mit ✕ darunter, und der Knopf zählt sie - dieselbe Begründung
   wie beim unpersistierten Quickpick-Zustand. Im Marktprofil gibt es keinen Filter-Knopf, weil dort
   kein Filter wirkt; Live hat eine eigene, kleinere Fassung (Wettbewerbe, „Nur Spiele mit
@@ -169,23 +235,62 @@ Benutzer auf Deutsch und führe Analyseaufträge selbstständig über die vorhan
   ein Raster nur der Tage der Analyse, das ohne Übernehmen sofort wirkt; `next48` bleibt dabei
   strikt. Form und H2H teilen sich einen Umschalter (beide Zustände bleiben, weil die Sortierung
   je Spalte liest). Das Menü hat zwei Spalten aus Karten: links der Umfang (`scopedFixtures`, gilt
-  auch für Kelly und Quickpick), rechts, was nur die Tabelle eingrenzt, und die Anzeige. Der Kopf
+  auch für Kelly und Quickpick), rechts, was nur die Tabelle eingrenzt, und die Punkte in Form und H2H (Gruppe „Form und H2H“). Der Kopf
   zählt die angezeigten Spiele aus `filtered`, weil das Menü die Statuszeile verdeckt. Die
   Tageskacheln beginnen am ersten Analysetag, nicht am Montag davor. Grün markiert im Menü die
   Wahl nur als Linie und Schalterbahn, nie als Fläche oder Häkchen (Grün ✓ heißt in der Tabelle
   „Empfehlenswert“); Blau ist dort nur Tastaturfokus. Seit 28.09.2026 im Leistenstil: Die Wahl
   trägt wie der aktive Leisteneintrag eine hellere Fläche, fette Schrift und einen grünen Balken,
-  alles nicht Gewählte liegt tiefer als die Karte, und die Karten haben einen Rand. „Vorteil & Kelly-Einsatz anzeigen“ ist ab Werk aus
-  (`football-analyzer:kelly-visible-v2`). Die Heatmap (`frontend/src/HeatmapTable.tsx`, Rechnung in
+  alles nicht Gewählte liegt tiefer als die Karte, und die Karten haben einen Rand. Die Heatmap (`frontend/src/HeatmapTable.tsx`, Rechnung in
   `frontend/src/heatmap.ts`) zeigt je Spiel eine Zeile mit Δ Elo, Δ Form, Δ xG, Δ Schüsse aufs
   Tor und Δ Ecken als Heim minus Auswärts, die Remis-Punkte und die Quoten für 1X2, Remis und
   BTTS (ein anderer gewählter Markt kommt als vierte Spalte dazu). Sie liest nur den Snapshot,
   kostet keinen Aufruf und ändert weder Tipp noch Wahrscheinlichkeit. **Δ xG ist die
   Torerwartung des Modells** (`expectedGoals`), nicht das xG von API-Football. Eine fehlende
-  Seite ergibt „–“, nie 0. Die **Value-Färbung der Quoten erscheint nur mit „Vorteil &
-  Kelly-Einsatz anzeigen“** (Davids Entscheidung vom 25.09.2026): Ein großer Value ist laut
-  Messung meist ein Ausrutscher des Modells, eine immer sichtbare Färbung höbe gerade die
-  schwächsten Wetten hervor. Bei `probabilityReliable: false` bleibt die 1X2-Quote ohne Farbe.
+  Seite ergibt „–“, nie 0. Die **Value-Färbung der Quoten erscheint nur in der Anzeige „Vorteil &
+  Kelly“** (Davids Entscheidung vom 25.09.2026): Ein großer Value ist laut Messung meist ein
+  Ausrutscher des Modells, eine immer sichtbare Färbung höbe gerade die schwächsten Wetten
+  hervor. Bei `probabilityReliable: false` bleibt die 1X2-Quote ohne Farbe.
+- **Anzeige „Kennzahlen | Vorteil & Kelly“** (seit 28.09.2026, Davids Entscheidung nach einem
+  Entwurf des UX-Agenten): ein Segmentschalter in der Werkzeugleiste von Tabelle und Heatmap, der
+  den früheren Schalter „Vorteil & Kelly-Einsatz anzeigen“ im Filtermenü ersetzt - er blendet
+  kein Spiel aus und gehört deshalb wie Markt und Sortierung in die Leiste. Ab Werk
+  „Kennzahlen“, gemerkt unter `football-analyzer:kelly-visible-v2` (Zustand `showKelly` in
+  `App.tsx`). Im Modus „Vorteil & Kelly“ stehen unter der Leiste die Kelly-Zeile (Markt, Zahl
+  der Wetten, Einsatz von Budget, Automatik/Manuell, **Einsatzrahmen mit Plätzen**) und immer
+  die Warnung „Ein großer Vorteil ist meist ein Fehler des Modells. Auch die Kelly-Auswahl lag,
+  an alten Spielen geprüft, im Minus – rechne nicht mit Gewinn.“ **Die Spalten der Tabelle
+  ändern sich dabei nicht** (Davids Entscheidung vom 29.09.2026, nach einem Tag mit eigenen
+  Kelly-Spalten: „das Verhalten wie vorher war besser“): Die Marktzelle zeigt zusätzlich den
+  Vorteil, die Wetten selbst stehen im Kelly-Dialog. Die Auswahl rechnet `selectKelly`
+  (`frontend/src/kelly.ts`) **einmal** im Dashboard auf `scopedFixtures`; Kelly-Zeile und
+  Dialog lesen dasselbe Ergebnis, ein Tabellenfilter ändert es nicht. Solange das Marktprofil
+  lädt, steht „Automatik wird geladen …“ statt eines Betrags, der gleich umspringt. Der Vorteil
+  ist in der Marktzelle grau, nicht grün - Grün heißt dort „Empfehlenswert“. **Live zeigt nie einen Vorteil** und hat keinen Umschalter: Er stammt aus
+  Quote und Wahrscheinlichkeit vor dem Anpfiff und ist im laufenden Spiel veraltet.
+- **Spalten der Tabelle** (`frontend/src/tableColumns.ts`, seit 28.09.2026): eine Liste erzeugt
+  Raster und Mindestbreite, vorher standen beide getrennt in `styles.css` und `App.tsx`. Fest
+  sind Spiel, Anstoß (eigene Spalte mit Land, Liga, „Klasse“) und **Daten** (Datenvertrauen des
+  gezeigten Marktes, darunter „⚠ n Hinweise“ mit dem Wortlaut im Tooltip). In beiden Anzeigen
+  je Markt nur, was passt: Punkte bei 1X2/Remis/Alle, Schüsse aufs Tor bei Tor- und BTTS-Märkten,
+  bei Torlinien die Torerwartung als Summe, bei allen vier 1.-HZ-Märkten die der Halbzeit mit
+  „Spiel Σ“ darunter. **Ecken stehen nicht mehr in der Zeile**, sondern im Kopf der
+  Detailansicht (aus dem Snapshot, sofort da) und in der Heatmap. Bei „Alle Märkte“ statt
+  vierzehn Kästchen die 1X2-Zelle und „Empfohlene Märkte“ (höchstens drei mit ✓/★, ★ zuerst,
+  1X2 und Märkte ohne belastbare Wahrscheinlichkeit nie). Eine H2H-Remisserie steht grau als
+  „Remis-Serie“ unter den H2H-Punkten. Kelly-Spalten (Tipp, Modell, Korrigiert, Kelly-Einsatz)
+  gab es vom 28. bis 29.09.2026 und gibt es nicht mehr - nicht wieder einbauen, ohne David zu
+  fragen. Sortierbar ist nur, was zu
+  sehen ist; eine gemerkte Sortierung auf eine ausgeblendete Spalte fällt auf den Anstoß zurück,
+  ohne gelöscht zu werden. Bei Sortierung nach Anstoß trennt eine leise Zeile die Tage (Berliner
+  Zeit), das Datum fällt dann aus der Zeile.
+- **Der Kelly-Dialog heißt „Kelly-Auswahl“ und führt die Liste der Wetten** (seit 29.09.2026
+  wieder, Davids Entscheidung): Modus, Kennzahlen, Hinweise, Einstellungen, dann die sortierbare
+  Liste (Spiel, Markt, Quote, Modell, Korrigiert nur in der Automatik, Vorteil grau mit „nach
+  Korr.“, Kelly-Anteil mit dem Wert ohne Grenzen, Einsatz), Erklärungen und Export. Solange die
+  Automatik lädt, zeigt die Liste keine Beträge. Der Export nimmt die ganze Auswahl über den
+  Umfang in der Reihenfolge des Dashboards, nicht die Sortierung der Liste. „Erwarteter Ertrag“ ist nicht mehr grün und sagt „Gemessen lag
+  die Auswahl bisher im Minus.“ - eine Rechnung, keine Messung.
 - Klappt die App eine Partie auf, lädt sie deren Detailkennzahlen über
   `/api/fixture/insights`: Torphasen je Viertelstunde, direkte Duelle mit Liga und
   Halbzeitstand sowie Trends über die letzten zehn Partien inklusive Ballbesitz und
@@ -245,13 +350,20 @@ Benutzer auf Deutsch und führe Analyseaufträge selbstständig über die vorhan
   Aufrufe, 0 schaltet es ab), neueste Partien zuerst. Für einen Rückstand `npm run settle --
   --budget <n>` mit größerem Budget in Etappen laufen lassen; ohne `--budget` arbeitet der
   Befehl den gesamten Rückstand ab und kann das Tagesbudget überschreiten.
+- **API-Football dreht gelegentlich nachträglich Heim und Gast** (Senegal - Mozambique am
+  26.09.2026, dazu PSG - Rennes). Die Prognosetabellen speichern nur Teamnamen; `settleFixture`
+  (`src/database.ts`) vergleicht sie deshalb seit 28.09.2026 mit der Antwort und spiegelt Tore,
+  Pausenstand und xG, wenn das Paar vertauscht dasteht. Vorher wäre ein Sieg gespiegelt
+  abgerechnet worden; beide bekannten Fälle endeten remis und blieben folgenlos.
+  `fixture_results` folgt der aktuellen Ausrichtung der API.
 - Jeder Dashboard-Lauf gibt nach der Abrechnung eine Kalibrier-Kurzfassung aus: Trefferquote
   des Modellfavoriten gegen seine mittlere Prognose, aufgeschlüsselt nach Ligastärke. Gruppen
   unter 30 Partien sind als „Stichprobe zu klein“ markiert, ab 5 Prozentpunkten Abweichung
   folgt ein Hinweis auf den vollständigen Bericht.
 - Modellgüte anzeigen: `npm run report`. Der Abschnitt „Ligastärke bei Cross-League-Partien“
   schlüsselt die 1X2-Kalibrierung danach auf, wie gut die Ligastärke bekannt war (Ligapartie,
-  gemessen, geschätzt, ohne Rating). Die Spalte „Abweichung“ ist Trefferquote minus mittlere
+  gemessen, geschätzt, Team-Elo, gleiche Liga, ohne Rating; die Gruppe steht in den Warnungen
+  der Prognose, `cohortOf` in `src/database.ts`). Die Spalte „Abweichung“ ist Trefferquote minus mittlere
   Prognose des Modellfavoriten: deutlich positiv heißt, der Klassenunterschied wird
   unterschätzt und `strength.unratedPenalty` gehört erhöht; deutlich negativ heißt, das
   Modell trennt zu scharf und `strength.factorDivisor` gehört erhöht. Pokalpartien enden
@@ -481,8 +593,77 @@ nachgezogen, nicht gesammelt am Ende.
 
 - Davids Auftrag vom 24.09.2026: ein eigenes Elo je **Mannschaft**, chronologisch aus
   historischen API-Football-Spielen, Vereine und Nationalteams auf **getrennten** Skalen.
-  **Es berührt weder Tipps noch Wahrscheinlichkeiten noch Filter**, bis ein Backtest-Befund
-  und David etwas anderes entscheiden.
+  Bei **Vereinen** berührt es weder Tipps noch Wahrscheinlichkeiten noch Filter, bis ein
+  Backtest-Befund und David etwas anderes entscheiden.
+- **Seit 28.09.2026 trägt es bei Länderspielen den Klassenunterschied** (Davids Entscheidung
+  nach der Prüfung vom selben Tag). Nationalteams haben keine Heimatliga und damit kein
+  Liga-Rating; ohne Faktor gab das Modell dem Favoriten 46 %, er gewann 54 %. Jetzt entsteht
+  der Torfaktor aus der Elo-Differenz ohne Elo-Heimvorteil: `10 ** (Δ / 1400)`, dieselben
+  Klemmen wie beim Liga-Faktor (`teamEloComparison` in `src/strength-factor.ts`, Aufruf im
+  Analyzer, wenn kein Liga-Vergleich existiert). **Nur bei gleichem Kontinentalverband**
+  (`elo_ratings.league` trägt für Nationalteams UEFA, CAF, AFC, CONCACAF, CONMEBOL oder OFC):
+  Die Verbände spielen fast nur unter sich, ihre Skalen sind schlecht verbunden (Vietnam
+  steht vor Italien), und zwischen Verbänden traf der Elo-Favorit 5-11 Punkte seltener als
+  erwartet. Gemessen an nachgebauten Länderspielen, Teiler auf 2023-24 bestimmt und auf
+  01.2025-09.2026 geprüft: 1X2-Log-Loss −0,083 ± 0,008, Gegenprobe −0,049 ± 0,008, Favorit
+  58 % vorhergesagt gegen 58 % eingetreten; flach zwischen 1200 und 1500. Tipico liegt
+  weiter mindestens gleichauf (+0,032 ± 0,038 über 65 echte Tipps) - ein großer Vorteil bei
+  Länderspielen bleibt eher ein Modellfehler, und die Kelly-Auswahl lässt Spiele zwischen
+  verschiedenen Ligen ohnehin weg. Die Warnung „Stärke aus dem Team-Elo der Nationalteams“
+  ordnet solche Prognosen im Report der Gruppe „Team-Elo“ zu. Nachmessen gegen Tipico nach
+  rund 400 abgerechneten Länderspielen (4-5 Länderspielfenster).
+- **Eigene Torkorrektur für Länderspiele** (`config.goalLineCalibrationNational`, intercept
+  1,135, slope 0,553, seit 28.09.2026): Jedes Spiel zweier Nationalteams mit Elo - auch
+  zwischen Verbänden, wo kein Faktor greift - rechnet die Torsumme damit statt mit dem
+  Liga-Satz (`goalCalibration` in `analyzeFixture`). Mit dem Liga-Satz erwartete das
+  Modell dort rund 0,3 Tore zu viel. Gemessen per Zeit-Split: Tormärkte je Spiel −0,050 ±
+  0,011 bzw. −0,043 ± 0,007 Log-Loss, 1X2 unverändert. **BTTS bleibt rund 5 Punkte zu
+  hoch** - die schwächere Seite bleibt öfter torlos (45 % statt 38 %), das ist die
+  Aufteilung, nicht die Summe; ein Schritt dagegen wäre ein neues Modellelement mit eigener,
+  vorab festgelegter Prüfung. Die erste Halbzeit bleibt beim Liga-Satz (keine historischen
+  Pausenstände), Jugendteams ohne Elo ebenso. Vereinsspiele zwischen verschiedenen Ligen
+  brauchen gemessen keinen eigenen Satz. Mit beidem zusammen stieg `goalLineModelVersion`
+  auf **3.3.0**.
+- **Frauen-Vereine haben seit 29.09.2026 eine eigene Skala `club-women`** (Davids Wunsch): beide
+  Teams „… W“, ein nationaler Wettbewerb oder einer aus `ELO_WOMEN_CLUB_COMPETITIONS` (UWCL,
+  Europa Cup der Frauen, AFC/CAF Women's Champions League), Jugend über `ELO_YOUTH_PATTERN` weiter
+  draußen. Rechnet wie die Vereine (Liga-Mitnahme, Ligaebenen - diese seit demselben Tag je
+  Skala, sonst stünden Frauenligen in der Ebenenfolge der Männerligen ihres Landes). Rund 650
+  Teams aus dem vorhandenen Bestand, 0 Aufrufe. **Nur Anzeige** wie das Vereins-Elo überhaupt,
+  im Elo-Backtest nicht mitgezählt. Männer-Vereine und A-Nationalteams blieben nachgewiesen
+  unverändert.
+- **Jugend- und Frauen-Nationalteams haben seit 29.09.2026 eigene Skalen** (Davids Auftrag):
+  `national-u23`, `-u21`, `-u20`, `-u19`, `-u17`, `-women` (`EloSystem`, `ELO_SYSTEMS` in
+  `src/elo-config.ts`), mit denselben Parametern wie die A-Nationalteams (`systemConfigOf`). Die
+  Skala kommt aus den **Teamnamen** („Iceland U21“, „Spain W“, `nationalCategoryOf`), und nur in
+  den Wettbewerben aus `ELO_NATIONAL_CATEGORY_COMPETITIONS` - dazu gehören „Friendlies“ (10) und
+  „Friendlies Women“ (666). Beide Teams müssen zur selben Skala passen; Vereins-Jugend und
+  Frauen-Vereine bleiben ausgeschlossen. Nachgeladen mit `npm run elo -- backfill
+  --national-categories --from 2019` (83 Wettbewerbs-Saisons, 5.806 Spiele, 82 Aufrufe); die
+  Wochenrunde nimmt die laufenden Saisons dieser Wettbewerbe mit. A-Nationalteams und Vereine
+  blieben dabei nachgewiesen unverändert. Für diese Wettbewerbe gilt die 80-%-Abkürzung des
+  Nachladens nicht mehr (sie hatte drei U21-Saisons mit rund 15 % Lücke als vollständig
+  markiert); bei den übrigen Wettbewerben ist dieselbe Schwäche möglich, aber ungeprüft.
+  **Die U21 trägt seit 29.09.2026 den Klassenfaktor** (Davids Entscheidung nach der Prüfung vom
+  selben Tag): `config.strength.teamEloSystems` = `national`, `national-u21`, derselbe Teiler
+  1400, dazu die Torkorrektur der Länderspiele; die Skala bestimmt der Analyzer aus den
+  Teamnamen. Gemessen: 1X2-Log-Loss −0,129 ± 0,022 (2023-24) und −0,136 ± 0,024 (2025-26) gegen
+  „ohne Faktor“; Favorit vorher 45-47 % vorhergesagt gegen 54-59 % eingetreten, mit Faktor
+  60-63 gegen 62-64 %. Ohne Faktor empfahl die App U21-BTTS mit rund 63 %, eingetreten waren in
+  solchen Spielen 39 % - das fällt mit Faktor und Torkorrektur fast ganz weg; BTTS bleibt
+  trotzdem rund 7-10 Punkte zu hoch (dieselbe Aufteilungsschwäche wie bei den A-Teams). Gegen
+  Tipico erst 6 abgerechnete Spiele. **Nach 100 abgerechneten U21-Spielen wird das Modell
+  nachgestellt** (Davids Anweisung vom 29.09.2026): Die Kalibrier-Kurzfassung jeder Analyse zeigt
+  die Gruppe „Team-Elo U21“ mit ihrer Spielzahl; bei 100 misst der Prüfer-Agent ungefragt
+  Teiler, Torkorrektur, BTTS-Aufteilung, Heimvorteil der Jugend-Skala (Hinweis: eher 30 als 60)
+  und den Abstand zu Tipico - bekannt sind zu niedrige Favoriten (Kosovo – Zypern 55 gegen 79 %).
+  Umgestellt wird nach Davids Entscheidung.
+  `goalLineModelVersion` 3.4.0. **U19 und U17** messen ebenfalls klar besser (−0,081/−0,088 bzw.
+  −0,050/−0,084), sind aber **nicht** eingeschaltet, weil Tipico sie seit Beginn der Exporte
+  (11.08.2026) nie führte - **tauchen sie in einer data.json auf, werden sie in
+  `teamEloSystems` nachgezogen** (Davids Anweisung vom 29.09.2026). U20, U23 und
+  Frauen-Nationalteams: nein (zu wenige Spiele bzw. Favorit weiter unterschätzt) - dort vorher
+  neu messen.
 - **In der App steht es seit 24.09.2026 unverbindlich neben dem Teamnamen** (Davids Wunsch):
   klein und grau, Vertrauen und Stand im Tooltip, unter 50 % Vertrauen blasser (`EloTag` in
   `frontend/src/App.tsx`). Der Dashboard-Lauf hängt es über die Team-ID an
@@ -490,7 +671,8 @@ nachgezogen, nicht gesammelt am Ende.
   dafür nur `elo_ratings` - kein Aufruf. Ein Test hält fest, dass die Märkte mit und ohne Elo
   identisch bleiben.
 - **Automatische Pflege (seit 24.09.2026, `src/elo-update.ts`):** Jeder Dashboard-Lauf zieht das
-  Elo vor dem Schreiben des Snapshots nach - neue abgeschlossene Spiele aus den seit dem letzten
+  Elo **vor den Analysen** nach (seit 28.09.2026; vorher danach, dann rechnete das Modell bei
+  Länderspielen mit dem Elo der vorigen Analyse) - neue abgeschlossene Spiele aus den seit dem letzten
   Import geschriebenen Cache-Dateien (rund 300 je Analyse, kostenlos), dann neu rechnen (rund
   35 s). Die erste Analyse, die mehr als 7 Tage nach der letzten **Wochenrunde** läuft, holt
   zusätzlich die laufende Saison jeder Liga, die im letzten Jahr (400 Tage) im Bestand vorkam
@@ -636,7 +818,7 @@ nachgezogen, nicht gesammelt am Ende.
 
 ## Quickpicker
 
-Der **Quickpicker** neben dem Kelly-Knopf filtert die Tabelle nach einer **Voreinstellung**.
+Der **Quickpicker** neben dem Filter-Knopf filtert die Tabelle nach einer **Voreinstellung**.
 Es gibt fünf, und sie haben **verschiedene Maßstäbe** - was für die eine gilt, gilt für die
 anderen ausdrücklich nicht.
 
@@ -895,6 +1077,10 @@ anderen ausdrücklich nicht.
   `MODEL_BOUND_PRESETS` in `tools/quickpick-report.ts`): streng 5,8/Tag bei 59,7 % und +6,8 %,
   ausgewogen 10,9 bei 53,5 % und −2,2 %, locker 15,0 bei 51,0 % und −3,8 %, weit 24,8 bei 45,3 %
   und −9,3 %. Über die Versionen stabil - der Filter hängt kaum an der Modellversion.
+  **Seit 3.3.0 (28.09.2026) beginnt die Messung neu**, und Länderspiele verschieben sich
+  deutlich: Mit Elo-Faktor und eigener Torkorrektur erfüllen weniger von ihnen die
+  Kerntore (am Nachbau 594 → 308 seit 2023), weil dort tatsächlich weniger Tore fallen.
+  Nach 1-2 Länderspielfenstern `npm run quickpick-report -- --preset hz15` laufen lassen.
 - **Zwei Warnzeichen gehören zu diesen Zahlen.** Die zweite Zeithälfte liegt auf **allen vier**
   Stufen unter der ersten (−4,4 / −3,2 / −3,2 / −6,2 Punkte) - einzeln innerhalb der Streuung,
   aber viermal dasselbe Vorzeichen. Und die Schwellen 3,2 / 0,23 / 2,00 wurden auf denselben
