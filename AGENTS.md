@@ -457,12 +457,14 @@ Benutzer auf Deutsch und führe Analyseaufträge selbstständig über die vorhan
   05.10.2026: 3.1.0 (meist 900, dazu kurz 1200 und 1500) −1,1 ± 5,3, 3.2.0 (1500) +21,5 ± 5,0.
   Tipico lag dort vorher klar besser (+0,095 ± 0,028 Log-Loss).
   Die Ligastärke selbst ist teils veraltet: Laufende Pokalsaisons lädt die Analyse nur nach, wenn
-  ein Rating nicht belastbar ist. Am 05.10.2026 nachgeladen: 13 von 38 Vereinswettbewerben
-  (600 Aufrufe, Champions League jetzt vollständig), danach EFL Trophy, Australia Cup,
-  Conference League, Copa Paraguay und Copa Chile (46 Aufrufe). Offen u. a. NM Cupen, Emperor
-  Cup, Puchar Polski, Cupa României - die Liste erzeugt ein Abgleich der Cross-League-Spiele in
-  den Snapshots gegen `strength_matches`. **NM Cupen** führt API-Football als Saison 2027
-  (August bis Oktober 2026), die `seasonsFor` nie lädt - offen, braucht eine eigene Änderung.
+  ein Rating nicht belastbar ist. Am 05.10.2026 die laufende Saison aller 38 Vereinswettbewerbe
+  mit Spielen zwischen Ligen seit 22.08. nachgeladen (`npm run strength -- --competition … --seasons
+  1`, zusammen 1.325 Aufrufe, rund 1.100 neue Duelle). Was danach in `strength_matches` fehlt, ist
+  strukturell: zwei Teams derselben Liga (späte Pokalrunden, etwa Copa do Brasil und Copa
+  Argentina nur noch Erstligisten) oder Teams ohne erkennbare Heimatliga (U21, Reserve). Die Liste
+  erzeugt ein Abgleich der Cross-League-Spiele in den Snapshots gegen `strength_matches`.
+  **NM Cupen** führt API-Football als Saison 2027 (August bis Oktober 2026), die `seasonsFor` nie
+  lädt - offen, braucht eine eigene Änderung.
 - **„Saison fertig“ in der Ligastärke (seit 05.10.2026, `src/strength-builder.ts`):** Eine
   Pokalsaison gilt erst als fertig, wenn ihr `end` vorbei ist **und** keine Ansetzung mehr offen
   steht (PST zählt als offen, eine offene Ansetzung über 30 Tage vor heute aber als erledigt -
