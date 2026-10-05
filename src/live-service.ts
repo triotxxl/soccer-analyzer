@@ -35,6 +35,15 @@ interface UsageRecord {
   used: number;
 }
 
+/**
+ * Lohnt ein eigener Statistik-Abruf? Nicht, wenn die Liga laut `coverage` keine Live-Statistik
+ * führt (ab schemaVersion 7 im Snapshot). Vorher kostete jede solche Partie einen Abruf, bis
+ * `withoutStatistics` sie nach der ersten leeren Antwort aussperrte. Ohne Angabe wird gefragt.
+ */
+function statisticsCovered(dashboard: DashboardFixture | undefined): boolean {
+  return dashboard?.liveCoverage?.statistics !== false;
+}
+
 function berlinDay(timestamp: number): string {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: config.timezone,
@@ -285,6 +294,7 @@ export class LiveService {
       // Nachladen nur, wenn der Batch nichts mitgeliefert hat und der zwischengespeicherte
       // Stand veraltet ist - sonst bliebe er fuer immer eingefroren.
       if (!embedded
+        && statisticsCovered(dashboard)
         && this.statisticsAge(fixture.fixture.id, startedAt) >= config.liveStatisticsRefreshMs
         && this.shouldFetchStatistics(fixture.fixture.id, startedAt)
         && client.requestCount - before < budgetLeft) {
@@ -321,7 +331,8 @@ export class LiveService {
     const stale = running
       .map((fixture) => fixture.fixture.id)
       .filter((id) => this.statisticsAge(id, startedAt) >= config.liveStatisticsRefreshMs
-        && !this.withoutStatistics.has(id));
+        && !this.withoutStatistics.has(id)
+        && statisticsCovered(byId.get(id)));
     for (const batch of chunkIds(stale)) {
       if (client.requestCount - before >= budgetLeft) break;
       for (const fixture of await client.getFixturesWithStatistics(batch, true)) {

@@ -58,7 +58,7 @@ export function teamIdOf(fixture: DashboardFixture, side: "home" | "away"): numb
   return match ? Number(match[1]) : null;
 }
 
-function eloGapCause(teamId: number | null, now: number, lookup: CoverageLookup): { cause: string; action: string } {
+export function eloGapCause(teamId: number | null, now: number, lookup: Pick<CoverageLookup, "eloMatches">): { cause: string; action: string } {
   if (teamId === null) {
     return { cause: "Team-ID fehlt in der Analyse (Stand vor dem 29.09.2026)", action: "Analyse neu laufen lassen" };
   }

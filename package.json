@@ -32,9 +32,11 @@
     "elo": "node --env-file-if-exists=.env tools/elo.ts",
     "elo-backtest": "node --env-file-if-exists=.env tools/elo-backtest.ts",
     "draw-signals-report": "node --env-file-if-exists=.env tools/draw-signals-report.ts",
+    "live-model-report": "node tools/live-model-report.ts",
     "backfill-results": "node tools/backfill-results.ts",
     "backfill-half-stats": "node --env-file-if-exists=.env tools/backfill-half-stats.ts",
-    "coverage": "node --env-file-if-exists=.env tools/coverage.ts"
+    "coverage": "node --env-file-if-exists=.env tools/coverage.ts",
+    "prepare-analysis": "node --env-file-if-exists=.env tools/prepare-analysis.ts"
   },
   "engines": {
     "node": ">=24.0.0"

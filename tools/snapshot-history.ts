@@ -57,7 +57,7 @@ export function readOutcomes(): Map<number, SettledOutcome> {
 }
 
 /**
- * Je Partie der jüngste Snapshot - Quoten werden bis zum Anpfiff nachgeführt. Snapshots vor
+ * Je Partie der jüngste Snapshot vor dem Anpfiff - Quoten werden bis dahin nachgeführt. Snapshots vor
  * `TABLE_SCOPE_FIXED` bekommen ihre Ligatabelle neu gerechnet (`repairTables`), die Dateien
  * selbst bleiben unverändert.
  */
@@ -69,17 +69,20 @@ export function readFixtures(): DashboardFixture[] {
   const repair = tableRepairer();
   Object.assign(tableRepair, { repaired: 0, emptied: 0, unrepairable: 0 });
   for (const file of files) {
-    let snapshot: { fixtures?: DashboardFixture[] };
+    let snapshot: { fixtures?: DashboardFixture[]; meta?: { createdAt?: string } };
     try {
       snapshot = JSON.parse(fs.readFileSync(path.join(OUTPUT_DIR, file), "utf8"));
     } catch {
       continue; // Ein abgebrochener Lauf hinterlässt gelegentlich eine halbe Datei.
     }
     const stamp = file.slice("dashboard-".length, -".json".length);
+    const createdAt = Date.parse(snapshot.meta?.createdAt ?? "");
     // Die Reparatur braucht alle Partien desselben Laufs, nicht nur die ausgewählten: Der Lauf
     // fror jede Tabelle beim frühesten Anpfiff ihres Abschnitts ein.
     if (stamp < TABLE_SCOPE_FIXED) repair?.(snapshot.fixtures ?? []);
     for (const fixture of snapshot.fixtures ?? []) {
+      // Nur Stände vor dem Anpfiff - ein Lauf kurz nach Anstoß führt laufende Spiele mit.
+      if (Number.isFinite(createdAt) && createdAt >= Date.parse(fixture.kickoff)) continue;
       const previous = latest.get(fixture.fixtureId);
       if (previous && previous.stamp >= stamp) continue;
       latest.set(fixture.fixtureId, { stamp, fixture });

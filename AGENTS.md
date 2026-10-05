@@ -8,11 +8,31 @@ Benutzer auf Deutsch und führe Analyseaufträge selbstständig über die vorhan
 
 1. Die vom Benutzer aktualisierte `data.json` im Repository ist die alleinige Quelle für
    die zu analysierenden Tipico-Fixtures und Tipico-Quoten.
-2. Ohne abweichende Zeitangabe führe den vollständigen Lauf mit folgendem Befehl aus:
+2. **Reihenfolge jeder Analyse (Davids Anweisung vom 05.10.2026): erst zuordnen, dann Daten
+   nachziehen, erst am Ende analysieren.** Eine Zuordnung, die erst nach der Analyse gesetzt
+   wird, braucht eine zweite Analyse - am 05.10.2026 kostete das zwei Wiederholungen.
+   1. **Zuordnen:** `npm run prepare-analysis -- --dates <bereich>` (gleicher Bereich und
+      gleiche `--input` wie die Analyse; `tools/prepare-analysis.ts`, praktisch 0 Aufrufe, weil
+      Ligaliste und Ansetzungen danach ohnehin aus dem Cache kommen). Es nennt offene Ligen mit
+      Kandidaten, jedes Tipico-Spiel ohne API-Ansetzung mit den ähnlichsten Ansetzungen der Liga
+      (Team-IDs, Anstoß, Status, Namensähnlichkeit) und die laut API verschobenen Spiele.
+      Liga-Aliase (`npm run aliases`) und Team-Aliase (`npm run team-aliases`) setzen, unklare
+      Namen recherchieren (Umbenennung, Umzug), dann das Werkzeug erneut laufen lassen, bis nur
+      noch Spiele ohne API-Gegenstück übrig sind. **Bestehende Aliase können falsch sein**
+      („Shanghai Segenda“ zeigte seit der ersten Fassung auf Shanghai Second) - passt ein
+      Kandidat nicht, den vorhandenen Alias prüfen.
+   2. **Daten nachziehen:** Abschnitt 3 desselben Werkzeugs listet Teams ohne Elo mit Ursache
+      und Maßnahme; Lücken nach „Pflege“, erster Punkt, schließen (Backfill, Listen in
+      `src/elo-config.ts`, `npm run elo -- build`). Das wöchentliche Elo-Nachladen und die
+      fehlende Ligastärke holt die Analyse selbst vor dem Rechnen.
+   3. **Analysieren:** erst jetzt die Analyse für den gewünschten Zeitraum. Ohne abweichende
+      Zeitangabe:
 
    ```powershell
    npm run dashboard -- --dates next48
    ```
+
+   Danach wie bisher `npm run coverage` für die Ligastärke-Lücken und die Abrechnung.
 
 3. Der Lauf importiert Tipico-IDs und Quoten in SQLite, verwendet gespeicherte Liga- und
    Teamzuordnungen, analysiert Liga- und Pokal-/Cross-League-Spiele getrennt und erzeugt
@@ -200,6 +220,25 @@ Benutzer auf Deutsch und führe Analyseaufträge selbstständig über die vorhan
   bewertet Fixtures mit Live-Status ebenso wie `NS`/`TBD`. Beendete und abgesagte Partien
   fallen heraus. Maßgeblich ist der Status von API-Football, nicht der möglicherweise
   veraltete Status in `data.json`. Die Statuslogik steht zentral in `src/util.ts`.
+- **Zeitpunkte nie als Text vergleichen.** API-Football liefert Anstoßzeiten mit Zeitzone
+  („2026-10-11T18:00:00+02:00“), Snapshots stehen in UTC („…Z“). Als Text verglichen lag 17:00Z
+  „vor“ 18:00+02:00, obwohl es eine Stunde nach Anpfiff ist: Bis 05.10.2026 wurden so 395
+  Torlinien- und 849 Profilprognosen bis 2 Stunden nach Anpfiff gespeichert, und fällige Spiele
+  wurden bis 2 Stunden zu spät abgerechnet. In JS `Date.parse`, in SQL `julianday()`
+  (`saveGoalLinePredictions`, `saveProfilePredictions`, `unsettledFixtures`, `getLeagueStrength`,
+  `getPoolRatingFloor`, `tools/live-model-report.ts`). Fällig zur Abrechnung ist ein Spiel erst
+  110 Minuten nach Anpfiff (`UNSETTLED_MIN_AGE_MS`) - vorher ist keins beendet, und der Aufruf
+  wäre verloren. Die Snapshot-Leser (`collectSnapshots` im Marktprofil, `readFixtures` in
+  `tools/snapshot-history.ts`) nehmen nur Stände vor dem Anpfiff. Statuscodes werden ohne
+  Rücksicht auf die Schreibweise verglichen (API-Football schreibt Absagen teils „Canc“).
+- **Platzhaltertermine bei API-Football** (seit 05.10.2026, `requestedFixtureScope` in
+  `src/analyzer.ts`): Manche Ligen führen Spiele bis kurz vorher auf einem vorläufigen Termin
+  (Olympiakos - Panathinaikos seit August auf Samstag 15:00 UTC, bei Tipico Sonntag 18:00 UTC).
+  Die Zuordnung sucht zuerst ±12 Stunden um den Tipico-Anstoß; findet sie dort nichts, nimmt
+  ein zweiter Durchgang dieselbe Paarung derselben Liga bis ±4 Tage - nur wenn sie dort
+  eindeutig ist und keine andere Tipico-Partie sie belegt. Der Anstoß kommt dann von Tipico,
+  alles andere von der API. Lauf vom 05.10.2026 (Mo-So): 687 → 725 von 751 Spielen. Die
+  Ansetzung muss an einem Tag des Umfangs liegen, sonst wird sie gar nicht geladen.
 - Die Live-Ansicht der App fragt ausschließlich Fixtures aus `output/dashboard-latest.json`
   ab, die laut Anstoßzeit gerade laufen können und von der Ansicht auch beobachtet werden.
   Bis `LIVE_ALL_THRESHOLD` (25) Partien werden sie über `/fixtures?ids=` zu je 20 IDs
@@ -207,7 +246,10 @@ Benutzer auf Deutsch und führe Analyseaufträge selbstständig über die vorhan
   Dienst auf `/fixtures?live=all` im 15-Sekunden-Takt und zieht die Statistiken nur noch
   minütlich über 20er-Bündel nach. Ohne laufende Partie entstehen keine Anfragen.
   Begrenzt wird das über `LIVE_DAILY_REQUEST_BUDGET`. Live-Stände werden nach
-  `data/live-snapshots/` mitgeschrieben.
+  `data/live-snapshots/` mitgeschrieben, seit 29.09.2026 samt Karten und den gezeigten
+  Live-Chancen. Einen eigenen Statistik-Abruf gibt es nicht für Spiele, deren Liga laut
+  `liveCoverage.statistics` keine Live-Statistik führt (vorher erst nach der ersten leeren
+  Antwort). Was die Ansicht zeigt, steht im Abschnitt „Live-Ansicht und Live-Chancen“.
 - Die Übersicht stellt jedem Teamnamen sein Wappen voran. Die URL kommt aus der ohnehin
   geladenen Fixture-Antwort von API-Football und steht als `homeCrest`/`awayCrest` im
   Dashboard-Snapshot; das kostet keinen zusätzlichen Aufruf. Führt die Antwort kein Wappen
@@ -232,12 +274,15 @@ Benutzer auf Deutsch und führe Analyseaufträge selbstständig über die vorhan
   Empfehlung“). Die Elemente darin sind Segmentschalter und Schalter statt Auswahllisten und
   Checkboxen; „an“ heißt überall „Filter aktiv“, deshalb heißt der Pokal-Schalter **„Nur
   Ligaspiele“** (ab Werk aus, `showCrossLeague` negiert). Der Zeitraum ist „Nächste 48 Std.“ plus
-  ein Raster nur der Tage der Analyse, das ohne Übernehmen sofort wirkt; `next48` bleibt dabei
-  strikt. Form und H2H teilen sich einen Umschalter (beide Zustände bleiben, weil die Sortierung
+  ein **richtiger Kalender** (seit 30.09.2026, Davids Wunsch - das Raster aus Tageskacheln ließ
+  sich über drei Wochen nicht als Zeitraum bedienen): Felder „Von“/„Bis“ (`<input type="date">`,
+  begrenzt auf die Tage der Analyse, ein Bis vor dem Von macht beide zu diesem Tag) und eine
+  Monatsansicht Mo-So mit Blättern, Tage außerhalb der Analyse sichtbar, aber nicht wählbar. Klick,
+  zweiter Klick = Zeitraum, während der Wahl zeigt das Überfahren den künftigen Zeitraum. Alles
+  wirkt ohne Übernehmen sofort; `next48` bleibt dabei strikt. Form und H2H teilen sich einen Umschalter (beide Zustände bleiben, weil die Sortierung
   je Spalte liest). Das Menü hat zwei Spalten aus Karten: links der Umfang (`scopedFixtures`, gilt
   auch für Kelly und Quickpick), rechts, was nur die Tabelle eingrenzt, und die Punkte in Form und H2H (Gruppe „Form und H2H“). Der Kopf
-  zählt die angezeigten Spiele aus `filtered`, weil das Menü die Statuszeile verdeckt. Die
-  Tageskacheln beginnen am ersten Analysetag, nicht am Montag davor. Grün markiert im Menü die
+  zählt die angezeigten Spiele aus `filtered`, weil das Menü die Statuszeile verdeckt. Grün markiert im Menü die
   Wahl nur als Linie und Schalterbahn, nie als Fläche oder Häkchen (Grün ✓ heißt in der Tabelle
   „Empfehlenswert“); Blau ist dort nur Tastaturfokus. Seit 28.09.2026 im Leistenstil: Die Wahl
   trägt wie der aktive Leisteneintrag eine hellere Fläche, fette Schrift und einen grünen Balken,
@@ -326,6 +371,12 @@ Benutzer auf Deutsch und führe Analyseaufträge selbstständig über die vorhan
 - `null` heißt in `fixture_results` immer „unbekannt", `0` heißt „gab es nicht". Ohne
   Ereignisliste bleiben alle Halbzeit-Zähler `null`. `goals_complete` sagt, ob die
   Ereignisse jedes Tor des Endstands tragen - nur dann sind die Torminuten belastbar.
+  **Bei AET/PEN gehen die Abschnitte 1-2 gegen `score.fulltime` (Stand nach 90 Minuten) und die
+  Verlängerungstore gegen den Zuwachs bis `goals`** (seit 29.09.2026, Befund des Prüfer-Agenten,
+  an 198 AET-Spielen im Cache geprüft). Vorher gingen alle Tore gegen den 90-Minuten-Stand, und
+  jedes Pokalspiel mit Tor in der Verlängerung galt als lückenhaft (AET 8 von 70, danach 62;
+  PEN 182 → 189 von 225). `score.extratime` taugt dafür nicht - API-Football führt es mal als
+  Gesamtstand, mal als Zuwachs.
   `half_stats_status` hält fest, ob die Halbzeitwerte schon geholt wurden und ob es welche
   gab; `unavailable` verhindert, dass derselbe leere Wettbewerb erneut abgefragt wird.
 - Rückwirkend nachtragen: `npm run backfill-results -- --scan` liest ausschließlich den
@@ -344,7 +395,14 @@ Benutzer auf Deutsch und führe Analyseaufträge selbstständig über die vorhan
   Gesamtwert und Halbzeitwerte werden dort getrennt gezählt. Wer Halbzeiten summiert, darf
   sich deshalb nicht auf Gleichheit mit dem Gesamtwert verlassen. Die Torzahlen sind davon
   nicht betroffen - sie kommen aus den Ereignissen und gehen in allen 7.516 Partien mit
-  lückenloser Liste auf.
+  lückenloser Liste auf. (Stand 29.09.2026 nach der AET-Korrektur: 13.144 Spiele mit
+  lückenlosen Torminuten, FT 12.893, AET 62, PEN 189.)
+- **Nachspielzeit-Tore führt API-Football uneinheitlich** - mal als Minute „90“ ohne `extra`,
+  mal als „90+x“ (je 100 Spiele 17,8 zu 3,5 Anfang August, 5,1 zu 17,4 seit Mitte September;
+  die Summe bleibt bei rund 22, bei 45/45+ ebenso). Wer Minute 90 von der Nachspielzeit trennt,
+  misst eine Drift der API. Das Live-Modell fasst deshalb 45/45+ und 90/90+ je zu einem Block
+  zusammen. Ob die Torphasen der Detailansicht (`fixture-insights.ts`) betroffen sind, ist
+  ungeprüft.
 - Nach beendeten Spielen: `npm run settle`. Jeder Dashboard-Lauf rechnet am Ende
   automatisch fällige Prognosen ab, begrenzt durch `SETTLE_REQUEST_BUDGET` (Standard 200
   Aufrufe, 0 schaltet es ab), neueste Partien zuerst. Für einen Rückstand `npm run settle --
@@ -356,19 +414,63 @@ Benutzer auf Deutsch und führe Analyseaufträge selbstständig über die vorhan
   Pausenstand und xG, wenn das Paar vertauscht dasteht. Vorher wäre ein Sieg gespiegelt
   abgerechnet worden; beide bekannten Fälle endeten remis und blieben folgenlos.
   `fixture_results` folgt der aktuellen Ausrichtung der API.
-- Jeder Dashboard-Lauf gibt nach der Abrechnung eine Kalibrier-Kurzfassung aus: Trefferquote
-  des Modellfavoriten gegen seine mittlere Prognose, aufgeschlüsselt nach Ligastärke. Gruppen
-  unter 30 Partien sind als „Stichprobe zu klein“ markiert, ab 5 Prozentpunkten Abweichung
-  folgt ein Hinweis auf den vollständigen Bericht.
+- Jeder Dashboard-Lauf gibt nach der Abrechnung eine Kalibrier-Kurzfassung aus
+  (`src/calibration.ts`): Trefferquote des Modellfavoriten gegen seine mittlere Prognose über
+  alle Fassungen, aufgeschlüsselt nach Ligastärke. Bei den Gruppen zwischen Ligen bzw.
+  Nationalteams (gemessen, geschätzt, Team-Elo, Team-Elo U21) folgt eine Zeile „seit <Version>:
+  n Spiele, stärkere Liga/stärkeres Team gewinnt X statt Y ± Standardfehler“ - **nur die laufende
+  Modellfassung**, weil jede Fassung ihren eigenen Teiler hat. Gruppen unter 30 Spielen sind
+  als „Stichprobe zu klein“ markiert. „Auffällig“ heißt: ab 30 Spielen mindestens 5 Punkte
+  **und** mindestens 2 Standardfehler Abweichung - bei den Gruppen zwischen Ligen an der
+  stärkeren Seite der laufenden Fassung, sonst am Favoriten; „vor Ligastärke“ nie.
 - Modellgüte anzeigen: `npm run report`. Der Abschnitt „Ligastärke bei Cross-League-Partien“
   schlüsselt die 1X2-Kalibrierung danach auf, wie gut die Ligastärke bekannt war (Ligapartie,
-  gemessen, geschätzt, Team-Elo, gleiche Liga, ohne Rating; die Gruppe steht in den Warnungen
-  der Prognose, `cohortOf` in `src/database.ts`). Die Spalte „Abweichung“ ist Trefferquote minus mittlere
-  Prognose des Modellfavoriten: deutlich positiv heißt, der Klassenunterschied wird
-  unterschätzt und `strength.unratedPenalty` gehört erhöht; deutlich negativ heißt, das
-  Modell trennt zu scharf und `strength.factorDivisor` gehört erhöht. Pokalpartien enden
-  häufiger remis als Ligapartien, was die Favoritenquote strukturell drückt - das gehört bei
-  der Auslegung mitbedacht.
+  gemessen, geschätzt, Team-Elo, Team-Elo U21, gleiche Liga, ohne Rating, vor Ligastärke; die
+  Gruppe steht in den Warnungen der Prognose, `cohortOf` in `src/database.ts`), darunter die
+  Tabelle **„Stärkere Seite je Modellversion“** (`strongerSideByVersion`) - nur sie misst einen
+  bestimmten Teiler. **Seit 05.10.2026** (Prüfung des Prüfer-Agenten):
+  je Spiel zählt nur die neueste Modellversion, und Spiele zwischen Ligen aus Fassungen vor 3.1.0
+  stehen in der eigenen Gruppe **„vor Ligastärke“** - diese Fassungen kannten keine Ligastärke,
+  trugen aber schon die Cross-League-Warnung und landeten bis dahin in „gemessen“ (310 von 516
+  Zeilen). **Maßgeblich für den Teiler ist „stärkere Liga gewinnt“**, nicht „Favorit trifft“:
+  Der Modellfavorit ist bei Spielen zwischen Ligen oft die schwächere Liga, eine negative
+  Favoriten-Abweichung hieß dort gerade „Faktor zu schwach“. Die Spalte vergleicht den Sieg der
+  Seite aus der stärkeren Liga (`goal_line_predictions.strength_factor` > 1 Heim, < 1 Gast) mit
+  ihrer Prognose: deutlich positiv = Klassenunterschied unterschätzt (`strength.factorDivisor`
+  zu groß, bei „geschätzt“ `strength.unratedPenalty` zu klein), deutlich negativ = zu scharf.
+  Den Faktor älterer Prognosen trägt `node tools/backfill-strength-factor.ts` aus den Snapshots
+  nach (0 Aufrufe). Mehr Remis im Pokal gibt es gemessen nicht (ab 3.1.0 −1,4 ± 2,9 Punkte); die
+  frühere Annahme stammte aus denselben Altzeilen.
+- **`strength.factorDivisor` 1200 seit 05.10.2026, `goalLineModelVersion` 3.5.0** (Davids
+  Entscheidung nach der Prüfung vom selben Tag). **Jede Änderung an `config.strength` erhöht
+  `goalLineModelVersion`** - nur so misst die Tabelle je Modellversion einen bestimmten Teiler
+  (in 3.1.0 liefen ohne neue Version nacheinander 1200, 900 und 1500).
+  Die Erhöhung 900 → 1500 (wirksam ab 31.08., Commit 02.09.) stand auf den
+  Altzeilen oben; mit 1500 gewann die stärkere Liga seit 3.2.0 66 % statt 48 % vorhergesagt.
+  1200 wurde an `strength_matches` per Zeit-Split gewählt (−0,010 ± 0,002 Log-Loss gegen 1500) und
+  an den eigenen Prognosen bestätigt (−0,024 ± 0,005). Begründung im Kommentar in
+  `src/config.ts`. Folgen: mehr Spiele mit „Klasse“-Kürzel (Schwellen 1,5/2,2 am Faktor), die
+  modellgebundenen Quickpick-Messungen (`MODEL_BOUND_PRESETS`: hz15, remis) beginnen neu.
+  **Nachmessen nach rund 150 abgerechneten Spielen von 3.5.0** in der Tabelle „Stärkere Seite
+  je Modellversion“ bzw. der Kurzfassungszeile „seit 3.5.0“ (Gruppe „gemessen“; bei 150 Spielen
+  rund ± 4 Punkte; Standardfehler unter der Prognose, √(Σ p(1−p)) / n). Je Fassung gemessen am
+  05.10.2026: 3.1.0 (meist 900, dazu kurz 1200 und 1500) −1,1 ± 5,3, 3.2.0 (1500) +21,5 ± 5,0.
+  Tipico lag dort vorher klar besser (+0,095 ± 0,028 Log-Loss).
+  Die Ligastärke selbst ist teils veraltet: Laufende Pokalsaisons lädt die Analyse nur nach, wenn
+  ein Rating nicht belastbar ist. Am 05.10.2026 nachgeladen: 13 von 38 Vereinswettbewerben
+  (600 Aufrufe, Champions League jetzt vollständig), danach EFL Trophy, Australia Cup,
+  Conference League, Copa Paraguay und Copa Chile (46 Aufrufe). Offen u. a. NM Cupen, Emperor
+  Cup, Puchar Polski, Cupa României - die Liste erzeugt ein Abgleich der Cross-League-Spiele in
+  den Snapshots gegen `strength_matches`. **NM Cupen** führt API-Football als Saison 2027
+  (August bis Oktober 2026), die `seasonsFor` nie lädt - offen, braucht eine eigene Änderung.
+- **„Saison fertig“ in der Ligastärke (seit 05.10.2026, `src/strength-builder.ts`):** Eine
+  Pokalsaison gilt erst als fertig, wenn ihr `end` vorbei ist **und** keine Ansetzung mehr offen
+  steht (PST zählt als offen, eine offene Ansetzung über 30 Tage vor heute aber als erledigt -
+  sonst hielten verschleppte Altspiele wie Copa do Brasil 2025, PST vom 19.02.2025, eine Saison
+  für immer offen). Vorher genügte `end`, das API-Football mit jeder neu angesetzten
+  Runde nach hinten schiebt - EFL Trophy, Australia Cup, Conference League und Copa Paraguay 2026
+  froren so ein. `isStrengthSeasonComplete` verwirft zudem eine Markierung, die vor dem heutigen
+  `end` gesetzt wurde; solche Saisons lädt der nächste Aufruf von selbst neu.
 - Das Team-Elo holt einmal pro Woche mit einer Analyse die laufenden Saisons aller Ligen aus
   dem Bestand (rund 485 Aufrufe im September, 440 im Januar, 175 im Juli; Abschnitt „Team-Elo").
   An dem Tag ist die Analyse entsprechend teurer.
@@ -444,6 +546,91 @@ nachgezogen, nicht gesammelt am Ende.
 - Handy-Breite ist dort nur Randnotiz (Davids Entscheidung vom 27.09.2026): Die App läuft lokal am
   Desktop.
 
+## Live-Ansicht und Live-Chancen
+
+- Davids Auftrag vom 29.09.2026: in Live schnell sehen und filtern, welche laufenden Spiele
+  Chancen bieten (Sieger, noch ein Tor, Über/Unter, Karten). Ablauf: Prüfer-Agent (was ein
+  Live-Modell braucht und was messbar ist), Hauptsitzung (was die API liefert), UX-Agent
+  (Aufbau). **Momentum / „letzte 15 Minuten“ ist ausdrücklich nicht gewünscht** (Davids
+  Entscheidung) - gerechnet und gezeigt wird mit Gesamtwerten seit Anpfiff.
+- **Was die API live liefert** (am Cache gemessen, 0 Aufrufe): Minute, Stand, Ereignisse (Tore,
+  Karten mit Spieler und Minute, Wechsel, VAR). Statistik nur in rund der Hälfte der Spiele;
+  vorab erkennbar an `coverage.fixtures.statistics_fixtures` der Saison (bei „ja“ kam in 69 von
+  70 laufenden Spielen welche, bei „nein“ in 16 von 225). **Live-xG kommt praktisch nie** - im
+  ganzen Cache hatte kein laufendes Spiel einen Wert; xG gibt es erst nach Abpfiff.
+  Großchancen und gefährliche Angriffe gibt es gar nicht.
+- **Live-Modell `src/live-model.ts`** (rein, `liveChances`): erwartete Resttore, P(noch ein
+  Tor), P(über 1,5/2,5/3,5 am Ende), P(nächstes Tor Heim/keins/Gast), P(1/X/2 nach 90).
+  μ = λ (Torerwartung vor dem Anpfiff) × S(t) (gemessener Anteil der noch fallenden Tore) ×
+  0,604 bei eigener Roter × 1,552 bei gegnerischer Roter, je Team unabhängig Poisson. Rot
+  zählt je Team höchstens einmal (nur das ist gemessen). Minute 45/45+ und 90/90+ sind je ein
+  Block (Nachspielzeit-Drift der API, siehe oben); in der Nachspielzeit gilt der gemessene Rest
+  des Blocks (`STOPPAGE_REMAINING`). Gemessen vom Prüfer an 7.273 Spielen, Zeit-Split
+  August/September: gegen eine gleichmäßige Uhr Brier „noch ein Tor“ −0,012 ± 0,001, je Band
+  2-4 Punkte neben dem Eingetretenen; ab der 85. Minute fällt in 30 von 100 Spielen noch ein
+  Tor (gleichmäßig gerechnet 14).
+- **Bewusst nicht im Modell, weil gemessen wirkungslos:** der Spielstand („der Rückliegende
+  drückt“ - beim 1X2 sogar schlechter), die Live-Statistik (Schüsse aufs Tor der ersten
+  Halbzeit auf die Tore der zweiten: kann auch Zufall sein; deckt sich mit der Prüfung vom
+  17.09.) und ein Nachschärfen von λ nach den bisherigen Toren. Karten: anzeigen und filtern,
+  **keine Kartenprognose** (kein Marktvergleich, Kartendaten fehlen in rund jeder siebten Liga).
+- **Keine Live-Chance** in Verlängerung, Pause davor, Elfmeterschießen, Unterbrechung, bei
+  unklarem Status und bei Jugendspielen mit kürzeren Halbzeiten (U17 und jünger, `isShortMatch`).
+  Sieger und nächstes Tor bleiben bei `probabilityReliable: false` leer - wie vor dem Anpfiff;
+  die Torlinien bleiben. Die Chancen gelten für 90 Minuten; im Pokal heißt „Sieger“ nicht
+  „kommt weiter“.
+- **„Vorläufig“ (Davids Entscheidung vom 29.09.2026):** Die Live-Chance ist sofort sichtbar,
+  mit Abzeichen und Warnzeile („… rechne nicht mit Gewinn“), `LIVE_MODEL_PROVISIONAL = true`.
+  **Nachmessung nach rund 1.500 abgerechneten Spielen des laufenden Modells** (etwa 11 Tage):
+  `npm run live-model-report -- --since 2026-09-30 --min-model 3.4.0`. Die vier Kriterien sind
+  vorab festgelegt und stehen im Kopf von `tools/live-model-report.ts`; das Werkzeug meldet
+  „bestanden / nicht bestanden“. Danach entscheidet David, ob „vorläufig“ fällt. Die
+  Konstanten leitet `--derive` aus `fixture_results` ab; übernommen werden sie von Hand, und
+  `LIVE_MODEL_VERSION` steigt - die Nachmessung gilt je Fassung. Ohne `--since` misst das
+  Werkzeug auf denselben Daten, aus denen die Konstanten stammen - das ist kein Beleg.
+- **Live-Tafel (`src/live-board.ts`):** trägt `live` (die Chancen), `marketStands` (Tatsachen
+  aus dem Stand über `marketStandNow` in `src/market-outcome.ts`: erreicht / nicht mehr möglich /
+  noch n Tore nötig / n Tore Luft), `cards` und `statisticsCoverage`. **Karten kommen aus den
+  Ereignissen**, nicht aus der Statistik (die fehlt in rund 70 % der laufenden Spiele): Gelb-Rot
+  steht als „Red Card“, eine per VAR hochgestufte Karte bringt ihre eigene „Red Card“ mit (409
+  von 464 Fällen), eine zurückgenommene Rote löscht die API meist selbst (83 von 86) und zieht
+  deshalb nur ab, wenn sie noch dasteht. `cards: null` heißt „keine Kartendaten“: Die Liga
+  führt keine Karten in den Ereignissen (`cardData: false`) oder es gibt weder Ereignisse noch
+  Statistik. **Dreht API-Football Heim und Gast**, wird die Live-Antwort über die Team-IDs in
+  die Ausrichtung des Dashboards gespiegelt; ohne Team-IDs bleibt sie, wie sie kommt.
+- **Dashboard `schemaVersion: 7`:** `liveCoverage` je Spiel (aus der ohnehin geladenen
+  Ligaliste, 0 Aufrufe) und `cardData` (`AnalyzerDatabase.cardDataByLeague`: unter einer Gelben
+  je Spiel über mindestens 20 Spiele = keine Kartendaten; am 29.09.2026 31 von 211 Ligen).
+  Ältere Snapshots tragen beides nicht; die App sagt dann nichts Falsches, nur weniger.
+- **App:** Live hat eine **eigene Frage** statt des Marktes der Tabelle (`liveQuestion`, gemerkt
+  unter `football-analyzer:live-question`, Liste in `frontend/src/liveQuestions.ts`): Überblick,
+  Noch ein Tor, Über/Unter 1,5/2,5/3,5, BTTS Ja/Nein (**nur Stand**, keine gemessene
+  Live-Chance), Nächstes Tor, Sieger nach 90 Min., Karten. **Keine 1.-HZ-Märkte in Live.** Die
+  Liste ist **eine Tabelle mit Kopfzeile** (Davids Wunsch vom 29.09.2026: „übersichtlich als
+  Tabelle“): Min., Spiel (Teams mit Rot, Land · Liga), Stand, die Frage (Chance mit „vorläufig“
+  oder Tatsache, darunter der zweite Wert), dann **Aufs Tor, Karten, Ballbesitz, Pässe** je Heim
+  oben und Gast unten, auf Höhe der Teamnamen. Karten stehen nur beim Team, das welche hat (keine
+  gelbe „0“); „–“ heißt keine Kartendaten bzw. keine Live-Statistik (Grund im Tooltip). Pässe
+  als „412 · 84 %“: API-Football liefert live „Total passes“ und „Passes accurate“, „Passes %“
+  fast nie (16 von 292) - die Quote rechnet `teamSnapshot` daraus. Die Frage steht einmal in der
+  Kopfzeile statt in jeder Zeile. **Keine Quote, kein ✓/★** -
+  der Wert vor dem Anpfiff steht nur grau als „vor Anpfiff x %“. Das Fenster mit den Kennzahlen
+  öffnet **per Klick auf die Zeile, an der Stelle der Maus** (Davids Wunsch vom 29.09.2026;
+  vorher beim Überfahren, das deckte beim Weg über die Liste die Zeilen zu). Zu geht es mit
+  einem zweiten Klick, einem Klick daneben, Escape oder Scrollen der Liste; mit der Tastatur
+  öffnet Enter es neben der Zeile. Es zeigt Chancen live, Karten, Tore und Karten, drei Hauptstatistiken plus eine Kontextzeile und
+  „Vor dem Anpfiff“ (gewählter Markt und ✓/★-Märkte mit Quote). Das Aktivitätsbild ist aus der
+  App entfernt (die CLI behält es). Die App rechnet keine Wahrscheinlichkeit selbst.
+- **Filter:** „Beobachtete Spiele“ bestimmt die Aufrufe (Wettbewerbe, „Nur Spiele mit Empfehlung
+  vor Anpfiff“); „Nur Anzeige“ kostet nichts: Chance ab 50/65/80 % (folgt der Frage, bei
+  BTTS/Karten abgeschaltet), Rote Karte im Spiel, Phase (1. HZ, 2. HZ, ab 75.). Nicht
+  gespeichert, als Schildchen sichtbar. Sortierung: Anstoß (Vorgabe - nach Chance springen die
+  Zeilen bei jedem Abruf), Spielminute, Chance, Karten; sortierbar nur, was zu sehen ist.
+- **Bewusst nicht gebaut:** Momentum, `/odds/live` (Live-Preis neben Live-Chance wäre genau der
+  Vorteil, den Live nie zeigt), „Karten ab N“ (die Sortierung erledigt das), „Nur mit
+  Live-Statistik“ (die Statistik trägt keine belastbare Aussage; der Filter versteckte Spiele,
+  deren Chance genauso gilt).
+
 ## Märkte
 
 - Das Dashboard führt 14 Märkte, jeweils als Paar aus Basis- und Gegenrichtung: 1X2, Remis,
@@ -461,8 +648,10 @@ nachgezogen, nicht gesammelt am Ende.
   dort nie erreichbar.
 - Ein neuer Markt braucht Einträge in `DashboardMarketKey`, `thresholds`, der Marktliste,
   `decideMarket` (`src/market-outcome.ts`), `MARKET_OPTIONS`, `MARKET_TOGGLES` und
-  `RADIAL_LABELS`. Die letzten drei und `thresholds` sind als vollständige Records notiert,
-  der Compiler erzwingt sie also.
+  `MARKET_GROUP_OF` (`frontend/src/App.tsx`, Gruppe in der Marktliste der Werkzeugleiste und in
+  der Marktauswahl am „Add“-Knopf). `MARKET_GROUP_OF` und `thresholds` sind als vollständige
+  Records notiert, der Compiler erzwingt sie also. `RADIAL_LABELS` gibt es seit 30.09.2026 nicht
+  mehr: Das Radialmenü wurde durch eine Liste ersetzt, die die vollen Marktnamen zeigt.
 
 ## Kelly-Automatik und Marktprofil
 

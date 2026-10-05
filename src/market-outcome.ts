@@ -49,6 +49,47 @@ export function decideMarket(marketKey: string, selection: string, outcome: Outc
 }
 
 /**
+ * Was der aktuelle Stand eines laufenden Spiels über einen Ganzspiel-Markt schon sicher sagt -
+ * eine Tatsache, keine Wahrscheinlichkeit:
+ *
+ * - `won`: Kein weiteres Tor kann es noch ändern (Über 2,5 bei 2:1, BTTS bei 1:1).
+ * - `lost`: Kein weiteres Tor kann es noch retten (Unter 2,5 bei 2:1).
+ * - `winning`: Stünde jetzt der Abpfiff an, wäre es gewonnen; `goalsToSpare` weitere Tore
+ *   verträgt es noch (Unter 2,5 bei 1:0 → 1).
+ * - `needs`: `goalsNeeded` weitere Tore fehlen mindestens (Über 2,5 bei 1:0 → 2).
+ *
+ * Wie `marketsExcludeEachOther` probiert sie mögliche Ausgänge gegen `decideMarket` aus, statt
+ * eine zweite Regeltabelle zu pflegen. `null` für Märkte ohne Ganzspiel-Entscheidung (Halbzeit)
+ * und für unbekannte.
+ */
+export type MarketStand =
+  | { status: "won" | "lost" }
+  | { status: "winning"; goalsToSpare: number }
+  | { status: "needs"; goalsNeeded: number };
+
+const MAX_FURTHER_GOALS = 8;
+
+export function marketStandNow(marketKey: string, selection: string, homeGoals: number, awayGoals: number): MarketStand | null {
+  const results: Array<{ further: number; win: boolean }> = [];
+  for (let home = 0; home <= MAX_FURTHER_GOALS; home += 1) {
+    for (let away = 0; away <= MAX_FURTHER_GOALS; away += 1) {
+      const win = decideMarket(marketKey, selection, {
+        homeGoals: homeGoals + home, awayGoals: awayGoals + away, halftimeHomeGoals: null, halftimeAwayGoals: null
+      });
+      if (win === null) return null;
+      results.push({ further: home + away, win });
+    }
+  }
+  if (results.every((result) => result.win)) return { status: "won" };
+  if (results.every((result) => !result.win)) return { status: "lost" };
+  if (results[0]!.win) {
+    const firstLoss = Math.min(...results.filter((result) => !result.win).map((result) => result.further));
+    return { status: "winning", goalsToSpare: firstLoss - 1 };
+  }
+  return { status: "needs", goalsNeeded: Math.min(...results.filter((result) => result.win).map((result) => result.further)) };
+}
+
+/**
  * Können zwei Auswahlen derselben Partie beide gewinnen?
  *
  * Auf beide Seiten eines Gegensatzes zu setzen, kostet garantiert Geld: Eine der beiden

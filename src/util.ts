@@ -143,16 +143,18 @@ const SCHEDULED_STATUSES = new Set(["NS", "TBD"]);
 const LIVE_STATUSES = new Set(["1H", "HT", "2H", "ET", "BT", "P", "SUSP", "INT", "LIVE"]);
 const FINISHED_STATUSES = new Set(["FT", "AET", "PEN", "PST", "CANC", "ABD", "AWD", "WO"]);
 
+// API-Football schreibt Absagen teils "Canc" statt "CANC" (im Cache 669 von 15.073 Vorkommen,
+// Prüfung vom 05.10.2026) - deshalb ohne Rücksicht auf Groß- und Kleinschreibung vergleichen.
 export function isScheduledStatus(short: string): boolean {
-  return SCHEDULED_STATUSES.has(short);
+  return SCHEDULED_STATUSES.has(short.toUpperCase());
 }
 
 export function isLiveStatus(short: string): boolean {
-  return LIVE_STATUSES.has(short);
+  return LIVE_STATUSES.has(short.toUpperCase());
 }
 
 export function isFinishedStatus(short: string): boolean {
-  return FINISHED_STATUSES.has(short);
+  return FINISHED_STATUSES.has(short.toUpperCase());
 }
 
 /** Partien, die der Analyzer bewertet: noch nicht angepfiffen oder aktuell laufend. */

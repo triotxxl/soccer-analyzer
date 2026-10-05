@@ -294,6 +294,7 @@ function report(): void {
   const outcomeRows = database.outcomeProbabilityReport();
   const defenseRows = database.defenseBadgeReport();
   const strengthRows = database.leagueStrengthReport();
+  const strongerRows = database.strongerSideByVersion();
   database.close();
   if (rows.length === 0 && profileRows.length === 0 && goalLineRows.length === 0) {
     console.log("Noch keine abgerechneten Kandidaten vorhanden.");
@@ -318,17 +319,33 @@ function report(): void {
   }
   if (strengthRows.length > 0) {
     console.log("\n## Ligastärke bei Cross-League-Partien\n");
-    console.log("| Ligastärke | Stichprobe | Favorit trifft | Trefferquote | Ø Prognose | Abweichung | Brier Score | 95-%-Intervall |");
-    console.log("|---|---:|---:|---:|---:|---:|---:|---:|");
+    console.log("| Ligastärke | Spiele | Favorit trifft | Trefferquote | Ø Prognose | Abweichung | Brier Score | 95-%-Intervall | mit Faktor | stärkere Seite gewinnt | Ø Prognose | Abweichung |");
+    console.log("|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|");
+    const signed = (value: number) => `${value >= 0 ? "+" : ""}${(value * 100).toFixed(1).replace(".", ",")} pp`;
     for (const row of strengthRows) {
-      const bias = `${row.bias >= 0 ? "+" : ""}${(row.bias * 100).toFixed(1).replace(".", ",")} pp`;
+      const stronger = row.strongerTotal > 0
+        ? `${row.strongerTotal} | ${percent(row.strongerWinRate)} | ${percent(row.strongerPredicted)} | ${signed(row.strongerWinRate - row.strongerPredicted)}`
+        : "– | – | – | –";
       console.log(
-        `| ${row.cohort} | ${row.total} | ${row.hits} | ${percent(row.hitRate)} | ${percent(row.averageProbability)} | ${bias} | ${row.brierScore.toFixed(3)} | ${percent(row.intervalLow)}–${percent(row.intervalHigh)} |`
+        `| ${row.cohort} | ${row.total} | ${row.hits} | ${percent(row.hitRate)} | ${percent(row.averageProbability)} | ${signed(row.bias)} | ${row.brierScore.toFixed(3)} | ${percent(row.intervalLow)}–${percent(row.intervalHigh)} | ${stronger} |`
       );
     }
+    if (strongerRows.length > 0) {
+      console.log("\n### Stärkere Seite je Modellversion\n");
+      console.log("| Gruppe | Modell | Spiele | stärkere Seite gewinnt | Ø Prognose | Abweichung |");
+      console.log("|---|---|---:|---:|---:|---:|");
+      for (const row of strongerRows) {
+        const deviation = `${signed(row.winRate - row.predicted)} ± ${(row.standardError * 100).toFixed(1).replace(".", ",")}`;
+        console.log(`| ${row.cohort} | ${row.modelVersion} | ${row.total} | ${percent(row.winRate)} | ${percent(row.predicted)} | ${deviation} |`);
+      }
+    }
     console.log(
-      "\nEine deutlich positive Abweichung bei „geschätzt“ oder „ohne Rating“ heißt: Der " +
-      "Klassenunterschied wird unterschätzt, strength.unratedPenalty gehört erhöht."
+      "\nJe Spiel zählt nur die neueste Modellversion. „vor Ligastärke“ sind Spiele zwischen " +
+      "Ligen aus Fassungen vor 3.1.0, die die Ligastärke noch nicht kannten - nur zur Einordnung." +
+      "\nMaßgeblich für den Teiler ist „stärkere Liga gewinnt“, und zwar je Modellversion (jede " +
+      "Fassung hat ihren eigenen Teiler, die Spalte oben mischt sie): deutlich positiv heißt, der " +
+      "Klassenunterschied wird unterschätzt (strength.factorDivisor zu groß, bei „geschätzt“ " +
+      "strength.unratedPenalty zu klein); deutlich negativ heißt, das Modell trennt zu scharf."
     );
   }
   if (outcomeRows.length > 0) {
@@ -600,6 +617,7 @@ async function dashboard(args: ParsedArgs): Promise<void> {
       tipicoOddsByFixture,
       recentStats,
       elo,
+      cardData: database.cardDataByLeague(),
       createdAt: goalsResult.createdAt,
       sourceFile,
       totalTipicoEvents: imported.totalEvents,

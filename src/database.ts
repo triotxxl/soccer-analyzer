@@ -152,7 +152,9 @@ export interface OutcomeProbabilityPerformanceRow {
 }
 
 export interface LeagueStrengthPerformanceRow {
-  cohort: "Ligapartie" | "gemessen" | "geschätzt" | "Team-Elo" | "Team-Elo U21" | "gleiche Liga" | "ohne Rating";
+  cohort: "Ligapartie" | "gemessen" | "geschätzt" | "Team-Elo" | "Team-Elo U21" | "gleiche Liga"
+    | "ohne Rating" | "vor Ligastärke";
+  /** Spiele, nicht Zeilen: je Spiel zählt nur die neueste Modellversion. */
   total: number;
   hits: number;
   hitRate: number;
@@ -161,6 +163,79 @@ export interface LeagueStrengthPerformanceRow {
   brierScore: number;
   intervalLow: number;
   intervalHigh: number;
+  /**
+   * Die Seite aus der stärkeren Liga (Faktor > 1 Heim, < 1 Gast) gegen ihre eigene Prognose -
+   * nur Spiele mit gespeichertem Faktor ungleich 1. Bei Spielen zwischen Ligen ist das die
+   * Größe, an der der Teiler hängt; der Modellfavorit ist dort oft die schwächere Liga.
+   */
+  strongerTotal: number;
+  strongerWinRate: number;
+  strongerPredicted: number;
+  /** Standardfehler der Abweichung unter der Prognose, √(Σ p(1−p)) / n; 0 ohne Spiele. */
+  strongerStandardError: number;
+}
+
+export interface StrongerSideVersionRow {
+  cohort: LeagueStrengthPerformanceRow["cohort"];
+  modelVersion: string;
+  total: number;
+  winRate: number;
+  predicted: number;
+  standardError: number;
+}
+
+function strongerSummary(samples: Array<{ won: boolean; probability: number }>): Pick<
+  LeagueStrengthPerformanceRow,
+  "strongerTotal" | "strongerWinRate" | "strongerPredicted" | "strongerStandardError"
+> {
+  const total = samples.length;
+  if (total === 0) {
+    return { strongerTotal: 0, strongerWinRate: 0, strongerPredicted: 0, strongerStandardError: 0 };
+  }
+  const winRate = samples.filter((sample) => sample.won).length / total;
+  return {
+    strongerTotal: total,
+    strongerWinRate: winRate,
+    strongerPredicted: samples.reduce((sum, sample) => sum + sample.probability, 0) / total,
+    // Standardfehler der Abweichung Siegquote minus Prognose unter der Prognose:
+    // √(Σ p(1−p)) / n. Anders als √(p̂(1−p̂)/n) wird er bei 0 % oder 100 % Siegen nicht 0.
+    strongerStandardError: Math.sqrt(
+      samples.reduce((sum, sample) => sum + sample.probability * (1 - sample.probability), 0)
+    ) / total
+  };
+}
+
+/** So lange nach Anpfiff ist ein Spiel frühestens beendet (90 Minuten plus Pause und Nachspielzeit). */
+const UNSETTLED_MIN_AGE_MS = 110 * 60 * 1000;
+
+/** Ab dieser Fassung rechnet das Modell mit der Ligastärke (Commit 03df6d2, 22.08.2026). */
+const FIRST_STRENGTH_MODEL_VERSION = [3, 1, 0] as const;
+
+/** Semver als Zahlen; `null` für alles andere (Testkennungen gelten als aktuell). */
+function parseModelVersion(version: string): number[] | null {
+  const match = /^(\d+)\.(\d+)\.(\d+)$/.exec(version);
+  return match ? match.slice(1).map(Number) : null;
+}
+
+function compareModelVersions(left: string, right: string): number {
+  const a = parseModelVersion(left);
+  const b = parseModelVersion(right);
+  if (!a || !b) return a ? -1 : b ? 1 : 0;
+  for (let index = 0; index < 3; index += 1) {
+    if (a[index] !== b[index]) return a[index]! - b[index]!;
+  }
+  return 0;
+}
+
+function predatesLeagueStrength(version: string): boolean {
+  const parsed = parseModelVersion(version);
+  if (!parsed) return false;
+  for (let index = 0; index < 3; index += 1) {
+    if (parsed[index] !== FIRST_STRENGTH_MODEL_VERSION[index]) {
+      return parsed[index]! < FIRST_STRENGTH_MODEL_VERSION[index];
+    }
+  }
+  return false;
 }
 
 export interface DefenseBadgePerformanceRow {
@@ -624,8 +699,11 @@ export class AnalyzerDatabase {
       }
     }
     const goalColumns = this.db.prepare("PRAGMA table_info(goal_line_predictions)").all() as Array<{ name: string }>;
+    // strength_factor seit 05.10.2026: Ohne den Faktor lässt sich im Report nicht sagen, welche
+    // Seite aus der stärkeren Liga kam - das Maß "Favorit trifft" verwechselte das.
     for (const column of [
-      "home_probability", "draw_probability", "away_probability", "btts_probability"
+      "home_probability", "draw_probability", "away_probability", "btts_probability",
+      "strength_factor"
     ]) {
       if (!goalColumns.some((item) => item.name === column)) {
         this.db.exec(`ALTER TABLE goal_line_predictions ADD COLUMN ${column} REAL`);
@@ -820,6 +898,25 @@ export class AnalyzerDatabase {
    * Alle je abgerechneten Partien, neueste zuerst. Grundlage des Nachtrags: Nur für diese
    * Partien liegt überhaupt eine Antwort im Cache, weil nur sie je abgefragt wurden.
    */
+  /**
+   * Führt eine Liga Karten in ihren Ereignislisten? Je `Land|Liga` (siehe `leagueKey` in
+   * `src/dashboard.ts`), nur Ligen mit mindestens 20 beendeten Spielen samt Ereignissen. Unter
+   * einer Gelben je Spiel im Mittel gilt: keine Kartendaten. Prüfung vom 29.09.2026: 31 von 209
+   * Ligen (etwa National League North/South, Liga Leumit) tragen Tore, aber keine Karten ein -
+   * dort hieße „0 Karten“ sonst „keine Karte“ statt „unbekannt“.
+   */
+  cardDataByLeague(minimumMatches = 20): Map<string, boolean> {
+    const rows = this.db.prepare(`
+      SELECT country, league, COUNT(*) AS matches,
+        AVG(yellow_ht1_home + yellow_ht1_away + yellow_ht2_home + yellow_ht2_away) AS yellow
+      FROM fixture_results
+      WHERE events_available = 1 AND yellow_ht1_home IS NOT NULL
+      GROUP BY country, league
+      HAVING COUNT(*) >= ?
+    `).all(minimumMatches) as Array<{ country: string; league: string; yellow: number }>;
+    return new Map(rows.map((row) => [`${row.country}|${row.league}`, row.yellow >= 1]));
+  }
+
   settledFixtureIds(): number[] {
     const rows = this.db.prepare(`
       SELECT fixture_id, MAX(kickoff) AS kickoff FROM (
@@ -926,7 +1023,7 @@ export class AnalyzerDatabase {
         breakdown_json = excluded.breakdown_json,
         warnings_json = excluded.warnings_json
       WHERE profile_predictions.settled_at IS NULL
-        AND excluded.snapshot_at < excluded.kickoff
+        AND julianday(excluded.snapshot_at) < julianday(excluded.kickoff)
         AND excluded.snapshot_at > profile_predictions.snapshot_at
     `);
     let saved = 0;
@@ -953,7 +1050,9 @@ export class AnalyzerDatabase {
         WHERE fixture_id = ? AND market = ? AND profile = ? AND model_version = ?
       `);
       for (const row of rows) {
-        if (snapshotAt >= row.kickoff) continue;
+        // Als Zeitpunkt vergleichen: Anstoßzeiten stehen teils als "…+02:00", Snapshots als
+        // "…Z" - als Text verglichen kamen bis 05.10.2026 Prognosen bis 2 Stunden nach Anpfiff durch.
+        if (Date.parse(snapshotAt) >= Date.parse(row.kickoff)) continue;
         const selection = market === "draw"
           ? "X"
           : (row as FavoriteScoreRow).selection;
@@ -1052,6 +1151,32 @@ export class AnalyzerDatabase {
     };
   }
 
+  /** Die gespeicherten Prognosen für den Nachtrag des Stärkefaktors. */
+  strengthFactorRows(): Array<{ fixtureId: number; modelVersion: string; snapshotAt: string; strengthFactor: number | null }> {
+    return (this.db.prepare(`
+      SELECT fixture_id, model_version, snapshot_at, strength_factor FROM goal_line_predictions
+    `).all() as Array<{ fixture_id: number; model_version: string; snapshot_at: string; strength_factor: number | null }>)
+      .map((row) => ({
+        fixtureId: row.fixture_id,
+        modelVersion: row.model_version,
+        snapshotAt: row.snapshot_at,
+        strengthFactor: row.strength_factor
+      }));
+  }
+
+  /**
+   * Trägt den Stärkefaktor einer älteren Prognose aus ihrem Snapshot nach
+   * (`tools/backfill-strength-factor.ts`). Ohne `overwrite` bleibt ein vorhandener Wert stehen.
+   */
+  backfillStrengthFactor(fixtureId: number, modelVersion: string, factor: number, overwrite = false): boolean {
+    const result = this.db.prepare(`
+      UPDATE goal_line_predictions SET strength_factor = ?
+      WHERE fixture_id = ? AND model_version = ?
+        AND (strength_factor IS NULL OR (? = 1 AND strength_factor <> ?))
+    `).run(factor, fixtureId, modelVersion, overwrite ? 1 : 0, factor);
+    return Number(result.changes) > 0;
+  }
+
   saveGoalLinePredictions(
     snapshotAt: string,
     rows: GoalLineRow[],
@@ -1067,10 +1192,11 @@ export class AnalyzerDatabase {
         first_half_expected_home_goals, first_half_expected_away_goals,
         first_half_expected_total_goals, first_half_data_confidence,
         first_half_over05, first_half_under05, first_half_over15, first_half_under15,
-        first_half_warnings_json, warnings_json, home_defense_json, away_defense_json
+        first_half_warnings_json, warnings_json, home_defense_json, away_defense_json,
+        strength_factor
       ) VALUES (
         ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
       )
       ON CONFLICT(fixture_id, model_version) DO UPDATE SET
         snapshot_at = excluded.snapshot_at,
@@ -1100,9 +1226,10 @@ export class AnalyzerDatabase {
         first_half_warnings_json = excluded.first_half_warnings_json,
         warnings_json = excluded.warnings_json,
         home_defense_json = excluded.home_defense_json,
-        away_defense_json = excluded.away_defense_json
+        away_defense_json = excluded.away_defense_json,
+        strength_factor = excluded.strength_factor
       WHERE goal_line_predictions.settled_at IS NULL
-        AND excluded.snapshot_at < excluded.kickoff
+        AND julianday(excluded.snapshot_at) < julianday(excluded.kickoff)
         AND excluded.snapshot_at > goal_line_predictions.snapshot_at
     `);
     const findPrediction = this.db.prepare(`
@@ -1129,7 +1256,9 @@ export class AnalyzerDatabase {
       );
       const runId = Number(run.lastInsertRowid);
       for (const row of rows) {
-        if (snapshotAt >= row.kickoff) continue;
+        // Als Zeitpunkt vergleichen: Anstoßzeiten stehen teils als "…+02:00", Snapshots als
+        // "…Z" - als Text verglichen kamen bis 05.10.2026 Prognosen bis 2 Stunden nach Anpfiff durch.
+        if (Date.parse(snapshotAt) >= Date.parse(row.kickoff)) continue;
         const result = insert.run(
           snapshotAt,
           row.fixtureId,
@@ -1164,7 +1293,8 @@ export class AnalyzerDatabase {
           JSON.stringify(row.firstHalf.warnings),
           JSON.stringify(row.warnings),
           JSON.stringify(row.defense?.home ?? null),
-          JSON.stringify(row.defense?.away ?? null)
+          JSON.stringify(row.defense?.away ?? null),
+          row.strength?.factor ?? null
         );
         saved += Number(result.changes);
         const prediction = findPrediction.get(
@@ -1235,27 +1365,28 @@ export class AnalyzerDatabase {
   }
 
   unsettledFixtures(now = new Date()): number[] {
+    // Fällig erst 110 Minuten nach Anpfiff: Früher ist kein Spiel beendet, und die Abrechnung
+    // holt es frisch aus dem Netz - der Aufruf wäre verloren. Bis 05.10.2026 verzögerte der
+    // Textvergleich mit "…+02:00" das zufällig um 2 Stunden; ohne ihn kostete es im Schnitt
+    // rund 7 Aufrufe je Analyse, an vollen Spieltagen bis 55 (Prüfung vom 05.10.2026).
+    const cutoff = new Date(now.getTime() - UNSETTLED_MIN_AGE_MS).toISOString();
     const rows = this.db.prepare(`
       SELECT fixture_id, MAX(kickoff) AS kickoff FROM (
         SELECT fixture_id, kickoff
         FROM candidates
-        WHERE settled_at IS NULL AND kickoff < ?
+        WHERE settled_at IS NULL AND julianday(kickoff) < julianday(?)
         UNION ALL
         SELECT fixture_id, kickoff
         FROM profile_predictions
-        WHERE settled_at IS NULL AND kickoff < ?
+        WHERE settled_at IS NULL AND julianday(kickoff) < julianday(?)
         UNION ALL
         SELECT fixture_id, kickoff
         FROM goal_line_predictions
-        WHERE settled_at IS NULL AND kickoff < ?
+        WHERE settled_at IS NULL AND julianday(kickoff) < julianday(?)
       )
       GROUP BY fixture_id
       ORDER BY kickoff DESC, fixture_id DESC
-    `).all(
-      now.toISOString(),
-      now.toISOString(),
-      now.toISOString()
-    ) as Array<{ fixture_id: number }>;
+    `).all(cutoff, cutoff, cutoff) as Array<{ fixture_id: number }>;
     return rows.map((row) => row.fixture_id);
   }
 
@@ -1599,16 +1730,20 @@ export class AnalyzerDatabase {
   }
 
   /**
-   * Kalibrierung der 1X2-Wahrscheinlichkeit danach aufgeschlüsselt, wie gut die Ligastärke
-   * der Partie bekannt war. Genau hier entscheidet sich, ob der Abschlag für Ligen ohne
-   * eigenes Rating (`strength.unratedPenalty`) passt: Liegt die Trefferquote des
-   * Modellfavoriten deutlich über seiner mittleren Wahrscheinlichkeit, rechnet das Modell
-   * zu ausgeglichen und unterschätzt den Klassenunterschied.
+   * Je abgerechnetem Spiel die neueste Prognose mit Gruppe, Modellfavorit und der Seite aus der
+   * stärkeren Liga. Grundlage für `leagueStrengthReport` und `strongerSideByVersion`.
    */
-  leagueStrengthReport(): LeagueStrengthPerformanceRow[] {
-    const rows = this.db.prepare(`
-      SELECT home_probability, draw_probability, away_probability,
-             actual_home_goals, actual_away_goals, warnings_json
+  private leagueStrengthSamples(): Array<{
+    cohort: LeagueStrengthPerformanceRow["cohort"];
+    modelVersion: string;
+    hit: boolean;
+    probability: number;
+    brier: number;
+    stronger: { won: boolean; probability: number } | null;
+  }> {
+    const allRows = this.db.prepare(`
+      SELECT fixture_id, model_version, home_probability, draw_probability, away_probability,
+             actual_home_goals, actual_away_goals, warnings_json, strength_factor
       FROM goal_line_predictions
       WHERE settled_at IS NOT NULL
         AND actual_home_goals IS NOT NULL
@@ -1617,14 +1752,31 @@ export class AnalyzerDatabase {
         AND draw_probability IS NOT NULL
         AND away_probability IS NOT NULL
     `).all() as Array<{
+      fixture_id: number;
+      model_version: string;
       home_probability: number;
       draw_probability: number;
       away_probability: number;
       actual_home_goals: number;
       actual_away_goals: number;
       warnings_json: string;
+      strength_factor: number | null;
     }>;
-    const cohortOf = (warnings: string): LeagueStrengthPerformanceRow["cohort"] => {
+    // Je Spiel nur die neueste Modellversion: Sonst zählt ein Spiel, das mehrere Fassungen
+    // gesehen hat, mehrfach, und die Standardfehler werden zu klein (Prüfung vom 05.10.2026:
+    // 516 Zeilen "gemessen" waren 397 Spiele).
+    const newest = new Map<number, (typeof allRows)[number]>();
+    for (const row of allRows) {
+      const existing = newest.get(row.fixture_id);
+      if (!existing || compareModelVersions(row.model_version, existing.model_version) > 0) {
+        newest.set(row.fixture_id, row);
+      }
+    }
+    const cohortOf = (warnings: string, modelVersion: string): LeagueStrengthPerformanceRow["cohort"] => {
+      // Fassungen vor 3.1.0 kannten die Ligastärke nicht, trugen aber schon die
+      // Cross-League-Warnung. Bis 05.10.2026 landeten sie in "gemessen" - 310 von 516 Zeilen,
+      // und auf dieser Grundlage wurde am 02.09.2026 der Teiler von 900 auf 1500 gesetzt.
+      if (/Cross-League/.test(warnings) && predatesLeagueStrength(modelVersion)) return "vor Ligastärke";
       if (/Kein Ligastärke-Vergleich/.test(warnings)) return "ohne Rating";
       if (/Team-Elo der U21-Nationalteams/.test(warnings)) return "Team-Elo U21";
       if (/Team-Elo der Nationalteams/.test(warnings)) return "Team-Elo";
@@ -1633,50 +1785,94 @@ export class AnalyzerDatabase {
       if (/Cross-League/.test(warnings)) return "gemessen";
       return "Ligapartie";
     };
-    const groups = new Map<LeagueStrengthPerformanceRow["cohort"], Array<{
-      hit: boolean;
-      probability: number;
-      brier: number;
-    }>>();
-    for (const row of rows) {
+    return [...newest.values()].map((row) => {
       const probabilities = [row.home_probability, row.draw_probability, row.away_probability];
       const actual = row.actual_home_goals > row.actual_away_goals
         ? 0
         : row.actual_home_goals === row.actual_away_goals ? 1 : 2;
       const predicted = probabilities.indexOf(Math.max(...probabilities));
-      const brier = probabilities.reduce(
-        (sum, probability, index) => sum + (probability - (index === actual ? 1 : 0)) ** 2,
-        0
-      );
-      const cohort = cohortOf(row.warnings_json ?? "");
-      const group = groups.get(cohort) ?? [];
-      group.push({ hit: predicted === actual, probability: probabilities[predicted]!, brier });
-      groups.set(cohort, group);
-    }
+      const factor = row.strength_factor;
+      return {
+        cohort: cohortOf(row.warnings_json ?? "", row.model_version),
+        modelVersion: row.model_version,
+        hit: predicted === actual,
+        probability: probabilities[predicted]!,
+        brier: probabilities.reduce(
+          (sum, probability, index) => sum + (probability - (index === actual ? 1 : 0)) ** 2,
+          0
+        ),
+        // Faktor > 1: Heim aus der stärkeren Liga (Heimtore mal Faktor), < 1: Gast. Faktor 1
+        // (gleiche Liga) und fehlender Faktor tragen keine stärkere Seite.
+        stronger: factor !== null && factor !== 1
+          ? factor > 1
+            ? { won: actual === 0, probability: row.home_probability }
+            : { won: actual === 2, probability: row.away_probability }
+          : null
+      };
+    });
+  }
+
+  /**
+   * Kalibrierung der 1X2-Wahrscheinlichkeit danach aufgeschlüsselt, wie gut die Ligastärke der
+   * Partie bekannt war. Je Spiel zählt die neueste Modellversion; mit `modelVersion` nur Spiele,
+   * deren neueste Prognose aus dieser Fassung stammt.
+   * "Favorit trifft" vergleicht den Modellfavoriten mit seiner Prognose. Für den Teiler
+   * (`strength.factorDivisor`) maßgeblich ist aber die Seite aus der stärkeren Liga
+   * (`stronger*`): Der Modellfavorit ist bei Spielen zwischen Ligen oft die schwächere Liga.
+   * Positiv heißt dort: Der Klassenunterschied wird unterschätzt.
+   */
+  leagueStrengthReport(options: { modelVersion?: string } = {}): LeagueStrengthPerformanceRow[] {
+    const samples = this.leagueStrengthSamples()
+      .filter((sample) => options.modelVersion === undefined || sample.modelVersion === options.modelVersion);
     const order: Array<LeagueStrengthPerformanceRow["cohort"]> =
-      ["Ligapartie", "gemessen", "geschätzt", "Team-Elo", "Team-Elo U21", "gleiche Liga", "ohne Rating"];
+      ["Ligapartie", "gemessen", "geschätzt", "Team-Elo", "Team-Elo U21", "gleiche Liga", "ohne Rating", "vor Ligastärke"];
     return order.flatMap((cohort) => {
-      const samples = groups.get(cohort);
-      if (!samples || samples.length === 0) return [];
-      const hits = samples.filter((sample) => sample.hit).length;
-      const [intervalLow, intervalHigh] = wilsonInterval(hits, samples.length);
-      const averageProbability =
-        samples.reduce((sum, sample) => sum + sample.probability, 0) / samples.length;
-      const hitRate = hits / samples.length;
+      const group = samples.filter((sample) => sample.cohort === cohort);
+      if (group.length === 0) return [];
+      const hits = group.filter((sample) => sample.hit).length;
+      const [intervalLow, intervalHigh] = wilsonInterval(hits, group.length);
+      const averageProbability = group.reduce((sum, sample) => sum + sample.probability, 0) / group.length;
+      const hitRate = hits / group.length;
       return [{
         cohort,
-        total: samples.length,
+        total: group.length,
         hits,
         hitRate,
         averageProbability,
-        // Positiv heißt: Der Favorit gewinnt öfter als vorhergesagt, das Modell rechnet die
-        // Partie also zu ausgeglichen.
+        // Positiv heißt: Der Favorit gewinnt öfter als vorhergesagt.
         bias: hitRate - averageProbability,
-        brierScore: samples.reduce((sum, sample) => sum + sample.brier, 0) / samples.length,
+        brierScore: group.reduce((sum, sample) => sum + sample.brier, 0) / group.length,
         intervalLow,
-        intervalHigh
+        intervalHigh,
+        ...strongerSummary(group.flatMap((sample) => sample.stronger ? [sample.stronger] : []))
       }];
     });
+  }
+
+  /**
+   * Die Seite aus der stärkeren Liga je Gruppe und Modellversion. Jede Fassung rechnet mit ihrem
+   * eigenen Teiler (3.1.0 meist 900, 3.2.0-3.4.0 1500, ab 3.5.0 1200) - über Fassungen gemittelt
+   * misst die Zahl keinen davon (Prüfung vom 05.10.2026).
+   */
+  strongerSideByVersion(): StrongerSideVersionRow[] {
+    const samples = this.leagueStrengthSamples().filter((sample) => sample.stronger !== null);
+    const keys = [...new Set(samples.map((sample) => `${sample.cohort}|${sample.modelVersion}`))];
+    return keys
+      .map((key) => {
+        const [cohort, modelVersion] = key.split("|") as [LeagueStrengthPerformanceRow["cohort"], string];
+        const group = samples.filter((sample) => sample.cohort === cohort && sample.modelVersion === modelVersion);
+        const summary = strongerSummary(group.map((sample) => sample.stronger!));
+        return {
+          cohort,
+          modelVersion,
+          total: summary.strongerTotal,
+          winRate: summary.strongerWinRate,
+          predicted: summary.strongerPredicted,
+          standardError: summary.strongerStandardError
+        };
+      })
+      .sort((left, right) => left.cohort.localeCompare(right.cohort) ||
+        compareModelVersions(left.modelVersion, right.modelVersion));
   }
 
   outcomeProbabilityReport(): OutcomeProbabilityPerformanceRow[] {
@@ -1965,13 +2161,22 @@ export class AnalyzerDatabase {
     return Number(result.changes) > 0;
   }
 
-  isStrengthSeasonComplete(competitionId: number, season: number): boolean {
+  /**
+   * Ob eine Pokalsaison fertig geladen ist. Mit `seasonEnd` gilt eine Markierung nur, wenn sie
+   * nach dem heutigen Saisonende gesetzt wurde: API-Football schiebt `end` mit jeder neu
+   * angesetzten Runde nach hinten, eine ältere Markierung stammt dann aus einer Zeit, in der
+   * die Saison nur scheinbar vorbei war (EFL Trophy 2026: markiert 21.09., Ende jetzt 24.11.).
+   */
+  isStrengthSeasonComplete(competitionId: number, season: number, seasonEnd?: string): boolean {
     const row = this.db.prepare(`
-      SELECT 1 AS present
+      SELECT completed_at
       FROM strength_build_progress
       WHERE competition_id = ? AND season = ?
-    `).get(competitionId, season) as { present: number } | undefined;
-    return row !== undefined;
+    `).get(competitionId, season) as { completed_at: string } | undefined;
+    if (!row) return false;
+    if (seasonEnd === undefined) return true;
+    const end = Date.parse(seasonEnd);
+    return !Number.isFinite(end) || Date.parse(row.completed_at) >= end;
   }
 
   markStrengthSeasonComplete(
@@ -2039,7 +2244,7 @@ export class AnalyzerDatabase {
     const row = this.db.prepare(`
       SELECT pool, league_id, season, as_of, rating, matches, clubs, reliable
       FROM league_strength_snapshots
-      WHERE pool = ? AND league_id = ? AND season <= ? AND as_of < ?
+      WHERE pool = ? AND league_id = ? AND season <= ? AND julianday(as_of) < julianday(?)
       ORDER BY season DESC, as_of DESC
       LIMIT 1
     `).get(pool, leagueId, season, cutoff) as {
@@ -2083,7 +2288,7 @@ export class AnalyzerDatabase {
             PARTITION BY league_id ORDER BY season DESC, as_of DESC
           ) AS position
         FROM league_strength_snapshots
-        WHERE pool = ? AND season <= ? AND as_of < ? AND reliable = 1
+        WHERE pool = ? AND season <= ? AND julianday(as_of) < julianday(?) AND reliable = 1
       )
       WHERE position = 1
     `).all(pool, season, cutoff) as Array<{

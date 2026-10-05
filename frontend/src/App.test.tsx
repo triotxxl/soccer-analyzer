@@ -638,9 +638,10 @@ describe("React-Dashboard", () => {
     await user.click(within(menu).getByRole("switch", { name: "Angepfiffene Spiele zeigen" }));
     const days = within(menu).getByRole("group", { name: "Zeitraum" });
 
-    // Nur die Tage der Analyse stehen im Raster; andere Zellen bleiben leer statt grau.
-    expect(within(days).queryByRole("button", { name: /15. August 2026/ })).not.toBeInTheDocument();
-    expect(within(days).getByRole("button", { name: /17. August 2026/ })).toBeInTheDocument();
+    // Ein richtiger Kalender: Der ganze Monat steht da, wählbar sind nur die Tage der Analyse.
+    expect(within(days).getByText("August 2026")).toBeInTheDocument();
+    expect(within(days).getByRole("button", { name: /15. August 2026/ })).toBeDisabled();
+    expect(within(days).getByRole("button", { name: /17. August 2026/ })).toBeEnabled();
 
     // Der Kartenkopf nennt, wie weit die 48 Stunden reichen. Ein Bedienhinweis steht erst
     // während der Wahl da, nicht in Ruhe (UX-Review vom 28.09.2026).
@@ -691,6 +692,52 @@ describe("React-Dashboard", () => {
     await user.keyboard("{Escape}");
     expect(screen.queryByRole("dialog", { name: "Filter" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Filter, 1 aktiv" })).toHaveFocus();
+  });
+
+  it("wählt einen Zeitraum über die Felder Von und Bis und blättert über den Monatswechsel", async () => {
+    const current = rangeDocument();
+    current.meta.lastAvailableDate = "2026-09-02";
+    current.meta.maximumDays = 18;
+    current.fixtures.push(fixture(5, "Im September", "strong", "2026-09-01T12:00:00.000Z"));
+    vi.stubGlobal("fetch", dashboardFetch(() => current));
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(<App />);
+    expect(await screen.findByText("Exakter Start")).toBeInTheDocument();
+    const menu = await openFilters(user);
+    const range = within(menu).getByRole("group", { name: "Zeitraum" });
+
+    // Die Felder sind leer, solange "Nächste 48 Std." gilt.
+    const from = within(range).getByLabelText("Von");
+    const until = within(range).getByLabelText("Bis");
+    expect(from).toHaveValue("");
+    expect(within(range).getByRole("button", { name: "Voriger Monat" })).toBeDisabled();
+
+    fireEvent.change(from, { target: { value: "2026-08-17" } });
+    fireEvent.change(until, { target: { value: "2026-09-01" } });
+    expect(from).toHaveValue("2026-08-17");
+    expect(until).toHaveValue("2026-09-01");
+    expect(screen.getByRole("button", { name: "17.08. – 01.09." })).toBeInTheDocument();
+    expect(screen.getByText("Im September")).toBeInTheDocument();
+    expect(screen.queryByText("Exakter Start")).not.toBeInTheDocument();
+    // Ein fertiger Zeitraum aus den Feldern wartet nicht auf einen zweiten Klick.
+    expect(within(range).queryByText(/letzten Tag anklicken/)).not.toBeInTheDocument();
+
+    // Das Bis-Feld zeigt den Monat seines Tages; weiter als die Analyse geht es nicht.
+    expect(within(range).getByText("September 2026")).toBeInTheDocument();
+    expect(within(range).getByRole("button", { name: "Nächster Monat" })).toBeDisabled();
+    expect(within(range).getByRole("button", { name: / 1. September 2026/ })).toHaveAttribute("aria-pressed", "true");
+    expect(within(range).getByRole("button", { name: / 3. September 2026/ })).toBeDisabled();
+
+    // Ein Bis vor dem Von macht aus beiden diesen Tag, statt einen leeren Zeitraum zu bilden.
+    fireEvent.change(until, { target: { value: "2026-08-16" } });
+    expect(from).toHaveValue("2026-08-16");
+    expect(until).toHaveValue("2026-08-16");
+
+    // Blättern und klicken: Anfang im August, Ende im September.
+    await user.click(within(range).getByRole("button", { name: /17. August 2026/ }));
+    await user.click(within(range).getByRole("button", { name: "Nächster Monat" }));
+    await user.click(within(range).getByRole("button", { name: / 2. September 2026/ }));
+    expect(screen.getByRole("button", { name: "17.08. – 02.09." })).toBeInTheDocument();
   });
 
   it("begrenzt einen benutzerdefinierten Bereich nach einem Snapshot-Refresh", async () => {
@@ -869,23 +916,48 @@ describe("React-Dashboard", () => {
     expect(fetchMock.mock.calls.length).toBeGreaterThanOrEqual(2);
   });
 
-  it("sammelt Wetten über das Radialmenü im Warenkorb und mischt eine Kombi", async () => {
+  it("sammelt Wetten über die Marktliste im Warenkorb und mischt eine Kombi", async () => {
     vi.stubGlobal("fetch", dashboardFetch(() => document()));
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     render(<App />);
     expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
 
+    // Überfahren öffnet nichts mehr - erst der Klick (Davids Wunsch vom 30.09.2026).
+    const alphaAdd = screen.getByRole("button", { name: "Zum Wett-Baukasten hinzufügen: Alpha FC – Gast FC" });
+    await user.hover(alphaAdd);
     expect(screen.queryByRole("menu")).not.toBeInTheDocument();
-    await user.hover(screen.getByRole("button", { name: "Zum Wett-Baukasten hinzufügen: Alpha FC – Gast FC" }));
-    let radial = screen.getByRole("menu", { name: "Markt hinzufügen: Alpha FC – Gast FC" });
-    await user.click(within(radial).getByRole("menuitem", { name: /1X2/ }));
+    await user.click(alphaAdd);
+    let list = screen.getByRole("menu", { name: "Markt hinzufügen: Alpha FC – Gast FC" });
+    // Gruppiert wie die Marktliste der Werkzeugleiste.
+    expect(within(list).getByRole("group", { name: "Ergebnis" })).toBeInTheDocument();
+    await user.click(within(list).getByRole("menuitemcheckbox", { name: /^1X2.*in den Wettschein$/ }));
     expect(screen.getByRole("button", { name: /Wett-Baukasten öffnen \(1 Wette\)/ })).toBeInTheDocument();
-    // Der Fächer bleibt offen, der aufgenommene Markt ist darin gesperrt.
-    expect(within(radial).getByRole("menuitem", { name: /1X2.*bereits im Warenkorb/ })).toBeDisabled();
+    // Die Liste bleibt offen, der Markt ist als gewählt markiert, der Knopf zählt mit.
+    expect(within(list).getByRole("menuitemcheckbox", { name: /^1X2.*aus dem Wettschein nehmen$/ })).toHaveAttribute("aria-checked", "true");
+    expect(within(list).getByText("1 im Wettschein")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Zum Wett-Baukasten hinzufügen: Alpha FC – Gast FC (1 im Wettschein)" })).toHaveTextContent("1");
 
-    await user.hover(screen.getByRole("button", { name: "Zum Wett-Baukasten hinzufügen: Zulu FC – Gast FC" }));
-    radial = screen.getByRole("menu", { name: "Markt hinzufügen: Zulu FC – Gast FC" });
-    await user.click(within(radial).getByRole("menuitem", { name: /1X2/ }));
+    // Ein zweiter Klick nimmt ihn wieder heraus, ein dritter legt ihn zurück.
+    await user.click(within(list).getByRole("menuitemcheckbox", { name: /^1X2.*aus dem Wettschein nehmen$/ }));
+    expect(screen.queryByRole("button", { name: /Wett-Baukasten öffnen/ })).not.toBeInTheDocument();
+    await user.click(within(list).getByRole("menuitemcheckbox", { name: /^1X2.*in den Wettschein$/ }));
+
+    // Escape schließt die Liste und gibt den Fokus an den Knopf zurück.
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Alpha FC – Gast FC \(1 im Wettschein\)/ })).toHaveFocus();
+
+    // Mit der Tastatur: öffnen, der Fokus steht auf dem ersten Markt, Enter legt ihn hinein.
+    const zuluAdd = screen.getByRole("button", { name: "Zum Wett-Baukasten hinzufügen: Zulu FC – Gast FC" });
+    zuluAdd.focus();
+    await user.keyboard("{Enter}");
+    list = screen.getByRole("menu", { name: "Markt hinzufügen: Zulu FC – Gast FC" });
+    const items = within(list).getAllByRole("menuitemcheckbox");
+    expect(items[0]).toHaveFocus();
+    await user.keyboard("{ArrowUp}");
+    expect(items.at(-1)).toHaveFocus();
+    await user.keyboard("{ArrowDown}{Enter}");
+    expect(items[0]).toHaveAttribute("aria-checked", "true");
     const cartButton = screen.getByRole("button", { name: /Wett-Baukasten öffnen \(2 Wetten\)/ });
 
     await user.click(cartButton);

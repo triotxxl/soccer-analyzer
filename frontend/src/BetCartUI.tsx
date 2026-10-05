@@ -1,125 +1,90 @@
-import { Check, Shuffle, ShoppingCartSimple, Trash, X } from "@phosphor-icons/react";
-import { Fragment, useEffect, useRef, useState, type CSSProperties } from "react";
-import { formatOdd } from "./App";
+import { Shuffle, ShoppingCartSimple, Trash, X } from "@phosphor-icons/react";
+import { useLayoutEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { MARKET_GROUPS, formatOdd, levelGlyph, marketGroupOf } from "./App";
 import {
   canGenerate, cartEntryId, generateCombos, requestedTotal, sizeRange,
   type CartEntry, type Combo, type ComboFillMode, type ComboSizeConfig
 } from "./betCart";
-import type { DashboardFixture, DashboardMarket, DashboardMarketKey } from "./types";
+import type { DashboardFixture, DashboardMarket } from "./types";
 
-/** Zwischen Nabe und Ring liegt eine Lücke ohne Zeiger-Ziel; erst nach dieser Verzögerung
- *  schließt das Menü, damit der Weg dorthin es nicht abreißen lässt. */
-const RADIAL_CLOSE_DELAY = 300;
-/** Unter diesem Durchmesser wird die Beschriftung unlesbar; dann lieber leicht anschneiden. */
-const RADIAL_ITEM_MIN = 34;
+/** Abstand der Liste zum Knopf und zum Fensterrand. */
+const MENU_GAP = 6;
+const MENU_MARGIN = 8;
 
-interface RadialLayout {
-  x: number;
-  y: number;
-  radius: number;
-  item: number;
+interface Box { left: number; top: number; right: number; bottom: number }
+
+/**
+ * Wo die Marktliste steht: rechts neben dem Knopf, oben auf Höhe der Zeile. Reicht der Platz
+ * nach unten nicht, klappt sie nach oben; reicht er rechts nicht, steht sie links vom Knopf.
+ * Eine Liste, die höher als das Fenster ist, beginnt am oberen Rand und scrollt selbst.
+ */
+export function menuPlacement(
+  trigger: Box,
+  menu: { width: number; height: number },
+  viewport: { width: number; height: number }
+): { left: number; top: number } {
+  let left = trigger.right + MENU_GAP;
+  if (left + menu.width > viewport.width - MENU_MARGIN) {
+    left = Math.max(MENU_MARGIN, trigger.left - MENU_GAP - menu.width);
+  }
+  let top = trigger.top - 4;
+  if (top + menu.height > viewport.height - MENU_MARGIN) top = trigger.bottom + 4 - menu.height;
+  return { left, top: Math.max(MENU_MARGIN, top) };
+}
+
+/** 1X2 nennt die Seite des Tipps, alle anderen Märkte tragen sie schon im Namen. */
+function menuLabel(market: DashboardMarket): string {
+  if (market.key === "1x2") return `1X2 · ${market.pick === "2" ? "Gast" : "Heim"}`;
+  return market.label;
 }
 
 /**
- * Der volle Marktname sprengt einen Kreis von 54 Pixeln.
- *
- * Als Record notiert und nicht als If-Kette: So erzwingt der Compiler bei jedem neuen Markt
- * eine eigene Beschriftung. Zuvor endete die Kette mit einem Rueckfall auf "HZ 1,5", der jeden
- * unbekannten Schluessel stillschweigend falsch beschriftet haette.
+ * Marktauswahl am „Add“-Knopf (seit 30.09.2026 statt des Radialmenüs, Davids Wunsch): eine
+ * senkrechte Liste im Leistenstil wie die Marktliste der Werkzeugleiste, gruppiert wie diese.
+ * Öffnet per Klick, nicht beim Überfahren - sonst ging beim Weg über die Tabelle ständig etwas
+ * auf. Bleibt nach dem Hinzufügen offen, damit mehrere Märkte eines Spiels ohne neues Öffnen
+ * gehen; ein Markt im Wettschein trägt den grünen Balken, ein zweiter Klick nimmt ihn heraus.
  */
-const RADIAL_LABELS: Record<DashboardMarketKey, string> = {
-  "1x2": "Heim",
-  draw: "Remis",
-  btts: "BTTS",
-  bttsNo: "BTTS ✗",
-  over15: "Ü 1,5",
-  under15: "U 1,5",
-  over25: "Ü 2,5",
-  under25: "U 2,5",
-  over35: "Ü 3,5",
-  under35: "U 3,5",
-  firstHalfOver05: "HZ Ü0,5",
-  firstHalfUnder05: "HZ U0,5",
-  firstHalfOver15: "HZ Ü1,5",
-  firstHalfUnder15: "HZ U1,5"
-};
-
-function radialLabel(market: DashboardMarket): string {
-  if (market.key === "1x2") return market.pick === "2" ? "Gast" : "Heim";
-  return RADIAL_LABELS[market.key];
-}
-
-/** Die Märkte liegen als geschlossener Ring um die Nabe, beginnend oben im Uhrzeigersinn. */
-export function radialAngles(count: number): number[] {
-  return Array.from({ length: count }, (_, index) => index * (360 / count) - 90);
-}
-
-/** Nachbarkreise liegen 2 * radius * sin(180° / count) auseinander; der Ring wächst so weit,
- *  dass sie sich nicht berühren und die Nabe in der Mitte frei bleibt. */
-export function radialRadius(count: number, item: number, hub: number): number {
-  const spread = count > 1 ? (item + 6) / (2 * Math.sin(Math.PI / count)) : 0;
-  return Math.max(hub / 2 + item / 2 + 10, spread);
-}
-
-/**
- * Größter Kreisdurchmesser, mit dem der Ring noch in den freien Platz um die Nabe passt.
- * Aus `radialRadius` aufgelöst: beide Schranken müssen `radius + item / 2 <= room` erfüllen.
- */
-export function radialItemSize(count: number, preferred: number, room: number, hub: number): number {
-  if (count < 2) return preferred;
-  const sine = Math.sin(Math.PI / count);
-  const bySpread = (room - 3 / sine) / (1 / (2 * sine) + 0.5);
-  const byClearance = room - hub / 2 - 10;
-  return Math.max(RADIAL_ITEM_MIN, Math.min(preferred, Math.floor(Math.min(bySpread, byClearance))));
-}
-
-/**
- * Der Mittelpunkt liegt immer auf der Nabe - der Ring gehört hinter den Knopf, nicht daneben.
- * Reicht der Platz bis zum Fensterrand nicht, schrumpft der Ring, statt zu wandern.
- */
-function radialLayoutFor(trigger: HTMLElement | null, count: number): RadialLayout | null {
-  if (!trigger) return null;
-  const viewportWidth = typeof window === "undefined" ? 1280 : window.innerWidth;
-  const viewportHeight = typeof window === "undefined" ? 800 : window.innerHeight;
-  const rect = trigger.getBoundingClientRect();
-  const x = rect.left + rect.width / 2;
-  const y = rect.top + rect.height / 2;
-  const room = Math.min(x, viewportWidth - x, y, viewportHeight - y) - 8;
-  const item = radialItemSize(count, viewportWidth <= 700 ? 40 : 54, room, rect.width);
-  return { x, y, radius: radialRadius(count, item, rect.width), item };
-}
-
-export function CartAddRadial({ fixture, cart, open, onOpen, onClose, onSelect, compact = false }: {
+export function CartAddMenu({ fixture, cart, open, onOpen, onClose, onSelect, onRemove, compact = false }: {
   fixture: DashboardFixture;
   cart: CartEntry[];
   open: boolean;
   onOpen(): void;
   onClose(): void;
   onSelect(market: DashboardMarket): void;
+  onRemove(market: DashboardMarket): void;
   /** Für die 34-px-Zeile der Heatmap: ein "+" statt des Wortes "Add". */
   compact?: boolean;
 }) {
   const hubRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
-  const closeTimer = useRef<number | null>(null);
-  const [layout, setLayout] = useState<RadialLayout | null>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [position, setPosition] = useState<{ left: number; top: number } | null>(null);
   // Die Rückrufe kommen als Inline-Funktionen an und wechseln bei jedem Rendern die
   // Identität; über die Referenz bleiben die Fensterlauscher trotzdem stabil.
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
 
-  useEffect(() => {
+  // Vor dem ersten Zeichnen messen, damit die Liste nicht sichtbar an die richtige Stelle springt.
+  useLayoutEffect(() => {
     if (!open) {
-      setLayout(null);
+      setPosition(null);
       return;
     }
-    const measure = () => setLayout(radialLayoutFor(triggerRef.current, fixture.markets.length));
-    // Ohne Zeigegerät bleibt nur der Tipp daneben, um den Ring wieder zu schließen.
+    const measure = () => {
+      const trigger = triggerRef.current;
+      const menu = menuRef.current;
+      if (!trigger || !menu) return;
+      setPosition(menuPlacement(trigger.getBoundingClientRect(),
+        { width: menu.offsetWidth, height: menu.offsetHeight },
+        { width: window.innerWidth, height: window.innerHeight }));
+    };
+    measure();
+    menuRef.current?.querySelector<HTMLButtonElement>("[role='menuitemcheckbox']")?.focus({ preventScroll: true });
     const closeOnOutside = (event: PointerEvent) => {
       if (!hubRef.current?.contains(event.target as Node)) closeRef.current();
     };
-    measure();
-    // Der Ring hängt an festen Fensterkoordinaten, die Zeile darunter scrollt weiter.
+    // Die Liste hängt an festen Fensterkoordinaten, die Zeile darunter scrollt weiter.
     window.addEventListener("scroll", measure, true);
     window.addEventListener("resize", measure);
     window.addEventListener("pointerdown", closeOnOutside);
@@ -128,81 +93,91 @@ export function CartAddRadial({ fixture, cart, open, onOpen, onClose, onSelect, 
       window.removeEventListener("resize", measure);
       window.removeEventListener("pointerdown", closeOnOutside);
     };
-  }, [open, fixture.markets.length]);
+  }, [open]);
 
-  const cancelClose = () => {
-    if (closeTimer.current === null) return;
-    window.clearTimeout(closeTimer.current);
-    closeTimer.current = null;
-  };
-  const scheduleClose = () => {
-    cancelClose();
-    closeTimer.current = window.setTimeout(() => {
-      closeTimer.current = null;
-      onClose();
-    }, RADIAL_CLOSE_DELAY);
-  };
-  useEffect(() => cancelClose, []);
-
-  const angles = radialAngles(fixture.markets.length);
+  const inCart = (market: DashboardMarket) => cart.some((entry) => entry.id === cartEntryId(fixture.fixtureId, market.key));
+  const count = fixture.markets.filter(inCart).length;
   const partie = `${fixture.homeTeam} – ${fixture.awayTeam}`;
+  const groups = MARKET_GROUPS
+    .map((group) => ({ group, markets: fixture.markets.filter((market) => marketGroupOf(market.key) === group) }))
+    .filter((item) => item.markets.length > 0);
 
-  return <div
-    ref={hubRef}
-    className={`cart-add-hub ${open ? "open" : ""}${compact ? " compact" : ""}`}
-    onMouseEnter={() => { cancelClose(); onOpen(); }}
-    onMouseLeave={scheduleClose}
-    onFocus={() => { cancelClose(); onOpen(); }}
-    onBlur={scheduleClose}
-  >
+  const onMenuKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (event.key === "Escape") {
+      // Sonst schlösse der Escape-Lauscher der App danach noch die aufgeklappte Zeile.
+      event.stopPropagation();
+      event.preventDefault();
+      onClose();
+      triggerRef.current?.focus();
+      return;
+    }
+    if (event.key === "Tab") {
+      onClose();
+      return;
+    }
+    const items = [...(menuRef.current?.querySelectorAll<HTMLButtonElement>("[role='menuitemcheckbox']") ?? [])];
+    const index = items.indexOf(document.activeElement as HTMLButtonElement);
+    const target = event.key === "ArrowDown" ? items[(index + 1) % items.length]
+      : event.key === "ArrowUp" ? items[(index - 1 + items.length) % items.length]
+      : event.key === "Home" ? items[0]
+      : event.key === "End" ? items.at(-1)
+      : undefined;
+    if (!target) return;
+    event.preventDefault();
+    target.focus();
+  };
+
+  return <div ref={hubRef} className={`cart-add-hub${open ? " open" : ""}${compact ? " compact" : ""}`}>
     <button
       ref={triggerRef}
-      className="cart-add"
-      aria-haspopup="true"
+      type="button"
+      className={`cart-add${count > 0 ? " has-entries" : ""}`}
+      aria-haspopup="menu"
       aria-expanded={open}
-      aria-label={`Zum Wett-Baukasten hinzufügen: ${partie}`}
-      title="Zeigen öffnet die Marktauswahl"
+      aria-label={count > 0
+        ? `Zum Wett-Baukasten hinzufügen: ${partie} (${count} im Wettschein)`
+        : `Zum Wett-Baukasten hinzufügen: ${partie}`}
+      title="Märkte dieses Spiels in den Wettschein legen"
       onClick={() => open ? onClose() : onOpen()}
     >
-      <span className="cart-add-word">{compact ? "+" : "Add"}</span>
-      <span className="cart-add-orbit" aria-hidden><i /><i /><i /></span>
+      {count > 0 ? count : compact ? "+" : "Add"}
     </button>
 
-    {open && layout && <div
-      className="cart-radial"
+    {open && <div
+      ref={menuRef}
+      className="cart-menu"
       role="menu"
       aria-label={`Markt hinzufügen: ${partie}`}
-      style={{
-        left: layout.x,
-        top: layout.y,
-        "--radial-radius": `${layout.radius}px`,
-        "--radial-item": `${layout.item}px`
-      } as CSSProperties}
+      // Bis zur ersten Messung unsichtbar, damit nichts an falscher Stelle aufblitzt.
+      style={position ? { left: position.left, top: position.top } : { visibility: "hidden" }}
+      onKeyDown={onMenuKeyDown}
     >
-      {fixture.markets.map((market, index) => {
-        const added = cart.some((entry) => entry.id === cartEntryId(fixture.fixtureId, market.key));
-        const angle = { "--radial-angle": `${angles[index]}deg`, "--radial-index": index } as CSSProperties;
-        return <Fragment key={market.key}>
-          <span className="cart-radial-spoke" style={angle} aria-hidden />
-          <span className="cart-radial-slot" style={angle}>
-            <button
-              role="menuitem"
-              className={`cart-radial-item ${market.recommendation.level}${added ? " added" : ""}`}
-              disabled={added}
-              aria-label={added
-                ? `${market.label} · ${market.selection} – bereits im Warenkorb`
-                : `${market.label} · ${market.selection} hinzufügen`}
-              title={`${market.label} · ${market.selection} · ${market.recommendation.label}`}
-              onClick={() => onSelect(market)}
-            >
-              <strong>{radialLabel(market)}</strong>
-              {added
-                ? <Check size={12} weight="bold" aria-hidden />
-                : <small>{formatOdd(market.odds)}</small>}
-            </button>
-          </span>
-        </Fragment>;
-      })}
+      <div className="cart-menu-head">
+        <strong>In den Wettschein</strong>
+        <span>{partie}</span>
+      </div>
+      {groups.map(({ group, markets }) => <div className="cart-menu-group" role="group" aria-label={group} key={group}>
+        <div className="cart-menu-group-title" aria-hidden>{group}</div>
+        {markets.map((market) => {
+          const added = inCart(market);
+          const text = `${menuLabel(market)} · ${market.selection}, Quote ${formatOdd(market.odds)}`;
+          return <button
+            type="button"
+            key={market.key}
+            role="menuitemcheckbox"
+            aria-checked={added}
+            className={`cart-menu-item ${market.recommendation.level}`}
+            aria-label={added ? `${text} – aus dem Wettschein nehmen` : `${text} – in den Wettschein`}
+            title={`${market.selection} · ${market.recommendation.label}`}
+            onClick={() => added ? onRemove(market) : onSelect(market)}
+          >
+            <span className="cart-menu-label">{menuLabel(market)}</span>
+            <span className="level-glyph" aria-hidden>{market.recommendation.level === "none" ? "" : levelGlyph(market.recommendation.level)}</span>
+            <span className="cart-menu-odds">{formatOdd(market.odds)}</span>
+          </button>;
+        })}
+      </div>)}
+      {count > 0 && <div className="cart-menu-foot">{count} im Wettschein</div>}
     </div>}
   </div>;
 }

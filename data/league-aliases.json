@@ -224,6 +224,11 @@
     "country": "Azerbaijan",
     "league": "Premyer Liqa"
   },
+  "australien|a league": {
+    "leagueId": 188,
+    "country": "Australia",
+    "league": "A-League"
+  },
   "australien|australien pokal endrunde": {
     "leagueId": 874,
     "country": "Australia",
@@ -528,6 +533,11 @@
     "leagueId": 536,
     "country": "World",
     "league": "CONCACAF Nations League"
+  },
+  "conference league|ligaphase": {
+    "leagueId": 848,
+    "country": "World",
+    "league": "UEFA Europa Conference League"
   },
   "conference league|qualifikationsrunde": {
     "leagueId": 848,

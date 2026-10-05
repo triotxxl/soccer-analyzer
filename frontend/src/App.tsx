@@ -1,9 +1,9 @@
 import {
-  Binoculars, Crosshair, Info, RocketLaunch, Shield, ShieldCheck, WarningCircle, X
+  Binoculars, CaretLeft, CaretRight, Crosshair, Info, RocketLaunch, Shield, ShieldCheck, WarningCircle, X
 } from "@phosphor-icons/react";
 import { Fragment, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
-import { BetBuilderDrawer, CartAddRadial, CartBadge } from "./BetCartUI";
-import { toCartEntry, toQuickpickCartEntry, useBetCart } from "./betCart";
+import { BetBuilderDrawer, CartAddMenu, CartBadge } from "./BetCartUI";
+import { cartEntryId, toCartEntry, toQuickpickCartEntry, useBetCart } from "./betCart";
 import { countryFlagCode } from "./countryFlags";
 import { FixtureInsightPanels, InsightsNotice, useFixtureInsights } from "./FixtureInsights";
 import { useDashboardData } from "./data";
@@ -11,6 +11,20 @@ import { heatmapMarkets } from "./heatmap";
 import { HeatmapTable, type HeatmapSort } from "./HeatmapTable";
 import { useLiveBoard } from "./liveData";
 import { LiveView } from "./LiveView";
+import {
+  effectiveLiveSort,
+  LIVE_PHASE_LABELS,
+  LIVE_QUESTION_GROUPS,
+  liveQuestionLabel,
+  loadLiveQuestion,
+  questionHasChance,
+  saveLiveQuestion,
+  visibleLiveMatches,
+  type LiveChanceMin,
+  type LivePhase,
+  type LiveQuestion,
+  type LiveSort
+} from "./liveQuestions";
 import { edgeOf, loadKellyAuto, loadKellySettings, loadKellyVisible, saveKellyAuto, saveKellySettings, saveKellyVisible, selectKelly, type KellySettings } from "./kelly";
 import { KellyButton, KellyDialog, formatEuro, kellyProfileNote } from "./KellyUI";
 import { FilterButton, FilterChip, FilterMenu, FilterSegment, type ClassGapFilter, type FilterMenuActions, type FilterMenuValues, type LevelFilter, type SegmentOption } from "./FilterMenu";
@@ -24,27 +38,57 @@ import { eloSystemLabel } from "../../src/elo-config.ts";
 import { gridTemplate, isFirstHalfMarket, isGoalLineMarket, minimumWidth, showsPoints, tableColumns, type TableColumn, type TableColumnId } from "./tableColumns";
 import type { ClassGap, DashboardDocument, DashboardFixture, DashboardMarket, DashboardMarketKey, FormResult, LeagueStats, RecommendationLevel } from "./types";
 
+/** Die Zwischenüberschriften der Marktlisten in dieser Reihenfolge. Reine Anzeige, keine Regel liest sie. */
+export const MARKET_GROUPS = ["Ergebnis", "BTTS (beide treffen)", "Tore im Spiel", "Tore 1. Halbzeit"] as const;
+export type MarketGroup = typeof MARKET_GROUPS[number];
+
+/**
+ * Als Record notiert, damit der Compiler bei jedem neuen Markt eine Gruppe verlangt - für die
+ * Marktliste der Werkzeugleiste und die Marktauswahl am „Add“-Knopf zugleich.
+ */
+const MARKET_GROUP_OF: Record<DashboardMarketKey, MarketGroup> = {
+  "1x2": "Ergebnis",
+  draw: "Ergebnis",
+  btts: "BTTS (beide treffen)",
+  bttsNo: "BTTS (beide treffen)",
+  over15: "Tore im Spiel",
+  under15: "Tore im Spiel",
+  over25: "Tore im Spiel",
+  under25: "Tore im Spiel",
+  over35: "Tore im Spiel",
+  under35: "Tore im Spiel",
+  firstHalfOver05: "Tore 1. Halbzeit",
+  firstHalfUnder05: "Tore 1. Halbzeit",
+  firstHalfOver15: "Tore 1. Halbzeit",
+  firstHalfUnder15: "Tore 1. Halbzeit"
+};
+
+export function marketGroupOf(key: DashboardMarketKey): MarketGroup {
+  return MARKET_GROUP_OF[key];
+}
+
 /**
  * Die Märkte der Auswahlliste. `group` ist die Zwischenüberschrift in der geöffneten Liste
- * (optgroup); „Alle Märkte“ steht ohne Überschrift darüber. Reine Anzeige, keine Regel liest sie.
+ * (optgroup); „Alle Märkte“ steht ohne Überschrift darüber.
  */
-const MARKET_OPTIONS: Array<{ key: "all" | DashboardMarketKey; label: string; group?: string }> = [
+const MARKET_OPTIONS: Array<{ key: "all" | DashboardMarketKey; label: string; group?: MarketGroup }> = ([
   { key: "all", label: "Alle Märkte" },
-  { key: "1x2", label: "1X2", group: "Ergebnis" },
-  { key: "draw", label: "Remis", group: "Ergebnis" },
-  { key: "btts", label: "BTTS", group: "BTTS (beide treffen)" },
-  { key: "bttsNo", label: "BTTS Nein", group: "BTTS (beide treffen)" },
-  { key: "over15", label: "Über 1,5", group: "Tore im Spiel" },
-  { key: "under15", label: "Unter 1,5", group: "Tore im Spiel" },
-  { key: "over25", label: "Über 2,5", group: "Tore im Spiel" },
-  { key: "under25", label: "Unter 2,5", group: "Tore im Spiel" },
-  { key: "over35", label: "Über 3,5", group: "Tore im Spiel" },
-  { key: "under35", label: "Unter 3,5", group: "Tore im Spiel" },
-  { key: "firstHalfOver05", label: "1. HZ Ü0,5", group: "Tore 1. Halbzeit" },
-  { key: "firstHalfUnder05", label: "1. HZ U0,5", group: "Tore 1. Halbzeit" },
-  { key: "firstHalfOver15", label: "1. HZ Ü1,5", group: "Tore 1. Halbzeit" },
-  { key: "firstHalfUnder15", label: "1. HZ U1,5", group: "Tore 1. Halbzeit" }
-];
+  { key: "1x2", label: "1X2" },
+  { key: "draw", label: "Remis" },
+  { key: "btts", label: "BTTS" },
+  { key: "bttsNo", label: "BTTS Nein" },
+  { key: "over15", label: "Über 1,5" },
+  { key: "under15", label: "Unter 1,5" },
+  { key: "over25", label: "Über 2,5" },
+  { key: "under25", label: "Unter 2,5" },
+  { key: "over35", label: "Über 3,5" },
+  { key: "under35", label: "Unter 3,5" },
+  { key: "firstHalfOver05", label: "1. HZ Ü0,5" },
+  { key: "firstHalfUnder05", label: "1. HZ U0,5" },
+  { key: "firstHalfOver15", label: "1. HZ Ü1,5" },
+  { key: "firstHalfUnder15", label: "1. HZ U1,5" }
+] as Array<{ key: "all" | DashboardMarketKey; label: string }>).map((option) =>
+  option.key === "all" ? option : { ...option, group: MARKET_GROUP_OF[option.key] });
 
 /**
  * Märkte, die auf das Ausbleiben setzen. Für sie kehrt sich die Bedeutung der H2H- und
@@ -155,19 +199,6 @@ function formatCalendarDate(value: string, options: Intl.DateTimeFormatOptions =
   return new Intl.DateTimeFormat("de-DE", { ...options, timeZone: "UTC" }).format(dateOnly(value));
 }
 
-/**
- * Die Tage der Analyse, beginnend am ersten - nicht am Montag davor. Bei kurzen Analysen standen
- * sonst zwei Tage in zwei Wochenzeilen mit lauter Leere; jede Kachel trägt deshalb ihren
- * Wochentag selbst.
- */
-function analysisDays(minimum: string, maximum: string): string[] {
-  const days: string[] = [];
-  for (const cursor = dateOnly(minimum); isoDate(cursor) <= maximum; cursor.setUTCDate(cursor.getUTCDate() + 1)) {
-    days.push(isoDate(cursor));
-  }
-  return days;
-}
-
 /** "Di 29.09., 11:00" - das Ende von `next48` im Kartenkopf. */
 function formatRangeEnd(value: number, timezone: string): string {
   const date = new Date(value);
@@ -177,12 +208,35 @@ function formatRangeEnd(value: number, timezone: string): string {
   return `${weekday} ${day}, ${clock}`;
 }
 
+/** Die Wochen eines Monats ab Montag; `null` füllt die Tage vor dem Ersten und nach dem Letzten. */
+function monthWeeks(month: string): Array<Array<string | null>> {
+  const first = dateOnly(`${month}-01`);
+  const cells: Array<string | null> = Array.from({ length: (first.getUTCDay() + 6) % 7 }, () => null);
+  for (const cursor = new Date(first); isoDate(cursor).startsWith(month); cursor.setUTCDate(cursor.getUTCDate() + 1)) {
+    cells.push(isoDate(cursor));
+  }
+  while (cells.length % 7 !== 0) cells.push(null);
+  return Array.from({ length: cells.length / 7 }, (_, index) => cells.slice(index * 7, index * 7 + 7));
+}
+
+/** "2026-10" plus/minus Monate. */
+function shiftMonth(month: string, offset: number): string {
+  const date = dateOnly(`${month}-01`);
+  date.setUTCMonth(date.getUTCMonth() + offset);
+  return isoDate(date).slice(0, 7);
+}
+
+const CALENDAR_WEEKDAYS = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
+
 /**
- * Zeitraum ohne Kalender-Fenster: die Kachel "Nächste 48 Std." und eine Reihe Tageskacheln der
- * Analyse. Ein Klick wählt einen Tag, ein zweiter macht daraus einen Zeitraum - sofort wirksam,
- * ohne Übernehmen. `next48` bleibt strikt ab jetzt und ist kein Kalendertag.
+ * Zeitraum als richtiger Kalender (Davids Wunsch vom 30.09.2026, vorher eine Reihe Tageskacheln):
+ * die Kachel "Nächste 48 Std.", die Felder Von und Bis zum Tippen oder über den Kalender des
+ * Browsers, darunter eine Monatsansicht Mo-So mit Blättern. Tage außerhalb der Analyse stehen da,
+ * sind aber nicht wählbar. Ein Klick wählt einen Tag, ein zweiter macht daraus einen Zeitraum -
+ * sofort wirksam, ohne Übernehmen; während der Wahl zeigt das Überfahren den künftigen Zeitraum.
+ * `next48` bleibt strikt ab jetzt und ist kein Kalendertag.
  */
-function DayRangePicker({ minimum, maximum, custom, start, end, selectingEnd, onNext48, onSelect }: {
+function DayRangePicker({ minimum, maximum, custom, start, end, selectingEnd, onNext48, onSelect, onRange }: {
   minimum: string | null;
   maximum: string | null;
   custom: boolean;
@@ -192,29 +246,92 @@ function DayRangePicker({ minimum, maximum, custom, start, end, selectingEnd, on
   selectingEnd: boolean;
   onNext48(): void;
   onSelect(value: string): void;
+  /** Von und Bis aus den Eingabefeldern, schon geordnet und begrenzt. */
+  onRange(start: string, end: string): void;
 }) {
+  const [shownMonth, setShownMonth] = useState(() => (custom && start ? start : minimum ?? "").slice(0, 7));
+  const [hovered, setHovered] = useState<string | null>(null);
+  if (!minimum || !maximum) {
+    return <div className="day-range" role="group" aria-label="Zeitraum">
+      <button type="button" className={`quick-range${custom ? "" : " active"}`} aria-pressed={!custom}
+        aria-label="Nächste 48 Std." title="Ab jetzt genau 48 Stunden – kein Kalendertag" onClick={onNext48}>
+        <span>Nächste</span><span>48 Std.</span>
+      </button>
+      <p className="filter-note">Keine Tage verfügbar.</p>
+    </div>;
+  }
+
+  const firstMonth = minimum.slice(0, 7);
+  const lastMonth = maximum.slice(0, 7);
+  // Nach einer neuen Analyse kann der gemerkte Monat außerhalb liegen.
+  const month = shownMonth < firstMonth ? firstMonth : shownMonth > lastMonth ? lastMonth : shownMonth;
+  const monthTitle = formatCalendarDate(`${month}-01`, { month: "long", year: "numeric" });
+
+  // Während der Wahl zeigt das Überfahren, welcher Zeitraum mit dem nächsten Klick entsteht.
+  const preview = custom && selectingEnd && hovered ? hovered : null;
+  // Während der Wahl ist start === end, der Zeitraum reicht also vom gewählten zum überfahrenen Tag.
+  const rangeStart = preview && preview < start ? preview : start;
+  const rangeEnd = preview && preview > end ? preview : end;
+
+  const typed = (field: "start" | "end", value: string) => {
+    // Ein geleertes oder halb getipptes Feld liefert "", das lässt den Zeitraum stehen.
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return;
+    const date = clampDate(value, minimum, maximum);
+    const otherStart = custom ? start : date;
+    const otherEnd = custom ? end : date;
+    if (field === "start") onRange(date, date > otherEnd ? date : otherEnd);
+    else onRange(date < otherStart ? date : otherStart, date);
+    setShownMonth(date.slice(0, 7));
+  };
+
   return <div className="day-range" role="group" aria-label="Zeitraum">
     <button type="button" className={`quick-range${custom ? "" : " active"}`} aria-pressed={!custom}
       aria-label="Nächste 48 Std." title="Ab jetzt genau 48 Stunden – kein Kalendertag" onClick={onNext48}>
       <span>Nächste</span><span>48 Std.</span>
     </button>
-    {minimum && maximum ? <div className="day-tiles">
-      {analysisDays(minimum, maximum).map((date) => {
-        const selected = custom && date >= start && date <= end;
-        const dayOfMonth = Number(date.slice(-2));
-        return <button type="button" key={date} className={`day-tile${selected ? " selected" : ""}`}
-          aria-label={formatCalendarDate(date, { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
-          aria-pressed={selected} onClick={() => onSelect(date)}>
-          <span className="day-weekday">{formatCalendarDate(date, { weekday: "short" }).replace(".", "")}</span>
-          {/* Am Monatsersten mit Monat, damit ein Zeitraum über den Wechsel lesbar bleibt. */}
-          <span className="day-num">{dayOfMonth === 1 ? `1.${Number(date.slice(5, 7))}` : dayOfMonth}</span>
-        </button>;
-      })}
-    </div> : <p className="filter-note">Keine Tage verfügbar.</p>}
+    <div className="date-fields">
+      <label className="date-field">
+        <span>Von</span>
+        <input type="date" min={minimum} max={maximum} value={custom ? start : ""}
+          onChange={(event) => typed("start", event.target.value)} />
+      </label>
+      <label className="date-field">
+        <span>Bis</span>
+        <input type="date" min={minimum} max={maximum} value={custom ? end : ""}
+          onChange={(event) => typed("end", event.target.value)} />
+      </label>
+    </div>
+    <div className="calendar" onMouseLeave={() => setHovered(null)}>
+      <div className="calendar-head">
+        <button type="button" className="calendar-nav" aria-label="Voriger Monat" disabled={month <= firstMonth}
+          onClick={() => setShownMonth(shiftMonth(month, -1))}><CaretLeft /></button>
+        <strong aria-live="polite">{monthTitle}</strong>
+        <button type="button" className="calendar-nav" aria-label="Nächster Monat" disabled={month >= lastMonth}
+          onClick={() => setShownMonth(shiftMonth(month, 1))}><CaretRight /></button>
+      </div>
+      <div className="calendar-grid">
+        {CALENDAR_WEEKDAYS.map((weekday) => <span key={weekday} className="calendar-weekday" aria-hidden>{weekday}</span>)}
+        {monthWeeks(month).flat().map((date, index) => {
+          if (!date) return <span key={`leer-${index}`} aria-hidden />;
+          const available = date >= minimum && date <= maximum;
+          const selected = custom && date >= start && date <= end;
+          const inRange = custom && date >= rangeStart && date <= rangeEnd;
+          const edge = custom && (date === rangeStart || date === rangeEnd);
+          return <button type="button" key={date}
+            className={`calendar-day${inRange ? " in-range" : ""}${edge ? " edge" : ""}${preview && inRange && !selected ? " preview" : ""}`}
+            aria-label={formatCalendarDate(date, { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
+            aria-pressed={selected} disabled={!available}
+            title={available ? undefined : "Keine Analyse für diesen Tag"}
+            onMouseEnter={() => setHovered(date)} onClick={() => onSelect(date)}>
+            <span className="day-num">{Number(date.slice(-2))}</span>
+          </button>;
+        })}
+      </div>
+    </div>
     {/* Nur während der Wahl: Der erste Klick wählt schon einen Tag, und genau dann erklärt
         der Satz den zweiten. Ein Bedienhinweis in Ruhe stand bei jedem Öffnen unter der
         wichtigsten Stellschraube (UX-Review vom 28.09.2026). */}
-    {minimum && maximum && custom && selectingEnd && <p className="filter-note day-range-hint">
+    {custom && selectingEnd && <p className="filter-note day-range-hint">
       Noch den letzten Tag anklicken – sonst gilt nur dieser.
     </p>}
   </div>;
@@ -795,7 +912,7 @@ export function MarketCard({ market, showEdge }: { market: DashboardMarket; show
   </div>;
 }
 
-function levelGlyph(level: RecommendationLevel): string {
+export function levelGlyph(level: RecommendationLevel): string {
   return level === "strong" ? "★" : level === "recommended" ? "✓" : "·";
 }
 
@@ -935,11 +1052,19 @@ function Dashboard({ document }: { document: DashboardDocument }) {
   const [openFixture, setOpenFixture] = useState<number | null>(null);
   // Der Abruf hängt allein an der aufgeklappten Partie: zugeklappt kostet die Ansicht nichts.
   const insights = useFixtureInsights(openFixture);
-  const [radialFixtureId, setRadialFixtureId] = useState<number | null>(null);
+  const [cartMenuFixtureId, setCartMenuFixtureId] = useState<number | null>(null);
   const [builderOpen, setBuilderOpen] = useState(false);
   const [kellyOpen, setKellyOpen] = useState(false);
   const [showKelly, setShowKelly] = useState(() => loadKellyVisible());
   const [liveRatedOnly, setLiveRatedOnly] = useState(false);
+  // Live hat eine eigene Frage statt des Marktes der Tabelle: „Noch ein Tor“ oder „Nächstes Tor“
+  // gibt es vor dem Anpfiff nicht, und ein Wechsel in Live stellte sonst die Tabelle mit um.
+  const [liveQuestion, setLiveQuestion] = useState<LiveQuestion>(loadLiveQuestion);
+  const [liveSort, setLiveSort] = useState<LiveSort>("kickoff");
+  // Die Anzeige-Filter werden wie alle Filter nicht gespeichert.
+  const [liveChanceMin, setLiveChanceMin] = useState<LiveChanceMin>("all");
+  const [liveRedOnly, setLiveRedOnly] = useState(false);
+  const [livePhase, setLivePhase] = useState<LivePhase>("all");
   const [kellySettings, setKellySettings] = useState<KellySettings>(() => loadKellySettings());
   const [quickpickOpen, setQuickpickOpen] = useState(false);
   // Die Regler werden gespeichert, der aktive Zustand nicht: Ein Filter, der nach einem
@@ -1029,7 +1154,7 @@ function Dashboard({ document }: { document: DashboardDocument }) {
     // Ein halb gewählter Zeitraum aus dem alten Lauf soll den nächsten Klick nicht verlängern.
     setSelectingRangeEnd(false);
     setOpenFixture((value) => value !== null && document.fixtures.some((fixture) => fixture.fixtureId === value) ? value : null);
-    setRadialFixtureId((value) => value !== null && document.fixtures.some((fixture) => fixture.fixtureId === value) ? value : null);
+    setCartMenuFixtureId((value) => value !== null && document.fixtures.some((fixture) => fixture.fixtureId === value) ? value : null);
     setMarketFilter((value) => value === "all" || document.fixtures.some((fixture) => fixture.markets.some((market) => market.key === value)) ? value : "all");
     setDeselectedLeagues((prev) => new Set([...prev].filter((key) => availableLeagues.some((item) => item.key === key))));
   }, [availableLeagues, document]);
@@ -1055,7 +1180,7 @@ function Dashboard({ document }: { document: DashboardDocument }) {
   useEffect(() => {
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
-      if (radialFixtureId !== null) setRadialFixtureId(null);
+      if (cartMenuFixtureId !== null) setCartMenuFixtureId(null);
       else if (builderOpen) setBuilderOpen(false);
       else if (kellyOpen) setKellyOpen(false);
       // Schließt nur das Panel und hebt den Filter nicht auf - das ist der Klick aufs ✕ im
@@ -1068,7 +1193,7 @@ function Dashboard({ document }: { document: DashboardDocument }) {
     };
     window.addEventListener("keydown", closeOnEscape);
     return () => window.removeEventListener("keydown", closeOnEscape);
-  }, [builderOpen, filterMenuOpen, kellyOpen, leagueFilterOpen, openFixture, quickpickOpen, radialFixtureId]);
+  }, [builderOpen, filterMenuOpen, kellyOpen, leagueFilterOpen, openFixture, quickpickOpen, cartMenuFixtureId]);
 
   const selectNav = (key: NavKey) => {
     if (key === "table" || key === "heatmap") {
@@ -1100,6 +1225,13 @@ function Dashboard({ document }: { document: DashboardDocument }) {
     }
     setCustomStart(date < customStart ? date : customStart);
     setCustomEnd(date < customStart ? customStart : date);
+    setSelectingRangeEnd(false);
+  };
+  // Von und Bis aus den Eingabefeldern: ein fertiger Zeitraum, der nächste Klick beginnt neu.
+  const selectCalendarRange = (start: string, end: string) => {
+    setCustomStart(start);
+    setCustomEnd(end);
+    setRangeMode("custom");
     setSelectingRangeEnd(false);
   };
   const selectNext48 = () => {
@@ -1298,6 +1430,10 @@ function Dashboard({ document }: { document: DashboardDocument }) {
   const isLeagueVisible = (country: string, league: string) =>
     !deselectedLeagues.has(leagueKey(country, league));
   const liveMatches = (live.board?.matches ?? []).filter((match) => isLeagueVisible(match.country, match.league));
+  const liveChanceApplies = questionHasChance(liveQuestion);
+  const liveVisible = visibleLiveMatches(liveMatches, {
+    question: liveQuestion, chanceMin: liveChanceMin, redOnly: liveRedOnly, phase: livePhase, sort: liveSort
+  });
 
   const marketLabelOf = (key: MarketFilter) => availableMarketOptions.find((option) => option.key === key)?.label ?? key;
   const leagueCount = { selected: availableLeagues.length - deselectedLeagues.size, total: availableLeagues.length };
@@ -1318,7 +1454,12 @@ function Dashboard({ document }: { document: DashboardDocument }) {
   const activeFilters: ActiveFilter[] = [];
   if (view === "live") {
     if (deselectedLeagues.size > 0) activeFilters.push(leagueChip);
-    if (liveRatedOnly) activeFilters.push({ key: "rated", label: "Nur Spiele mit Empfehlung", clearLabel: "Wieder alle Spiele beobachten", clear: () => setLiveRatedOnly(false) });
+    if (liveRatedOnly) activeFilters.push({ key: "rated", label: "Nur Spiele mit Empfehlung vor Anpfiff", clearLabel: "Wieder alle Spiele beobachten", clear: () => setLiveRatedOnly(false) });
+    // Ein Chancenfilter, der bei der gewählten Frage nicht greift, blendet nichts aus und steht
+    // deshalb auch nicht als Schildchen da.
+    if (liveChanceMin !== "all" && liveChanceApplies) activeFilters.push({ key: "chance", label: `Chance ab ${liveChanceMin} %`, clearLabel: "Chancenfilter aufheben", clear: () => setLiveChanceMin("all") });
+    if (liveRedOnly) activeFilters.push({ key: "red", label: "Rote Karte im Spiel", clearLabel: "Wieder alle laufenden Spiele zeigen", clear: () => setLiveRedOnly(false) });
+    if (livePhase !== "all") activeFilters.push({ key: "phase", label: LIVE_PHASE_LABELS[livePhase], clearLabel: "Phasenfilter aufheben", clear: () => setLivePhase("all") });
   } else {
     if (levelFilter !== "all") activeFilters.push({ key: "level", label: levelFilter === "strong" ? "★ Starke Tipps" : "✓ Empfehlungen", clearLabel: "Bewertungsfilter aufheben", clear: () => setLevelFilter("all") });
     if (rangeMode === "custom") activeFilters.push({
@@ -1341,6 +1482,9 @@ function Dashboard({ document }: { document: DashboardDocument }) {
     selectAllLeagues();
     if (view === "live") {
       setLiveRatedOnly(false);
+      setLiveChanceMin("all");
+      setLiveRedOnly(false);
+      setLivePhase("all");
       return;
     }
     setLevelFilter("all");
@@ -1360,6 +1504,14 @@ function Dashboard({ document }: { document: DashboardDocument }) {
     showCrossLeague,
     showPast,
     liveRatedOnly,
+    live: {
+      chanceMin: liveChanceMin,
+      chanceApplies: liveChanceApplies,
+      questionLabel: liveQuestionLabel(liveQuestion),
+      redOnly: liveRedOnly,
+      phase: livePhase,
+      shown: liveVisible.length
+    },
     leagues: leagueCount,
     leagueList: availableLeagues,
     deselectedLeagues,
@@ -1381,6 +1533,9 @@ function Dashboard({ document }: { document: DashboardDocument }) {
     },
     setShowPast,
     setLiveRatedOnly,
+    setLiveChanceMin,
+    setLiveRedOnly,
+    setLivePhase,
     openLeagueFilter: () => setLeagueFilterOpen(true),
     toggleLeague,
     selectOnlyLeague: (key) => setDeselectedLeagues(new Set(availableLeagues.filter((item) => item.key !== key).map((item) => item.key))),
@@ -1390,7 +1545,8 @@ function Dashboard({ document }: { document: DashboardDocument }) {
 
   const rangeControl = <DayRangePicker minimum={document.meta.firstAvailableDate ?? null}
     maximum={document.meta.lastAvailableDate ?? null} custom={rangeMode === "custom"}
-    start={customStart} end={customEnd} selectingEnd={selectingRangeEnd} onNext48={selectNext48} onSelect={selectCalendarDate} />;
+    start={customStart} end={customEnd} selectingEnd={selectingRangeEnd} onNext48={selectNext48} onSelect={selectCalendarDate}
+    onRange={selectCalendarRange} />;
 
   // H2H und Form zeigen dieselbe Größe: Der Markt setzt beide ohnehin gleich (`selectMarket`),
   // getrennt einstellen war eine Kombination, die niemand brauchte. Beide Zustände bleiben, weil
@@ -1487,14 +1643,49 @@ function Dashboard({ document }: { document: DashboardDocument }) {
       onOpen={() => setQuickpickOpen(true)} onClear={() => clearAndRefocus(() => setQuickpickActive(false))} />}
   </div>;
 
-  const liveStatus = <p className="filter-status live-status">
-    <span><strong>{liveMatches.length}</strong> {liveMatches.length === 1 ? "laufendes Spiel" : "laufende Spiele"}</span>
+  // Die Technik (Kontingent, Abrufart) steht im Tooltip; sichtbar bleibt, was beim Lesen zählt.
+  const liveBudgetTitle = live.board
+    ? [
+        `API-Aufrufe heute: ${live.board.budget.usedToday} von ${live.board.budget.capToday}`,
+        ...(live.board.budget.apiRequestsRemaining !== null ? [`Kontingent verbleibend: ${live.board.budget.apiRequestsRemaining}`] : []),
+        live.board.strategy === "live-all" ? "Ein Sammelabruf für alle laufenden Spiele" : "Abruf in Bündeln zu 20 Spielen"
+      ].join(" · ")
+    : undefined;
+  const liveStatus = <p className="filter-status live-status" title={liveBudgetTitle}>
+    <span><strong>{liveVisible.length}</strong> {liveVisible.length === 1 ? "laufendes Spiel" : "laufende Spiele"}
+      {liveVisible.length !== liveMatches.length && <> von {liveMatches.length}</>}</span>
     {" · "}{live.board ? `${live.board.candidates} im Zeitfenster` : "Warte auf Daten"}
-    {live.board && <>{" · "}API-Aufrufe heute: {live.board.budget.usedToday} von {live.board.budget.capToday}</>}
-    {live.board && live.board.budget.apiRequestsRemaining !== null && <>{" · "}Kontingent verbleibend: {live.board.budget.apiRequestsRemaining}</>}
-    {live.board && <>{" · "}Aktualisiert: {formatDataTimestamp(live.board.createdAt, document.meta.timezone)}
-      {" · "}{live.board.strategy === "live-all" ? "Sammelabruf" : "Bündelabruf"}</>}
+    {live.board && <>{" · "}Aktualisiert: {formatDataTimestamp(live.board.createdAt, document.meta.timezone)}</>}
   </p>;
+
+  const selectLiveQuestion = (question: LiveQuestion) => {
+    setLiveQuestion(question);
+    saveLiveQuestion(question);
+  };
+  const liveQuestionControl = <label className="toolbar-field">
+    <span>Markt</span>
+    <select value={liveQuestion} onChange={(event) => selectLiveQuestion(event.target.value as LiveQuestion)}>
+      {LIVE_QUESTION_GROUPS.map(({ group, options }) => {
+        const items = options.map((option) => <option value={option.key} key={option.key}>{option.label}</option>);
+        return group ? <optgroup label={group} key={group}>{items}</optgroup> : <Fragment key="ungrouped">{items}</Fragment>;
+      })}
+    </select>
+  </label>;
+  // Sortierbar nur, was zu sehen ist. Vorgabe ist der Anstoß: Nach Chance springen die Zeilen
+  // bei jedem Abruf, und ein offenes Kennzahlen-Fenster säße über der falschen Zeile.
+  const liveSortOptions: Array<[LiveSort, string]> = [
+    ["kickoff", "Anstoß"],
+    ["minute", "Spielminute"],
+    ...(liveChanceApplies ? [["chance", "Chance"] as [LiveSort, string]] : []),
+    ...(liveQuestion === "cards" ? [["cards", "Karten"] as [LiveSort, string]] : [])
+  ];
+  const liveSortControl = <div className="toolbar-field sort-field">
+    <label htmlFor="live-sort-select">Sortierung</label>
+    <select id="live-sort-select" value={effectiveLiveSort(liveSort, liveQuestion)}
+      onChange={(event) => setLiveSort(event.target.value as LiveSort)}>
+      {liveSortOptions.map(([key, label]) => <option value={key} key={key}>{label}</option>)}
+    </select>
+  </div>;
 
   // Kopf und Zeilen der Tabelle folgen der Spaltenliste (tableColumns.ts): je Modus und Markt nur,
   // was dazu passt. Der Kopf markiert die wirksame Sortierung, nicht eine gemerkte ausgeblendete.
@@ -1680,14 +1871,15 @@ function Dashboard({ document }: { document: DashboardDocument }) {
         showEdge={showKelly}
         openFixture={openFixture}
         onToggleFixture={(fixtureId) => setOpenFixture((value) => value === fixtureId ? null : fixtureId)}
-        cartSlot={(fixture) => <CartAddRadial
+        cartSlot={(fixture) => <CartAddMenu
           compact
           fixture={fixture}
           cart={cart}
-          open={radialFixtureId === fixture.fixtureId}
-          onOpen={() => setRadialFixtureId(fixture.fixtureId)}
-          onClose={() => setRadialFixtureId((current) => current === fixture.fixtureId ? null : current)}
+          open={cartMenuFixtureId === fixture.fixtureId}
+          onOpen={() => setCartMenuFixtureId(fixture.fixtureId)}
+          onClose={() => setCartMenuFixtureId((current) => current === fixture.fixtureId ? null : current)}
           onSelect={(market) => addEntry(toCartEntry(fixture, market))}
+          onRemove={(market) => removeEntry(cartEntryId(fixture.fixtureId, market.key))}
         />}
         empty={emptyState}
       /> : <div className="table-scroll">
@@ -1707,13 +1899,14 @@ function Dashboard({ document }: { document: DashboardDocument }) {
               </div>}
               <article className={`fixture-wrap level-${bestLevel(fixture, marketFilter)} ${openFixture === fixture.fixtureId ? "open" : ""}`} style={tableWidth}>
                 <div className="fixture-row-wrap">
-                <CartAddRadial
+                <CartAddMenu
                   fixture={fixture}
                   cart={cart}
-                  open={radialFixtureId === fixture.fixtureId}
-                  onOpen={() => setRadialFixtureId(fixture.fixtureId)}
-                  onClose={() => setRadialFixtureId((current) => current === fixture.fixtureId ? null : current)}
+                  open={cartMenuFixtureId === fixture.fixtureId}
+                  onOpen={() => setCartMenuFixtureId(fixture.fixtureId)}
+                  onClose={() => setCartMenuFixtureId((current) => current === fixture.fixtureId ? null : current)}
                   onSelect={(market) => addEntry(toCartEntry(fixture, market))}
+                  onRemove={(market) => removeEntry(cartEntryId(fixture.fixtureId, market.key))}
                 />
                 <button className={`${fixtureGridClass} fixture-row`} style={gridStyle} onClick={() => setOpenFixture((value) => value === fixture.fixtureId ? null : fixture.fixtureId)} aria-expanded={openFixture === fixture.fixtureId}>
                   {rowCells(fixture, !groupedByDay)}
@@ -1797,19 +1990,22 @@ function Dashboard({ document }: { document: DashboardDocument }) {
       })()}
       </div>
       </> : view === "profile" ? <MarketProfileView /> : <>
-      {/* Der Markt wirkt auch hier auf die Markttafeln - deshalb sichtbar, nicht still geerbt. */}
+      {/* Live hat eine eigene Frage statt des Marktes der Tabelle; sie steuert, was jede Zeile zeigt. */}
       <div className="view-toolbar">
         <div className="toolbar-row">
           {filterControl}
           <span className="toolbar-divider" aria-hidden />
-          {marketControl}
+          {liveQuestionControl}
+          {liveSortControl}
         </div>
         {filterStatusRow(liveStatus)}
       </div>
       <LiveView
         state={live}
-        marketFilter={marketFilter}
-        isLeagueVisible={isLeagueVisible}
+        matches={liveVisible}
+        runningCount={liveMatches.length}
+        question={liveQuestion}
+        onResetFilters={resetFilters}
       />
       </>}
     </main>

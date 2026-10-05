@@ -34,6 +34,12 @@ export function numericStatistic(statistics: ApiFixtureStatistic[], type: string
 
 export function teamSnapshot(statistics?: ApiTeamStatistics): LiveTeamSnapshot {
   const values = statistics?.statistics ?? [];
+  const totalPasses = numericStatistic(values, "Total passes");
+  const accuratePasses = numericStatistic(values, "Passes accurate");
+  // „Passes %“ fehlt live fast immer (im Cache 16 von 292 Einträgen mit Pässen, 29.09.2026);
+  // dann ergibt sich die Quote aus angekommenen durch alle Pässe.
+  const passAccuracy = numericStatistic(values, "Passes %")
+    ?? (totalPasses && accuratePasses !== null ? Math.round((accuratePasses / totalPasses) * 100) : null);
   return {
     shotsOnGoal: numericStatistic(values, "Shots on Goal"),
     totalShots: numericStatistic(values, "Total Shots"),
@@ -46,7 +52,9 @@ export function teamSnapshot(statistics?: ApiTeamStatistics): LiveTeamSnapshot {
     offsides: numericStatistic(values, "Offsides"),
     fouls: numericStatistic(values, "Fouls"),
     goalkeeperSaves: numericStatistic(values, "Goalkeeper Saves"),
-    passAccuracy: numericStatistic(values, "Passes %"),
+    totalPasses,
+    accuratePasses,
+    passAccuracy,
     yellowCards: numericStatistic(values, "Yellow Cards"),
     redCards: numericStatistic(values, "Red Cards"),
     expectedGoals: numericStatistic(values, "expected_goals")

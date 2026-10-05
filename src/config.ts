@@ -86,7 +86,8 @@ export const config = {
   // Torkorrektur für Nationalteams, Faktor 1 bei Pokalspielen zweier Teams derselben Liga.
   // 3.4.0 (29.09.2026): dasselbe für U21-Nationalteams (`teamEloSystems`), dazu eigene Pools
   // und die 3-Vereine-Grenze für Frauenwettbewerbe in der Ligastärke.
-  goalLineModelVersion: "3.4.0",
+  // 3.5.0 (05.10.2026): strength.factorDivisor 1500 -> 1200 (Begründung dort).
+  goalLineModelVersion: "3.5.0",
   xgEnrichmentRequestBudget: 250,
   // Torschüsse und Ecken der letzten fünf Partien. Ein Aufruf deckt zwanzig Partien ab, und
   // jede geholte wird gespeichert - ein 48-Stunden-Lauf braucht damit etwa zwanzig Aufrufe,
@@ -165,28 +166,31 @@ export const config = {
       : 100,
   strength: {
     // Elo-Differenz zweier Ligen -> Torfaktor je Seite: 10 ** (delta / factorDivisor).
-    // Seit dem neutralen Maßstab im Modell trägt dieser Faktor den Klassenunterschied
-    // allein; vorher hat die schiefe Pokal-Torbasis einen Teil davon verdeckt mitgetragen.
-    // Am 31.08.2026 auf 379 abgerechnete Cross-League-Partien mit gemessener Ligastärke
-    // nachgezogen (vorher 900, kalibriert an einer einzigen Pokalrunde mit 21 Partien).
-    // Der Favorit traf dort 36,4 % statt der prognostizierten 49,3 %, und der Fehler wächst
-    // mit der Spreizung: -3,8 pp bei ausgeglichenen Partien, -13,9 und -17,3 pp in der Mitte,
-    // -27,1 pp im schiefsten Viertel. Diese Dosis-Wirkung ist die Signatur zu scharfer
-    // Klassentrennung und gehört genau hierher.
-    // Eine Poisson-Simulation über dieselben Partien senkt mit 1500 die mittlere
-    // Favoritenwahrscheinlichkeit von 49,3 auf 44,6 % und den Brier-Score von 0.684 auf 0.664.
-    // Stärkere Stauchung bringt kaum noch etwas (0.657 bei 3000), kostet aber die
-    // Trennschärfe zwischen großen und kleinen Klassenunterschieden - das schiefste Viertel
-    // trifft mit 48,6 % weiterhin deutlich häufiger als ausgeglichene Partien mit 35,6 %.
-    // Die Simulation staucht die gesamte Spreizung, also auch den Formanteil; 1500 ist damit
-    // die Untergrenze des passenden Bereichs und bewusst die konservative Wahl, weil
-    // Überschätzung unmittelbar auf die Kelly-Einsätze durchschlägt.
-    // Rund 4,5 pp der Lücke überleben auch extreme Stauchung: Cross-League-Partien enden
-    // häufiger remis (29,3 % statt prognostizierter 23,4 %) und die Heimseite gewinnt seltener
-    // (34,3 % statt 41,2 %). Das ist kein Klassenthema und nicht über diesen Wert zu heilen.
+    // Seit dem neutralen Maßstab im Modell trägt dieser Faktor den Klassenunterschied allein.
+    // **Jede Änderung in `strength` erhöht `goalLineModelVersion`**: Der Bericht misst die
+    // stärkere Seite je Modellversion (`strongerSideByVersion`); in 3.1.0 liefen ohne neue Version
+    // nacheinander 1200, 900 und 1500, und die Messung je Teiler war nicht mehr trennbar.
+    // Geschichte: 900 (eine Pokalrunde, 21 Partien) -> 1500 ab 31.08.2026 (Commit 02.09.)
+    // -> 1200 am 05.10.2026.
+    // Die Erhöhung auf 1500 stand auf einem Zählfehler: Von 379 "gemessenen" Partien stammten
+    // 309 aus Modellfassungen vor 3.1.0, die gar keinen Faktor rechneten (cohortOf ordnete sie
+    // über die Cross-League-Warnung zu). Die 71 Partien mit echtem Faktor lagen bei 900
+    // unauffällig (-3,0 ± 5,8 pp). Auch der damalige Remis-Überschuss im Pokal (29,3 statt
+    // 23,4 %) kam nur aus diesen Altzeilen; ab 3.1.0 sind es -1,4 ± 2,9 Punkte.
+    // Mit 1500 gewann die Seite aus der stärkeren Liga seit 3.2.0 66 % statt der
+    // vorhergesagten 48 % (113 Spiele), Tipico gab ihr rund 4 Punkte mehr als das Modell.
+    // Prüfung des Prüfer-Agenten vom 05.10.2026, Raster vorab festgelegt, Zeit-Split:
+    // - an strength_matches (2.349 Spiele mit belastbaren Ratings, Rating vor Anpfiff, Wahl auf
+    //   der Zeit vor 15.10.2025): gewählt 1200, auf der zweiten Hälfte -0,0102 ± 0,0018
+    //   1X2-Log-Loss gegen 1500;
+    // - an den eigenen Prognosen ab 3.1.0 bestätigt: -0,0235 ± 0,0051 (190 Spiele), in beiden
+    //   Zeithälften gleich. 900 war dort etwas besser, aber nicht belegt und am Rand des Rasters.
+    // Die Ratings stehen auf der Elo-Skala 400 mit Heimvorteil 50; ein dazu passender Teiler
+    // liegt bei 940-1130. Nachmessen nach rund 150 abgerechneten Spielen von 3.5.0 an der Spalte
+    // "stärkere Liga gewinnt" in npm run report.
     // Die Grenzen sind so gewählt, dass im gemessenen Feld kein Faktor am Clamp hängt -
     // sonst unterscheidet das Modell große Klassenunterschiede nicht mehr voneinander.
-    factorDivisor: 1500,
+    factorDivisor: 1200,
     factorMin: 0.3,
     factorMax: 3.5,
     // Abschlag auf das schwächste belastbare Rating des Pools für Ligen ohne eigenes

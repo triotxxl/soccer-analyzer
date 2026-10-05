@@ -202,6 +202,9 @@ export interface LiveTeamSnapshot {
   offsides: number | null;
   fouls: number | null;
   goalkeeperSaves: number | null;
+  /** Pässe gesamt und angekommen; live meist vorhanden, anders als „Passes %“. */
+  totalPasses: number | null;
+  accuratePasses: number | null;
   passAccuracy: number | null;
   yellowCards: number | null;
   redCards: number | null;
@@ -360,6 +363,15 @@ export interface FirstHalfGoalLineProbabilities {
   under15: number;
 }
 
+/**
+ * Live-Abdeckung einer Wettbewerbs-Saison. `statistics` sagt die Live-Statistik gut voraus
+ * (29.09.2026: bei „ja“ kam in 69 von 70 laufenden Spielen welche, bei „nein“ in 16 von 225).
+ */
+export interface LiveCoverage {
+  statistics: boolean;
+  events: boolean;
+}
+
 export interface GoalLineRow {
   fixtureId: number;
   kickoff: string;
@@ -376,6 +388,11 @@ export interface GoalLineRow {
    */
   homeCrest?: string;
   awayCrest?: string;
+  /**
+   * Was API-Football für diese Wettbewerbs-Saison laut `coverage.fixtures` im Spiel liefert.
+   * Kostet nichts - die Ligaliste ist ohnehin geladen. Fehlt, wenn die Saison keine Angabe führt.
+   */
+  liveCoverage?: LiveCoverage;
   modelVersion: string;
   expectedHomeGoals: number;
   expectedAwayGoals: number;

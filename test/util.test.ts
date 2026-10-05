@@ -105,4 +105,7 @@ test("laufende Partien gelten als analysierbar, beendete nicht", () => {
     assert.equal(isAnalyzableStatus(status), false, status);
   }
   assert.equal(isAnalyzableStatus("unbekannt"), false);
+  // API-Football schreibt Absagen teils "Canc".
+  assert.equal(isFinishedStatus("Canc"), true);
+  assert.equal(isAnalyzableStatus("Canc"), false);
 });

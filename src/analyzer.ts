@@ -19,6 +19,7 @@ import {
 } from "./model.ts";
 import { compareStrength, ratingFor, sameLeagueComparison, teamEloComparison, type StrengthComparison } from "./strength-factor.ts";
 import { getTeamElo } from "./elo-store.ts";
+import { liveCoverageOf } from "./live-model.ts";
 import { eloSystemLabel, nationalCategoryOf, type EloSystem } from "./elo-config.ts";
 import { buildLeagueStrength } from "./strength-builder.ts";
 import { resolveLeagues, saveAlias } from "./resolver.ts";
@@ -39,6 +40,7 @@ import type {
   FavoriteAnalysisResult,
   GoalLineAnalysisResult,
   LeagueStats,
+  LiveMatchSelection,
   ResolutionFailure,
   ResolvedLeague
 } from "./types.ts";
@@ -61,9 +63,11 @@ interface DomesticLeagueReference {
   season: number;
 }
 
-interface RequestedFixtureScope {
+export interface RequestedFixtureScope {
   fixtures: ApiFixture[];
   aliases: TeamAliasMap;
+  /** Tipico-Spiele ohne API-Ansetzung - Arbeitsliste für `npm run prepare-analysis`. */
+  unmatched: LiveMatchSelection[];
 }
 
 function aliasMatchesApiName(requestedName: string, apiName: string, aliases: TeamAliasMap): boolean {
@@ -84,15 +88,54 @@ function tipicoOddsForTeams(
   );
 }
 
-async function requestedFixtureScope(
+export async function requestedFixtureScope(
   fixtures: ApiFixture[],
   input: AnalysisInput,
   teamAliasFile = TEAM_ALIASES_FILE,
   database?: AnalyzerDatabase
 ): Promise<RequestedFixtureScope> {
   const aliases = await readTeamAliases(teamAliasFile);
-  if (!input.matches || input.matches.length === 0) return { fixtures, aliases };
+  if (!input.matches || input.matches.length === 0) return { fixtures, aliases, unmatched: [] };
+  const resolveAmong = async (
+    match: NonNullable<AnalysisInput["matches"]>[number],
+    candidates: ApiFixture[]
+  ): Promise<ApiFixture | undefined> => {
+    const direct = candidates.find((fixture) =>
+      fixtureMatchesTeamAliases(match.homeTeam, match.awayTeam, fixture, aliases)
+    );
+    if (direct) return direct;
+    const ranked = candidates
+      .map((fixture) => ({
+        fixture,
+        homeScore: teamNameSimilarity(match.homeTeam, fixture.teams.home.name),
+        awayScore: teamNameSimilarity(match.awayTeam, fixture.teams.away.name)
+      }))
+      .map((item) => ({ ...item, score: (item.homeScore + item.awayScore) / 2 }))
+      .sort((left, right) => right.score - left.score);
+    const best = ranked[0];
+    if (!(
+      best && best.score >= 0.65 && best.homeScore >= 0.5 && best.awayScore >= 0.5 &&
+      (!ranked[1] || best.score - ranked[1].score >= 0.08)
+    )) return undefined;
+    for (const [tipicoName, apiTeam] of [
+      [match.homeTeam, best.fixture.teams.home],
+      [match.awayTeam, best.fixture.teams.away]
+    ] as const) {
+      if (normalizeText(tipicoName) === normalizeText(apiTeam.name)) continue;
+      await saveTeamAlias(tipicoName, apiTeam, teamAliasFile);
+      aliases[teamAliasKey(tipicoName)] = {
+        tipicoName,
+        apiTeamId: apiTeam.id,
+        apiTeamName: apiTeam.name
+      };
+    }
+    return best.fixture;
+  };
   const selected: ApiFixture[] = [];
+  const isSelected = (fixture: ApiFixture) =>
+    selected.some((item) => item.fixture.id === fixture.fixture.id);
+  const unresolved: Array<{ match: NonNullable<AnalysisInput["matches"]>[number]; kickoff: number }> = [];
+  const unmatched: LiveMatchSelection[] = [];
   for (const match of input.matches) {
     const requestedKickoff = match.kickoff ? Date.parse(match.kickoff) : Number.NaN;
     const candidates = Number.isFinite(requestedKickoff)
@@ -100,45 +143,52 @@ async function requestedFixtureScope(
           Math.abs(fixture.fixture.timestamp * 1000 - requestedKickoff) <= 12 * 60 * 60 * 1000
         )
       : fixtures;
-    const direct = candidates.find((fixture) =>
-      fixtureMatchesTeamAliases(match.homeTeam, match.awayTeam, fixture, aliases)
-    );
-    let resolved = direct;
+    const resolved = await resolveAmong(match, candidates);
     if (!resolved) {
-      const ranked = candidates
-        .map((fixture) => ({
-          fixture,
-          homeScore: teamNameSimilarity(match.homeTeam, fixture.teams.home.name),
-          awayScore: teamNameSimilarity(match.awayTeam, fixture.teams.away.name)
-        }))
-        .map((item) => ({ ...item, score: (item.homeScore + item.awayScore) / 2 }))
-        .sort((left, right) => right.score - left.score);
-      const best = ranked[0];
-      if (
-        best && best.score >= 0.65 && best.homeScore >= 0.5 && best.awayScore >= 0.5 &&
-        (!ranked[1] || best.score - ranked[1].score >= 0.08)
-      ) {
-        resolved = best.fixture;
-        for (const [tipicoName, apiTeam] of [
-          [match.homeTeam, resolved.teams.home],
-          [match.awayTeam, resolved.teams.away]
-        ] as const) {
-          if (normalizeText(tipicoName) === normalizeText(apiTeam.name)) continue;
-          await saveTeamAlias(tipicoName, apiTeam, teamAliasFile);
-          aliases[teamAliasKey(tipicoName)] = {
-            tipicoName,
-            apiTeamId: apiTeam.id,
-            apiTeamName: apiTeam.name
-          };
-        }
-      }
+      if (Number.isFinite(requestedKickoff)) unresolved.push({ match, kickoff: requestedKickoff });
+      else unmatched.push(match);
+      continue;
     }
-    if (resolved && !selected.some((fixture) => fixture.fixture.id === resolved.fixture.id)) {
+    if (!isSelected(resolved)) {
       selected.push(resolved);
       database?.saveTipicoFixtureMapping(match, resolved);
     }
   }
-  return { fixtures: selected, aliases };
+  // Zweiter Durchgang: API-Football führt manche Spiele bis kurz vorher auf einem
+  // Platzhaltertermin (Olympiakos - Panathinaikos am 05.10.2026 seit August auf Samstag
+  // 15:00 UTC, bei Tipico Sonntag 18:00 UTC). Am 05.10.2026 fielen so rund 55 von 751
+  // Spielen heraus. Findet sich im 12-Stunden-Fenster nichts, gilt dieselbe Paarung in
+  // derselben Liga bis vier Tage daneben - nur wenn sie dort eindeutig ist und keine andere
+  // Tipico-Partie sie schon belegt. Der Anstoß kommt dann von Tipico, weil der Buchmacher
+  // auf den echten Termin anbietet; Liga, Teams, Status und Ergebnis bleiben von der API.
+  for (const { match, kickoff } of unresolved) {
+    const nearby = fixtures.filter((fixture) =>
+      !isSelected(fixture) &&
+      Math.abs(fixture.fixture.timestamp * 1000 - kickoff) <= 4 * 24 * 60 * 60 * 1000
+    );
+    const resolved = await resolveAmong(match, nearby);
+    const samePairing = resolved
+      ? nearby.filter((fixture) =>
+          fixture.teams.home.id === resolved.teams.home.id &&
+          fixture.teams.away.id === resolved.teams.away.id
+        )
+      : [];
+    if (!resolved || samePairing.length !== 1) {
+      unmatched.push(match);
+      continue;
+    }
+    const rescheduled: ApiFixture = {
+      ...resolved,
+      fixture: {
+        ...resolved.fixture,
+        date: new Date(kickoff).toISOString(),
+        timestamp: Math.floor(kickoff / 1000)
+      }
+    };
+    selected.push(rescheduled);
+    database?.saveTipicoFixtureMapping(match, rescheduled);
+  }
+  return { fixtures: selected, aliases, unmatched };
 }
 
 function saveCompetitionMappings(
@@ -420,6 +470,8 @@ export async function runGoalLineAnalysis(
     if (resolution.failures.length > 0) {
       throw new LeagueResolutionError(resolution.failures);
     }
+    // Für die Live-Abdeckung je Spiel (`liveCoverage`) - aus der ohnehin geladenen Ligaliste.
+    const seasonsByLeague = new Map(leagues.map((league) => [league.league.id, league.seasons]));
     saveCompetitionMappings(input, resolution.resolved, database);
     await Promise.all(
       resolution.resolved
@@ -747,6 +799,11 @@ export async function runGoalLineAnalysis(
         awayTeamId: fixture.teams.away.id,
         homeCrest: fixture.teams.home.logo,
         awayCrest: fixture.teams.away.logo,
+        ...(() => {
+          const season = seasonsByLeague.get(fixture.league.id)?.find((item) => item.year === fixture.league.season);
+          const liveCoverage = liveCoverageOf(season?.coverage);
+          return liveCoverage ? { liveCoverage } : {};
+        })(),
         modelVersion: config.goalLineModelVersion,
         expectedHomeGoals: model.expectedHomeGoals,
         expectedAwayGoals: model.expectedAwayGoals,

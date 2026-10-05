@@ -44,9 +44,8 @@ test("Stärkefaktor bleibt innerhalb der konfigurierten Grenzen", () => {
 });
 
 test("Bundesliga gegen 3. Liga ergibt einen plausiblen Torfaktor", () => {
-  // Das Band folgt dem am 31.08.2026 auf 379 abgerechnete Cross-League-Partien
-  // nachgezogenen factorDivisor. Vorher galt 1,7 bis 2,2 aus einer einzigen Pokalrunde;
-  // gegen abgerechnete Ergebnisse hat sich diese Trennung als zu scharf erwiesen.
+  // Das Band passt zum factorDivisor 1200 vom 05.10.2026 (Faktor rund 1,63). Mit 900 läge der
+  // Faktor bei rund 1,93 und der Test würde rot - eine weitere Senkung ist ungemessen.
   const factor = strengthFactor(1717, 1461);
   assert.ok(factor > 1.35 && factor < 1.65, `unerwarteter Faktor ${factor}`);
 });

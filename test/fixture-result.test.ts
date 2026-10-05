@@ -63,8 +63,18 @@ test("ein verschossener Elfmeter zählt nirgends", () => {
   assert.equal(result.goalsComplete, true);
 });
 
+/**
+ * So liefert API-Football eine Verlängerung (geprüft an 198 AET-Spielen im Cache am 29.09.2026):
+ * `goals` ist der Stand nach 120 Minuten, `score.fulltime` der nach 90.
+ */
+function afterExtraTime(options: MatchOptions, fulltime: { home: number; away: number }) {
+  const result = match(options);
+  result.score.fulltime = fulltime;
+  return result;
+}
+
 test("ein Tor in der Verlängerung steht im eigenen Abschnitt und der Endstand geht auf", () => {
-  const result = toFixtureResult(match({
+  const api = afterExtraTime({
     status: "AET", homeGoals: 2, awayGoals: 1, halfTimeHomeGoals: 1, halfTimeAwayGoals: 1,
     extraTimeHomeGoals: 1, extraTimeAwayGoals: 0,
     events: [
@@ -72,16 +82,32 @@ test("ein Tor in der Verlängerung steht im eigenen Abschnitt und der Endstand g
       event({ type: "Goal", minute: 40, teamId: AWAY }),
       event({ type: "Goal", minute: 105, teamId: HOME })
     ]
-  }));
+  }, { home: 1, away: 1 });
+  const result = toFixtureResult(api);
   assert.ok(result);
   assert.equal(result.goalsHt1Home, 1);
   assert.equal(result.goalsEtHome, 1);
   assert.equal(result.etHomeGoals, 1);
+  // Bis zum 29.09.2026 ging das Verlängerungstor gegen den 90-Minuten-Stand, und das Spiel
+  // galt als lückenhaft.
   assert.equal(result.goalsComplete, true);
+  assert.equal(result.finalHomeGoals, 1);
   assert.equal(
     (result.goalsHt1Home ?? 0) + (result.goalsHt2Home ?? 0) + (result.goalsEtHome ?? 0),
-    result.finalHomeGoals
+    api.goals.home
   );
+});
+
+test("fehlt ein Verlängerungstor in der Ereignisliste, ist das Spiel lückenhaft", () => {
+  const result = toFixtureResult(afterExtraTime({
+    status: "AET", homeGoals: 2, awayGoals: 1, halfTimeHomeGoals: 1, halfTimeAwayGoals: 1,
+    events: [
+      event({ type: "Goal", minute: 10, teamId: HOME }),
+      event({ type: "Goal", minute: 40, teamId: AWAY })
+    ]
+  }, { home: 1, away: 1 }));
+  assert.ok(result);
+  assert.equal(result.goalsComplete, false);
 });
 
 test("das Elfmeterschießen landet nicht in der Verlängerung", () => {

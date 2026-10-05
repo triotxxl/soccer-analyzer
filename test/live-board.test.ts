@@ -130,6 +130,84 @@ test("meldet fehlende Statistiken, damit der Einzelabruf greifen kann", () => {
   assert.equal(nachgeladen.metrics.home.totalShots, 3);
 });
 
+test("zählt Karten aus den Ereignissen, auch wenn die Statistik fehlt", () => {
+  const live = fixture({ id: 80, timestamp: NOW / 1000, homeId: 1, awayId: 2, homeGoals: 0, awayGoals: 0, status: "2H" });
+  live.fixture.status = { long: "Second Half", short: "2H", elapsed: 70 };
+  live.events = [
+    { time: { elapsed: 20 }, team: live.teams.home, type: "Card", detail: "Yellow Card", player: { id: 5, name: "Spieler C" } },
+    { time: { elapsed: 55 }, team: live.teams.home, type: "Card", detail: "Red Card", player: { id: 5, name: "Spieler C" } },
+    { time: { elapsed: 60 }, team: live.teams.away, type: "Card", detail: "Red Card", player: { id: 7, name: "Spieler D" } },
+    // Zurückgenommen, und die API hat die Karte noch nicht gelöscht: zählt ab.
+    { time: { elapsed: 62 }, team: live.teams.away, type: "Var", detail: "Red card cancelled", player: { id: 7, name: "Spieler D" } },
+    // Zurückgenommen, die Karte steht aber gar nicht mehr da: zählt nicht ab.
+    { time: { elapsed: 64 }, team: live.teams.home, type: "Var", detail: "Red card cancelled", player: { id: 9, name: "Spieler E" } },
+    // Die Hochstufung bringt ihre eigene Rote mit; das VAR-Ereignis zählt nicht extra.
+    { time: { elapsed: 66 }, team: live.teams.away, type: "Var", detail: "Card upgrade", player: { id: 8, name: "Spieler F" } }
+  ];
+  const match = toBoardMatch(live, dashboardFixture(80, new Date(NOW - 4_200_000).toISOString()));
+  assert.equal(match.metricsAvailable, false);
+  assert.deepEqual(match.cards, { home: { yellow: 1, red: 1 }, away: { yellow: 0, red: 0 } });
+  // Die Rote geht in die Live-Chance ein: Das Heimteam trifft seltener als der Gast.
+  assert.equal(match.live.state, "ok");
+  assert.ok(match.live.nextGoal!.away > match.live.nextGoal!.home);
+});
+
+test("ohne Kartendaten der Liga steht null statt 0", () => {
+  const live = fixture({ id: 81, timestamp: NOW / 1000, homeId: 1, awayId: 2, homeGoals: 1, awayGoals: 0, status: "1H" });
+  live.fixture.status = { long: "First Half", short: "1H", elapsed: 30 };
+  live.events = [];
+  const dashboard = { ...dashboardFixture(81, new Date(NOW - 1_800_000).toISOString()), cardData: false };
+  assert.equal(toBoardMatch(live, dashboard).cards, null);
+  assert.deepEqual(toBoardMatch(live, dashboardFixture(81, dashboard.kickoff)).cards,
+    { home: { yellow: 0, red: 0 }, away: { yellow: 0, red: 0 } });
+});
+
+test("dreht die API Heim und Gast, wird die Live-Antwort in die Ausrichtung des Dashboards gespiegelt", () => {
+  // Dashboard: 1 (FC Köln) gegen 2 (HSV). Die API führt das Spiel nachträglich als 2 gegen 1.
+  const live = fixture({ id: 82, timestamp: NOW / 1000, homeId: 2, awayId: 1, homeGoals: 2, awayGoals: 0, status: "2H" });
+  live.fixture.status = { long: "Second Half", short: "2H", elapsed: 60 };
+  live.events = [
+    { time: { elapsed: 30 }, team: live.teams.home, type: "Goal", detail: "Normal Goal", player: { id: 3, name: "HSV-Stürmer" } }
+  ];
+  const dashboard = { ...dashboardFixture(82, new Date(NOW - 3_600_000).toISOString()), homeTeamId: 1, awayTeamId: 2 };
+  const match = toBoardMatch(live, dashboard);
+  assert.deepEqual(match.goals, { home: 0, away: 2 });
+  assert.equal(match.events[0]?.side, "away");
+  // Ohne Team-IDs im Snapshot bleibt alles, wie die API es liefert.
+  const withoutIds = toBoardMatch(live, dashboardFixture(82, dashboard.kickoff));
+  assert.deepEqual(withoutIds.goals, { home: 2, away: 0 });
+});
+
+test("trägt Live-Chancen, Stand-Tatsachen und keine Chance in der Verlängerung", () => {
+  const live = fixture({ id: 83, timestamp: NOW / 1000, homeId: 1, awayId: 2, homeGoals: 1, awayGoals: 1, status: "2H" });
+  live.fixture.status = { long: "Second Half", short: "2H", elapsed: 75 };
+  const dashboard = dashboardFixture(83, new Date(NOW - 4_800_000).toISOString());
+  const match = toBoardMatch(live, dashboard);
+  assert.equal(match.live.state, "ok");
+  assert.equal(match.live.provisional, true);
+  assert.ok(match.live.anotherGoal! > 0.3 && match.live.anotherGoal! < 0.7);
+  assert.deepEqual(match.marketStands.over25, { status: "needs", goalsNeeded: 1 });
+  assert.deepEqual(match.marketStands.btts, { status: "won" });
+  assert.equal(match.statisticsCoverage, null);
+
+  const extraTime = structuredClone(live);
+  extraTime.fixture.status = { long: "Extra Time", short: "ET", elapsed: 100 };
+  assert.equal(toBoardMatch(extraTime, dashboard).live.state, "extraTime");
+  assert.equal(toBoardMatch(extraTime, dashboard).live.anotherGoal, null);
+
+  // Ohne Ligastärke-Vergleich keine Aufteilung: Sieger und nächstes Tor bleiben leer.
+  const unreliable = {
+    ...dashboard,
+    liveCoverage: { statistics: false, events: true },
+    markets: [{ ...market(), key: "1x2" as const, probabilityReliable: false }]
+  };
+  const hidden = toBoardMatch(live, unreliable);
+  assert.equal(hidden.live.result, null);
+  assert.equal(hidden.live.nextGoal, null);
+  assert.ok(hidden.live.lines !== null);
+  assert.equal(hidden.statisticsCoverage, false);
+});
+
 test("schreibt eine JSONL-Zeile je Stand und erkennt unveränderte Stände", () => {
   const live = fixture({ id: 79, timestamp: NOW / 1000, homeId: 1, awayId: 2, homeGoals: 2, awayGoals: 1, status: "2H" });
   live.fixture.status = { long: "Second Half", short: "2H", elapsed: 70 };

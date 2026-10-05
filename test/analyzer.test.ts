@@ -170,6 +170,76 @@ test("Torlinien ordnen dieselbe Paarung an zwei Terminen über die Anstoßzeit z
   database.close();
 });
 
+test("Torlinien finden ein Spiel, das API-Football auf einem Platzhaltertermin führt, und nehmen den Tipico-Anstoß", async () => {
+  const target = new Date("2026-07-29T10:00:00.000Z");
+  const apiTimestamp = Date.parse("2026-07-29T15:00:00.000Z") / 1000;
+  const tipicoKickoff = "2026-07-30T18:00:00.000Z";
+  const placeholder = fixture({ id: 921, timestamp: apiTimestamp, homeId: 1, awayId: 2 });
+  const leagues: ApiLeague[] = [{
+    league: { id: 78, name: "Bundesliga", type: "League" },
+    country: { name: "Germany" },
+    seasons: [{ year: 2026, start: "2026-01-01", end: "2026-12-31", current: true }]
+  }];
+  const fake = {
+    requestCount: 0,
+    requestsRemaining: 7_500,
+    getLeagues: async () => leagues,
+    getFixturesForDate: async (date: string): Promise<ApiFixture[]> =>
+      date === "2026-07-29" ? [placeholder] : [],
+    getSeasonFixtures: async () => history(apiTimestamp)
+  } as unknown as ApiFootballClient;
+  const directory = await mkdtemp(path.join(os.tmpdir(), "football-placeholder-e2e-"));
+  const database = new AnalyzerDatabase(path.join(directory, "test.sqlite"));
+  const result = await runGoalLineAnalysis({
+    selections: [{ country: "Deutschland", league: "Bundesliga" }],
+    markets: [],
+    dates: "both",
+    matches: [{
+      homeTeam: placeholder.teams.home.name,
+      awayTeam: placeholder.teams.away.name,
+      kickoff: tipicoKickoff
+    }]
+  }, { client: fake, database, now: target });
+  assert.deepEqual(result.rows.map((row) => row.fixtureId), [921]);
+  assert.equal(Date.parse(result.rows[0]!.kickoff), Date.parse(tipicoKickoff));
+  database.close();
+});
+
+test("Torlinien ordnen eine Paarung außerhalb des Anstoßfensters nicht zu, wenn sie mehrdeutig ist", async () => {
+  const target = new Date("2026-07-29T10:00:00.000Z");
+  const firstTimestamp = Date.parse("2026-07-29T15:00:00.000Z") / 1000;
+  const secondTimestamp = Date.parse("2026-07-31T15:00:00.000Z") / 1000;
+  const first = fixture({ id: 931, timestamp: firstTimestamp, homeId: 1, awayId: 2 });
+  const second = fixture({ id: 932, timestamp: secondTimestamp, homeId: 1, awayId: 2 });
+  const leagues: ApiLeague[] = [{
+    league: { id: 78, name: "Bundesliga", type: "League" },
+    country: { name: "Germany" },
+    seasons: [{ year: 2026, start: "2026-01-01", end: "2026-12-31", current: true }]
+  }];
+  const fake = {
+    requestCount: 0,
+    requestsRemaining: 7_500,
+    getLeagues: async () => leagues,
+    getFixturesForDate: async (date: string): Promise<ApiFixture[]> =>
+      date === "2026-07-29" ? [first] : date === "2026-07-30" ? [second] : [],
+    getSeasonFixtures: async () => history(firstTimestamp)
+  } as unknown as ApiFootballClient;
+  const directory = await mkdtemp(path.join(os.tmpdir(), "football-ambiguous-e2e-"));
+  const database = new AnalyzerDatabase(path.join(directory, "test.sqlite"));
+  const result = await runGoalLineAnalysis({
+    selections: [{ country: "Deutschland", league: "Bundesliga" }],
+    markets: [],
+    dates: "both",
+    matches: [{
+      homeTeam: first.teams.home.name,
+      awayTeam: first.teams.away.name,
+      kickoff: "2026-07-30T12:00:00.000Z"
+    }]
+  }, { client: fake, database, now: target });
+  assert.equal(result.rows.length, 0);
+  database.close();
+});
+
 test("Torlinien laden bei Cross-League-Spielen die letzten Pflichtspiele beider Teams", async () => {
   const target = new Date("2026-07-29T10:00:00.000Z");
   const timestamp = Date.parse("2026-07-29T18:00:00.000Z") / 1000;

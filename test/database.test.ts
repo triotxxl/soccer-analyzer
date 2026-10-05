@@ -453,6 +453,12 @@ test("speichert und berichtet aktive Profilprognosen ohne Duplikate", async () =
     report.map((item) => item.band).sort(),
     ["60–69"]
   );
+  // Anstoß mit Zeitzone: 17:00Z liegt eine Stunde nach Anpfiff (16:00Z), als Text aber davor.
+  const offsetRow = { ...row("1.3.0", 70), fixtureId: 299, kickoff: "2026-01-01T18:00:00+02:00" };
+  database.saveProfilePredictions("2026-01-01T17:00:00.000Z", "draw", [offsetRow]);
+  assert.equal(database.profilePredictionCount(), 1);
+  database.saveProfilePredictions("2026-01-01T15:00:00.000Z", "draw", [offsetRow]);
+  assert.equal(database.profilePredictionCount(), 2);
   database.close();
 });
 
@@ -550,6 +556,94 @@ test("Ligastärke-Bericht trennt gemessen, geschätzt und ohne Rating", async ()
   assert.equal(Math.round(byCohort.get("geschätzt")!.bias * 1000) / 1000, -0.7);
   assert.equal(byCohort.get("ohne Rating")!.total, 1);
   assert.equal(byCohort.get("Ligapartie")!.total, 1);
+  database.close();
+});
+
+test("Ligastärke-Bericht trennt Fassungen vor der Ligastärke, zählt je Spiel einmal und misst die stärkere Liga", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "football-strength-cohorts-"));
+  const database = new AnalyzerDatabase(path.join(directory, "test.sqlite"));
+  const crossLeague = ["Cross-League: Teamform aus Pflichtspielen verschiedener Wettbewerbe"];
+  const strength = (factor: number) => ({
+    home: { leagueId: 1, rating: 1600, reliable: true },
+    away: { leagueId: 2, rating: 1500, reliable: true },
+    factor
+  });
+  const base: GoalLineRow = {
+    fixtureId: 0, kickoff: "2026-01-01T18:00:00.000Z", country: "Deutschland", league: "DFB Pokal",
+    homeTeam: "Heim", awayTeam: "Gast", modelVersion: "3.4.0",
+    expectedHomeGoals: 1.5, expectedAwayGoals: 1.2, expectedTotalGoals: 2.7, dataConfidence: 80,
+    outcomeProbabilities: { home: 0.45, draw: 0.25, away: 0.3, btts: 0.5 },
+    probabilities: { over15: 0.8, under15: 0.2, over25: 0.6, under25: 0.4, over35: 0.35, under35: 0.65 },
+    firstHalf: {
+      expectedHomeGoals: 0.7, expectedAwayGoals: 0.5, expectedTotalGoals: 1.2, dataConfidence: 80,
+      probabilities: { over05: 0.7, under05: 0.3, over15: 0.4, under15: 0.6 }, warnings: []
+    },
+    warnings: crossLeague
+  };
+  const rows: GoalLineRow[] = [
+    // Vor 3.1.0 gab es keinen Faktor, die Cross-League-Warnung aber schon (Fund vom 05.10.2026).
+    { ...base, fixtureId: 1, modelVersion: "3.0.0" },
+    // Dasselbe Spiel in zwei Fassungen: Die neueste zählt, auch wenn sie zuerst gespeichert ist.
+    { ...base, fixtureId: 2, modelVersion: "3.4.0", strength: strength(1.3) },
+    { ...base, fixtureId: 2, modelVersion: "3.0.0" },
+    // Gast aus der stärkeren Liga: Faktor unter 1.
+    { ...base, fixtureId: 3, strength: strength(0.8) },
+    // Faktor 1 trägt keine stärkere Seite.
+    { ...base, fixtureId: 4, strength: strength(1) }
+  ];
+  database.saveGoalLinePredictions("2025-12-31T10:00:00.000Z", rows, {
+    dates: ["2026-01-01"],
+    selections: [{ country: "Deutschland", league: "DFB Pokal" }],
+    matches: rows.map(() => ({ homeTeam: "Heim", awayTeam: "Gast" }))
+  });
+  for (const [fixtureId, homeGoals, awayGoals] of [[1, 1, 0], [2, 2, 1], [3, 0, 2], [4, 0, 0]] as const) {
+    database.settleFixture(fixture({
+      id: fixtureId, timestamp: Date.parse(base.kickoff) / 1000, homeId: 1, awayId: 2, homeGoals, awayGoals
+    }));
+  }
+  const byCohort = new Map(database.leagueStrengthReport().map((row) => [row.cohort, row]));
+  assert.equal(byCohort.get("vor Ligastärke")!.total, 1);
+  const measured = byCohort.get("gemessen")!;
+  assert.equal(measured.total, 3, "Spiel 2 zählt nur in seiner neuesten Fassung");
+  // Spiel 2: Heim stärker (0,45), Heimsieg. Spiel 3: Gast stärker (0,30), Auswärtssieg.
+  // Mit vertauschtem Vorzeichen hätte die stärkere Seite beide Male verloren.
+  assert.equal(measured.strongerTotal, 2);
+  assert.equal(measured.strongerWinRate, 1);
+  assert.ok(Math.abs(measured.strongerPredicted - 0.375) < 1e-12);
+  // Je Fassung getrennt: Die Spiele mit Faktor stammen alle aus 3.4.0.
+  assert.deepEqual(
+    database.strongerSideByVersion().map((row) => [row.cohort, row.modelVersion, row.total, row.winRate]),
+    [["gemessen", "3.4.0", 2, 1]]
+  );
+  // Nur die laufende Fassung: Spiel 1 (3.0.0) fällt heraus, Spiel 2 zählt mit seiner neuesten.
+  const current = database.leagueStrengthReport({ modelVersion: "3.4.0" });
+  assert.deepEqual(current.map((row) => [row.cohort, row.total]), [["gemessen", 3]]);
+  assert.deepEqual(database.leagueStrengthReport({ modelVersion: "3.5.0" }), []);
+  database.close();
+});
+
+test("Prognosen nach Anpfiff werden auch bei Anstoßzeiten mit Zeitzone nicht gespeichert", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "football-kickoff-offset-"));
+  const database = new AnalyzerDatabase(path.join(directory, "test.sqlite"));
+  const row: GoalLineRow = {
+    fixtureId: 801, kickoff: "2026-10-11T18:00:00+02:00", country: "Griechenland", league: "Super League 1",
+    homeTeam: "Heim", awayTeam: "Gast", modelVersion: "3.5.0",
+    expectedHomeGoals: 1.5, expectedAwayGoals: 1.1, expectedTotalGoals: 2.6, dataConfidence: 80,
+    outcomeProbabilities: { home: 0.45, draw: 0.27, away: 0.28, btts: 0.5 },
+    probabilities: { over15: 0.75, under15: 0.25, over25: 0.5, under25: 0.5, over35: 0.27, under35: 0.73 },
+    firstHalf: {
+      expectedHomeGoals: 0.7, expectedAwayGoals: 0.5, expectedTotalGoals: 1.2, dataConfidence: 80,
+      probabilities: { over05: 0.7, under05: 0.3, over15: 0.34, under15: 0.66 }, warnings: []
+    },
+    warnings: []
+  };
+  const scope = { dates: ["2026-10-11"], selections: [], matches: [] };
+  // 17:00Z liegt eine Stunde nach dem Anpfiff (16:00Z), als Text aber vor "…18:00:00+02:00".
+  assert.equal(database.saveGoalLinePredictions("2026-10-11T17:00:00.000Z", [row], scope), 0);
+  assert.equal(database.saveGoalLinePredictions("2026-10-11T15:00:00.000Z", [row], scope), 1);
+  // Fällig erst rund zwei Stunden nach Anpfiff (16:00Z), nicht schon während des Spiels.
+  assert.deepEqual(database.unsettledFixtures(new Date("2026-10-11T17:00:00.000Z")), []);
+  assert.deepEqual(database.unsettledFixtures(new Date("2026-10-11T18:00:00.000Z")), [801]);
   database.close();
 });
 

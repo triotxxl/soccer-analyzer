@@ -606,7 +606,8 @@ Gastgeber selten treffen, und teilt man die Torrate des Außenseiters durch gena
 niedrigen Wert, wird er zum vermeintlichen Favoriten.
 
 Der tatsächliche Klassenunterschied kommt separat über das Ligarating dazu. Aus der
-Differenz beider Ligaratings entsteht ein Torfaktor `10 ** (Δ / 1500)`, der auf die
+Differenz beider Ligaratings entsteht ein Torfaktor `10 ** (Δ / 1200)` (900 bis 31.08.2026,
+danach 1500, seit 05.10.2026 1200 - Begründung in `src/config.ts`), der auf die
 erwarteten Heimtore multipliziert und von den Auswärtstoren geteilt wird; er ist auf
 0,3 bis 3,5 begrenzt. Ligen ohne belastbares eigenes Rating erhalten das schwächste
 belastbare Rating ihres Pools abzüglich 120 Punkten — wer in der Elo-Kette aus

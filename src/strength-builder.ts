@@ -30,6 +30,14 @@ export interface StrengthBuildResult {
 
 class RequestBudgetReached extends Error {}
 
+/**
+ * Ansetzungen, die nicht mehr gespielt werden. Anders als `isFinishedStatus` in `src/util.ts`
+ * zählt PST (verschoben) hier als offen: Ein verschobenes Pokalspiel wird nachgeholt.
+ */
+const CLOSED_STATUSES = new Set(["FT", "AET", "PEN", "CANC", "ABD", "AWD", "WO"]);
+/** Offene Ansetzungen, die so lange zurückliegen, werden nicht mehr nachgeholt. */
+const STALE_OPEN_FIXTURE_MS = 30 * 24 * 60 * 60 * 1000;
+
 export function relevantCompetitions(leagues: ApiLeague[]): ApiLeague[] {
   return leagues
     .filter((league) => league.league.type.toLocaleLowerCase() !== "league")
@@ -156,7 +164,10 @@ export async function buildLeagueStrength(options: {
         seasonCount,
         now
       )) {
-        if (database.isStrengthSeasonComplete(competition.league.id, season)) {
+        const seasonDetails = competition.seasons.find(
+          (item) => item.year === season
+        );
+        if (database.isStrengthSeasonComplete(competition.league.id, season, seasonDetails?.end)) {
           competitionsProcessed += 1;
           continue;
         }
@@ -164,9 +175,8 @@ export async function buildLeagueStrength(options: {
           budgetReached = true;
           break outer;
         }
-        const fixtures = completedFixtures(
-          await client.getSeasonFixtures(competition.league.id, season)
-        );
+        const seasonFixtures = await client.getSeasonFixtures(competition.league.id, season);
+        const fixtures = completedFixtures(seasonFixtures);
         fixturesCollected += fixtures.length;
         for (const fixture of fixtures) {
           try {
@@ -215,12 +225,21 @@ export async function buildLeagueStrength(options: {
             throw error;
           }
         }
-        const seasonDetails = competition.seasons.find(
-          (item) => item.year === season
-        );
+        // Fertig erst, wenn das Saisonende vorbei ist UND keine Ansetzung mehr offen steht.
+        // API-Football führt `end` als letzte bisher angesetzte Partie und schiebt es mit jeder
+        // neuen Pokalrunde nach hinten; nur nach `end` markiert, froren EFL Trophy, Australia
+        // Cup, Conference League und Copa Paraguay 2026 ein (Prüfung vom 05.10.2026).
+        // Eine Ansetzung, deren Termin über 30 Tage zurückliegt, gilt als erledigt: API-Football
+        // lässt verschobene Altspiele teils für immer offen stehen (Copa do Brasil 2025, PST vom
+        // 19.02.2025), die Saison würde sonst bei jedem Nachladen erneut geholt.
+        const staleBefore = now.getTime() - STALE_OPEN_FIXTURE_MS;
         const seasonEnded =
           seasonDetails !== undefined &&
-          Date.parse(seasonDetails.end) < now.getTime();
+          Date.parse(seasonDetails.end) < now.getTime() &&
+          !seasonFixtures.some((fixture) =>
+            !CLOSED_STATUSES.has(fixture.fixture.status.short.toUpperCase()) &&
+            fixture.fixture.timestamp * 1000 >= staleBefore
+          );
         if (seasonEnded) {
           database.markStrengthSeasonComplete(
             competition.league.id,

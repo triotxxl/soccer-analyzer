@@ -22,6 +22,13 @@ Markt (z. B. Über 2,5)
 - **Empfehlungsstufe ≠ Vorteil.** Die Stufe („Sehr empfehlenswert" ★ / „Empfehlenswert" ✓ / keine)
   beruht nur auf Modellwahrscheinlichkeit, Datenvertrauen und Profilpunkten, **nie** auf Quote oder
   Vorteil. Eine UI, die Stufe und Vorteil zu einem Signal verschmilzt, ist ein P0-Fehler.
+- **Live-Chance ≠ Empfehlungsstufe ≠ Vorteil** (seit 29.09.2026). Die Live-Chance („Noch ein Tor
+  67 %“) ist eine Modellwahrscheinlichkeit im laufenden Spiel aus Torerwartung vor dem Anpfiff,
+  Minute, Stand und Roten Karten (`src/live-model.ts`); sie gilt für 90 Minuten und ist bis zur
+  Nachmessung „vorläufig“. Sie trägt kein ✓/★ und nie einen Vorteil - einen Live-Preis gibt es in
+  der App nicht, und die Quote vor dem Anpfiff ist im Spiel veraltet.
+- **Tatsache ≠ Chance.** „Erreicht“, „noch 2 Tore nötig“, „nicht mehr möglich“ kommen aus dem
+  Stand und sind sicher; sie stehen ohne Prozent und ohne „vorläufig“.
 
 ## Projektfeste Regeln (aus AGENTS.md - nicht zur Disposition)
 

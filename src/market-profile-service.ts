@@ -54,7 +54,7 @@ export class MarketProfileError extends Error {
 }
 
 /**
- * Je Partie und Markt zählt der jüngste Snapshot: Quoten werden bis zum Anpfiff nachgeführt,
+ * Je Partie und Markt zählt der jüngste Snapshot vor dem Anpfiff: Quoten werden bis dahin nachgeführt,
  * und der Picker arbeitet immer auf dem letzten Stand.
  */
 function collectSnapshots(outputDir: string): Map<string, EdgeObservation> {
@@ -63,14 +63,18 @@ function collectSnapshots(outputDir: string): Map<string, EdgeObservation> {
     ? fs.readdirSync(outputDir).filter((file) => file.startsWith("dashboard-") && file.endsWith(".json"))
     : [];
   for (const file of files) {
-    let snapshot: { fixtures?: DashboardFixture[] };
+    let snapshot: { fixtures?: DashboardFixture[]; meta?: { createdAt?: string } };
     try {
-      snapshot = JSON.parse(fs.readFileSync(path.join(outputDir, file), "utf8")) as { fixtures?: DashboardFixture[] };
+      snapshot = JSON.parse(fs.readFileSync(path.join(outputDir, file), "utf8")) as typeof snapshot;
     } catch {
       continue; // Ein abgebrochener Lauf hinterlässt gelegentlich eine halbe Datei.
     }
     const stamp = file.slice("dashboard-".length, -".json".length);
+    const createdAt = Date.parse(snapshot.meta?.createdAt ?? "");
     for (const fixture of snapshot.fixtures ?? []) {
+      // Nur Stände vor dem Anpfiff: Ein Lauf kurz nach Anstoß führt laufende Spiele mit
+      // (5 % der Spiele, Prüfung vom 05.10.2026) - der Picker hätte sie so nie gesehen.
+      if (Number.isFinite(createdAt) && createdAt >= Date.parse(fixture.kickoff)) continue;
       for (const market of (fixture.markets ?? []) as DashboardMarket[]) {
         if (market.odds === null || market.odds <= 1) continue;
         if (market.probability === null || market.probability === undefined) continue;

@@ -129,7 +129,8 @@ fallen je Lauf eher 25–30 Wetten an statt 40, eine Laufzählung liefe aus dem 
    weiterhin unmessbar und steht allein auf dem Argument der Messgrundlage.
 5. **Je Markt vergleichen:** Trennt die Regel inzwischen die tragenden Märkte (Über 2,5, BTTS)
    von den leckenden (1. HZ Über, 1X2)? Das ist die Frage, für die dieser Betrieb läuft.
-6. Zählerstand der `factorDivisor`-Kohorte mitnennen.
+6. Zählerstand der laufenden Modellfassung in „stärkere Liga gewinnt“ (Gruppe „gemessen“,
+   Kurzfassung „seit 3.5.0“ bzw. `npm run report`, Tabelle je Modellversion) mitnennen.
 
 Die Entscheidung, ob danach umgestellt wird — Regel, Märkte oder zurück auf Echtgeld —
 trifft David, nicht die Checkliste.

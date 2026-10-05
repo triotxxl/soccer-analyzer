@@ -109,6 +109,99 @@ test("Ligastärke-Builder lädt die neueste Saison zuerst", async () => {
   database.close();
 });
 
+test("Eine Pokalsaison mit offener Ansetzung gilt nicht als fertig, auch wenn ihr Ende vorbei ist", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "football-strength-open-"));
+  const database = new AnalyzerDatabase(path.join(directory, "test.sqlite"));
+  const cup = (end: string): ApiLeague[] => [{
+    league: { id: 46, name: "EFL Trophy", type: "Cup" },
+    country: { name: "England" },
+    seasons: [{ year: 2026, start: "2026-08-01", end, current: true }]
+  }];
+  let leagues = cup("2026-09-20");
+  const played = fixture({ id: 1, timestamp: Date.parse("2026-09-01T18:00:00Z") / 1000, homeId: 1, awayId: 2, homeGoals: 1, awayGoals: 0, leagueId: 46 });
+  // Die nächste Runde ist schon angesetzt, das `end` der API hinkt hinterher.
+  const upcoming = fixture({ id: 2, timestamp: Date.parse("2026-10-06T18:00:00Z") / 1000, homeId: 3, awayId: 4, status: "NS", leagueId: 46 });
+  let seasonFixtures = [played, upcoming];
+  const fake = {
+    requestCount: 0,
+    requestsRemaining: 1_000,
+    getAllLeagues: async () => leagues,
+    getSeasonFixtures: async () => seasonFixtures,
+    getTeamSeasonFixtures: async () => []
+  } as unknown as ApiFootballClient;
+  const run = (now: string) => buildLeagueStrength({
+    client: fake, database, seasons: 1, requestBudget: 50, competitionIds: [46], now: new Date(now)
+  });
+  await run("2026-09-25T00:00:00Z");
+  assert.equal(database.isStrengthSeasonComplete(46, 2026), false, "offene Ansetzung - nicht fertig");
+
+  // Alle Spiele gespielt und das Ende vorbei: jetzt fertig.
+  seasonFixtures = [played];
+  await run("2026-09-25T00:00:00Z");
+  assert.equal(database.isStrengthSeasonComplete(46, 2026, "2026-09-20"), true);
+
+  // API-Football hängt eine weitere Runde an und schiebt `end` nach hinten: Die alte Markierung
+  // gilt nicht mehr, die Saison wird erneut geladen.
+  leagues = cup("2026-11-24");
+  assert.equal(database.isStrengthSeasonComplete(46, 2026, "2026-11-24"), false);
+  let reloaded = false;
+  (fake as unknown as { getSeasonFixtures: () => Promise<ApiFixture[]> }).getSeasonFixtures = async () => {
+    reloaded = true;
+    return [played];
+  };
+  await run("2026-10-05T00:00:00Z");
+  assert.ok(reloaded, "verlängerte Saison wird neu geladen");
+  database.close();
+});
+
+test("Absagen als „Canc“ und monatealte verschobene Spiele halten eine Saison nicht offen", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "football-strength-stale-"));
+  const database = new AnalyzerDatabase(path.join(directory, "test.sqlite"));
+  const leagues: ApiLeague[] = [{
+    league: { id: 73, name: "Copa Do Brasil", type: "Cup" },
+    country: { name: "Brazil" },
+    seasons: [{ year: 2025, start: "2025-02-01", end: "2025-12-15", current: false }]
+  }];
+  const played = fixture({ id: 1, timestamp: Date.parse("2025-12-10T22:00:00Z") / 1000, homeId: 1, awayId: 2, homeGoals: 1, awayGoals: 1, leagueId: 73, season: 2025 });
+  const cancelled = fixture({ id: 2, timestamp: Date.parse("2025-11-01T22:00:00Z") / 1000, homeId: 3, awayId: 4, status: "Canc", leagueId: 73, season: 2025 });
+  const postponedLongAgo = fixture({ id: 3, timestamp: Date.parse("2025-02-19T22:00:00Z") / 1000, homeId: 5, awayId: 6, status: "PST", leagueId: 73, season: 2025 });
+  const fake = {
+    requestCount: 0,
+    requestsRemaining: 1_000,
+    getAllLeagues: async () => leagues,
+    getSeasonFixtures: async () => [played, cancelled, postponedLongAgo],
+    getTeamSeasonFixtures: async () => []
+  } as unknown as ApiFootballClient;
+  await buildLeagueStrength({
+    client: fake, database, seasons: 1, requestBudget: 50, competitionIds: [73], now: new Date("2026-01-10T00:00:00Z")
+  });
+  assert.equal(database.isStrengthSeasonComplete(73, 2025, "2025-12-15"), true);
+  database.close();
+});
+
+test("Ein kürzlich verschobenes Spiel hält die Saison offen", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "football-strength-recent-pst-"));
+  const database = new AnalyzerDatabase(path.join(directory, "test.sqlite"));
+  const leagues: ApiLeague[] = [{
+    league: { id: 73, name: "Copa Do Brasil", type: "Cup" },
+    country: { name: "Brazil" },
+    seasons: [{ year: 2025, start: "2025-02-01", end: "2025-12-15", current: true }]
+  }];
+  const postponed = fixture({ id: 4, timestamp: Date.parse("2025-12-14T22:00:00Z") / 1000, homeId: 7, awayId: 8, status: "PST", leagueId: 73, season: 2025 });
+  const fake = {
+    requestCount: 0,
+    requestsRemaining: 1_000,
+    getAllLeagues: async () => leagues,
+    getSeasonFixtures: async () => [postponed],
+    getTeamSeasonFixtures: async () => []
+  } as unknown as ApiFootballClient;
+  await buildLeagueStrength({
+    client: fake, database, seasons: 1, requestBudget: 50, competitionIds: [73], now: new Date("2025-12-20T00:00:00Z")
+  });
+  assert.equal(database.isStrengthSeasonComplete(73, 2025), false);
+  database.close();
+});
+
 test("Ligastärke wird zeitlich korrekt aufgebaut und erst belastbar aktiviert", async () => {
   const directory = await mkdtemp(path.join(os.tmpdir(), "football-strength-db-"));
   const database = new AnalyzerDatabase(path.join(directory, "test.sqlite"));

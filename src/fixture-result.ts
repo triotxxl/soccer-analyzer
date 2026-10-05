@@ -307,10 +307,23 @@ export function toFixtureResult(
   // Minute fehlt. Anders als `minutesComplete` in `fixture-insights.ts` darf das hier auch für
   // AET und PEN gelten: Die Verlängerung ist ein eigener Abschnitt, und das Schießen ist oben
   // bereits herausgefiltert.
+  //
+  // `finalHome` ist `score.fulltime`, also der Stand nach 90 Minuten. Die Abschnitte 1-2 gehen
+  // deshalb gegen ihn, die Verlängerung gegen den Zuwachs bis `goals` (Stand nach 120 Minuten
+  // ohne Schießen). Bis zum 29.09.2026 gingen alle Tore gegen den 90-Minuten-Stand, und jedes
+  // Pokalspiel mit Tor in der Verlängerung galt als lückenhaft (86 von 90 solcher Spiele).
+  // `score.extratime` taugt dafür nicht, weil API-Football es mal als Gesamtstand, mal als
+  // Zuwachs führt.
+  const regularGoals = (teamId: number) =>
+    countedGoals.filter((goal) => goal.teamId === teamId && goal.section !== 3).length;
+  const extraGoals = (teamId: number) =>
+    countedGoals.filter((goal) => goal.teamId === teamId && goal.section === 3).length;
   const goalsComplete = rawEvents !== null
     && countedGoals.every((goal) => goal.section !== null)
-    && countedGoals.filter((goal) => goal.teamId === homeTeamId).length === finalHome
-    && countedGoals.filter((goal) => goal.teamId === awayTeamId).length === finalAway;
+    && regularGoals(homeTeamId) === finalHome
+    && regularGoals(awayTeamId) === finalAway
+    && extraGoals(homeTeamId) === (fixture.goals.home ?? finalHome) - finalHome
+    && extraGoals(awayTeamId) === (fixture.goals.away ?? finalAway) - finalAway;
 
   const statistics = options.statistics ?? fixture.statistics;
   const homeStats = statsFor(statistics?.find((entry) => entry.team.id === homeTeamId));

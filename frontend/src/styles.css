@@ -151,7 +151,7 @@ fieldset.filter-field { min-width: 0; margin-inline: 0; padding: 0; border: 0; }
    in einer waagrechten Reihe wie ein Trennstrich zwischen zwei Segmenten aus. Ein Pseudo-Element
    statt Inhalt, damit label.textContent unveraendert bleibt (App.test.tsx prueft ihn). */
 .segmented.filter-seg label:has(input:checked)::after,
-.filter-tile.checked::after, .quick-range.active::after, .day-tile.selected::after
+.filter-tile.checked::after, .quick-range.active::after
   { content: ""; position: absolute; left: 8px; right: 8px; bottom: 0; height: 3px; border-radius: 3px 3px 0 0; background: var(--green); }
 .segmented.filter-seg label:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: -2px; }
 .segmented.filter-seg label:has(input:disabled) { cursor: default; opacity: .45; }
@@ -224,23 +224,37 @@ fieldset.filter-field { min-width: 0; margin-inline: 0; padding: 0; border: 0; }
 .filter-chip-clear { display: grid; place-items: center; width: 24px; height: 100%; padding: 0; border: 0; border-left: 1px solid var(--line); background: transparent; color: var(--muted); }
 .filter-chip-label:hover, .filter-chip-clear:hover { background: rgba(255,255,255,.06); color: var(--text); }
 
-/* Zeitraum: links die Kachel "Naechste 48 Std.", rechts eine Reihe Tageskacheln ab dem ersten
-   Tag der Analyse, sieben je Zeile. Jeder gewaehlte Tag traegt den gruenen Balken, ein Zeitraum
-   liest sich so als unterbrochene Linie. Kein Monatspfeil, kein Uebernehmen. */
+/* Zeitraum als Kalender (seit 30.09.2026): oben links die Kachel "Naechste 48 Std.", daneben die
+   Felder Von und Bis, darunter ueber die volle Breite die Monatsansicht Mo-So. Der gewaehlte
+   Zeitraum liegt als Flaeche #37373d, Anfang und Ende tragen den gruenen Balken wie jede Wahl im
+   Menue. Kein Uebernehmen. */
 .day-range { display: grid; grid-template-columns: 76px minmax(0, 1fr); gap: 8px; align-items: start; min-width: 0; }
 .quick-range { position: relative; display: grid; place-content: center; gap: 1px; height: 44px; min-width: 0; padding: 0 6px; border: 0; border-radius: 8px; background: var(--bg); color: var(--muted); font-size: 11px; font-weight: 600; line-height: 1.25; text-align: center; }
 .quick-range:hover:not(.active) { background: #222222; color: var(--text); }
 .quick-range.active { background: #37373d; color: var(--text); }
 .quick-range:focus-visible { outline-offset: -2px; }
-.day-tiles { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; min-width: 0; }
-.day-tile { position: relative; display: grid; place-content: center; gap: 1px; height: 44px; min-width: 0; padding: 0; border: 0; border-radius: 8px; background: var(--bg); color: var(--text); font-family: var(--mono); text-align: center; }
-.day-tile:hover:not(.selected) { background: #222222; }
-.day-tile.selected { background: #37373d; }
-.day-tile.selected .day-weekday { color: var(--text); }
-.day-tile.selected .day-num { font-weight: 700; }
-.day-tile:focus-visible { outline-offset: -2px; }
-.day-weekday { color: var(--muted); font-size: 10px; line-height: 1.2; }
-.day-num { font-size: 13px; font-weight: 600; line-height: 1.2; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.date-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; min-width: 0; }
+.date-field { display: grid; gap: 2px; min-width: 0; height: 44px; padding: 5px 8px; border-radius: 8px; background: var(--bg); color: var(--muted); font-size: 10px; line-height: 1.2; }
+.date-field:focus-within { outline: 2px solid var(--accent); outline-offset: -2px; }
+.date-field input { width: 100%; min-width: 0; padding: 0; border: 0; background: transparent; color: var(--text); color-scheme: dark; font-family: var(--mono); font-size: 12px; font-variant-numeric: tabular-nums; }
+.date-field input:focus { outline: 0; }
+.date-field input::-webkit-calendar-picker-indicator { cursor: pointer; opacity: .7; }
+.calendar { grid-column: 1 / -1; display: grid; gap: 6px; min-width: 0; padding: 8px; border-radius: 8px; background: var(--bg); }
+.calendar-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.calendar-head strong { color: var(--text); font-size: 12px; font-weight: 600; }
+.calendar-nav { display: grid; place-items: center; width: 26px; height: 26px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: var(--muted); }
+.calendar-nav:hover:not(:disabled) { background: #222222; color: var(--text); }
+.calendar-nav:disabled { opacity: .3; cursor: default; }
+.calendar-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; }
+.calendar-weekday { padding: 2px 0 4px; color: var(--dim); font-size: 10px; font-weight: 600; text-align: center; }
+.calendar-day { position: relative; display: grid; place-items: center; height: 32px; min-width: 0; padding: 0; border: 0; border-radius: 6px; background: transparent; color: var(--text); font-family: var(--mono); font-size: 12px; font-variant-numeric: tabular-nums; }
+.calendar-day:hover:not(:disabled):not(.in-range) { background: #222222; }
+.calendar-day:disabled { color: var(--dim); opacity: .45; cursor: default; }
+.calendar-day.in-range { background: #37373d; }
+.calendar-day.preview { background: #2c2c30; }
+.calendar-day.edge { font-weight: 700; }
+.calendar-day.edge::after { content: ""; position: absolute; left: 6px; right: 6px; bottom: 0; height: 3px; border-radius: 3px 3px 0 0; background: var(--green); }
+.calendar-day:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .day-range-hint { grid-column: 1 / -1; }
 .league-filter-modal { position: fixed; top: 50%; left: 50%; z-index: 61; width: min(940px, calc(100vw - 32px)); max-height: min(680px, calc(100vh - 48px)); display: flex; flex-direction: column; overflow: hidden; border: 1px solid #4a4a4a; border-radius: 14px; background: #1e1e1e; box-shadow: 0 24px 60px rgba(0,0,0,.55); transform: translate(-50%,-50%); }
 .league-modal-toolbar { flex: 0 0 auto; display: flex; gap: 8px; padding: 14px 16px 0; }
@@ -441,53 +455,44 @@ fieldset.filter-field { min-width: 0; margin-inline: 0; padding: 0; border: 0; }
    blau (Blau ist nur Tastaturfokus) und nicht grün (Grün heißt in der Tabelle „Empfehlenswert“). */
 .fixture-wrap.open { background: #37373d; box-shadow: inset 3px 0 0 var(--text); }
 .fixture-row { width: 100%; min-height: 56px; padding: 6px 10px 6px 40px; border: 0; background: transparent; text-align: left; }
-/* Die Nabe trägt das Wort "Add" statt eines Plus. Gestrichelte Kontur und die drei Punkte,
-   die sie umlaufen, kündigen den Ring an; angeklickt wird sie nur für Tastatur und Touch. */
-/* Zwei Fallen auf einmal, beide betreffen den Ring, nicht die Nabe selbst:
-   Kein transform! Ein transformierter Vorfahre wird zum Bezugsrahmen für position: fixed,
-   und der Ring rechnet in Fensterkoordinaten - er landete sonst als Versatz neben der Nabe
-   statt hinter ihr. Deshalb wird über margin zentriert.
-   Und kein z-index! Eine positionierte Box mit z-index öffnet einen eigenen Stapelkontext;
-   der Ring läge dann mit seiner 46 innerhalb dieser Stufe und verschwände unter dem
-   Tabellenkopf auf Stufe 5. Ohne z-index malt die absolut positionierte Nabe ohnehin über
-   die nicht positionierte Zeile, und der Ring vergleicht sich direkt mit dem Kopf. */
+/* Der "Add"-Knopf im Leistenstil (seit 30.09.2026 statt der gestrichelten Nabe mit Ring):
+   Ruhe --bg, Ueberfahren #222, offen #37373d. Liegt aus dem Spiel etwas im Wettschein, steht
+   dort die Zahl mit dem gruenen Balken unten wie an gewaehlten Kacheln im Filtermenue.
+   Keine Daueranimation - das "Atmen" der Punkte lief in jeder ueberfahrenen Zeile.
+   Die Nabe traegt weder transform noch z-index: Ein transformierter Vorfahre wuerde zum
+   Bezugsrahmen fuer die feste Liste, ein z-index oeffnete einen Stapelkontext, in dem die Liste
+   unter dem Tabellenkopf verschwaende. Deshalb wird ueber margin zentriert. */
 .cart-add-hub { --hub-size: 26px; position: absolute; left: 8px; top: 50%; margin-top: calc(var(--hub-size) / -2); }
-.cart-add { position: relative; display: grid; place-items: center; width: var(--hub-size); height: var(--hub-size); padding: 0; border: 1px dashed #5f5f5f; border-radius: 50%; background: #202020; color: #9d9d9d; line-height: 1; transition: border-color .15s ease, background .15s ease, color .15s ease; }
-.cart-add-word { font-size: 8px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
-/* Die Punkte sitzen mit derselben Technik wie die Speichen knapp außerhalb der Nabe und
-   sind damit eine Miniatur des Rings, der gleich aufgeht. */
-.cart-add-orbit { position: absolute; inset: 0; pointer-events: none; }
-.cart-add-orbit i { position: absolute; left: 50%; top: 50%; width: 3px; height: 3px; margin: -1.5px 0 0 -1.5px; border-radius: 50%; background: currentColor; opacity: .55; transition: transform .18s ease, opacity .18s ease; transform: rotate(var(--orbit-angle)) translateX(21px); }
-.cart-add-orbit i:nth-child(1) { --orbit-angle: -90deg; }
-.cart-add-orbit i:nth-child(2) { --orbit-angle: 30deg; }
-.cart-add-orbit i:nth-child(3) { --orbit-angle: 150deg; }
-/* Solange die Zeile unter dem Zeiger liegt, atmen die Punkte nach außen: der Hinweis,
-   dass hier noch etwas aufgeht. */
-.fixture-row-wrap:hover .cart-add-orbit i { animation: cart-add-orbit-breathe 2.2s ease-in-out infinite; }
-.cart-add:hover, .cart-add-hub.open .cart-add { border-style: solid; border-color: var(--accent); background: rgba(55,148,255,.16); color: #cde6ff; }
-/* Beim Öffnen fliegen die Punkte nach außen und übergeben an den echten Ring. */
-.cart-add:hover .cart-add-orbit i, .cart-add-hub.open .cart-add-orbit i { animation: none; opacity: 0; transform: rotate(var(--orbit-angle)) translateX(30px); }
-@keyframes cart-add-orbit-breathe {
-  0%, 100% { opacity: .55; transform: rotate(var(--orbit-angle)) translateX(21px); }
-  50% { opacity: .95; transform: rotate(var(--orbit-angle)) translateX(25px); }
-}
+.cart-add { position: relative; display: grid; place-items: center; width: var(--hub-size); height: var(--hub-size); padding: 0; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--muted); font-size: 8px; font-weight: 700; letter-spacing: .06em; line-height: 1; text-transform: uppercase; transition: background .1s ease, color .1s ease; }
+.cart-add:hover { background: #222222; color: var(--text); }
+.cart-add-hub.open .cart-add { background: #37373d; color: var(--text); }
+.cart-add.has-entries { color: var(--text); font-family: var(--mono); font-size: 12px; letter-spacing: 0; }
+.cart-add.has-entries::after { content: ""; position: absolute; left: 4px; right: 4px; bottom: 0; height: 2px; border-radius: 2px 2px 0 0; background: var(--green); }
+.cart-add:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 
-/* Radialmenü: Der Mittelpunkt liegt auf der Nabe, jede Speiche wird um ihren Winkel
-   gedreht, nach außen geschoben und für den Inhalt zurückgedreht. */
-.cart-radial { position: fixed; z-index: 46; width: 0; height: 0; }
-.cart-radial-spoke { position: absolute; left: 0; top: 0; width: var(--radial-radius); height: 1px; background: linear-gradient(90deg, rgba(55,148,255,.5), rgba(55,148,255,0) 88%); transform-origin: 0 50%; transform: rotate(var(--radial-angle)); pointer-events: none; }
-.cart-radial-slot { position: absolute; left: 0; top: 0; transform: rotate(var(--radial-angle)) translateX(var(--radial-radius)) rotate(calc(-1 * var(--radial-angle))); }
-.cart-radial-item { position: absolute; display: grid; place-content: center; justify-items: center; gap: 1px; width: var(--radial-item); height: var(--radial-item); padding: 0; border: 1px solid #4a4a4a; border-radius: 50%; background: #252526; color: var(--text); box-shadow: 0 10px 24px rgba(0,0,0,.5); transform: translate(-50%,-50%); transition: border-color .12s ease, background .12s ease, transform .12s ease; animation: cart-radial-in .16s ease-out backwards; animation-delay: calc(var(--radial-index) * 25ms); }
-.cart-radial-item strong { font-size: 9px; letter-spacing: .02em; white-space: nowrap; }
-.cart-radial-item small { color: #969696; font-size: 10px; }
-.cart-radial-item.recommended { border-color: rgba(95,191,139,.6); background: rgba(95,191,139,.12); }
-.cart-radial-item.strong { border-color: rgba(217,180,95,.7); background: rgba(217,180,95,.12); }
-.cart-radial-item:not(:disabled):hover { border-color: var(--accent); background: var(--accent-soft); transform: translate(-50%,-50%) scale(1.1); }
-.cart-radial-item.added { border-style: dashed; color: var(--green); cursor: not-allowed; opacity: .7; }
-@keyframes cart-radial-in { from { opacity: 0; transform: translate(-50%,-50%) scale(.55); } to { opacity: 1; transform: translate(-50%,-50%) scale(1); } }
+/* Die Marktliste: gebaut wie die geoeffnete Marktliste der Werkzeugleiste
+   (.view-toolbar select::picker(select)). Fest im Fenster, damit das seitliche Scrollen der
+   Tabelle nichts abschneidet; die Stelle misst menuPlacement in BetCartUI.tsx. Im Wettschein
+   heisst gewaehlt: Flaeche #37373d, fett, gruener Balken links - kein Haekchen, denn ✓ heisst in
+   der Tabelle "Empfehlenswert". Einzige Animation: 120 ms Einblenden. */
+.cart-menu { position: fixed; z-index: 46; display: flex; flex-direction: column; width: 260px; max-height: min(460px, calc(100vh - 16px)); padding: 4px; overflow-y: auto; border: 1px solid #4a4a4a; border-radius: 10px; background: var(--bg); box-shadow: 0 18px 42px rgba(0,0,0,.62); color: var(--text); font-size: 12px; text-align: left; animation: cart-menu-in .12s ease-out; }
+@keyframes cart-menu-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+.cart-menu-head { display: grid; gap: 2px; padding: 6px 10px 8px; border-bottom: 1px solid var(--line); }
+.cart-menu-head strong { font-size: 12px; font-weight: 600; }
+.cart-menu-head span { overflow: hidden; color: var(--muted); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.cart-menu-group + .cart-menu-group { margin-top: 4px; border-top: 1px solid var(--line); }
+.cart-menu-group-title { padding: 8px 10px 2px; color: var(--muted); font-size: 10px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
+.cart-menu-item { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) 14px 40px; align-items: center; gap: 6px; width: 100%; min-height: 30px; margin-top: 2px; padding: 0 10px 0 14px; border: 0; border-radius: 6px; background: transparent; color: var(--muted); font-size: 12px; text-align: left; }
+.cart-menu-item:hover:not([aria-checked="true"]) { background: #222222; color: var(--text); }
+.cart-menu-item[aria-checked="true"] { background: #37373d; color: var(--text); font-weight: 600; }
+.cart-menu-item[aria-checked="true"]::before { content: ""; position: absolute; top: 6px; bottom: 6px; left: 0; width: 3px; border-radius: 0 3px 3px 0; background: var(--green); }
+.cart-menu-item:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.cart-menu-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cart-menu-item .level-glyph { width: auto; text-align: center; }
+.cart-menu-odds { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; }
+.cart-menu-foot { margin-top: 4px; padding: 8px 10px 4px; border-top: 1px solid var(--line); color: var(--muted); font-size: 11px; }
 @media (prefers-reduced-motion: reduce) {
-  .cart-add-orbit i, .cart-radial-item { transition: none; animation: none; }
-  .fixture-row-wrap:hover .cart-add-orbit i { animation: none; }
+  .cart-add, .cart-menu { transition: none; animation: none; }
   .insight-loading i { animation: none; }
 }
 .fixture-row:hover { background: #222222; }
@@ -820,64 +825,97 @@ fieldset.filter-field { min-width: 0; margin-inline: 0; padding: 0; border: 0; }
 .live-notice { display: flex; align-items: center; gap: 8px; margin-top: 14px; padding: 9px 12px; border: 1px solid #6a4423; border-radius: 10px; background: #332415; color: #e2984a; font-size: 10px; }
 .live-notice svg { flex: 0 0 auto; }
 
+.live-warning { margin: 12px 0 0; }
 .live-list { min-height: 0; flex: 1; margin: 0 -28px; padding: 14px 28px 24px; overflow: auto; }
-.live-row { --market-count: 5; display: grid; grid-template-columns: 58px minmax(180px,1.5fr) 42px minmax(120px,.85fr) minmax(110px,.7fr) repeat(var(--market-count),minmax(122px,.8fr)); gap: 12px; align-items: center; min-width: max(100%, calc(620px + var(--market-count) * 134px)); min-height: 78px; padding: 10px 12px; border-bottom: 1px solid var(--line-soft); background: rgba(30,30,30,.72); }
-.live-row:nth-child(odd) { background: rgba(37,37,38,.78); }
+/* Sechs Spalten statt fünf plus bis zu vierzehn Marktkästchen (seit 29.09.2026): Die Zeile
+   beantwortet eine gewählte Frage, Quote und Stufe vor dem Anpfiff stehen im Fenster. Keine
+   Streifen - wie die Tabelle seit 28.09. */
+.live-row { display: grid; grid-template-columns: 64px minmax(170px,1.3fr) 40px minmax(200px,1.5fr) 64px 84px 84px 112px; gap: 14px; align-items: center; min-width: 900px; min-height: 76px; padding: 10px 12px; border-bottom: 1px solid var(--line-soft); cursor: pointer; }
 .live-row:hover, .live-row:focus-visible { background: rgba(255,255,255,.05); }
+.live-row.open { background: rgba(255,255,255,.08); }
 .live-row > span { min-width: 0; }
 
-.live-minute { display: grid; place-items: center; padding: 5px 4px; border: 1px solid rgba(241,76,76,.45); border-radius: 8px; background: rgba(241,76,76,.12); color: #ff8a8a; font-size: 11px; font-weight: 700; }
+.live-minute { display: grid; place-items: center; padding: 5px 4px; border: 1px solid rgba(241,76,76,.45); border-radius: 8px; background: rgba(241,76,76,.12); color: #ff8a8a; font-size: 11px; font-weight: 700; white-space: nowrap; }
 .live-minute.live::before { display: inline-block; width: 5px; height: 5px; margin-right: 5px; border-radius: 50%; background: var(--red); content: ""; animation: live-pulse 1.6s ease-in-out infinite; vertical-align: middle; }
 @keyframes live-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .25; } }
 @media (prefers-reduced-motion: reduce) { .live-minute.live::before { animation: none; } }
 
-.live-teams { display: grid; gap: 6px; }
+.live-teams { display: grid; gap: 5px; }
 .live-team { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .live-team strong { overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
 .live-team:first-child strong { color: var(--home); }
-.live-team:last-child strong { color: var(--away); }
-.live-red { flex: 0 0 auto; padding: 1px 5px; border-radius: 4px; background: var(--red); color: #ffffff; font-size: 8px; font-style: normal; font-weight: 700; }
+.live-team:nth-child(2) strong { color: var(--away); }
+.live-league { overflow: hidden; color: #969696; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.live-red { flex: 0 0 auto; padding: 1px 5px; border-radius: 4px; background: var(--red); color: #ffffff; font-size: 10px; font-style: normal; font-weight: 700; }
 .live-score { display: grid; gap: 6px; text-align: center; }
 .live-score strong { font-size: 14px; font-variant-numeric: tabular-nums; }
-.live-meta { display: grid; gap: 4px; min-width: 0; color: #969696; }
-.live-meta small { overflow: hidden; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
-.live-momentum { display: grid; gap: 6px; }
-.live-momentum-line { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; color: #969696; font-size: 8px; }
-.live-momentum-line strong { color: var(--text); font-size: 11px; font-variant-numeric: tabular-nums; }
+
+.live-value { display: grid; gap: 3px; }
+.live-value-label { color: #969696; font-size: 10px; }
+.live-value-line { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+.live-chance { font-size: 16px; font-variant-numeric: tabular-nums; }
+.live-fact { color: var(--text); font-size: 12px; }
+.live-fact.muted { color: #969696; }
+/* Grau statt Grün oder Gold: Grün heißt „Empfehlenswert“, Gold „Sehr empfehlenswert“. */
+.live-provisional { padding: 0 5px; border: 1px solid #555555; border-radius: 4px; color: #b9b9b9; font-size: 10px; font-weight: 400; }
+.live-second { display: grid; gap: 4px; color: #969696; font-size: 10px; }
+.live-second small { font-size: 10px; }
+.live-prematch-hint { color: #8a8a8a; }
+/* Kopfzeile wie in der Tabelle: bleibt beim Scrollen stehen, blendet nichts aus. */
+.live-head { position: sticky; top: -14px; z-index: 2; min-height: 0; padding-block: 8px; background: var(--bg); color: #969696; font-size: 10px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; cursor: default; }
+.live-head:hover { background: var(--bg); }
+.live-head > span:nth-child(n+5) { text-align: center; }
+/* Heim oben, Gast unten - auf Höhe der Teamnamen und des Stands. */
+.live-stat { display: grid; gap: 6px; text-align: center; font-size: 12px; font-variant-numeric: tabular-nums; }
+.live-stat .home, .live-stat .away { display: flex; justify-content: center; align-items: center; gap: 6px; min-height: 17px; white-space: nowrap; }
+.live-card { display: inline-flex; align-items: center; gap: 3px; }
+/* Als Karte gezeichnet (hochkant), nicht in Gold: Gold heißt „Sehr empfehlenswert“. */
+.live-card i { display: inline-block; width: 8px; height: 11px; border-radius: 2px; background: #e8c93a; }
+.live-card.red i { background: var(--red); }
 
 .live-metric-bar { display: flex; overflow: hidden; height: 5px; border-radius: 3px; background: #333333; }
 .live-metric-bar i { display: block; height: 100%; }
 .live-metric-bar i.home { background: var(--home); }
+.live-metric-bar i.middle { background: #5a5a5a; }
 .live-metric-bar i.away { background: var(--away); }
 .live-metric-bar i.empty { width: 100%; background: repeating-linear-gradient(90deg, #3a3a3a 0 4px, transparent 4px 8px); }
 
-.live-panel { position: fixed; z-index: 45; max-height: min(78vh, 640px); padding: 14px 16px; border: 1px solid #4a4a4a; border-radius: 13px; background: #252526; box-shadow: 0 22px 55px rgba(0,0,0,.65); overflow-y: auto; pointer-events: none; }
-.live-panel-head { display: grid; gap: 5px; padding-bottom: 10px; border-bottom: 1px solid var(--line-soft); }
+.live-panel { position: fixed; z-index: 45; max-height: min(88vh, 720px); padding: 14px 16px; border: 1px solid #4a4a4a; border-radius: 13px; background: #252526; box-shadow: 0 22px 55px rgba(0,0,0,.65); overflow-y: auto; }
+.live-panel-head { display: grid; gap: 5px; padding-bottom: 10px; }
 .live-panel-head .live-minute { justify-self: start; padding-inline: 8px; }
 .live-panel-head strong { font-size: 13px; }
-.live-panel-head small { color: #969696; font-size: 9px; }
-.live-panel-empty { margin: 12px 0 0; color: #969696; font-size: 10px; line-height: 1.6; }
-.live-metric-list { display: grid; gap: 7px; padding: 11px 0; }
-.live-metric-row { display: grid; grid-template-columns: 46px minmax(0,1fr) 46px; align-items: center; gap: 9px; }
+.live-panel-head small { color: #969696; font-size: 10px; }
+.live-section { padding: 9px 0; border-top: 1px solid var(--line-soft); }
+.live-section:last-child { padding-bottom: 0; }
+.live-section h4 { margin: 0 0 7px; color: #969696; font-size: 10px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
+.live-section h4 .live-provisional { letter-spacing: 0; text-transform: none; }
+.live-panel-empty { margin: 0; color: #969696; font-size: 11px; line-height: 1.5; }
+.live-panel-note { margin: 6px 0 0; color: #969696; font-size: 10px; line-height: 1.5; }
+.live-chances { display: grid; gap: 4px; margin: 0; }
+.live-chances div { display: grid; grid-template-columns: 128px minmax(0,1fr); gap: 8px; font-size: 11px; }
+.live-chances dt { color: #969696; }
+.live-chances dd { margin: 0; color: var(--text); font-variant-numeric: tabular-nums; }
+.live-cards { margin: 0; color: #b9b9b9; font-size: 11px; }
+.live-cards strong { color: var(--text); font-variant-numeric: tabular-nums; }
+.live-metric-list { display: grid; gap: 7px; }
+.live-metric-row { display: grid; grid-template-columns: 40px minmax(0,1fr) 40px; align-items: center; gap: 9px; }
 .live-metric-home, .live-metric-away { font-size: 11px; font-variant-numeric: tabular-nums; }
 .live-metric-home { color: var(--home); text-align: right; }
 .live-metric-away { color: var(--away); }
 .live-metric-body { display: grid; gap: 3px; min-width: 0; }
-.live-metric-body small { color: #969696; font-size: 8px; letter-spacing: .04em; text-align: center; text-transform: uppercase; }
-.live-activity { margin: 4px 0 0; color: #969696; font-size: 9px; text-align: center; }
-.live-activity strong { color: var(--text); }
+.live-metric-body small { color: #969696; font-size: 10px; text-align: center; }
+.live-context { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 2px 0 0; color: #969696; font-size: 10px; }
+.live-context strong { color: #b9b9b9; font-weight: 600; font-variant-numeric: tabular-nums; }
 
-.live-events, .live-prematch { padding-top: 11px; border-top: 1px solid var(--line-soft); }
-.live-events h4, .live-prematch h4 { margin: 0 0 7px; color: #969696; font-size: 8px; letter-spacing: .09em; text-transform: uppercase; }
 .live-events ul, .live-prematch ul { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
-.live-events li { display: grid; grid-template-columns: 34px 20px minmax(0,1fr); align-items: center; gap: 7px; font-size: 9px; }
+.live-events li { display: grid; grid-template-columns: 38px 22px minmax(0,1fr); align-items: center; gap: 7px; font-size: 11px; }
 .live-events li.home .live-event-text { color: var(--home); }
 .live-events li.away .live-event-text { color: var(--away); }
 .live-event-minute { color: #969696; font-variant-numeric: tabular-nums; }
 .live-event-glyph { font-size: 10px; text-align: center; }
 .live-event-text { overflow: hidden; color: #b9b9b9; text-overflow: ellipsis; white-space: nowrap; }
-.live-prematch p { margin: 0 0 7px; color: #969696; font-size: 9px; }
-.live-prematch li { display: grid; grid-template-columns: minmax(0,1fr) 58px 42px; gap: 8px; padding: 3px 6px; border-radius: 6px; color: #b9b9b9; font-size: 9px; }
+.live-prematch p { margin: 0 0 7px; color: #969696; font-size: 10px; }
+.live-prematch li { display: grid; grid-template-columns: minmax(0,1fr) auto 42px; gap: 10px; padding: 3px 6px; border-radius: 6px; color: #b9b9b9; font-size: 11px; }
 .live-prematch li.recommended { background: rgba(95,191,139,.1); color: #cfe9d8; }
 .live-prematch li.strong { background: rgba(217,180,95,.1); color: #ecdcb4; }
 .live-prematch li span:nth-child(2) { text-align: right; }
@@ -915,8 +953,6 @@ fieldset.filter-field { min-width: 0; margin-inline: 0; padding: 0; border: 0; }
   .table-scroll { margin: 0 0 12px; }
   .fixture-detail-panel { width: auto; min-width: 0; flex: 0 0 auto; border-left: 0; border-top: 1px solid var(--line); }
   .period-row, .period-axis { grid-template-columns: 16px 36px 17px repeat(6, minmax(0, 1fr)); }
-  .cart-radial-item strong { font-size: 8px; }
-  .cart-radial-item small { font-size: 9px; }
   .bet-cart-badge { right: 14px; bottom: 14px; }
 }
 
@@ -1090,9 +1126,7 @@ fieldset.filter-field { min-width: 0; margin-inline: 0; padding: 0; border: 0; }
 .heatmap-row-wrap.open { background: #252526; box-shadow: inset 3px 0 0 var(--accent); }
 .heatmap-row { height: 34px; padding: 0 10px 0 38px; border: 0; background: transparent; text-align: left; }
 .heatmap-row-wrap .cart-add-hub { --hub-size: 22px; }
-.cart-add-hub.compact .cart-add { border-radius: 6px; }
-.cart-add-hub.compact .cart-add-word { font-size: 14px; font-weight: 500; letter-spacing: 0; }
-.cart-add-hub.compact .cart-add-orbit { display: none; }
+.cart-add-hub.compact .cart-add:not(.has-entries) { font-size: 14px; font-weight: 500; letter-spacing: 0; }
 .heatmap-time { display: flex; align-items: baseline; gap: 6px; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .heatmap-time small { color: #6f6f6f; font-size: 10px; }
 .heatmap-time strong { color: #e0e0e0; font-size: 13px; font-weight: 700; }

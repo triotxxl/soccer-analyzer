@@ -3,7 +3,7 @@ import path from "node:path";
 import { config, ROOT_DIR } from "./config.ts";
 import { recentAverage, type MatchSideStats, type RecentAverage } from "./recent-stats.ts";
 import { teamNameSimilarity } from "./team-resolver.ts";
-import type { DefensiveProfile, DrawAnalysisResult, FavoriteAnalysisResult, GoalLineAnalysisResult, GoalLineRow, LeagueStats, LeagueStrengthComparison, RecentMatchSummary, TipicoOdds } from "./types.ts";
+import type { DefensiveProfile, DrawAnalysisResult, FavoriteAnalysisResult, GoalLineAnalysisResult, GoalLineRow, LeagueStats, LeagueStrengthComparison, LiveCoverage, RecentMatchSummary, TipicoOdds } from "./types.ts";
 import type { EloSystem } from "./elo-config.ts";
 
 export interface DashboardInput {
@@ -31,6 +31,16 @@ export interface DashboardInput {
    * es geht in keinen Tipp, keine Wahrscheinlichkeit und keinen Filter ein.
    */
   elo?: Map<number, TeamElo>;
+  /**
+   * Ob eine Liga Karten in den Ereignissen führt, je `Land|Liga` aus `fixture_results`
+   * (`AnalyzerDatabase.cardDataByLeague`). Fehlt eine Liga, bleibt `cardData` offen.
+   */
+  cardData?: Map<string, boolean>;
+}
+
+/** Schlüssel für `DashboardInput.cardData` - dieselben Namen wie in `fixture_results`. */
+export function leagueKey(country: string, league: string): string {
+  return `${country}|${league}`;
 }
 
 /** Das Team-Elo, wie es neben dem Namen steht. `asOf` ist der Stand des letzten Aufbaus. */
@@ -121,6 +131,17 @@ export interface DashboardFixture {
    */
   homeElo?: TeamElo;
   awayElo?: TeamElo;
+  /**
+   * Ab schemaVersion 7: was API-Football für den Wettbewerb im Spiel liefert. Die Live-Ansicht
+   * sagt damit vorab „Diese Liga liefert keine Live-Statistik.“ und spart den Statistik-Abruf.
+   */
+  liveCoverage?: LiveCoverage;
+  /**
+   * Ab schemaVersion 7: false, wenn die Liga in den Ereignissen keine Karten führt (im Mittel
+   * unter einer Gelben je Spiel über mindestens 20 abgerechnete Spiele). Dort heißt „0 Karten“
+   * „unbekannt“. Fehlt bei zu wenigen Spielen und in älteren Läufen.
+   */
+  cardData?: boolean;
   modelVersion: string;
   crossLeague: boolean;
   classGap?: ClassGap;
@@ -169,7 +190,7 @@ export interface DashboardFixture {
 }
 
 export interface DashboardDocument {
-  schemaVersion: 1 | 2 | 3 | 4 | 5 | 6;
+  schemaVersion: 1 | 2 | 3 | 4 | 5 | 6 | 7;
   meta: {
     createdAt: string;
     timezone: string;
@@ -482,6 +503,8 @@ export function buildDashboardDocument(input: DashboardInput): DashboardDocument
       ...(row.awayCrest ? { awayCrest: row.awayCrest } : {}),
       ...(row.homeTeamId !== undefined ? { homeTeamId: row.homeTeamId } : {}),
       ...(row.awayTeamId !== undefined ? { awayTeamId: row.awayTeamId } : {}),
+      ...(row.liveCoverage ? { liveCoverage: row.liveCoverage } : {}),
+      ...(input.cardData?.has(leagueKey(row.country, row.league)) ? { cardData: input.cardData.get(leagueKey(row.country, row.league))! } : {}),
       ...(classGap ? { classGap } : {}),
       dataConfidence: row.dataConfidence, warnings, h2hNotice,
       form: {
@@ -525,7 +548,7 @@ export function buildDashboardDocument(input: DashboardInput): DashboardDocument
   const createdAt = Date.parse(input.createdAt);
   const latestKickoff = fixtures.reduce((latest, fixture) => Math.max(latest, Date.parse(fixture.kickoff)), createdAt);
   return {
-    schemaVersion: 6,
+    schemaVersion: 7,
     meta: {
       createdAt: input.createdAt, timezone: config.timezone, sourceFile: input.sourceFile,
       totalTipicoEvents: input.totalTipicoEvents, selectedTipicoEvents: input.selectedTipicoEvents,

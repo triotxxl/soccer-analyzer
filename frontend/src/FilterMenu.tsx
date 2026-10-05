@@ -1,6 +1,7 @@
 import { CaretRight, Info, MagnifyingGlass, SlidersHorizontal, X } from "@phosphor-icons/react";
 import { useEffect, useId, useRef, useState, type ReactNode, type Ref } from "react";
 import { countryFlagCode } from "./countryFlags";
+import type { LiveChanceMin, LivePhase } from "./liveQuestions";
 
 export type LevelFilter = "all" | "strong" | "recommended";
 export type ClassGapFilter = "all" | "only" | "hide";
@@ -186,6 +187,17 @@ export interface FilterMenuValues {
   showCrossLeague: boolean;
   showPast: boolean;
   liveRatedOnly: boolean;
+  /** Die Anzeige-Filter der Live-Ansicht; sie wirken auf die geladene Tafel und kosten nichts. */
+  live: {
+    chanceMin: LiveChanceMin;
+    /** Hat die gewählte Frage eine Live-Chance? Sonst greift „Chance ab“ nicht. */
+    chanceApplies: boolean;
+    questionLabel: string;
+    redOnly: boolean;
+    phase: LivePhase;
+    /** Zahl der laufenden Spiele, die die Filter übrig lassen. */
+    shown: number;
+  };
   leagues: { selected: number; total: number };
   leagueList: ReadonlyArray<LeagueEntry>;
   deselectedLeagues: ReadonlySet<string>;
@@ -204,6 +216,9 @@ export interface FilterMenuActions {
   setShowCrossLeague(value: boolean): void;
   setShowPast(value: boolean): void;
   setLiveRatedOnly(value: boolean): void;
+  setLiveChanceMin(value: LiveChanceMin): void;
+  setLiveRedOnly(value: boolean): void;
+  setLivePhase(value: LivePhase): void;
   openLeagueFilter(): void;
   toggleLeague(key: string): void;
   /** Wählt alle anderen Wettbewerbe ab. */
@@ -218,6 +233,20 @@ const LEVELS: ReadonlyArray<{ key: LevelFilter; label: string; hint?: string; ma
   { key: "all", label: "Alle Spiele", marks: [] },
   { key: "recommended", label: "Empfehlungen", hint: "(✓ und ★)", marks: ["green", "gold"] },
   { key: "strong", label: "Starke Tipps", hint: "(nur ★)", marks: ["gold"] }
+];
+
+const CHANCE_OPTIONS: ReadonlyArray<SegmentOption<LiveChanceMin>> = [
+  { value: "all", label: "Alle", ariaLabel: "Alle Chancen" },
+  { value: "50", label: "50 %", ariaLabel: "Chance ab 50 %" },
+  { value: "65", label: "65 %", ariaLabel: "Chance ab 65 %" },
+  { value: "80", label: "80 %", ariaLabel: "Chance ab 80 %" }
+];
+
+const PHASE_OPTIONS: ReadonlyArray<SegmentOption<LivePhase>> = [
+  { value: "all", label: "Alle", ariaLabel: "Alle Spielphasen" },
+  { value: "first", label: "1. HZ", ariaLabel: "1. Halbzeit" },
+  { value: "second", label: "2. HZ", ariaLabel: "2. Halbzeit" },
+  { value: "late", label: "Ab 75.", ariaLabel: "Ab der 75. Minute" }
 ];
 
 const CLASS_GAP_OPTIONS: ReadonlyArray<SegmentOption<ClassGapFilter>> = [
@@ -336,13 +365,33 @@ export function FilterMenu({ values, actions, rangeControl, displayControls }: {
         </div>
       </> : <div className="filter-column">
         <section className="filter-group">
-          <div className="filter-group-head"><h3>Beobachtete Spiele</h3></div>
+          <div className="filter-group-head"><h3>Beobachtete Spiele</h3><span>bestimmt die API-Aufrufe</span></div>
           <FilterCard title="Wettbewerbe">
             {leagueField}
             <div className="filter-card-rule">
-              <FilterSwitch label="Nur Spiele mit Empfehlung" checked={values.liveRatedOnly} onChange={actions.setLiveRatedOnly} />
+              <FilterSwitch label="Nur Spiele mit Empfehlung vor Anpfiff" checked={values.liveRatedOnly} onChange={actions.setLiveRatedOnly} />
               {/* Wie viele beobachtet werden, steht schon im Kopf. */}
               <p className="filter-note">Abgewählte kosten keine API-Aufrufe.</p>
+            </div>
+          </FilterCard>
+        </section>
+        {/* Getrennt von den beobachteten Spielen: Diese Filter blenden nur aus, was schon geladen
+            ist, und ändern keinen Abruf. */}
+        <section className="filter-group">
+          <div className="filter-group-head"><h3>Nur Anzeige</h3><span>kostet nichts</span></div>
+          <FilterCard title="Chance" aside={`Markt: ${values.live.questionLabel}`}>
+            <FilterSegment name="live-chance" legend="Chance ab" value={values.live.chanceMin}
+              onChange={actions.setLiveChanceMin} disabled={!values.live.chanceApplies} options={CHANCE_OPTIONS}
+              note={values.live.chanceApplies
+                ? "Spiele ohne Live-Chance (etwa in der Verlängerung) fallen dabei heraus."
+                : "Greift bei diesem Markt nicht – er hat keine Live-Chance."} />
+          </FilterCard>
+          <FilterCard title="Spiel">
+            <FilterSwitch label="Rote Karte im Spiel" note="Spiele ohne Kartendaten fallen dabei heraus."
+              checked={values.live.redOnly} onChange={actions.setLiveRedOnly} />
+            <div className="filter-card-rule">
+              <FilterSegment name="live-phase" legend="Phase" value={values.live.phase}
+                onChange={actions.setLivePhase} options={PHASE_OPTIONS} />
             </div>
           </FilterCard>
         </section>

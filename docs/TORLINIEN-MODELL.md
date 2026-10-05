@@ -108,7 +108,9 @@ Pokalspielen. Es liegt in `league_strength_snapshots` und wird von
 
 Aus der Differenz entsteht ein Torfaktor:
 
-`Faktor = 10 ** ((Rating Heimliga − Rating Gastliga) / 1500)` (bis 31.08.2026: 900)
+`Faktor = 10 ** ((Rating Heimliga − Rating Gastliga) / 1200)` (bis 31.08.2026: 900, dann 1500,
+seit 05.10.2026 1200; die Erhöhung auf 1500 stand auf einem Zählfehler im Bericht, siehe
+`src/config.ts`)
 
 begrenzt auf 0,3 bis 3,5. Er wird auf die erwarteten Heimtore multipliziert und von den
 Auswärtstoren geteilt, ist also symmetrisch: `Faktor(a, b) = 1 / Faktor(b, a)`.
@@ -124,7 +126,9 @@ Wer in der Elo-Kette nie auftaucht, ist unterklassig und nicht Mittelfeld. Ein n
 Startwert von 1500 läge über der 3. Liga und wäre offensichtlich falsch.
 
 Sind **beide** Seiten geschätzt, trägt der Vergleich keine Information und der Faktor
-entfällt. Ebenso, wenn beide Teams aus derselben Liga kommen.
+entfällt. Kommen beide Teams aus derselben Liga, ist der Faktor seit 28.09.2026 genau 1
+(`sameLeagueComparison`) - es gibt keinen Klassenunterschied, die 1X2-Wahrscheinlichkeit bleibt
+aber sichtbar.
 
 Ratings und Faktor stehen als Detailzeile am 1X2-Markt im Dashboard; ist eine Seite
 geschätzt, erscheint zusätzlich eine Warnung.
@@ -145,10 +149,11 @@ Ein leicht negativer Bias ist erwünscht: `1 / Quote` enthält die Buchmachermar
 gemessenen Feld kein einziger Faktor am Clamp hängt — sonst könnte das Modell große
 Klassenunterschiede nicht mehr voneinander unterscheiden.
 
-Die Stellschrauben stehen in `config.strength` und lassen sich ohne Modelländerung
-anpassen. **Die Kalibrierung beruht auf einer einzigen Pokalrunde.** Sie gehört mit
-abgerechneten Ergebnissen aus `npm run settle` und `npm run report` nachgezogen, sobald
-genug Cross-League-Partien ausgewertet sind.
+Die Stellschrauben stehen in `config.strength`. **Jede Änderung daran erhöht
+`goalLineModelVersion`**: Der Bericht misst die stärkere Seite je Modellversion, und nur so
+lässt sich ein Teiler an seinen eigenen Prognosen prüfen (in 3.1.0 liefen ohne neue Version
+nacheinander die Teiler 1200, 900 und 1500). Nachgezogen wird mit `npm run report`, Tabelle
+„Stärkere Seite je Modellversion“; Stand und Begründung im Kommentar in `src/config.ts`.
 
 Bekannte verbleibende Schwäche: Bei Vereinen, deren Liga geschätzt werden muss, bleibt die
 Abweichung am größten. Rhynern gegen Dresden liegt bei 64 % gegen 91 % Markt — die
