@@ -491,8 +491,8 @@
   },
   "al ahli": {
     "tipicoName": "Al Ahli",
-    "apiTeamId": 2929,
-    "apiTeamName": "Al-Ahli Jeddah"
+    "apiTeamId": 2896,
+    "apiTeamName": "Al Ahli Doha"
   },
   "al ahly sc": {
     "tipicoName": "Al Ahly SC",
@@ -2356,8 +2356,8 @@
   },
   "cd platense": {
     "tipicoName": "CD Platense",
-    "apiTeamId": 19763,
-    "apiTeamName": "Platense"
+    "apiTeamId": 1057,
+    "apiTeamName": "Platense FC"
   },
   "cd platense municipal zacatecoluca": {
     "tipicoName": "CD Platense Municipal Zacatecoluca",
@@ -4999,6 +4999,11 @@
     "apiTeamId": 8620,
     "apiTeamName": "Viktoria Plzeň II"
   },
+  "fc viktoriya sumy": {
+    "tipicoName": "FC Viktoriya Sumy",
+    "apiTeamId": 13223,
+    "apiTeamName": "Viktoriya Mykolaivka"
+  },
   "fc villefranche beaujolais": {
     "tipicoName": "FC Villefranche-Beaujolais",
     "apiTeamId": 1302,
@@ -7474,6 +7479,11 @@
     "apiTeamId": 1526,
     "apiTeamName": "Libya"
   },
+  "lierse kempenzonen": {
+    "tipicoName": "Lierse Kempenzonen",
+    "apiTeamId": 6219,
+    "apiTeamName": "K. Lierse S.K."
+  },
   "lillestrom sk": {
     "tipicoName": "Lilleström SK",
     "apiTeamId": 321,
@@ -8024,6 +8034,11 @@
     "apiTeamId": 3490,
     "apiTeamName": "Puszcza Niepołomice"
   },
+  "mks sandecja": {
+    "tipicoName": "MKS Sandecja",
+    "apiTeamId": 3492,
+    "apiTeamName": "Sandecja Nowy Sącz"
+  },
   "mks znicz pruszkow": {
     "tipicoName": "MKS Znicz Pruszkow",
     "apiTeamId": 6964,
@@ -8486,6 +8501,11 @@
   },
   "nk dubrava": {
     "tipicoName": "NK Dubrava",
+    "apiTeamId": 6255,
+    "apiTeamName": "Dubrava Zagreb"
+  },
+  "nk dubrava zagreb": {
+    "tipicoName": "NK Dubrava Zagreb",
     "apiTeamId": 6255,
     "apiTeamName": "Dubrava Zagreb"
   },
@@ -10609,6 +10629,11 @@
     "apiTeamId": 12900,
     "apiTeamName": "Śląsk Wrocław II"
   },
+  "slavia kromeriz": {
+    "tipicoName": "Slavia Kromeriz",
+    "apiTeamId": 7291,
+    "apiTeamName": "Hanácká"
+  },
   "sliema wanderers fc": {
     "tipicoName": "Sliema Wanderers FC",
     "apiTeamId": 4628,
@@ -11948,6 +11973,11 @@
     "tipicoName": "Villa Mitre BB",
     "apiTeamId": 1938,
     "apiTeamName": "Villa Mitre"
+  },
+  "vinotinto ecuador": {
+    "tipicoName": "Vinotinto Ecuador",
+    "apiTeamId": 21103,
+    "apiTeamName": "Cuniburo"
   },
   "vion zlate moravce": {
     "tipicoName": "Vion Zlate Moravce",

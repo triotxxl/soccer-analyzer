@@ -444,6 +444,11 @@
     "country": "China",
     "league": "League Two"
   },
+  "china|china league 2 aufstiegsrunde": {
+    "leagueId": 929,
+    "country": "China",
+    "league": "League Two"
+  },
   "china|china league 2 nord": {
     "leagueId": 929,
     "country": "China",
@@ -1948,6 +1953,11 @@
     "leagueId": 272,
     "country": "Hungary",
     "league": "NB II"
+  },
+  "uruguay|copa uruguay knockout stage": {
+    "leagueId": 930,
+    "country": "Uruguay",
+    "league": "Copa Uruguay"
   },
   "uruguay|primera division clausura": {
     "leagueId": 268,
