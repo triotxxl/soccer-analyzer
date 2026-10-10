@@ -204,6 +204,11 @@
     "country": "Argentina",
     "league": "Torneo Federal A"
   },
+  "argentinien|torneo federal a playoffs": {
+    "leagueId": 134,
+    "country": "Argentina",
+    "league": "Torneo Federal A"
+  },
   "argentinien|torneo federal a promotion playoffs": {
     "leagueId": 134,
     "country": "Argentina",
@@ -223,6 +228,11 @@
     "leagueId": 419,
     "country": "Azerbaijan",
     "league": "Premyer Liqa"
+  },
+  "athiopien|premier league": {
+    "leagueId": 363,
+    "country": "Ethiopia",
+    "league": "Premier League"
   },
   "australien|a league": {
     "leagueId": 188,
@@ -899,6 +909,11 @@
     "country": "Honduras",
     "league": "Liga Nacional"
   },
+  "indien|indian super league": {
+    "leagueId": 323,
+    "country": "India",
+    "league": "Indian Super League"
+  },
   "indonesien|championship gruppe a": {
     "leagueId": 275,
     "country": "Indonesia",
@@ -993,6 +1008,16 @@
     "leagueId": 10,
     "country": "World",
     "league": "Friendlies"
+  },
+  "international|freundschaftsspiele frauen": {
+    "leagueId": 666,
+    "country": "World",
+    "league": "Friendlies Women"
+  },
+  "international|wm qualifikation frauen uefa playoffs": {
+    "leagueId": 880,
+    "country": "World",
+    "league": "World Cup - Women - Qualification Europe"
   },
   "irak|iraqi league": {
     "leagueId": 542,
