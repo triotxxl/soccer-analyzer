@@ -204,10 +204,12 @@ export const REMIS_SCORE_PRESET: QuickpickPreset<RemisScoreQuickpickSettings> = 
       : `So oft endete das Spiel wirklich unentschieden: ${(measured.trefferquote * 100).toFixed(1).replace(".", ",")} %`
         + ` (an ${measured.n} alten Wetten geprüft). Ohne Filter ist es jedes vierte Spiel.`
   }),
-  honesty: "An alten Spielen geprüft endete in der Vorgabe gut jedes dritte Spiel unentschieden –"
-    + " genauso oft wie beim Filter „Remis-Kandidaten“, aber bei viel weniger Spielen. Die Punkte"
-    + " je Hinweis sind gesetzt, und es waren erst 83 Spiele: Das kann auch Zufall sein. Ein"
-    + " Schein mit vier Spielen ging so gut wie nie durch. Rechne nicht mit Gewinn.",
+  honesty: "An alten Spielen geprüft endete in der Vorgabe knapp jedes dritte Spiel"
+    + " unentschieden. Die Punkte je Hinweis sind gesetzt, und es waren erst wenige Spiele: Das"
+    + " kann auch Zufall sein. Ein Schein mit vier Spielen ging so gut wie nie durch. Rechne nicht"
+    + " mit Gewinn.",
+  warnung: "Die Punkte je Hinweis sind gesetzt, nicht gemessen, und geprüft ist erst wenig – das"
+    + " kann auch Zufall sein. Rechne nicht mit Gewinn.",
   wettschein: {
     hinweis: "Legt jedes gefundene Spiel als „Unentschieden“ in den Wettschein. Ein"
       + " Sieger-Tipp zum selben Spiel bleibt daneben bestehen."

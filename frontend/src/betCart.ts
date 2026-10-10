@@ -107,6 +107,24 @@ export function toQuickpickCartEntry(
   };
 }
 
+/**
+ * Die 1X2-Seite gegen den Modelltipp für das „Add“-Menü. Die Quote kommt nur aus dem Snapshot
+ * (`oddsHome`/`oddsAway`, ab `schemaVersion: 5`); eine über den Buchmacherschnitt geschätzte
+ * Quote (`counterOddsOf`) taugt nicht als Wettpreis und wird hier bewusst nicht genommen.
+ * Die Wahrscheinlichkeit ist `1 − p(1X2) − p(Remis)`, aber nur, wenn der 1X2-Markt belastbar ist.
+ */
+export function toCounterCartEntry(fixture: DashboardFixture, market: DashboardMarket): CartEntry | null {
+  if (market.key !== "1x2" || market.pick === null) return null;
+  const side = market.pick === "1" ? "2" : "1";
+  const stored = side === "1" ? market.oddsHome : market.oddsAway;
+  const odds = typeof stored === "number" && stored > 1 ? stored : null;
+  const draw = fixture.markets.find((entry) => entry.key === "draw");
+  const probability = market.probabilityReliable !== false && draw
+    ? Math.max(0, 1 - market.probability - draw.probability)
+    : null;
+  return toQuickpickCartEntry(fixture, side, odds, probability);
+}
+
 function isCartEntry(value: unknown): value is CartEntry {
   if (!value || typeof value !== "object") return false;
   const candidate = value as Partial<CartEntry>;
@@ -145,13 +163,24 @@ export function useBetCart() {
     setCart((current) => current.some((item) => item.id === entry.id) ? current : [...current, entry]);
   }, []);
 
+  /**
+   * Wie `addEntry`, ersetzt aber einen Eintrag gleicher Kennung an seiner Stelle. Nötig beim
+   * 1X2: Beide Seiten teilen sich eine Kennung, und ein Wechsel von Heim auf Gast ließe mit
+   * `addEntry` still die alte Seite stehen.
+   */
+  const replaceEntry = useCallback((entry: CartEntry) => {
+    setCart((current) => current.some((item) => item.id === entry.id)
+      ? current.map((item) => item.id === entry.id ? entry : item)
+      : [...current, entry]);
+  }, []);
+
   const removeEntry = useCallback((id: string) => {
     setCart((current) => current.filter((item) => item.id !== id));
   }, []);
 
   const clear = useCallback(() => setCart([]), []);
 
-  return { cart, addEntry, removeEntry, clear };
+  return { cart, addEntry, replaceEntry, removeEntry, clear };
 }
 
 function shuffle<T>(values: T[]): T[] {

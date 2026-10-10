@@ -2,8 +2,8 @@ import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { afterEach, describe, expect, it } from "vitest";
-import { KellyDialog, kellyProfileNote } from "./KellyUI";
-import { DEFAULT_KELLY_SETTINGS, selectKelly, type KellySettings } from "./kelly";
+import { concentrationNotice, KellyDialog, kellyProfileNote } from "./KellyUI";
+import { DEFAULT_KELLY_SETTINGS, selectKelly, type KellyCandidate, type KellySettings } from "./kelly";
 import { buildMarketProfile } from "../../src/market-profile";
 import type { DashboardFixture, MarketProfile } from "./types";
 
@@ -143,11 +143,11 @@ describe("Kelly-Eingabefelder", () => {
 });
 
 describe("Aufbau des Dialogs", () => {
-  it("zeigt Einsatz, Wettanzahl und erwarteten Ertrag ohne jedes Aufklappen", () => {
+  it("zeigt Einsatz, Wettanzahl und was auf Dauer zu erwarten ist, ohne jedes Aufklappen", () => {
     render(<Harness />);
     expect(screen.getByText("Einsatz gesamt")).toBeInTheDocument();
     expect(screen.getByText("Wetten")).toBeInTheDocument();
-    expect(screen.getByText("Erwarteter Ertrag")).toBeInTheDocument();
+    expect(screen.getByText("Auf Dauer")).toBeInTheDocument();
   });
 
   it("fasst die Einstellungen zusammen, statt sie auszubreiten", () => {
@@ -178,11 +178,17 @@ describe("Aufbau des Dialogs", () => {
     expect(screen.getByRole("button", { name: "Auswahl als JSON exportieren" })).toBeEnabled();
   });
 
-  it("färbt den erwarteten Ertrag nicht und sagt, dass die Auswahl gemessen im Minus lag", () => {
+  /**
+   * Bis 06.10.2026 stand hier „Erwarteter Ertrag“ zur korrigierten Modellchance (rund +10 %),
+   * eingetreten waren rund -6 %. Jetzt zählt der faire Tipico-Preis - ohne Aufschlag ein Minus.
+   */
+  it("rechnet „Auf Dauer“ zum fairen Tipico-Preis, färbt es nicht und sagt, dass das Modell nicht besser trifft", () => {
     render(<Harness initial={{ minEdge: 0 }} />);
-    const value = screen.getByText("Erwarteter Ertrag").parentElement!;
+    const value = screen.getByText("Auf Dauer").parentElement!;
     expect(value.querySelector(".kelly-metric-good, .kelly-metric-bad")).toBeNull();
-    expect(value).toHaveTextContent("Gemessen lag die Auswahl bisher im Minus.");
+    expect(value).toHaveTextContent("zur Tipico-Quote ohne Aufschlag, teils geschätzt.");
+    expect(value).toHaveTextContent("Das Modell trifft geprüft nicht öfter als die Quote.");
+    expect(value).toHaveTextContent("−");
   });
 });
 
@@ -256,13 +262,37 @@ describe("Automatik-Modus", () => {
 
   it("begründet, warum die Korrektur greift", async () => {
     render(<Harness profile={profileFor("btts")} auto />);
-    expect(screen.getByText(/alten Wetten wirklich eingetreten/)).toBeInTheDocument();
+    // Die Grundmenge der Korrektur sind die Spiele mit Vorteil, nicht alle Zeilen.
+    expect(screen.getByText(/alten Spielen mit Vorteil wirklich/)).toBeInTheDocument();
     // Wie belastbar die Korrektur ist, steht hinter einem eigenen Aufklapper.
     expect(screen.queryByText(/rechne\s+nicht mit Gewinn/)).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Woher die Korrektur kommt" }));
     // Stand 21.09.2026: im Minus, nicht "etwa bei null".
     expect(screen.getByText(/liegt diese Auswahl im Minus/)).toBeInTheDocument();
     expect(screen.getByText(/rechne\s+nicht mit Gewinn/)).toBeInTheDocument();
+    expect(screen.getByText(/Tipico-Quote ohne Aufschlag\s+es erwarten ließ/)).toBeInTheDocument();
+  });
+
+  /**
+   * Bis 06.10.2026 zeigten die Schildchen die Abweichung des ganzen Marktes - bei BTTS Nein
+   * „−3,7“, während die gewählten Wetten um +2,8 Punkte angehoben wurden.
+   */
+  it("zeigt in den Schildchen die Korrektur, die bei den gewählten Wetten angewandt wurde", () => {
+    // 60 % behauptet, 65 % eingetreten: Die Korrektur hebt um 5 Punkte an.
+    render(<Harness profile={profileFor("btts", 200, 130)} auto />);
+    const chips = screen.getByText("Gespielt wird").parentElement!;
+    expect(chips).toHaveTextContent("+5,0 PP");
+  });
+
+  /** Davids Entscheidung vom 06.10.2026: Die Marktabwahl gilt auch in der Automatik. */
+  it("bietet die Marktabwahl auch in der Automatik an, und sie wirkt", async () => {
+    let latest: KellySettings | null = null;
+    render(<Harness profile={profileFor("btts", 200, 130)} auto onChange={(next) => { latest = next; }} />);
+    expect(screen.getByRole("table")).not.toHaveTextContent("Keine Wette in der Auswahl");
+    await openSettings();
+    await userEvent.click(screen.getByRole("checkbox", { name: "BTTS" }));
+    expect(latest!.disabledMarkets).toContain("btts");
+    expect(screen.getByRole("table")).toHaveTextContent("Keine Wette in der Auswahl");
   });
 
   it("unterscheidet Laden, Fehler und fehlende Messung", () => {
@@ -282,5 +312,28 @@ describe("Automatik-Modus", () => {
     // Ohne Messung bleibt der manuelle Modus aktiv, statt eine Empfehlung vorzutäuschen.
     await openSettings();
     expect(screen.getByLabelText("Mindest-Vorteil (Edge, Prozentpunkte)")).toBeInTheDocument();
+  });
+});
+
+describe("Häufung auf einem Markt", () => {
+  function candidate(marketKey: string, marketLabel: string, calibrationBias: number | null): KellyCandidate {
+    return { marketKey, marketLabel, calibrationBias } as unknown as KellyCandidate;
+  }
+
+  it("benennt es, wenn fast die ganze Liste ein angehobener Markt ist", () => {
+    const list = [
+      ...Array.from({ length: 5 }, () => candidate("bttsNo", "BTTS Nein", 0.028)),
+      candidate("over25", "Über 2,5", -0.08), candidate("btts", "BTTS", -0.05)
+    ];
+    expect(concentrationNotice(list)).toBe("5 von 7 Wetten sind BTTS Nein, und ihre Chance wurde nach oben"
+      + " korrigiert. Liegt das Modell dort falsch, trifft es fast alle Wetten zugleich.");
+  });
+
+  it("schweigt bei gemischter Liste oder gesenkter Chance", () => {
+    expect(concentrationNotice([
+      candidate("bttsNo", "BTTS Nein", 0.03), candidate("bttsNo", "BTTS Nein", 0.03),
+      candidate("over25", "Über 2,5", -0.08), candidate("btts", "BTTS", -0.05)
+    ])).toBeNull();
+    expect(concentrationNotice(Array.from({ length: 6 }, () => candidate("over25", "Über 2,5", -0.08)))).toBeNull();
   });
 });

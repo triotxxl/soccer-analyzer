@@ -219,11 +219,13 @@ export const DAVES_PRESET: QuickpickPreset<DavesQuickpickSettings> = {
     + " deutlich. Dazu wurden die Schwellen an genau den Spielen gesucht, an denen sie jetzt"
     + " gemessen werden. In einer Kombi müssen alle Tipps stimmen: Je mehr Spiele du"
     + " zusammenlegst, desto seltener geht der Schein durch.",
+  warnung: "Jede Stufe lag an alten Spielen im Minus – und je mehr Spiele in der Kombi, desto"
+    + " seltener geht der Schein durch. Rechne nicht mit Gewinn.",
   wettschein: {
     hinweis: "Legt den Sieger-Tipp jedes gefundenen Spiels in den Wettschein. Dort baust du"
       + " dir daraus deine Kombis."
   },
-  leerSatz: "Keine Partie ist nach diesen Kriterien klar überlegen.",
+  leerSatz: "Kein Spiel ist nach diesen Kriterien klar überlegen.",
   defaults: DEFAULT_QUICKPICK_SETTINGS,
   levels: QUICKPICK_LEVELS,
   defaultSort: "tabelle",

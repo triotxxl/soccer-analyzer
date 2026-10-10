@@ -37,7 +37,16 @@ export interface EdgeObservation extends MarketObservation {
   confidence: number;
   crossLeague: boolean;
   hasStrength: boolean;
+  /**
+   * Wann das Spiel abgerechnet wurde (frühestes `settled_at`). Die Nachspielung in
+   * `tools/edge-report.ts` nimmt in ein Profil zum Zeitpunkt t nur Spiele, deren Ergebnis da
+   * schon feststand - sonst sähe die Rückrechnung in die Zukunft.
+   */
+  settledAt: string;
 }
+
+/** Nur datierte Snapshots: `dashboard-latest.json` doppelt den jüngsten Lauf. */
+const DATED_SNAPSHOT = /^dashboard-\d{4}-\d{2}-\d{2}.*\.json$/;
 
 export type MarketProfileErrorCode = "database_missing" | "no_snapshots" | "insufficient_data";
 
@@ -57,10 +66,10 @@ export class MarketProfileError extends Error {
  * Je Partie und Markt zählt der jüngste Snapshot vor dem Anpfiff: Quoten werden bis dahin nachgeführt,
  * und der Picker arbeitet immer auf dem letzten Stand.
  */
-function collectSnapshots(outputDir: string): Map<string, EdgeObservation> {
-  const latest = new Map<string, EdgeObservation & { stamp: string }>();
+function collectSnapshots(outputDir: string): Map<string, Omit<EdgeObservation, "settledAt">> {
+  const latest = new Map<string, Omit<EdgeObservation, "settledAt"> & { stamp: string }>();
   const files = fs.existsSync(outputDir)
-    ? fs.readdirSync(outputDir).filter((file) => file.startsWith("dashboard-") && file.endsWith(".json"))
+    ? fs.readdirSync(outputDir).filter((file) => DATED_SNAPSHOT.test(file))
     : [];
   for (const file of files) {
     let snapshot: { fixtures?: DashboardFixture[]; meta?: { createdAt?: string } };
@@ -79,7 +88,10 @@ function collectSnapshots(outputDir: string): Map<string, EdgeObservation> {
         if (market.odds === null || market.odds <= 1) continue;
         if (market.probability === null || market.probability === undefined) continue;
         if (market.probabilityReliable === false) continue;
-        const key = `${fixture.fixtureId}|${market.key}|${market.selection}`;
+        // Ohne die Auswahl im Schlüssel: Wechselt der 1X2-Tipp zwischen zwei Snapshots, zählte
+        // sonst auch der veraltete Tipp mit (190 Spiele am 06.10.2026). Es gilt der jüngste
+        // Stand vor dem Anpfiff samt seiner Auswahl.
+        const key = `${fixture.fixtureId}|${market.key}`;
         const previous = latest.get(key);
         if (previous && previous.stamp >= stamp) continue;
         latest.set(key, {
@@ -103,7 +115,7 @@ function collectSnapshots(outputDir: string): Map<string, EdgeObservation> {
       }
     }
   }
-  return latest as Map<string, EdgeObservation>;
+  return latest;
 }
 
 export interface ObservationSources {
@@ -111,33 +123,44 @@ export interface ObservationSources {
   outputDir?: string;
 }
 
-/** Liest Snapshots und Ergebnisse und behält nur die entschiedenen Zeilen. */
-export function buildObservations(sources: ObservationSources = {}): EdgeObservation[] {
-  const databaseFile = sources.databaseFile ?? DB_FILE;
-  const outputDir = sources.outputDir ?? OUTPUT_DIR;
+export type SettledOutcome = Outcome & { settledAt: string };
 
+/** Endstand und Pausenstand je abgerechnetem Spiel, mit der frühesten Abrechnung. */
+export function readOutcomes(databaseFile: string = DB_FILE): Map<number, SettledOutcome> {
   if (!fs.existsSync(databaseFile)) {
     throw new MarketProfileError("database_missing",
       "Es gibt noch keine Datenbank mit abgerechneten Ergebnissen.", 404);
   }
 
   const database = new DatabaseSync(databaseFile, { readOnly: true });
-  const outcomes = new Map<number, Outcome>();
+  const outcomes = new Map<number, SettledOutcome>();
   const rows = database.prepare(`
     SELECT fixture_id, actual_home_goals, actual_away_goals,
-           actual_halftime_home_goals, actual_halftime_away_goals
+           actual_halftime_home_goals, actual_halftime_away_goals, settled_at
     FROM goal_line_predictions
     WHERE settled_at IS NOT NULL AND actual_home_goals IS NOT NULL AND actual_away_goals IS NOT NULL
-  `).all() as Array<Record<string, number | null>>;
+  `).all() as Array<Record<string, number | string | null>>;
   for (const row of rows) {
+    const settledAt = row.settled_at as string;
+    const previous = outcomes.get(row.fixture_id as number);
+    // Mehrere Prognosezeilen je Spiel tragen denselben Stand; es zählt die früheste Abrechnung.
+    if (previous && Date.parse(previous.settledAt) <= Date.parse(settledAt)) continue;
     outcomes.set(row.fixture_id as number, {
       homeGoals: row.actual_home_goals as number,
       awayGoals: row.actual_away_goals as number,
       halftimeHomeGoals: row.actual_halftime_home_goals as number | null,
-      halftimeAwayGoals: row.actual_halftime_away_goals as number | null
+      halftimeAwayGoals: row.actual_halftime_away_goals as number | null,
+      settledAt
     });
   }
   database.close();
+  return outcomes;
+}
+
+/** Liest Snapshots und Ergebnisse und behält nur die entschiedenen Zeilen. */
+export function buildObservations(sources: ObservationSources = {}): EdgeObservation[] {
+  const outputDir = sources.outputDir ?? OUTPUT_DIR;
+  const outcomes = readOutcomes(sources.databaseFile ?? DB_FILE);
 
   const snapshots = collectSnapshots(outputDir);
   if (snapshots.size === 0) {
@@ -151,9 +174,9 @@ export function buildObservations(sources: ObservationSources = {}): EdgeObserva
     if (!outcome) continue;
     const won = decideMarket(candidate.marketKey, candidate.selection, outcome);
     if (won === null) continue;
-    observations.push({ ...candidate, hit: won ? 1 : 0 });
+    observations.push({ ...candidate, hit: won ? 1 : 0, settledAt: outcome.settledAt });
   }
-  return observations.sort((left, right) => left.kickoff.localeCompare(right.kickoff));
+  return observations.sort((left, right) => Date.parse(left.kickoff) - Date.parse(right.kickoff));
 }
 
 /** Jüngste Änderung an Datenbank oder Snapshot-Ordner - der Auslöser für eine Neuberechnung. */

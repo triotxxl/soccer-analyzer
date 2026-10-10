@@ -84,13 +84,15 @@ describe("Automatik im Kelly-Picker", () => {
       budget: 250,
       kellyFraction: 0.5,
       maxExposurePercent: 1,
-      allowMultipleMarketsPerGame: true
+      allowMultipleMarketsPerGame: true,
+      disabledMarkets: ["1x2", "bttsNo"] as DashboardMarketKey[]
     };
     const derived = recommendedSettings(base);
     expect(derived.budget).toBe(250);
     expect(derived.kellyFraction).toBe(0.5);
     expect(derived.maxStakePercent).toBe(base.maxStakePercent);
-    expect(derived.disabledMarkets).toEqual([]);
+    // Die Marktabwahl bleibt seit 06.10.2026 beim Nutzer (Davids Entscheidung).
+    expect(derived.disabledMarkets).toEqual(["1x2", "bttsNo"]);
     expect(derived.maxEdge).toBeNull();
     expect(derived.minEdge).toBe(0);
     expect(derived.excludeCrossLeague).toBe(true);
@@ -159,41 +161,52 @@ describe("Automatik im Kelly-Picker", () => {
     expect(candidates[0]!.marketKey).toBe("over25");
   });
 
-  it("rechnet den Erwartungswert aus der korrigierten Wahrscheinlichkeit", () => {
+  it("beachtet die Marktabwahl auch in der Automatik", () => {
+    const profile = buildMarketProfile(observations("draw", 200, 60, 0.32, 4));
+    const settings = recommendedSettings({ ...DEFAULT_KELLY_SETTINGS, disabledMarkets: ["draw"] });
+    expect(computeKellyCandidates([fixture("draw", 0.32, 5)], "all", settings, profile).candidates).toHaveLength(0);
+  });
+
+  /**
+   * Bis 06.10.2026 rechnete der Erwartungswert mit der korrigierten Chance und versprach rund
+   * +10 %; nachgespielt traten rund -6 % ein, die Treffer lagen auf dem fairen Tipico-Preis.
+   */
+  it("rechnet den Erwartungswert zum fairen Tipico-Preis, nicht zur Modellchance", () => {
     const profile = buildMarketProfile(observations("draw", 200, 60, 0.32, 4));
     const { candidates } = computeKellyCandidates(
       [fixture("draw", 0.32, 5)], "all", recommendedSettings(DEFAULT_KELLY_SETTINGS), profile);
     const candidate = candidates[0]!;
+    // Ohne 1X2-Quoten im Spiel ist der Aufschlag geschätzt (Dreiweg-Median 1,107).
+    expect(candidate.fairSource).toBe("geschätzt");
+    expect(candidate.fairProbability).toBeCloseTo(0.2 / 1.107, 8);
     expect(expectedValueOf(candidates)).toBeCloseTo(
-      candidate.stake * (candidate.calibratedProbability! * candidate.odds - 1), 8);
+      candidate.stake * (candidate.fairProbability * candidate.odds - 1), 8);
+    // Zum fairen Preis bleibt um den Aufschlag weniger als der Einsatz.
+    expect(expectedValueOf(candidates)).toBeLessThan(0);
   });
 });
 
 describe("Gegenmärkte im Kelly-Picker", () => {
-  it("hebt die Wahrscheinlichkeit eines Unter-Marktes an, wenn er selbst Vorteil hat", () => {
-    // Über 2,5 behauptet 60 % und erreicht 45 % - also ist Unter 2,5 um 15 Punkte zu niedrig
-    // angesetzt: behauptet 40 %, tatsächlich 55 %. Die Quote 2,6 verlangt 38,5 %, die Zeile
-    // hat damit schon roh 1,5 PP Vorteil und die Korrektur legt darauf.
+  /**
+   * Bis 06.10.2026 bekam Unter 2,5 hier die gespiegelte Korrektur von Über 2,5 - nach oben,
+   * also mit falschem Vorzeichen (siehe AGENTS.md). Ohne eigene Zeilen ist ein Markt jetzt nicht
+   * empfehlbar.
+   */
+  it("empfiehlt einen Gegenmarkt ohne eigene Zeilen nicht", () => {
     const profile = buildMarketProfile(observations("over25", 200, 90, 0.6, 1.9));
     const settings = recommendedSettings(DEFAULT_KELLY_SETTINGS);
     const fixtures = [fixture("under25", 0.4, 2.6)];
-
-    const automatic = computeKellyCandidates(fixtures, "all", settings, profile);
-    expect(automatic.candidates).toHaveLength(1);
-    const candidate = automatic.candidates[0]!;
-    expect(candidate.probability).toBeCloseTo(0.4, 5);
-    // Nach oben korrigiert, nicht nach unten - das ist der Unterschied zu den Über-Märkten.
-    expect(candidate.calibrationBias!).toBeGreaterThan(0);
-    expect(candidate.calibratedProbability!).toBeGreaterThan(0.4);
-    expect(candidate.calibratedEdge!).toBeGreaterThan(candidate.edge);
+    expect(computeKellyCandidates(fixtures, "all", settings, profile).candidates).toHaveLength(0);
   });
 
-  it("lässt einen Gegenmarkt nicht allein durch die Korrektur entstehen", () => {
-    // Dieselbe Korrektur, aber bei Quote 2,1 verlangt der Markt 47,6 % und das Modell sagt
-    // 40 % - roh also ein Nachteil von 7,6 PP. Angehoben käme die Zeile auf 55 % und sähe
-    // nach Vorteil aus; genau diesen Pfad sperrt `AUTO_RULE.minRawEdge`. Der Bias ist an
-    // Zeilen mit eigenem Vorteil gemessen und trägt hier nicht.
-    const profile = buildMarketProfile(observations("over25", 200, 90, 0.6, 1.9));
+  it("lässt einen Markt nicht allein durch die Korrektur entstehen", () => {
+    // Bei Quote 2,1 verlangt der Markt 47,6 % und das Modell sagt 40 % - roh also ein Nachteil
+    // von 7,6 PP. Selbst eine Korrektur nach oben dürfte daraus keine Wette machen; genau diesen
+    // Pfad sperrt `AUTO_RULE.minRawEdge`. Der Bias ist an Zeilen mit eigenem Vorteil gemessen.
+    const profile = buildMarketProfile([
+      ...observations("over25", 200, 90, 0.6, 1.9),
+      ...observations("under25", 200, 110, 0.45, 2.4)
+    ]);
     const settings = recommendedSettings(DEFAULT_KELLY_SETTINGS);
     const fixtures = [fixture("under25", 0.4, 2.1)];
 
@@ -202,14 +215,14 @@ describe("Gegenmärkte im Kelly-Picker", () => {
   });
 
   it("empfiehlt keinen Gegenmarkt, wenn die Quote den Vorteil auffrisst", () => {
-    const profile = buildMarketProfile(observations("over25", 200, 90, 0.6, 1.9));
-    // Dieselbe Korrektur, aber eine Quote, die 60 % verlangt.
+    const profile = buildMarketProfile(observations("under25", 200, 110, 0.45, 2.4));
+    // Eine Quote, die 60 % verlangt.
     const result = computeKellyCandidates(
       [fixture("under25", 0.4, 1.67)], "all", recommendedSettings(DEFAULT_KELLY_SETTINGS), profile);
     expect(result.candidates).toHaveLength(0);
   });
 
-  it("lässt Über 3,5 aus, solange es keinen Spiegelpartner mit Historie gibt", () => {
+  it("lässt Über 3,5 aus, solange es keine eigene Historie gibt", () => {
     const profile = buildMarketProfile(observations("over25", 200, 90, 0.6, 1.9));
     const result = computeKellyCandidates(
       [fixture("over35", 0.35, 3.5)], "all", recommendedSettings(DEFAULT_KELLY_SETTINGS), profile);

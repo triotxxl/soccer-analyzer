@@ -22,6 +22,8 @@ import {
   QUICKPICK_PRESETS,
   DEFAULT_HZ15_SETTINGS,
   DEFAULT_REMIS_SETTINGS,
+  DEFAULT_MODELL1X2_SETTINGS,
+  oddsEstimated,
   HZ15_LEVELS,
   REMIS_LEVELS,
   firstHalfRateOf,
@@ -974,5 +976,76 @@ describe("Remis-Kandidaten", () => {
     const vorgabe = REMIS_LEVELS.find((level) => level.id === "ausgewogen")!;
     expect(QUICKPICK_PRESETS.remis.noteOf(vorgabe.measured)).toMatch(/Treffer$|geprüft$/);
     expect(QUICKPICK_PRESETS.remis.massstab).toBe("trefferquote");
+  });
+});
+
+describe("Sieger laut Modell", () => {
+  /** Alpha mit 70 % Siegchance, 18 % Remis, Beta 12 %; Tipp der Tabelle ist ebenfalls Alpha. */
+  function klar(patch: Partial<DashboardFixture["markets"][number]> = {}, drawPatch: Partial<DashboardFixture["markets"][number]> = {}): DashboardFixture {
+    return fixture({
+      markets: [
+        { ...fixture().markets[0]!, probability: 0.7, odds: 1.4, oddsHome: 1.4, oddsAway: 7.5, ...patch },
+        {
+          key: "draw", label: "Remis", selection: "Unentschieden (X)", pick: null,
+          selectionTone: "draw", probability: 0.18, odds: 4.6, confidence: 80, score: 20,
+          recommendation: { level: "none", label: "Nicht empfehlenswert" }, details: [], ...drawPatch
+        }
+      ]
+    });
+  }
+
+  it("tippt den Favoriten des Modells, wenn er sicher genug ist", () => {
+    const evaluation = evaluateFixture(klar(), DEFAULT_MODELL1X2_SETTINGS);
+    expect(evaluation.passes).toBe(true);
+    expect(evaluation.side).toBe("1");
+    expect(evaluation.market).toBe("1x2");
+    expect(evaluation.selection).toBe("Heimsieg Alpha");
+    expect(evaluation.odds).toBe(1.4);
+    expect(evaluation.modell1x2?.probability).toBe(0.7);
+    expect(evaluation.modell1x2?.pickAgrees).toBe(true);
+  });
+
+  /**
+   * Der Kern dieser Voreinstellung: `pick` kommt aus den Favoritenpunkten (Quotenmedian), nicht
+   * aus dem Modell. Sieht das Modell die Gegenseite vorn, wird die Gegenseite getippt.
+   */
+  it("tippt die Gegenseite, wenn das Modell sie vorn sieht", () => {
+    const partie = klar({ probability: 0.12, odds: 1.9, oddsHome: 1.9, oddsAway: 1.45 }, { probability: 0.2 });
+    const evaluation = evaluateFixture(partie, DEFAULT_MODELL1X2_SETTINGS);
+    expect(evaluation.passes).toBe(true);
+    expect(evaluation.side).toBe("2");
+    expect(evaluation.selection).toBe("Auswärtssieg Beta");
+    expect(evaluation.odds).toBe(1.45);
+    expect(evaluation.modell1x2?.probability).toBeCloseTo(0.68, 10);
+    expect(evaluation.modell1x2?.counterProbability).toBe(0.12);
+    expect(evaluation.modell1x2?.pickAgrees).toBe(false);
+    expect(oddsEstimated(evaluation)).toBe(false);
+  });
+
+  it("kennzeichnet eine geschätzte Gegenquote aus alten Analysen", () => {
+    const partie = klar({ probability: 0.12, odds: 4.2, oddsHome: undefined, oddsAway: undefined }, { probability: 0.2, odds: 3.6 });
+    const evaluation = evaluateFixture(partie, DEFAULT_MODELL1X2_SETTINGS);
+    expect(evaluation.side).toBe("2");
+    expect(evaluation.modell1x2?.oddsSource).toBe("geschätzt");
+    expect(oddsEstimated(evaluation)).toBe(true);
+  });
+
+  it("weist ohne belastbare Siegchance, ohne Quote und unter der Schwelle ab", () => {
+    expect(evaluateFixture(klar({ probabilityReliable: false }), DEFAULT_MODELL1X2_SETTINGS).rejectedBy).toBe("nichtBelastbar");
+    expect(evaluateFixture(klar({ odds: null, oddsHome: null }), DEFAULT_MODELL1X2_SETTINGS).rejectedBy).toBe("keineQuote");
+    expect(evaluateFixture(klar({ probability: 0.55 }), DEFAULT_MODELL1X2_SETTINGS).rejectedBy).toBe("siegChance");
+  });
+
+
+  /** Der Quotenbereich ist die Identität: Darüber folgt die Trefferquote dem Preis, nicht dem Modell. */
+  it("weist eine Quote außerhalb von 1,30 bis 2,00 ab, auch bei hoher Siegchance", () => {
+    expect(evaluateFixture(klar({ probability: 0.75, odds: 2.2, oddsHome: 2.2 }), DEFAULT_MODELL1X2_SETTINGS).rejectedBy).toBe("quote");
+    expect(evaluateFixture(klar({ odds: 1.2, oddsHome: 1.2 }), DEFAULT_MODELL1X2_SETTINGS).rejectedBy).toBe("quote");
+  });
+  it("behält eigene Regler neben den anderen Filtern", () => {
+    const store = withSettings(loadQuickpickStore(), { ...DEFAULT_MODELL1X2_SETTINGS, minWinProbability: 0.72 });
+    expect(store.modell1x2.minWinProbability).toBe(0.72);
+    expect(store.remis).toEqual(DEFAULT_REMIS_SETTINGS);
+    expect(settingsOf({ ...store, aktiv: "modell1x2" }).preset).toBe("modell1x2");
   });
 });

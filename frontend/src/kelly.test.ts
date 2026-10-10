@@ -166,15 +166,68 @@ describe("computeKellyCandidates", () => {
     expect(candidate!.stakePercent).toBeCloseTo(0.03);
   });
 
-  it("finalStake übersteigt nie fullKelly * Fraktion * Budget, auch nach Exposure-Scaling", () => {
+  /**
+   * Ohne Mindesteinsatz (`minStake: 0`), sonst nähme die Rechnung den Zweig der Auswahl und
+   * erreichte das Herunterskalieren nie - bis 06.10.2026 tat dieser Test genau das und bliebe
+   * auch mit einem Fehler darin grün.
+   */
+  it("finalStake übersteigt ohne Mindesteinsatz nie fullKelly * Fraktion * Budget, auch nach Exposure-Scaling", () => {
     const fixtures = Array.from({ length: 8 }, (_, index) =>
       fixture(index + 1, `Team${index}`, [market("btts", 0.6 + index * 0.01, 2 + index * 0.05)]));
-    const config = settings({ kellyFraction: 0.25, maxStakePercent: 0.03, maxExposurePercent: 0.1, minEdge: 0 });
-    const { candidates } = computeKellyCandidates(fixtures, "btts", config);
+    const config = settings({ kellyFraction: 0.25, maxStakePercent: 0.03, maxExposurePercent: 0.1, minEdge: 0, minStake: 0 });
+    const { candidates, scaleFactor } = computeKellyCandidates(fixtures, "btts", config);
+    expect(scaleFactor).toBeLessThan(1);
     for (const candidate of candidates) {
       const theoretical = candidate.fullKelly * config.kellyFraction * config.budget;
       expect(candidate.stake).toBeLessThanOrEqual(theoretical + 1e-9);
     }
+  });
+
+  /** Mit Mindesteinsatz gilt die Zusage oben bewusst nicht: Zu kleine Beträge werden angehoben. */
+  it("hebt einen zu kleinen Kelly-Betrag auf den Mindesteinsatz an", () => {
+    // Viertel-Kelly bei 54 % zur Quote 1,90: (0,54 · 1,9 − 1) / 0,9 · 0,25 · 100 € = 0,72 €.
+    const fixtures = [fixture(1, "Alpha", [market("btts", 0.54, 1.9)])];
+    const config = settings({ kellyFraction: 0.25, maxStakePercent: 0.03, maxExposurePercent: 0.25, minEdge: 0, minStake: 1 });
+    const [candidate] = computeKellyCandidates(fixtures, "btts", config).candidates;
+    expect(candidate!.fullKelly * 0.25 * 100).toBeCloseTo(0.72, 2);
+    expect(candidate!.stake).toBe(1);
+  });
+});
+
+/**
+ * Bis 06.10.2026 hob der Mindesteinsatz Beträge nach der Grenze je Spiel wieder an: 2 € auf
+ * einem Spiel mit 1 € Grenze, und der Export meldete 1 €.
+ */
+describe("Mindesteinsatz und Grenze je Spiel", () => {
+  const twoMarkets = () => [fixture(1, "Alpha", [market("over25", 0.62, 1.8), market("btts", 0.6, 1.85)])];
+  const config = () => settings({
+    budget: 20, allowMultipleMarketsPerGame: true, enableGameRiskLimit: true, maxRiskPerGame: 0.05,
+    minStake: 1, minEdge: 0
+  });
+
+  it("legt nach dem Anheben nie mehr als die Grenze auf ein Spiel", () => {
+    const result = computeKellyCandidates(twoMarkets(), "all", config());
+    const total = result.candidates.reduce((sum, candidate) => sum + candidate.stake, 0);
+    expect(total).toBeLessThanOrEqual(1 + 1e-9);
+    expect(result.candidates).toHaveLength(1);
+    expect(result.filtered.overGameLimit).toBe(1);
+  });
+
+  it("meldet im Export die Endbeträge", () => {
+    const result = computeKellyCandidates(twoMarkets(), "all", config());
+    const exported = buildKellyExport(result, { marketFilter: "all", marketLabel: "Alle", settings: config() });
+    expect(exported.gameRiskLimits[0]!.stakeAfter).toBeCloseTo(exported.summary.totalStake, 2);
+  });
+});
+
+describe("Angepfiffene Spiele", () => {
+  it("lässt Spiele mit Anstoß bis zum Zeitpunkt der Auswahl weg", () => {
+    const fixtures = [fixture(1, "Alpha", [market("btts", 0.6, 2.2)])];
+    const config = settings({ minEdge: 0 });
+    const kickoff = Date.parse(fixtures[0]!.kickoff);
+    expect(computeKellyCandidates(fixtures, "all", config, null, { now: kickoff - 60_000 }).candidates).toHaveLength(1);
+    expect(computeKellyCandidates(fixtures, "all", config, null, { now: kickoff }).candidates).toHaveLength(0);
+    expect(selectKelly(fixtures, "all", config, false, null, { now: kickoff + 60_000 }).candidates).toHaveLength(0);
   });
 });
 

@@ -2,7 +2,7 @@ import { Shuffle, ShoppingCartSimple, Trash, X } from "@phosphor-icons/react";
 import { useLayoutEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { MARKET_GROUPS, formatOdd, levelGlyph, marketGroupOf } from "./App";
 import {
-  canGenerate, cartEntryId, generateCombos, requestedTotal, sizeRange,
+  canGenerate, cartEntryId, generateCombos, requestedTotal, sizeRange, toCounterCartEntry,
   type CartEntry, type Combo, type ComboFillMode, type ComboSizeConfig
 } from "./betCart";
 import type { DashboardFixture, DashboardMarket } from "./types";
@@ -38,12 +38,37 @@ function menuLabel(market: DashboardMarket): string {
   return market.label;
 }
 
+/** Ein Eintrag der Liste: ein Markt, beim 1X2 zusätzlich die Seite gegen den Modelltipp. */
+interface MenuItem {
+  market: DashboardMarket;
+  /** Gesetzt nur für die Gegenseite; der Modelltipp trägt seine Seite in `market.pick`. */
+  counterSide: "1" | "2" | null;
+  label: string;
+  selection: string;
+  odds: number | null;
+}
+
+function menuItems(fixture: DashboardFixture, market: DashboardMarket): MenuItem[] {
+  const own: MenuItem = { market, counterSide: null, label: menuLabel(market), selection: market.selection, odds: market.odds };
+  const counter = toCounterCartEntry(fixture, market);
+  if (!counter?.pick) return [own];
+  return [own, {
+    market,
+    counterSide: counter.pick,
+    label: `1X2 · ${counter.pick === "2" ? "Gast" : "Heim"}`,
+    selection: counter.selection,
+    odds: counter.odds
+  }];
+}
+
 /**
  * Marktauswahl am „Add“-Knopf (seit 30.09.2026 statt des Radialmenüs, Davids Wunsch): eine
  * senkrechte Liste im Leistenstil wie die Marktliste der Werkzeugleiste, gruppiert wie diese.
  * Öffnet per Klick, nicht beim Überfahren - sonst ging beim Weg über die Tabelle ständig etwas
  * auf. Bleibt nach dem Hinzufügen offen, damit mehrere Märkte eines Spiels ohne neues Öffnen
  * gehen; ein Markt im Wettschein trägt den grünen Balken, ein zweiter Klick nimmt ihn heraus.
+ * Beim 1X2 steht unter dem Modelltipp auch die andere Seite (seit 06.10.2026, Davids Wunsch);
+ * beide teilen sich eine Wettschein-Kennung, die Wahl der einen ersetzt also die andere.
  */
 export function CartAddMenu({ fixture, cart, open, onOpen, onClose, onSelect, onRemove, compact = false }: {
   fixture: DashboardFixture;
@@ -51,7 +76,8 @@ export function CartAddMenu({ fixture, cart, open, onOpen, onClose, onSelect, on
   open: boolean;
   onOpen(): void;
   onClose(): void;
-  onSelect(market: DashboardMarket): void;
+  /** `counterSide` ist gesetzt, wenn die 1X2-Seite gegen den Modelltipp gewählt wurde. */
+  onSelect(market: DashboardMarket, counterSide: "1" | "2" | null): void;
   onRemove(market: DashboardMarket): void;
   /** Für die 34-px-Zeile der Heatmap: ein "+" statt des Wortes "Add". */
   compact?: boolean;
@@ -95,8 +121,11 @@ export function CartAddMenu({ fixture, cart, open, onOpen, onClose, onSelect, on
     };
   }, [open]);
 
-  const inCart = (market: DashboardMarket) => cart.some((entry) => entry.id === cartEntryId(fixture.fixtureId, market.key));
-  const count = fixture.markets.filter(inCart).length;
+  // Beim 1X2 entscheidet zusätzlich die Seite: Beide Einträge teilen sich eine Kennung.
+  const inCart = ({ market, counterSide }: MenuItem) => cart.some((entry) =>
+    entry.id === cartEntryId(fixture.fixtureId, market.key)
+    && (market.key !== "1x2" || entry.pick === (counterSide ?? market.pick)));
+  const count = fixture.markets.filter((market) => cart.some((entry) => entry.id === cartEntryId(fixture.fixtureId, market.key))).length;
   const partie = `${fixture.homeTeam} – ${fixture.awayTeam}`;
   const groups = MARKET_GROUPS
     .map((group) => ({ group, markets: fixture.markets.filter((market) => marketGroupOf(market.key) === group) }))
@@ -158,22 +187,31 @@ export function CartAddMenu({ fixture, cart, open, onOpen, onClose, onSelect, on
       </div>
       {groups.map(({ group, markets }) => <div className="cart-menu-group" role="group" aria-label={group} key={group}>
         <div className="cart-menu-group-title" aria-hidden>{group}</div>
-        {markets.map((market) => {
-          const added = inCart(market);
-          const text = `${menuLabel(market)} · ${market.selection}, Quote ${formatOdd(market.odds)}`;
+        {markets.flatMap((market) => menuItems(fixture, market)).map((item) => {
+          const { market, counterSide, selection } = item;
+          const added = inCart(item);
+          const level = counterSide === null ? market.recommendation.level : "none";
+          const text = counterSide === null
+            ? `${item.label} · ${selection}, Quote ${formatOdd(item.odds)}`
+            : `${item.label} · ${selection} gegen den Modelltipp, Quote ${formatOdd(item.odds)}`;
           return <button
             type="button"
-            key={market.key}
+            key={`${market.key}:${counterSide ?? "tipp"}`}
             role="menuitemcheckbox"
             aria-checked={added}
-            className={`cart-menu-item ${market.recommendation.level}`}
+            className={`cart-menu-item ${level}`}
             aria-label={added ? `${text} – aus dem Wettschein nehmen` : `${text} – in den Wettschein`}
-            title={`${market.selection} · ${market.recommendation.label}`}
-            onClick={() => added ? onRemove(market) : onSelect(market)}
+            title={counterSide === null
+              ? `${selection} · ${market.recommendation.label}`
+              : `${selection} · gegen den Modelltipp`}
+            onClick={() => added ? onRemove(market) : onSelect(market, counterSide)}
           >
-            <span className="cart-menu-label">{menuLabel(market)}</span>
-            <span className="level-glyph" aria-hidden>{market.recommendation.level === "none" ? "" : levelGlyph(market.recommendation.level)}</span>
-            <span className="cart-menu-odds">{formatOdd(market.odds)}</span>
+            <span className="cart-menu-label">
+              {item.label}
+              {counterSide !== null && <span className="cart-menu-hint">Modell dagegen</span>}
+            </span>
+            <span className="level-glyph" aria-hidden>{level === "none" ? "" : levelGlyph(level)}</span>
+            <span className="cart-menu-odds">{formatOdd(item.odds)}</span>
           </button>;
         })}
       </div>)}

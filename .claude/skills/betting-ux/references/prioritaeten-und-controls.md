@@ -47,9 +47,9 @@ Ausgenommen: Warnungen und Ehrlichkeitshinweise - die werden gekürzt, nicht ent
 | stufenloser Wert, grobe Wahl reicht | Schieberegler | |
 | exakter Zahlenwert (Budget, Mindestquote) | Zahlenfeld, ggf. Regler + Zahlenfeld | Geldbeträge nie nur per Regler |
 | Ja/Nein, wirkt sofort | Schalter / Checkbox | im Filtermenü `FilterSwitch` (`role="switch"`), „an“ heißt dort immer „Filter aktiv“ oder „Anzeige an“ - deshalb „Nur Ligaspiele“ statt eines ab Werk eingeschalteten Pokal-Schalters |
-| viele selten genutzte Filter | Dialog oder Schublade | wie Quickpicker |
+| viele selten genutzte Filter | Aufklapper in einer Karte oder eigener Dialog | wie „Werte anpassen“ im Quickpicker |
 | vertiefende Information | Aufklappen / Detailansicht | wie `fixture-detail-panel` |
-| getrennte Bereiche derselben Sache | Reiter | vorsichtig: der Quickpicker wählt bewusst per Umschalter + Dropdown statt Reitern |
+| getrennte Bereiche derselben Sache | Reiter | vorsichtig: der Quickpicker zeigt seine sechs Filter seit 10.10.2026 als eine Radio-Liste unter zwei Gruppenüberschriften statt Reitern oder Dropdown |
 | Zustand | Abzeichen | wie „Klasse ↑", „Modell dagegen" |
 | einzelne Kennzahl | Zahl mit Beschriftung | wie die Bewertungskacheln im Filtermenü (Wort klein, Zahl groß); als Auswahl zugleich Radio |
 | Verlauf | Punktereihe / Sparkline | wie Form- und H2H-Punkte |

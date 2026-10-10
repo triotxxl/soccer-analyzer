@@ -305,8 +305,10 @@ export const DOMINANZ_PRESET: QuickpickPreset<DominanzQuickpickSettings> = {
         + ` Trefferquote, weil bei diesem Filter beides auseinanderläuft.`
   }),
   honesty: "Dieser Filter findet den Sieger gut – aber der Buchmacher weiß das auch und"
-    + " rechnet es in die Quote ein. Auf jeder Stufe verlierst du damit auf Dauer zehn bis"
-    + " fünfzehn Prozent. Hohe Quoten und gute Begründungen: ja. Gewinn: nein.",
+    + " rechnet es in die Quote ein. Auf jeder Stufe verlierst du damit auf Dauer rund elf bis"
+    + " sechzehn Prozent. Hohe Quoten und gute Begründungen: ja. Gewinn: nein.",
+  warnung: "Der Buchmacher preist diese Stärke ein: An alten Spielen gingen auf jeder Stufe rund"
+    + " 11 bis 16 % je Tipp verloren. Rechne nicht mit Gewinn.",
   wettschein: {
     hinweis: "Legt jedes gefundene Spiel mit der Quote der stärkeren Mannschaft in den"
       + " Wettschein. Schau vorher in die Kombi-Tabelle, was daraus wird."

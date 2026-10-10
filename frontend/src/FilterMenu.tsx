@@ -75,8 +75,14 @@ export function FilterSwitch({ label, note, warning, checked, onChange }: {
  * Eine Karte im Stil der Vorlage: kleiner grauer Titel, rechts daneben der wirksame Stand
  * ("bis Di 29.09., 11:00", "Markt: Über 2,5"), darunter die Bedienelemente.
  */
-function FilterCard({ title, aside, children }: { title?: string; aside?: ReactNode; children: ReactNode }) {
-  return <div className="filter-card">
+export function FilterCard({ title, aside, children, className }: {
+  title?: string;
+  aside?: ReactNode;
+  children: ReactNode;
+  /** Zusatzklasse, etwa für die Karten des Quickpickers mit eigener Scrollfläche. */
+  className?: string;
+}) {
+  return <div className={className ? `filter-card ${className}` : "filter-card"}>
     {(title || aside) && <div className="filter-card-head">
       {title && <h4>{title}</h4>}
       {aside && <span className="filter-card-aside">{aside}</span>}

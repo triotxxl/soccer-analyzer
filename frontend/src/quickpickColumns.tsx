@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { formatOdd } from "./App";
 import { DRAW_SIGNAL_CONFIG, DRAW_SIGNAL_META, formatDrawPoints } from "../../src/draw-signals.ts";
-import type { QuickpickEvaluation, QuickpickPresetId } from "./quickpick";
+import { oddsEstimated, type QuickpickEvaluation, type QuickpickPresetId } from "./quickpick";
 import type { DashboardFixture } from "./types";
 
 /**
@@ -202,7 +202,7 @@ const DOMINANZ_COLUMNS: QuickpickColumn[] = [
     value: (row) => row.evaluation.odds ?? -1,
     cell: (row) => {
       const odds = row.evaluation.odds;
-      const geschaetzt = row.evaluation.dominanz?.oddsSource === "geschätzt";
+      const geschaetzt = oddsEstimated(row.evaluation);
       return {
         main: odds === null ? "–" : `${geschaetzt ? "≈ " : ""}${formatOdd(odds)}`,
         mainTitle: geschaetzt
@@ -422,12 +422,75 @@ const REMIS_SCORE_COLUMNS: QuickpickColumn[] = [
   }
 ];
 
+function formatPercent(value: number): string {
+  return `${(value * 100).toFixed(1).replace(".", ",")} %`;
+}
+
+/**
+ * Die Spalten der Voreinstellung „Sieger laut Modell". Die Seite ist der Favorit des Modells,
+ * nicht der 1X2-Tipp der Tabelle - wo beide auseinanderfallen, sagt das ein Hinweis, damit
+ * niemand die zwei Listen für einen Fehler hält.
+ */
+const MODELL1X2_COLUMNS: QuickpickColumn[] = [
+  partie,
+  {
+    key: "tipp", label: "Tipp", sortable: false, className: "quickpick-side",
+    cell: (row) => ({
+      main: teamOf(row),
+      note: row.evaluation.modell1x2?.pickAgrees === false
+        ? <span className="quickpick-badge" title="Die Tabelle tippt die andere Mannschaft: Ihr Tipp richtet sich zuerst nach den Quoten, dieser Filter nur nach dem Modell.">Tabelle tippt anders</span>
+        : "Favorit des Modells"
+    })
+  },
+  {
+    key: "siegchance", label: "Siegchance", ariaLabel: "Siegchance laut Modell", sortable: true,
+    value: (row) => row.evaluation.modell1x2?.probability ?? -1,
+    cell: (row) => {
+      const detail = row.evaluation.modell1x2;
+      if (detail == null) return { main: "–" };
+      return {
+        main: formatPercent(detail.probability),
+        mainTitle: "Wie hoch das Modell die Siegchance der getippten Mannschaft sieht – die"
+          + " wichtigste Bedingung dieses Filters.",
+        note: detail.drawProbability === null || detail.counterProbability === null ? undefined
+          : `Remis ${formatPercent(detail.drawProbability)} · Gegner ${formatPercent(detail.counterProbability)}`
+      };
+    }
+  },
+  {
+    key: "daten", label: "Daten", ariaLabel: "Datenvertrauen", sortable: true,
+    value: (row) => row.evaluation.modell1x2?.confidence ?? -1,
+    cell: (row) => ({
+      main: row.evaluation.modell1x2 == null ? "–" : `${row.evaluation.modell1x2.confidence} %`,
+      mainTitle: "Wie vollständig die Daten hinter der Rechnung sind. Keine Bedingung.",
+      note: "nur Einordnung"
+    })
+  },
+  {
+    key: "quote", label: "Quote", sortable: true,
+    value: (row) => row.evaluation.odds ?? -1,
+    cell: (row) => {
+      const odds = row.evaluation.odds;
+      const geschaetzt = oddsEstimated(row.evaluation);
+      return {
+        main: odds === null ? "–" : `${geschaetzt ? "≈ " : ""}${formatOdd(odds)}`,
+        mainTitle: geschaetzt
+          ? "Diese Quote ist geschätzt, weil für diese Seite keine gespeichert war. Sie liegt"
+            + " meist ein paar Prozent daneben – nach der nächsten Analyse stimmt sie genau."
+          : "Die Quote für diese Mannschaft aus der Analyse.",
+        note: odds === null ? undefined : `braucht ${(100 / odds).toFixed(0)} %`
+      };
+    }
+  }
+];
+
 const QUICKPICK_COLUMNS: Record<QuickpickPresetId, QuickpickColumn[]> = {
   daves1x2: DAVES_COLUMNS,
   dominanz: DOMINANZ_COLUMNS,
   hz15: HZ15_COLUMNS,
   remis: REMIS_COLUMNS,
-  remisScore: REMIS_SCORE_COLUMNS
+  remisScore: REMIS_SCORE_COLUMNS,
+  modell1x2: MODELL1X2_COLUMNS
 };
 
 /**
@@ -504,6 +567,15 @@ export function strengthOf(preset: QuickpickPresetId, row: QuickpickRow): Quickp
         + " das in 35 von 100 Spielen."
     };
   }
+  if (preset === "modell1x2") {
+    const detail = evaluation.modell1x2;
+    if (detail === null || detail === undefined) return null;
+    const percent = Math.round(detail.probability * 100);
+    return {
+      percent, label: `Sieg ${percent} %`, gut: 70, mittel: 60,
+      title: "Wie hoch das Modell die Siegchance der getippten Mannschaft sieht."
+    };
+  }
   if (preset === "remisScore") {
     const signals = evaluation.remisScore;
     if (signals === null || signals === undefined || signals.max === 0) return null;
@@ -512,7 +584,7 @@ export function strengthOf(preset: QuickpickPresetId, row: QuickpickRow): Quickp
       label: `Score ${formatDrawPoints(signals.score)}/${signals.max}`,
       gut: 64, mittel: 48,
       title: "Der Remis-Score: Punkte aus den einzelnen Hinweisen, aufgeklappt mit Begründung."
-        + " Noch nicht an alten Spielen geprüft."
+        + " Die Punkte je Hinweis sind gesetzt, nicht gemessen."
     };
   }
   const detail = evaluation.remis;

@@ -46,12 +46,16 @@ function balanced(id: number): DashboardFixture {
   return { ...base, form: { ...base.form, away: ["win", "win", "win", "win", "loss"] } };
 }
 
+/** Vor dem Anstoß der Testspiele - sonst gälten sie als angepfiffen und kämen nicht in den Wettschein. */
+const BEFORE_KICKOFF = Date.parse("2026-09-20T12:00:00.000Z");
+
 /** Der Dialog ist kontrolliert - für Eingabetests braucht er einen Halter. */
-function Harness({ fixtures, initial, preset = "daves1x2", active = false, onActiveChange, onAddAll }: {
+function Harness({ fixtures, initial, preset = "daves1x2", active = false, now = BEFORE_KICKOFF, onActiveChange, onAddAll }: {
   fixtures: DashboardFixture[];
   initial?: Partial<DavesQuickpickSettings>;
   preset?: QuickpickPresetId;
   active?: boolean;
+  now?: number;
   onActiveChange?(active: boolean): void;
   onAddAll?(rows: Array<{ fixture: DashboardFixture; evaluation: { side: "1" | "2" | null } }>): void;
 }) {
@@ -66,6 +70,7 @@ function Harness({ fixtures, initial, preset = "daves1x2", active = false, onAct
     store={store}
     active={isActive}
     timezone="Europe/Berlin"
+    now={now}
     onSettingsChange={(next) => setStore((value) => withSettings(value, next))}
     onPresetChange={(next) => setStore((value) => ({ ...value, aktiv: next }))}
     onActiveChange={(next) => { setActive(next); onActiveChange?.(next); }}
@@ -74,15 +79,18 @@ function Harness({ fixtures, initial, preset = "daves1x2", active = false, onAct
   />;
 }
 
-/** Die drei Schubladen der Fußzeile schließen einander aus - eine reicht je Prüfung. */
-async function openDrawer(name: RegExp): Promise<void> {
+/** Kombi-Chancen, Werte und Abweisungen stehen hinter Aufklappern. */
+async function openDisclosure(name: string | RegExp): Promise<void> {
   await userEvent.click(screen.getByRole("button", { name }));
 }
 
-/** Beschreibung, Kriterien und Ehrlichkeitsabsatz stehen hinter dem ⓘ. */
+/** Beschreibung, Kriterien und der volle Ehrlichkeitsabsatz stehen hinter einem Aufklapper. */
 async function openInfo(): Promise<void> {
-  await userEvent.click(screen.getByRole("button", { name: "Worauf dieser Filter achtet" }));
+  await openDisclosure("Worauf dieser Filter achtet");
 }
+
+/** Ein Filter der Liste, über den Anfang seines Namens - dahinter steht die Trefferzahl. */
+const presetRadio = (label: string) => screen.getByRole("radio", { name: new RegExp(`^${label}`) });
 
 /** Die Werte eines Spiels stehen aufgeklappt unter seiner Zeile. */
 async function openRow(partie: string): Promise<void> {
@@ -91,15 +99,23 @@ async function openRow(partie: string): Promise<void> {
 
 describe("QuickpickButton", () => {
   it("meldet den Klick nach oben", async () => {
-    const onOpen = vi.fn();
-    render(<QuickpickButton active={false} onOpen={onOpen} />);
+    const onToggle = vi.fn();
+    render(<QuickpickButton active={false} open={false} onToggle={onToggle} />);
     await userEvent.click(screen.getByRole("button", { name: "Quickpicker öffnen" }));
-    expect(onOpen).toHaveBeenCalledOnce();
+    expect(onToggle).toHaveBeenCalledOnce();
   });
 
   it("zeigt am Knopf selbst, dass gefiltert wird", () => {
-    render(<QuickpickButton active onOpen={() => undefined} />);
-    expect(screen.getByRole("button", { name: "Quickpicker öffnen" })).toHaveAttribute("aria-pressed", "true");
+    render(<QuickpickButton active open={false} onToggle={() => undefined} />);
+    expect(screen.getByRole("button", { name: "Quickpicker öffnen" })).toHaveAccessibleDescription("Filter aktiv");
+  });
+
+  it("sagt wie der Filter-Knopf, ob sein Fenster offen ist", () => {
+    render(<QuickpickButton active={false} open onToggle={() => undefined} />);
+    const knopf = screen.getByRole("button", { name: "Quickpicker öffnen" });
+    expect(knopf).toHaveAttribute("aria-expanded", "true");
+    expect(knopf).toHaveAttribute("aria-haspopup", "dialog");
+    expect(knopf).not.toHaveAccessibleDescription("Filter aktiv");
   });
 });
 
@@ -128,7 +144,7 @@ describe("QuickpickChip", () => {
 describe("QuickpickDialog", () => {
   it("nennt die Voreinstellung mit allen Kriterien", async () => {
     render(<Harness fixtures={[fixture(1, "Alpha", "Beta", 75)]} />);
-    expect(screen.getByRole("combobox", { name: "Filter" })).toHaveValue("daves1x2");
+    expect(presetRadio("Daves 1x2-Filter")).toBeChecked();
 
     await openInfo();
 
@@ -142,15 +158,17 @@ describe("QuickpickDialog", () => {
   /**
    * Die Ehrlichkeitszusage ist Teil der Oberfläche, nicht nur der Dokumentation: Auf dem
    * Stand vom 21.09.2026 misst keine Stufe einen Gewinn, und das darf nicht stillschweigend
-   * verschwinden - auch nicht, wenn die Trefferquote gut aussieht.
+   * verschwinden - auch nicht, wenn die Trefferquote gut aussieht. Seit 10.10.2026 steht der
+   * Haken ohne Klick neben dem Wettschein-Knopf, der volle Absatz aufgeklappt.
    */
   it("warnt vor dem Ertrag, statt nur die Trefferquote zu zeigen", async () => {
     render(<Harness fixtures={[fixture(1, "Alpha", "Beta", 75)]} />);
     expect(screen.getByText("Treffer je Tipp")).toBeInTheDocument();
+    expect(screen.getByText(/Rechne nicht mit Gewinn/)).toBeInTheDocument();
+    expect(screen.queryByText(/jede Stufe im Minus/)).not.toBeInTheDocument();
 
     await openInfo();
 
-    expect(screen.getByText(/Rechne nicht mit Gewinn/)).toBeInTheDocument();
     expect(screen.getByText(/jede Stufe im Minus/)).toBeInTheDocument();
   });
 
@@ -175,9 +193,12 @@ describe("QuickpickDialog", () => {
   it("schaltet den Filter an und wieder aus", async () => {
     const onActiveChange = vi.fn();
     render(<Harness fixtures={[fixture(1, "Alpha", "Beta", 75)]} onActiveChange={onActiveChange} />);
-    await userEvent.click(screen.getByRole("button", { name: "Filter anwenden" }));
+    const schalter = screen.getByRole("switch", { name: "Tabelle filtern" });
+    expect(schalter).not.toBeChecked();
+    await userEvent.click(schalter);
     expect(onActiveChange).toHaveBeenLastCalledWith(true);
-    await userEvent.click(screen.getByRole("button", { name: "Filter aufheben" }));
+    expect(schalter).toBeChecked();
+    await userEvent.click(schalter);
     expect(onActiveChange).toHaveBeenLastCalledWith(false);
   });
 
@@ -185,7 +206,33 @@ describe("QuickpickDialog", () => {
   it("schaltet den Filter mit dem Wechsel ein", async () => {
     const onActiveChange = vi.fn();
     render(<Harness fixtures={[fixture(1, "Alpha", "Beta", 75)]} onActiveChange={onActiveChange} />);
-    await userEvent.click(screen.getByRole("radio", { name: "Modell-Filter" }));
+    await userEvent.click(presetRadio("Sieger laut Modell"));
+    expect(onActiveChange).toHaveBeenLastCalledWith(true);
+    expect(presetRadio("Sieger laut Modell")).toBeChecked();
+  });
+
+  /** Ein schon gewählter Filter löst kein change aus - der Klick darauf soll trotzdem filtern. */
+  it("schaltet auch mit dem schon gewählten Filter ein", async () => {
+    const onActiveChange = vi.fn();
+    render(<Harness fixtures={[fixture(1, "Alpha", "Beta", 75)]} onActiveChange={onActiveChange} />);
+    await userEvent.click(presetRadio("Daves 1x2-Filter"));
+    expect(onActiveChange).toHaveBeenLastCalledWith(true);
+  });
+
+  it("schaltet mit Stufe und Regler ein, mit der Sortierung nicht", async () => {
+    const onActiveChange = vi.fn();
+    render(<Harness fixtures={[fixture(1, "Alpha", "Beta", 75)]} onActiveChange={onActiveChange} />);
+    await userEvent.click(screen.getByRole("radio", { name: "Quote" }));
+    await openDisclosure("Kombi-Chancen");
+    await openRow("Alpha – Beta");
+    expect(onActiveChange).not.toHaveBeenCalled();
+
+    await userEvent.click(screen.getByRole("radio", { name: /^Streng/ }));
+    expect(onActiveChange).toHaveBeenLastCalledWith(true);
+
+    onActiveChange.mockClear();
+    await openDisclosure("Werte anpassen");
+    fireEvent.change(screen.getByLabelText(/^Modell sieht Favoriten ab/), { target: { value: "75" } });
     expect(onActiveChange).toHaveBeenLastCalledWith(true);
   });
 
@@ -201,52 +248,75 @@ describe("QuickpickDialog", () => {
 
   it("sperrt den Wettschein-Knopf ohne Treffer", () => {
     render(<Harness fixtures={[balanced(1)]} />);
-    expect(screen.getByRole("button", { name: /Keine Treffer/ })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /Kein Spiel gefunden/ })).toBeDisabled();
+  });
+
+  /** Wie bei Kelly: Die Quote eines angepfiffenen Spiels stammt von vor dem Anpfiff. */
+  it("legt angepfiffene Spiele nicht in den Wettschein", () => {
+    render(<Harness fixtures={[fixture(1, "Alpha", "Beta", 75)]} now={Date.parse("2026-09-20T18:30:00.000Z")} />);
+    expect(screen.getByText("Alpha – Beta")).toBeInTheDocument();
+    expect(screen.getByText("1 schon angepfiffen")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Alle schon angepfiffen/ })).toBeDisabled();
   });
 
   describe("Strengestufen", () => {
     const stufen = () => within(screen.getByRole("group", { name: "Strengestufe" }));
 
-    it("zeigt jede Stufe mit ihrer gemessenen Menge und Trefferquote", async () => {
+    it("zeigt jede Stufe mit ihrer gemessenen Menge und Trefferquote", () => {
       render(<Harness fixtures={[fixture(1, "Alpha", "Beta", 75)]} />);
-      await openDrawer(/^Strenge:/);
       for (const label of ["Streng", "Ausgewogen", "Locker", "Weit"]) {
-        expect(stufen().getByRole("button", { name: new RegExp(`^${label}`) })).toBeInTheDocument();
+        expect(stufen().getByRole("radio", { name: new RegExp(`^${label}`) })).toBeInTheDocument();
       }
       // Bewusst gegen das Format geprüft, nicht gegen den Stand: Die Zahlen wandern mit jeder
       // Nachkalibrierung. Ob sie noch zur Messung passen, prüft npm run quickpick-report.
-      expect(stufen().getByRole("button", { name: /^Ausgewogen/ }))
-        .toHaveTextContent(/^Ausgewogen\d+,\d\/Tag · \d+,\d %$/);
+      expect(stufen().getByRole("radio", { name: /^Ausgewogen/ }))
+        .toHaveAccessibleName(/^Ausgewogen: Treffer je Tipp \d+,\d %, \d+,\d Spiele je Tag$/);
     });
 
     it("hebt die eingestellte Stufe hervor und wechselt auf Klick", async () => {
       render(<Harness fixtures={[fixture(1, "Alpha", "Beta", 75)]} />);
-      await openDrawer(/^Strenge:/);
-      expect(stufen().getByRole("button", { name: /^Ausgewogen/ })).toHaveAttribute("aria-pressed", "true");
+      expect(stufen().getByRole("radio", { name: /^Ausgewogen/ })).toBeChecked();
 
-      await userEvent.click(stufen().getByRole("button", { name: /^Streng/ }));
+      await userEvent.click(stufen().getByRole("radio", { name: /^Streng/ }));
 
-      expect(stufen().getByRole("button", { name: /^Streng/ })).toHaveAttribute("aria-pressed", "true");
-      expect(stufen().getByRole("button", { name: /^Ausgewogen/ })).toHaveAttribute("aria-pressed", "false");
+      expect(stufen().getByRole("radio", { name: /^Streng/ })).toBeChecked();
+      expect(stufen().getByRole("radio", { name: /^Ausgewogen/ })).not.toBeChecked();
+      await openDisclosure("Werte anpassen");
       expect((screen.getByLabelText(/^Getippte Mannschaft ab/) as HTMLInputElement).value).toBe("70");
     });
 
     /** Wer an einem einzelnen Regler dreht, soll nicht fälschlich auf einer Stufe stehen. */
     it("meldet eigene Werte, sobald ein Regler abweicht", () => {
       render(<Harness fixtures={[fixture(1, "Alpha", "Beta", 75)]} initial={{ strongMinimum: 63 }} />);
-      expect(screen.getByRole("button", { name: /^Strenge:/ })).toHaveTextContent("Strenge: eigene Werte");
+      expect(screen.getByText("eigene Werte – die Zahlen gelten nicht")).toBeInTheDocument();
     });
 
     /**
-     * Der blaue Rahmen ist die einzige Warnung, dass die gemessenen Zahlen auf den
-     * Stufenknöpfen zu anderen Werten gehören. Ohne ihn liest man eine Trefferquote ab,
-     * die für die eigene Einstellung nie gemessen wurde.
+     * Auch ein Wert, den keine Stufe verstellt, wurde nie gemessen (Davids Entscheidung vom
+     * 10.10.2026). Die Stufe bleibt gewählt, ihre Zahlen gelten aber nicht mehr.
+     */
+    it("meldet eigene Werte auch bei einer geänderten Mindestquote", async () => {
+      render(<Harness fixtures={[fixture(1, "Alpha", "Beta", 75)]} initial={{ minOdds: 1.5 }} />);
+      expect(screen.getByText("eigene Werte – die Zahlen gelten nicht")).toBeInTheDocument();
+      expect(stufen().getByRole("radio", { name: /^Ausgewogen/ })).toBeChecked();
+      expect(screen.getByLabelText(/^Mindestquote/)).toHaveClass("changed");
+
+      await userEvent.click(screen.getByRole("button", { name: "Auf Stufe zurücksetzen" }));
+
+      expect((screen.getByLabelText(/^Mindestquote/) as HTMLInputElement).value).toBe("1.3");
+      expect(screen.queryByText("eigene Werte – die Zahlen gelten nicht")).not.toBeInTheDocument();
+    });
+
+    /**
+     * Die Markierung ist die Warnung, dass die gemessenen Zahlen der Stufen zu anderen Werten
+     * gehören. Ohne sie liest man eine Trefferquote ab, die für die eigene Einstellung nie
+     * gemessen wurde. Bei eigenen Werten steht „Werte anpassen“ von selbst offen.
      */
     it("markiert den geänderten Regler und stellt ihn zurück", async () => {
       render(<Harness fixtures={[fixture(1, "Alpha", "Beta", 75)]} initial={{ strongMinimum: 63 }} />);
-      await openDrawer(/^Strenge:/);
       const feld = screen.getByLabelText(/^Getippte Mannschaft ab/) as HTMLInputElement;
       expect(feld).toHaveClass("changed");
+      expect(screen.getByText("Stufe: 60")).toBeInTheDocument();
 
       await userEvent.click(screen.getByRole("button", { name: "Auf Stufe zurücksetzen" }));
 
@@ -261,7 +331,7 @@ describe("QuickpickDialog", () => {
     expect(screen.getByText("Alpha – Beta")).toBeInTheDocument();
     expect(screen.getByText("Gamma – Delta")).toBeInTheDocument();
 
-    await openDrawer(/^Strenge:/);
+    await openDisclosure("Werte anpassen");
     fireEvent.change(screen.getByLabelText(/^Modell sieht Favoriten ab/), { target: { value: "80" } });
 
     expect(screen.getByText("Alpha – Beta")).toBeInTheDocument();
@@ -270,14 +340,15 @@ describe("QuickpickDialog", () => {
 
   it("benennt die Abweisungen mit Zahl und Grund", async () => {
     render(<Harness fixtures={[fixture(1, "Alpha", "Beta", 75), balanced(2)]} />);
-    await openDrawer(/^Abgewiesen/);
-    expect(screen.getByText(/Woran die übrigen 1 Partien scheitern/)).toBeInTheDocument();
+    await openDisclosure("Woran das übrige Spiel scheitert");
     expect(screen.getByText("keine Mannschaft ist in der Form klar besser")).toBeInTheDocument();
   });
 
-  it("sagt es, wenn keine Partie klar überlegen ist", () => {
+  /** Ohne Treffer steht das Warum gleich da - ein Klick weniger, wenn die Liste leer ist. */
+  it("sagt es, wenn kein Spiel klar überlegen ist, und nennt den Grund", () => {
     render(<Harness fixtures={[balanced(1)]} />);
-    expect(screen.getByText("Keine Partie ist nach diesen Kriterien klar überlegen.")).toBeInTheDocument();
+    expect(screen.getByText("Kein Spiel ist nach diesen Kriterien klar überlegen.")).toBeInTheDocument();
+    expect(screen.getByText("keine Mannschaft ist in der Form klar besser")).toBeInTheDocument();
   });
 });
 
@@ -311,45 +382,30 @@ describe("Vier Voreinstellungen", () => {
 
   it("lässt zwischen den Voreinstellungen wechseln", async () => {
     render(<Harness fixtures={[dominant(1)]} />);
-    const auswahl = screen.getByRole("combobox", { name: "Filter" });
-    expect(auswahl).toHaveValue("daves1x2");
+    expect(presetRadio("Daves 1x2-Filter")).toBeChecked();
 
-    await userEvent.selectOptions(auswahl, "dominanz");
+    await userEvent.click(presetRadio("Dominanz"));
 
-    expect(auswahl).toHaveValue("dominanz");
+    expect(presetRadio("Dominanz")).toBeChecked();
+    expect(presetRadio("Daves 1x2-Filter")).not.toBeChecked();
     await openInfo();
     expect(screen.getByText(/rechnet es in die Quote ein/)).toBeInTheDocument();
   });
 
-  /** Das Dropdown zeigt nur die Filter der gewählten Gruppe. */
-  it("teilt die Filter auf Daves und Modell auf", async () => {
+  /** Alle sechs Filter stehen in einer Liste, unter zwei Überschriften. */
+  it("teilt die Filter auf Daves und Modell auf", () => {
     render(<Harness fixtures={[fixture(1, "Alpha", "Beta", 75)]} />);
-    expect(screen.getByRole("radio", { name: "Daves Filter" })).toHaveAttribute("aria-checked", "true");
-    const namen = () => within(screen.getByRole("combobox", { name: "Filter" })).getAllByRole("option").map((option) => option.getAttribute("value"));
-    expect(namen()).toEqual(["daves1x2", "dominanz", "remisScore"]);
-
-    await userEvent.click(screen.getByRole("radio", { name: "Modell-Filter" }));
-
-    expect(screen.getByRole("radio", { name: "Modell-Filter" })).toHaveAttribute("aria-checked", "true");
-    expect(namen()).toEqual(["hz15", "remis"]);
-    expect(screen.getByRole("combobox", { name: "Filter" })).toHaveValue("hz15");
-  });
-
-  /** Wer hin- und herschaltet, landet wieder bei seinem Filter, nicht beim ersten der Gruppe. */
-  it("merkt sich den Filter je Gruppe", async () => {
-    render(<Harness fixtures={[fixture(1, "Alpha", "Beta", 75)]} />);
-    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Filter" }), "dominanz");
-    await userEvent.click(screen.getByRole("radio", { name: "Modell-Filter" }));
-    await userEvent.click(screen.getByRole("radio", { name: "Daves Filter" }));
-    expect(screen.getByRole("combobox", { name: "Filter" })).toHaveValue("dominanz");
+    const werte = (gruppe: string) => within(screen.getByRole("group", { name: gruppe }))
+      .getAllByRole("radio").map((radio) => radio.getAttribute("value"));
+    expect(werte("Daves Filter")).toEqual(["daves1x2", "dominanz", "remisScore"]);
+    expect(werte("Modell-Filter")).toEqual(["modell1x2", "hz15", "remis"]);
   });
 
   /** Jeder Eintrag nennt, wie viele Spiele er mit **seinen** Einstellungen findet. */
-  it("zählt die Treffer je Filter", async () => {
+  it("zählt die Treffer je Filter", () => {
     render(<Harness fixtures={[fixture(1, "Alpha", "Beta", 75)]} />);
-    expect(screen.getByRole("option", { name: /Daves 1x2-Filter/ })).toHaveTextContent("· 1 Spiel");
-    await userEvent.click(screen.getByRole("radio", { name: "Modell-Filter" }));
-    expect(screen.getByRole("option", { name: /Remis-Kandidaten/ })).toHaveTextContent("0 Spiele");
+    expect(presetRadio("Daves 1x2-Filter")).toHaveAccessibleName("Daves 1x2-Filter, 1 Spiel");
+    expect(presetRadio("Remis-Kandidaten")).toHaveAccessibleName("Remis-Kandidaten, 0 Spiele");
   });
 
   it("zeigt eigene Werte für Serie und Bilanz", async () => {
@@ -370,10 +426,10 @@ describe("Vier Voreinstellungen", () => {
     expect(screen.getByText("Serie 5")).toBeInTheDocument();
   });
 
-  /** Kurze Kombis sind der Zweck – was sie kosten, steht in der Schublade. */
+  /** Kurze Kombis sind der Zweck – was sie kosten, steht unter der Stufe. */
   it("zeigt die Kombi-Tabelle, sobald eine Messung vorliegt", async () => {
     render(<Harness fixtures={[dominant(1)]} />);
-    await openDrawer(/^Kombi-Chancen/);
+    await openDisclosure("Kombi-Chancen");
     expect(screen.getByText(/Was Kombis aus dieser Stufe gebracht hätten/)).toBeInTheDocument();
     // Die Spalte „erwartet" ist der Kern: Eine Kombi multipliziert den Ertrag je Bein.
     expect(screen.getByRole("columnheader", { name: "erwartet" })).toBeInTheDocument();
@@ -404,7 +460,7 @@ describe("Remis-Score", () => {
       onSettingsChange={() => undefined} onPresetChange={() => undefined}
       onActiveChange={() => undefined} onAddAll={() => undefined} onClose={() => undefined} />);
 
-    expect(screen.getByRole("combobox", { name: "Filter" })).toHaveValue("remisScore");
+    expect(presetRadio("Remis-Score")).toBeChecked();
     await openRow("Alpha – Beta");
 
     expect(screen.getByText("Punkte je Spiel ähnlich")).toBeInTheDocument();
@@ -414,16 +470,20 @@ describe("Remis-Score", () => {
     expect(screen.getByText("zu wenige Spiele mit Schussdaten")).toBeInTheDocument();
   });
 
-  it("steht im Dropdown bei Daves Filtern und warnt ehrlich vor der dünnen Grundlage", async () => {
+  it("steht bei Daves Filtern und warnt ehrlich vor der dünnen Grundlage", async () => {
     render(<Harness fixtures={[fixture(1, "Alpha", "Beta", 75)]} />);
-    const namen = within(screen.getByRole("combobox", { name: "Filter" })).getAllByRole("option")
-      .map((option) => option.getAttribute("value"));
-    expect(namen).toEqual(["daves1x2", "dominanz", "remisScore"]);
+    expect(within(screen.getByRole("group", { name: "Daves Filter" })).getByRole("radio", { name: /^Remis-Score/ }))
+      .toBeInTheDocument();
 
-    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Filter" }), "remisScore");
+    await userEvent.click(presetRadio("Remis-Score"));
+    // Der Haken steht ohne Klick da ...
+    expect(screen.getByText(/gesetzt, nicht gemessen/)).toBeInTheDocument();
+    expect(screen.getByText(/Rechne nicht mit Gewinn/)).toBeInTheDocument();
+
+    // ... der volle Absatz aufgeklappt.
     await openInfo();
     expect(screen.getByText(/Das kann auch Zufall sein/)).toBeInTheDocument();
-    expect(screen.getByText(/Rechne nicht mit Gewinn/)).toBeInTheDocument();
+    expect(screen.getAllByText(/Rechne nicht mit Gewinn/)).toHaveLength(2);
     expect(screen.getByText(/Großchancen fehlen/)).toBeInTheDocument();
   });
 });

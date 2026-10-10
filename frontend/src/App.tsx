@@ -3,7 +3,7 @@ import {
 } from "@phosphor-icons/react";
 import { Fragment, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { BetBuilderDrawer, CartAddMenu, CartBadge } from "./BetCartUI";
-import { cartEntryId, toCartEntry, toQuickpickCartEntry, useBetCart } from "./betCart";
+import { cartEntryId, toCartEntry, toCounterCartEntry, toQuickpickCartEntry, useBetCart } from "./betCart";
 import { countryFlagCode } from "./countryFlags";
 import { FixtureInsightPanels, InsightsNotice, useFixtureInsights } from "./FixtureInsights";
 import { useDashboardData } from "./data";
@@ -1067,6 +1067,8 @@ function Dashboard({ document }: { document: DashboardDocument }) {
   const [livePhase, setLivePhase] = useState<LivePhase>("all");
   const [kellySettings, setKellySettings] = useState<KellySettings>(() => loadKellySettings());
   const [quickpickOpen, setQuickpickOpen] = useState(false);
+  const quickpickAnchorRef = useRef<HTMLDivElement>(null);
+  const quickpickButtonRef = useRef<HTMLButtonElement>(null);
   // Die Regler werden gespeichert, der aktive Zustand nicht: Ein Filter, der nach einem
   // Neuladen unbemerkt fast alle Zeilen ausblendet, wäre dieselbe Falle wie der geerbte
   // Einsatzrahmen der Kelly-Automatik, der wochenlang unentdeckt auf 100 % stand.
@@ -1074,7 +1076,13 @@ function Dashboard({ document }: { document: DashboardDocument }) {
   // Beide Voreinstellungen behalten ihre eigenen Regler; gewechselt wird nur, welche aktiv ist.
   const [quickpickStore, setQuickpickStore] = useState<QuickpickStore>(loadQuickpickStore);
   const quickpickSettings = settingsOf(quickpickStore);
-  const { cart, addEntry, removeEntry, clear: clearCart } = useBetCart();
+  const { cart, addEntry, replaceEntry, removeEntry, clear: clearCart } = useBetCart();
+  // Ersetzen statt Anhängen: Beim 1X2 teilen sich Modelltipp und Gegenseite eine Kennung,
+  // die Wahl der einen Seite nimmt die andere aus dem Schein.
+  const addFromMenu = (fixture: DashboardFixture, market: DashboardMarket, counterSide: "1" | "2" | null) => {
+    const entry = counterSide === null ? toCartEntry(fixture, market) : toCounterCartEntry(fixture, market);
+    if (entry) replaceEntry(entry);
+  };
   const watchedFixtureIds = useMemo(() => document.fixtures
     .filter((fixture) => !deselectedLeagues.has(leagueKey(fixture.country, fixture.league)))
     .filter((fixture) => !liveRatedOnly
@@ -1165,6 +1173,15 @@ function Dashboard({ document }: { document: DashboardDocument }) {
     setFilterMenuOpen(false);
     if (returnFocus) filterButtonRef.current?.focus();
   };
+  // Dieselben Regeln für den Quickpicker. Schließen hebt den Filter nie auf - das ist das ✕ am
+  // Schildchen oder der Schalter „Tabelle filtern“, eine bewusste Handlung.
+  const closeQuickpick = (returnFocus: boolean) => {
+    setQuickpickOpen(false);
+    if (returnFocus) quickpickButtonRef.current?.focus();
+  };
+  // Filtermenü und Quickpicker liegen am selben Platz unter der Leiste - offen ist höchstens eins.
+  const openFilterMenu = () => { setQuickpickOpen(false); setFilterMenuOpen(true); };
+  const openQuickpick = () => { setFilterMenuOpen(false); setQuickpickOpen(true); };
 
   useEffect(() => {
     // Solange der Wettbewerbe-Dialog offen ist, gehört jeder Klick ihm - sonst schlösse ein
@@ -1178,6 +1195,15 @@ function Dashboard({ document }: { document: DashboardDocument }) {
   }, [filterMenuOpen, leagueFilterOpen]);
 
   useEffect(() => {
+    if (!quickpickOpen) return;
+    const closeOutside = (event: PointerEvent) => {
+      if (!quickpickAnchorRef.current?.contains(event.target as Node)) setQuickpickOpen(false);
+    };
+    window.addEventListener("pointerdown", closeOutside);
+    return () => window.removeEventListener("pointerdown", closeOutside);
+  }, [quickpickOpen]);
+
+  useEffect(() => {
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
       if (cartMenuFixtureId !== null) setCartMenuFixtureId(null);
@@ -1185,7 +1211,7 @@ function Dashboard({ document }: { document: DashboardDocument }) {
       else if (kellyOpen) setKellyOpen(false);
       // Schließt nur das Panel und hebt den Filter nicht auf - das ist der Klick aufs ✕ im
       // Streifen, eine bewusste Handlung statt eines Nebeneffekts vom Wegklicken.
-      else if (quickpickOpen) setQuickpickOpen(false);
+      else if (quickpickOpen) closeQuickpick(true);
       // Der Wettbewerbe-Dialog liegt über dem Menü - von oben nach unten.
       else if (leagueFilterOpen) setLeagueFilterOpen(false);
       else if (filterMenuOpen) closeFilterMenu(true);
@@ -1202,7 +1228,10 @@ function Dashboard({ document }: { document: DashboardDocument }) {
     } else {
       setView(key);
     }
+    // Beide Fenster hängen an der Werkzeugleiste; ohne das gingen sie nach Live und zurück
+    // von selbst wieder auf.
     setFilterMenuOpen(false);
+    setQuickpickOpen(false);
   };
 
   useEffect(() => { saveView(view); }, [view]);
@@ -1267,8 +1296,10 @@ function Dashboard({ document }: { document: DashboardDocument }) {
   const quickpick = applyQuickpick(quickpickActive ? scopedFixtures : [], quickpickSettings);
   // Eine Rechnung für Kelly-Zeile und Dialog - auf dem Umfang, nicht auf `filtered`.
   // Ohne useMemo: `scopedFixtures` und `now` entstehen je Render neu, und die Rechnung ist billig.
+  // `now` hält angepfiffene Spiele heraus, auch wenn „Laufende / beendete Partien“ sie in der
+  // Tabelle zeigt: Ihre Quote stammt von vor dem Anpfiff.
   const kellySelection = showKelly && view === "prematch"
-    ? selectKelly(scopedFixtures, marketFilter, kellySettings, kellyAuto, marketProfile.profile)
+    ? selectKelly(scopedFixtures, marketFilter, kellySettings, kellyAuto, marketProfile.profile, { now })
     : null;
   const quickpickLabel = presetOf(quickpickSettings).label;
   const filtered = scopedFixtures.filter((fixture) => {
@@ -1580,10 +1611,52 @@ function Dashboard({ document }: { document: DashboardDocument }) {
     if (next && !event.currentTarget.contains(next)) setFilterMenuOpen(false);
   }}>
     <FilterButton buttonRef={filterButtonRef} open={filterMenuOpen} activeCount={activeFilterCount}
-      onToggle={() => setFilterMenuOpen((value) => !value)} />
+      onToggle={() => (filterMenuOpen ? setFilterMenuOpen(false) : openFilterMenu())} />
     {filterMenuOpen && <FilterMenu values={filterMenuValues} actions={filterMenuActions}
       rangeControl={view === "prematch" ? rangeControl : undefined}
       displayControls={view === "prematch" ? displayControls : undefined} />}
+  </div>;
+
+  // Der Quickpicker hängt wie das Filtermenü als nicht-modales Fenster unter seinem Knopf. Das
+  // Fenster richtet sich an der Knopfgruppe aus (.quickpick-anchor ist nicht positioniert),
+  // damit es an derselben Stelle aufgeht wie das Filtermenü und nicht rechts abgeschnitten wird.
+  const quickpickControl = <div className="filter-anchor quickpick-anchor" ref={quickpickAnchorRef} onBlur={(event) => {
+    const next = event.relatedTarget as Node | null;
+    if (next && !event.currentTarget.contains(next)) setQuickpickOpen(false);
+  }}>
+    <QuickpickButton buttonRef={quickpickButtonRef} active={quickpickActive} open={quickpickOpen}
+      onToggle={() => (quickpickOpen ? setQuickpickOpen(false) : openQuickpick())} />
+    {quickpickOpen && <QuickpickDialog
+      fixtures={scopedFixtures}
+      store={quickpickStore}
+      active={quickpickActive}
+      timezone={document.meta.timezone}
+      now={now}
+      shownInTable={filtered.length}
+      onSettingsChange={(next) => setQuickpickStore((store) => withSettings(store, next))}
+      onPresetChange={(preset: QuickpickPresetId) => setQuickpickStore((store) => ({ ...store, aktiv: preset }))}
+      onActiveChange={setQuickpickActive}
+      onAddAll={(rows) => {
+        for (const row of rows) {
+          // Eine Voreinstellung ohne Seite stützt eine Torlinie. Dafür gibt es den allgemeinen
+          // Konstruktor: Er übernimmt Marktkennung, Beschriftung und Auswahl direkt aus dem
+          // Markt des Laufs, und `cartEntryId` lässt die Wette neben einer 1X2-Wette derselben
+          // Partie bestehen, statt sie zu verdrängen.
+          if (row.evaluation.market !== "1x2") {
+            const market = row.fixture.markets.find((entry) => entry.key === row.evaluation.market);
+            if (market) addEntry(toCartEntry(row.fixture, market));
+            continue;
+          }
+          // Die gestützte Seite muss in den Schein, nicht der Modelltipp: Bei „Dominanz" können
+          // die beiden auseinanderfallen, und dann wäre der Eintrag schlicht die falsche Wette.
+          if (row.evaluation.side === null) continue;
+          addEntry(toQuickpickCartEntry(row.fixture, row.evaluation.side, row.evaluation.odds, null));
+        }
+        setQuickpickOpen(false);
+        setBuilderOpen(true);
+      }}
+      onClose={() => closeQuickpick(true)}
+    />}
   </div>;
 
   const marketControl = <label className="toolbar-field">
@@ -1614,7 +1687,7 @@ function Dashboard({ document }: { document: DashboardDocument }) {
     return <div className="kelly-status">
       <p className="kelly-status-line">
         <span title={"Geprüft werden die Spiele aus Zeitraum und Wettbewerben im Filter, samt „Nur"
-          + " Ligaspiele“ und angepfiffenen Spielen, und der gewählte Markt. Bewertung und"
+          + " Ligaspiele“, und der gewählte Markt. Angepfiffene Spiele zählen nie mit. Bewertung und"
           + " Klassenunterschied grenzen nur die Tabelle ein."}>
           Kelly-Auswahl · {marketLabelOf(marketFilter)}:
         </span>
@@ -1637,10 +1710,10 @@ function Dashboard({ document }: { document: DashboardDocument }) {
   const filterStatusRow = (status: ReactNode) => <div className="filter-status-row">
     {status}
     {activeFilters.map((filter) => <FilterChip key={filter.key} label={filter.label} title="Filter öffnen"
-      clearLabel={filter.clearLabel} onOpen={() => setFilterMenuOpen(true)} onClear={() => clearAndRefocus(filter.clear)} />)}
+      clearLabel={filter.clearLabel} onOpen={openFilterMenu} onClear={() => clearAndRefocus(filter.clear)} />)}
     {showQuickpickChip && <QuickpickChip label={quickpickLabel}
       passed={quickpick.report.passed} evaluated={quickpick.report.evaluated}
-      onOpen={() => setQuickpickOpen(true)} onClear={() => clearAndRefocus(() => setQuickpickActive(false))} />}
+      onOpen={openQuickpick} onClear={() => clearAndRefocus(() => setQuickpickActive(false))} />}
   </div>;
 
   // Die Technik (Kontingent, Abrufart) steht im Tooltip; sichtbar bleibt, was beim Lesen zählt.
@@ -1827,9 +1900,9 @@ function Dashboard({ document }: { document: DashboardDocument }) {
       <div className="view-toolbar">
         <div className="toolbar-row">
           {/* Links, was Spiele ausblendet; rechts der Linie, was nur die Darstellung ändert. */}
-          <div className="toolbar-group">
+          <div className="toolbar-group toolbar-filters">
             {filterControl}
-            <QuickpickButton active={quickpickActive} onOpen={() => setQuickpickOpen(true)} />
+            {quickpickControl}
           </div>
           <span className="toolbar-divider" aria-hidden />
           {marketControl}
@@ -1878,7 +1951,7 @@ function Dashboard({ document }: { document: DashboardDocument }) {
           open={cartMenuFixtureId === fixture.fixtureId}
           onOpen={() => setCartMenuFixtureId(fixture.fixtureId)}
           onClose={() => setCartMenuFixtureId((current) => current === fixture.fixtureId ? null : current)}
-          onSelect={(market) => addEntry(toCartEntry(fixture, market))}
+          onSelect={(market, counterSide) => addFromMenu(fixture, market, counterSide)}
           onRemove={(market) => removeEntry(cartEntryId(fixture.fixtureId, market.key))}
         />}
         empty={emptyState}
@@ -1905,7 +1978,7 @@ function Dashboard({ document }: { document: DashboardDocument }) {
                   open={cartMenuFixtureId === fixture.fixtureId}
                   onOpen={() => setCartMenuFixtureId(fixture.fixtureId)}
                   onClose={() => setCartMenuFixtureId((current) => current === fixture.fixtureId ? null : current)}
-                  onSelect={(market) => addEntry(toCartEntry(fixture, market))}
+                  onSelect={(market, counterSide) => addFromMenu(fixture, market, counterSide)}
                   onRemove={(market) => removeEntry(cartEntryId(fixture.fixtureId, market.key))}
                 />
                 <button className={`${fixtureGridClass} fixture-row`} style={gridStyle} onClick={() => setOpenFixture((value) => value === fixture.fixtureId ? null : fixture.fixtureId)} aria-expanded={openFixture === fixture.fixtureId}>
@@ -1993,7 +2066,7 @@ function Dashboard({ document }: { document: DashboardDocument }) {
       {/* Live hat eine eigene Frage statt des Marktes der Tabelle; sie steuert, was jede Zeile zeigt. */}
       <div className="view-toolbar">
         <div className="toolbar-row">
-          {filterControl}
+          <div className="toolbar-group toolbar-filters">{filterControl}</div>
           <span className="toolbar-divider" aria-hidden />
           {liveQuestionControl}
           {liveSortControl}
@@ -2010,6 +2083,9 @@ function Dashboard({ document }: { document: DashboardDocument }) {
       </>}
     </main>
   </div>
+  {/* Dunkelt den Rest ab, solange Filtermenü oder Quickpicker offen sind. Der Wettbewerbe-Dialog
+      bringt seinen eigenen Hintergrund mit - zwei übereinander dunkelten doppelt ab. */}
+  {(filterMenuOpen || quickpickOpen) && !leagueFilterOpen && <div className="menu-backdrop" aria-hidden />}
   {leagueFilterOpen && <LeagueFilterModal
     leagues={availableLeagues}
     statsByKey={leagueStatsByKey}
@@ -2033,35 +2109,6 @@ function Dashboard({ document }: { document: DashboardDocument }) {
     onAutoChange={setKellyAuto}
     onSettingsChange={setKellySettings}
     onClose={() => setKellyOpen(false)}
-  />}
-  {quickpickOpen && <QuickpickDialog
-    fixtures={scopedFixtures}
-    store={quickpickStore}
-    active={quickpickActive}
-    timezone={document.meta.timezone}
-    onSettingsChange={(next) => setQuickpickStore((store) => withSettings(store, next))}
-    onPresetChange={(preset: QuickpickPresetId) => setQuickpickStore((store) => ({ ...store, aktiv: preset }))}
-    onActiveChange={setQuickpickActive}
-    onAddAll={(rows) => {
-      for (const row of rows) {
-        // Eine Voreinstellung ohne Seite stützt eine Torlinie. Dafür gibt es den allgemeinen
-        // Konstruktor: Er übernimmt Marktkennung, Beschriftung und Auswahl direkt aus dem
-        // Markt des Laufs, und `cartEntryId` lässt die Wette neben einer 1X2-Wette derselben
-        // Partie bestehen, statt sie zu verdrängen.
-        if (row.evaluation.market !== "1x2") {
-          const market = row.fixture.markets.find((entry) => entry.key === row.evaluation.market);
-          if (market) addEntry(toCartEntry(row.fixture, market));
-          continue;
-        }
-        // Die gestützte Seite muss in den Schein, nicht der Modelltipp: Bei „Dominanz" können
-        // die beiden auseinanderfallen, und dann wäre der Eintrag schlicht die falsche Wette.
-        if (row.evaluation.side === null) continue;
-        addEntry(toQuickpickCartEntry(row.fixture, row.evaluation.side, row.evaluation.odds, null));
-      }
-      setQuickpickOpen(false);
-      setBuilderOpen(true);
-    }}
-    onClose={() => setQuickpickOpen(false)}
   />}
   </>;
 }

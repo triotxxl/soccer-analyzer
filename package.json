@@ -26,6 +26,7 @@
     "smoke": "node --env-file-if-exists=.env src/cli.ts smoke",
     "edge-report": "node --env-file-if-exists=.env tools/edge-report.ts",
     "edge-report:simulate": "node --env-file-if-exists=.env tools/edge-report.ts --simulate",
+    "btts-check": "node --env-file-if-exists=.env tools/btts-check.ts",
     "kelly-tracker": "node --env-file-if-exists=.env tools/kelly-tracker.ts",
     "insights-probe": "node --env-file-if-exists=.env tools/insights-probe.ts",
     "quickpick-report": "node --env-file-if-exists=.env tools/quickpick-report.ts",

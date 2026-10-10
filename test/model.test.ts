@@ -12,7 +12,8 @@ import {
   goalLineProbabilities,
   playedMatches,
   poissonProbabilities,
-  recalibrateGoals
+  recalibrateGoals,
+  shiftHomeAway
 } from "../src/model.ts";
 import { config } from "../src/config.ts";
 import type { FixtureExpectedGoals } from "../src/types.ts";
@@ -485,4 +486,36 @@ test("eine eigene Torkorrektur ändert nur die Summe, nicht die Aufteilung", () 
   const expected = config.goalLineCalibrationNational.intercept + config.goalLineCalibrationNational.slope * raw;
   assert.ok(Math.abs(nationalTotal - expected) < 1e-9, `Summe ${nationalTotal}, erwartet ${expected}`);
   assert.ok(Math.abs(national.expectedHomeGoals / nationalTotal - league.expectedHomeGoals / leagueTotal) < 1e-12);
+});
+
+test("shiftHomeAway verschiebt die Aufteilung und hält die Summe", () => {
+  const unchanged = shiftHomeAway(1.4, 1.3, 0, 0.2, 4.5);
+  assert.deepEqual(unchanged, { homeGoals: 1.4, awayGoals: 1.3 });
+
+  const shifted = shiftHomeAway(1.4, 1.3, 0.054, 0.2, 4.5);
+  assert.ok(Math.abs(shifted.homeGoals + shifted.awayGoals - 2.7) < 1e-12);
+  const ratio = (shifted.homeGoals / shifted.awayGoals) / (1.4 / 1.3);
+  assert.ok(Math.abs(ratio - Math.exp(2 * 0.054)) < 1e-12);
+});
+
+/**
+ * Die Heim-/Gast-Korrektur vom 10.10.2026 darf nur 1X2 und BTTS bewegen, nicht die Torlinien -
+ * Über/Unter hängt allein an der Summe. Und ab Werk ist sie aus.
+ */
+test("homeShift hebt den Heimsieg, ohne die Torlinien zu ändern", () => {
+  const base = 1_800_000_000;
+  const upcoming = fixture({ id: 999, timestamp: base, homeId: 1, awayId: 2 });
+  const plain = analyzeFixture(upcoming, history(base));
+  const shifted = analyzeFixture(upcoming, history(base), history(base), { homeShift: 0.054 });
+
+  assert.ok(shifted.probabilities.home > plain.probabilities.home);
+  assert.ok(shifted.probabilities.away < plain.probabilities.away);
+  // Gleich bis auf das endliche Torraster von `poissonProbabilities` (rund 2e-7).
+  assert.ok(Math.abs(shifted.probabilities.over25 - plain.probabilities.over25) < 1e-5);
+  assert.ok(Math.abs(
+    (shifted.expectedHomeGoals + shifted.expectedAwayGoals) - (plain.expectedHomeGoals + plain.expectedAwayGoals)
+  ) < 1e-9);
+
+  assert.equal(config.goalLineHomeShift, 0, "eingeschaltet wird erst nach der BTTS-Prüfung");
+  assert.deepEqual(analyzeFixture(upcoming, history(base), history(base), { homeShift: config.goalLineHomeShift }), plain);
 });

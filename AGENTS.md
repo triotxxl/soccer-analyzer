@@ -260,7 +260,11 @@ Benutzer auf Deutsch und führe Analyseaufträge selbstständig über die vorhan
   Ansicht `prematch` mit anderer Darstellung (Wahl in `localStorage`, Vorgabe Tabelle).
 - Alle Filter stehen im **Filtermenü** (`frontend/src/FilterMenu.tsx`, seit 27.09.2026 statt der
   Filterspalte): ein nicht-modales Fenster unter dem Filter-Knopf links in der Werkzeugleiste, das
-  über der Tabelle liegt und nichts verdrängt. Markt und Sortierung bleiben sichtbar in der Leiste,
+  über der Tabelle liegt und nichts verdrängt. **Seit 10.10.2026 dunkelt ein weichgezeichneter
+  Hintergrund (`.menu-backdrop`) den Rest ab, solange Filtermenü oder Quickpicker offen sind**
+  (Davids Wunsch); nur die Gruppe mit Filter und Quickpick (`.toolbar-filters`) bleibt darüber, ein
+  Klick auf den Hintergrund schließt, ein Fokus-Gefängnis gibt es nicht. Baukasten, Kelly-Dialog
+  und Wettbewerbe-Dialog (`.overlay-backdrop`) sind dabei ebenfalls weichgezeichnet. Markt und Sortierung bleiben sichtbar in der Leiste,
   weil sie nichts ausblenden. **Werkzeugleiste seit 28.09.2026 im Leistenstil** (Entwurf des
   UX-Agenten, Davids Entscheidung): links Filter und Quickpick (beide blenden aus), eine Trennlinie,
   dann Markt, Sortierung, Anzeige und direkt daneben „Kelly-Auswahl“ (nur im Kelly-Modus).
@@ -334,8 +338,10 @@ Benutzer auf Deutsch und führe Analyseaufträge selbstständig über die vorhan
   Liste (Spiel, Markt, Quote, Modell, Korrigiert nur in der Automatik, Vorteil grau mit „nach
   Korr.“, Kelly-Anteil mit dem Wert ohne Grenzen, Einsatz), Erklärungen und Export. Solange die
   Automatik lädt, zeigt die Liste keine Beträge. Der Export nimmt die ganze Auswahl über den
-  Umfang in der Reihenfolge des Dashboards, nicht die Sortierung der Liste. „Erwarteter Ertrag“ ist nicht mehr grün und sagt „Gemessen lag
-  die Auswahl bisher im Minus.“ - eine Rechnung, keine Messung.
+  Umfang in der Reihenfolge des Dashboards, nicht die Sortierung der Liste. Die Kennzahl **„Auf Dauer“** (seit
+  06.10.2026 statt „Erwarteter Ertrag“) rechnet zum fairen Tipico-Preis ohne Aufschlag, ist
+  neutral gefärbt und sagt „Das Modell trifft geprüft nicht öfter als die Quote.“ - eine
+  Rechnung, keine Messung; Begründung im Abschnitt „Kelly-Automatik und Marktprofil“.
 - Klappt die App eine Partie auf, lädt sie deren Detailkennzahlen über
   `/api/fixture/insights`: Torphasen je Viertelstunde, direkte Duelle mit Liga und
   Halbzeitstand sowie Trends über die letzten zehn Partien inklusive Ballbesitz und
@@ -450,7 +456,7 @@ Benutzer auf Deutsch und führe Analyseaufträge selbstständig über die vorhan
   1200 wurde an `strength_matches` per Zeit-Split gewählt (−0,010 ± 0,002 Log-Loss gegen 1500) und
   an den eigenen Prognosen bestätigt (−0,024 ± 0,005). Begründung im Kommentar in
   `src/config.ts`. Folgen: mehr Spiele mit „Klasse“-Kürzel (Schwellen 1,5/2,2 am Faktor), die
-  modellgebundenen Quickpick-Messungen (`MODEL_BOUND_PRESETS`: hz15, remis) beginnen neu.
+  modellgebundenen Quickpick-Messungen (`MODEL_BOUND_PRESETS`: hz15, remis, modell1x2) beginnen neu.
   **Nachmessen nach rund 150 abgerechneten Spielen von 3.5.0** in der Tabelle „Stärkere Seite
   je Modellversion“ bzw. der Kurzfassungszeile „seit 3.5.0“ (Gruppe „gemessen“; bei 150 Spielen
   rund ± 4 Punkte; Standardfehler unter der Prognose, √(Σ p(1−p)) / n). Je Fassung gemessen am
@@ -635,6 +641,23 @@ nachgezogen, nicht gesammelt am Ende.
 
 ## Märkte
 
+- **Heim-/Gast-Aufteilung (Prüfung vom 10.10.2026, Davids Entscheidung: bauen, aber erst nach
+  der BTTS-Prüfung einschalten).** Ligaspiele ab 3.2.0: Heimsieg 2,7 ± 0,8 Punkte zu niedrig,
+  Auswärtssieg 4,3 ± 0,7 zu hoch, in 117 von 118 Ligen dieselbe Richtung, zeitlich stabil.
+  Ursache in `analyzeFixture`: 75 % Ortswert plus 25 % Gesamtwert, beides durch den Ligaschnitt
+  des Spielorts geteilt - das staucht λH/λA um rund 0,89. Tipico selbst ist dabei unverzerrt.
+  Korrektur `shiftHomeAway` (`src/model.ts`) **nach** `recalibrateGoals`, Summe fest, nur
+  Ligaspiele (`!crossLeague` im Analyzer), Stärke `config.goalLineHomeShift`. **Ab Werk 0 =
+  aus.** Einschalten nach der BTTS-Prüfung (`docs/btts-pruefung.md`, rund Mitte November):
+  0,054 setzen, `goalLineModelVersion` 3.6.0, dann beginnen die modellgebundenen
+  Quickpick-Messungen neu (`MODEL_BOUND_SINCE.modell1x2` auf 3.6.0 setzen) und
+  `strongerSideByVersion` darf 3.5.0 und 3.6.0 zusammenzählen (Spiele zwischen Ligen rechnen
+  identisch). Gemessen: 1X2-Log-Loss −0,0035 ± 0,0013 an 4.038 echten Ligaprognosen, an 74.033
+  nachgebauten Ligaspielen −0,0036 / −0,0023 ± 0,0004 im Zeit-Split; Über/Unter unverändert,
+  BTTS praktisch gleich; gegen Tipico fair nur ein Zehntel näher. Die Behebung an der Wurzel
+  maß etwas schlechter und bewegte Spiele zwischen Ligen und Länderspiele ungemessen mit.
+  Offen als eigene, vorab festzulegende Prüfung: 1X2 ist bei klaren Favoriten beidseitig zu
+  flach (Hinweis aus den Bändern, nachträglich gefunden).
 - Das Dashboard führt 14 Märkte, jeweils als Paar aus Basis- und Gegenrichtung: 1X2, Remis,
   BTTS Ja/Nein, Über/Unter 1,5, Über/Unter 2,5, Über/Unter 3,5 sowie 1. HZ Über/Unter 0,5 und
   1. HZ Über/Unter 1,5. Der Gegenmarkt steht in der Liste direkt hinter seinem Basismarkt.
@@ -657,16 +680,42 @@ nachgezogen, nicht gesammelt am Ende.
 
 ## Kelly-Automatik und Marktprofil
 
+- **Stand 06.10.2026 (drei Prüfer-Agenten nacheinander, Endstand der Drittprüfung) - gehört vor
+  jede Aussage über Kelly gelesen:** Die Kelly-Rechnung ist richtig (Formel, Viertel-Kelly,
+  Deckel, auch bei rund zwei Dutzend gleichzeitigen Wetten). **Value findet sie nicht.**
+  Nachgespielt (App-Regel je Snapshot, erste Sichtung) trafen die gewählten Wetten genau so oft
+  wie der faire Tipico-Preis: 947 Wetten, 42,8 % gegen 42,8 % (0,0 ± 1,6 Punkte), flach
+  −5,7 ± 4,1 %, ohne Remis −9,9 ± 3,5 %. In der Regression logit(Ergebnis) ~ logit(fair) +
+  logit(Modell) trägt das Modell nichts über den Preis hinaus (0,05 ± 0,10, je Spiel gebündelt;
+  Tipico 1,0). Ein Verlust gegen null ist mit 1,4 SE nicht bewiesen, auf Dauer ist aber etwa der
+  Aufschlag zu erwarten (Zweiweg 1,082-1,092, 1X2 1,107). Die korrigierte Chance liegt auf den
+  gewählten Zeilen 7,8 ± 1,5 Punkte zu hoch, über alle vorgefilterten Zeilen aber richtig
+  (+0,4 ± 0,6): **Das ist ein Auswahleffekt, keine reparierbare Schwäche der Korrektur.** Mit der
+  fairen Chance wäre Kelly überall 0. Zwei Dutzend Tipps am Tag gibt es nur freitags bis
+  sonntags mit weitem Rahmen (ab Werk 8-12 je Analyse, unter der Woche 3-5 je Tag). Davids
+  Entscheidungen daraus (06.10.2026):
+  - Der Kelly-Dialog zeigt **„Auf Dauer“** zum fairen Tipico-Preis statt „Erwarteter Ertrag“
+    zur korrigierten Chance (versprach rund +10 %). Rechnung: `expectedValueOf` mit
+    `fairProbability` aus `src/fair-price.ts`; fehlt die Gegenquote, mittlerer Aufschlag je
+    Marktfamilie (`MEDIAN_BOOK`, „teils geschätzt“).
+  - Die **Automatik beachtet die Marktabwahl** (`disabledMarkets`, 1X2 ab Werk aus).
+  - Eine Häufung auf einem angehobenen Markt (am Wochenende fast nur BTTS Nein) wird im Dialog
+    **nur benannt** (`concentrationNotice`), die Auswahl bleibt.
+  - BTTS, der einzige Hinweis auf eigenes Wissen (b = 0,37 ± 0,17, nachträglich herausgegriffen,
+    in der zweiten Hälfte nicht stabil), wird **vorab festgelegt geprüft**:
+    `docs/btts-pruefung.md`, `npm run btts-check`, ab 07.10.2026, 2.500 Spiele.
 - Der Kelly-Picker hat zwei Modi. In der **Automatik** (Vorgabe) entscheidet `autoDecide` in
   `src/market-profile.ts` anhand der eigenen abgerechneten Ergebnisse, welche Märkte und
   Partien gewählt werden. **Manuell** verhält sich unverändert wie zuvor.
 - `recommendedSettings` (`frontend/src/kelly.ts`) sagt, was die Automatik übernimmt: die
-  Auswahlregler (`minOdds`, `minEdge`, `maxEdge`, `minConfidence`, `disabledMarkets`,
-  `excludeCrossLeague`) **und** `allowMultipleMarketsPerGame` - ob mehrere Märkte derselben
+  Auswahlregler (`minOdds`, `minEdge`, `maxEdge`, `minConfidence`, `excludeCrossLeague`)
+  **und** `allowMultipleMarketsPerGame` - ob mehrere Märkte derselben
   Partie zugleich gespielt werden, ist eine Frage der Auswahl, und die Korrelation kann eine
   Einzelentscheidung nicht sehen. Beim Nutzer bleiben Budget, Kelly-Fraktion, Mindesteinsatz,
   Höchstzahl und die Risiko-Deckel (`maxStakePercent`, `maxExposurePercent`,
-  `enableGameRiskLimit`, `maxRiskPerGame`) - das ist eine Frage des Geldbeutels.
+  `enableGameRiskLimit`, `maxRiskPerGame`) - das ist eine Frage des Geldbeutels - und seit
+  06.10.2026 die **Marktabwahl** (`disabledMarkets`, Davids Entscheidung; vorher räumte die
+  Automatik sie ab, und die Abwahl der Gegenmärkte vom 10.09. war darin nicht umsetzbar).
   **Achtung:** Diese Werte werden aus dem manuellen Modus geerbt. Damit das nicht unbemerkt
   bleibt, nennt die Kopfzeile in der Automatik den Einsatzrahmen; in den Läufen bis zum
   15.09.2026 stand er auf 100 % statt der Vorgabe 25 %, ohne dass es auffiel.
@@ -675,6 +724,8 @@ nachgezogen, nicht gesammelt am Ende.
   mit `market.probability`, sondern mit dem um die gemessene Selbstüberschätzung
   verringerten Wert. Der Abschlag stammt aus dem Edge-Band des jeweiligen Marktes und wird
   gegen den Markt-Bias zusammengezogen, damit dünn besetzte Bänder nicht durchschlagen.
+  **Grenze:** Auf den gewählten Zeilen bleibt sie rund 8 Punkte zu hoch (siehe Stand oben);
+  Feinarbeit an Bändern oder Gewicht ändert daran nichts.
 - **Nie auf beide Seiten einer Partie setzen.** Schließen zwei Auswahlen einander aus, verliert
   eine davon mit Sicherheit und übrig bleibt die Spanne des Buchmachers. `marketsExcludeEachOther`
   (`src/market-outcome.ts`) erkennt solche Paare, indem es jeden plausiblen Spielausgang gegen
@@ -682,10 +733,11 @@ nachgezogen, nicht gesammelt am Ende.
   1,5" zusammen mit "Spiel unter 1,5". Der Picker behält von einem Paar die Seite mit dem höheren
   vollen Kelly-Wert, weil der Trefferchance und Quote gegeneinander abwägt; die höhere Quote allein
   gewinnt den Vergleich nicht. Die Reihenfolge der Liste bleibt dabei die des Dashboards.
-- Solange ein Gegenmarkt aus seinem Basismarkt gespiegelt ist, kann der Fall gar nicht eintreten:
-  Beide Wahrscheinlichkeiten ergeben zusammen exakt 1, beide Quoten wegen der Spanne mehr als 1,
-  also ist höchstens eine Seite im Vorteil. Erst wenn ein Gegenmarkt eigene Messwerte hat, bricht
-  diese Komplementarität — dafür ist die Sicherung da.
+- Für die beiden Seiten **desselben** Marktes tritt der Fall in der Automatik nie ein: Die
+  Modellwahrscheinlichkeiten ergeben zusammen exakt 1, die Quoten wegen der Spanne mehr als 1,
+  also hat höchstens eine Seite einen rohen Vorteil (am 06.10.2026 über 8.572 Paare nie beide),
+  und `autoDecide` verlangt einen. Die Sicherung greift bei unvereinbaren Märkten verschiedener
+  Linien und im manuellen Modus mit mehreren Märkten je Spiel.
 - `autoDecide` ist die einzige Stelle, an der die Auswahlregel steht. Sowohl die App als
   auch der Backtest rufen sie auf - eine zweite Fassung der Regel im Frontend würde die
   Rückrechnung wertlos machen.
@@ -693,8 +745,9 @@ nachgezogen, nicht gesammelt am Ende.
   sondern begründet**: `minRawEdge: 0`, weil das Profil ausschließlich Zeilen mit `edge > 0`
   misst und eine Korrektur unterhalb davon aus ihrem eigenen Messbereich extrapoliert;
   `maxRawEdge: 0.15`, weil der ROI monoton mit dem behaupteten Vorteil fällt (7-10 PP +3,1 %,
-  10-15 PP −7,1 %, 15-25 PP −20,1 %, ab 25 PP −84,3 % über 1061 Zeilen) und 0,15 bereits eine
-  Bandgrenze in `EDGE_BANDS` ist. Wer diese Werte ändert, sucht sonst einen Parameter, der zu
+  10-15 PP −7,1 %, 15-25 PP −20,1 %, ab 25 PP −84,3 % über 1061 Zeilen; am 06.10.2026 über
+  1.796 Zeilen −2,0 / −17,0 / −28,8 / −62,9 %) und 0,15 bereits eine Bandgrenze in
+  `EDGE_BANDS` ist. Wer diese Werte ändert, sucht sonst einen Parameter, der zu
   den Daten passt - genau das soll die Rückrechnung nicht belohnen.
 - **`minRawEdge` ist im Backtest nicht messbar.** Die Rückrechnung filtert vorab auf
   `edge > 0`, dort erreicht keine Zeile mit negativem Rohvorteil `autoDecide`. In der App
@@ -702,12 +755,22 @@ nachgezogen, nicht gesammelt am Ende.
   deshalb die Messgrundlage, keine Ertragszahl.
 - Bei `allowMultipleMarketsPerGame: false` wählt `marketCandidates` die Wette einer Partie
   über den **vollen Kelly-Wert**, nicht über den rohen Vorteil - derselbe Maßstab wie in
-  `withoutOpposites` und `applyStakeFloor`. Out of sample liefern beide Maßstäbe denselben
-  Ertrag (+3,5 %), der Kelly-Wert mit etwas kleinerer Streuung.
+  `withoutOpposites` und `applyStakeFloor`. Out of sample lieferten beide Maßstäbe denselben
+  Ertrag (+3,5 % am 15.09.; am 06.10. −2,1 ± 4,8 bzw. −0,0 ± 5,0 %). Ob die Rangfolge nach
+  vollem Kelly-Wert beim Abschneiden durch den Rahmen etwas nützt, ist nicht nachweisbar.
+- **Mindesteinsatz und Grenze je Spiel** (seit 06.10.2026): `applyStakeFloor` prüft die Grenze je
+  Spiel an den Endbeträgen. Würde das Anheben auf den Mindesteinsatz sie überschreiten, entfällt
+  die Wette (`filtered.overGameLimit`, eigener Hinweis im Dialog); `gameRiskLimits` und Export
+  tragen die Endbeträge. Vorher standen 2 € auf einem Spiel mit 1 € Grenze, und der Export
+  meldete 1 €. Tritt ab Werk nur unter rund 40 € Budget auf.
+- **Angepfiffene Spiele** sind nie in der Kelly-Auswahl (`selectKelly(…, { now })`), auch wenn
+  „Laufende / beendete Partien“ sie in der Tabelle zeigt: Ihre Quote stammt von vor dem Anpfiff.
 - Die Ansicht **Marktprofil** in der App zeigt je Markt Prognose, tatsächliche Trefferquote,
   Abweichung und Ertrag, aufklappbar nach Vorteilsband. Das Verdikt der Marktzeile gilt für
   alle Zeilen mit Vorteil zusammen und wird von der Automatik **nicht** gelesen - sonst wäre
-  Remis gesperrt, das über alle Zeilen bei −18,2 % liegt, im Band ab 7 PP aber bei +18,4 %.
+  Remis gesperrt, das über alle Zeilen bei −18,2 % lag, im Band ab 7 PP aber bei +18,4 %
+  (06.10.2026: −21,4 % gesamt, 7-10 PP +47,2 % bei n = 115, 10-15 PP −67,6 % bei n = 54 - kann
+  auch Zufall sein).
   Das Band bestimmt die Höhe der Korrektur, nicht Annahme oder Ablehnung.
 - **Eine Ablehnung nach Bandverdikt wurde am 15.09.2026 geprüft und verworfen.** Sie ist
   algebraisch fast dasselbe wie die bestehende Prüfung auf den korrigierten Vorteil:
@@ -715,15 +778,25 @@ nachgezogen, nicht gesammelt am Ende.
   ist derselbe Wert bis auf den positiven Faktor `Quote`. Auseinander laufen beide nur bei
   uneinheitlichen Quoten innerhalb einer Zelle - konstruierbar, aber über 2462 Prüfzeilen
   **null Mal** aufgetreten. Nicht erneut einbauen, ohne vorher im Ablehnungsregister des
-  Edge-Reports nachzusehen, ob der Fall inzwischen vorkommt. Relevant wird das erst, wenn die
-  Gegenmärkte auch im Trainingsprofil eigene Bänder tragen; heute sind sie dort gespiegelt und
-  hätten ohnehin keins.
-- Belastbarkeit prüfen: `npm run edge-report -- --simulate`. Die Kalibrierung wird dabei nur
-  aus der ersten Zeithälfte gebildet und auf die zweite angewendet, zusätzlich an mehreren
-  Trennstellen und einmal ohne den Remis-Markt. **Jeder ROI wird mit seinem Standardfehler
-  gedruckt** - ohne den ist eine Zahl auf diesen Stichproben nicht lesbar.
+  Edge-Reports nachzusehen, ob der Fall inzwischen vorkommt.
+- Belastbarkeit prüfen: `npm run edge-report -- --simulate` (seit 06.10.2026 neu gebaut). Für
+  jeden datierten Snapshot läuft genau die Regel der App: Profil nur aus Spielen, die vorher
+  abgerechnet waren (`settledAt`), Umfang „nächste 48 Std.“, `selectKelly` aus
+  `frontend/src/kelly.ts` mit Automatik und `now`, erste Sichtung je Spiel, gemessen gegen den
+  fairen Tipico-Preis. Drei Rahmen (ohne Rahmen, Testbetrieb, Vorgabe), je mit ohne Remis,
+  Zeithälften, Markt und Wetten je Tag. `--mit-1x2` lässt 1X2 zu. **Jeder ROI steht mit seinem
+  Standardfehler da**, zusätzlich je Anstoßtag gebündelt. Maßgeblich ist „Treffer − fair“.
+  Stand 06.10.2026, Marktabwahl ab Werk: ohne Rahmen 747 Wetten, Treffer − fair −0,8 ± 1,8,
+  −5,7 ± 4,7 %, ohne Remis −11,2 ± 3,9 %; Testbetrieb 556, −5,6 ± 5,5 %; Vorgabe 294,
+  −9,1 ± 7,6 %. Mit 1X2 763 Wetten, −6,4 ± 4,7 % (Drittprüfer mit `settled_at`: 781,
+  −6,6 ± 4,5 %; Unterschied durch den Schlüssel je Spiel und Markt und ohne `dashboard-latest`).
 
-  **Stand 21.09.2026** über 32.108 abgerechnete Marktzeilen, an drei Trennstellen:
+  **Bis 05.10.2026** bildete `--simulate` ein festes Profil aus der ersten Zeithälfte und zählte
+  jede angenommene Zeile - mehrere je Spiel, ohne Rahmen, flach, an drei Trennstellen mit
+  verschachtelten Prüfmengen. Das war nicht die Regel der App. Der dort gedruckte „gepaarte
+  Vergleich“ maß nur die abweichenden Zeilen, nicht den Regelunterschied, und neben dem ROI stand
+  das Intervall der Trefferquote. Historische Zahlen von damals, **Stand 21.09.2026** über
+  32.108 abgerechnete Marktzeilen, an drei Trennstellen:
 
   | Schnitt | Automatik | ohne Remis | frühere Vorgabe |
   |---|---|---|---|
@@ -731,8 +804,9 @@ nachgezogen, nicht gesammelt am Ende.
   | 07.09. | −8,1 ± 3,3 % | −9,8 ± 3,0 % | −11,3 ± 2,7 % |
   | 12.09. | −6,4 ± 4,7 % | −8,5 ± 4,3 % | −11,6 ± 2,9 % |
 
-  Der gepaarte Vergleich am 07.09. ergibt +9,0 ± 6,9 %, also 1,3 Sigma. **Die Automatik ist
-  damit weder gewinnbringend noch belegt weniger verlustreich** - am Schnitt 04.09. liegt sie
+  Der „gepaarte Vergleich“ am 07.09. ergab +9,0 ± 6,9 % - das war der Unterschied der
+  abweichenden Zeilen, nicht der Regeln. **Die Automatik war damit weder gewinnbringend noch
+  belegt weniger verlustreich** - am Schnitt 04.09. liegt sie
   innerhalb des Fehlerbereichs der alten Vorgabe. Ohne den Remis-Markt verliert sie an allen
   drei Stellen deutlich. Diese Einordnung gehört in jede Aussage über die Automatik.
 
@@ -754,28 +828,29 @@ nachgezogen, nicht gesammelt am Ende.
     Tipico-Preis vor Anpfiff (`tipico_fixtures.odds_json`, eine Zeile je Partie). In den
     Bändern des Pickers bewegt sich der Preis um **−0,4 %** auf unsere Seite, ab 15 PP sogar
     +2,3 % dagegen. Gegen den Tipico-Aufschlag von rund 10 % (`TIPICO_BOOK` 1,1068) ist das
-    nichts. Wer eine Wette nimmt, deren Preis sich danach nicht bewegt, hat keine Information.
+    nichts. Am 06.10.2026 (282 Wetten mit späterem Preis): faire Chance +0,66 ± 0,13 Punkte zu
+    unserer Seite, rund ein Sechstel des Aufschlags je Seite - fast keine Information.
   - Daraus folgt: Ein Plus entstünde nur aus **Informationen, die im Preis nicht stehen**
     (Aufstellungen, Ausfälle, Livestände) oder aus einem **kleineren Aufschlag**. Beides liegt
     außerhalb dessen, was dieses Repository tut. Weitere Runden an Schwellen, Bändern und
     Marktlisten sind gemessen aussichtslos und erzeugen nur Überanpassung.
-- Der Report druckt außerdem einen **gepaarten Vergleich** (nur die Zeilen, in denen sich zwei
-  Regeln unterscheiden - gemeinsame Zeilen tragen zu beiden Seiten dasselbe Rauschen bei), ein
-  **Ablehnungsregister** je Zelle aus Markt und Band samt Verdikt, und die Zahl der
-  angenommenen Zeilen ohne eigenen Modellvorteil. Für eine Regeländerung sind das die
-  Instrumente; der Live-Verlauf im Kelly-Tracker taugt dafür nicht, weil seine ROI-Streuung
-  bei 158 Wetten bei ±9,6 % liegt.
-- **Gegenmärkte ohne eigene Historie** werden gespiegelt statt geschätzt: Weil
-  `Unter = 1 − Über` und `BTTS Nein = 1 − BTTS Ja` gilt, ist die Abweichung der Gegenrichtung
-  exakt der negierte Wert des Basismarktes. Aus −7,1 PP bei Über 2,5 werden +7,1 PP bei
-  Unter 2,5 — die Korrektur *hebt* Unter-Wahrscheinlichkeiten also an. Solche Einträge tragen
-  `derivedFrom`, `roi: null` und keine Edge-Bänder; sobald der Markt eigene abgerechnete Zeilen
-  über der Mindeststichprobe hat, ersetzt die eigene Messung die Spiegelung.
-- Für die gespiegelten Märkte gibt es **keinen Ertragsnachweis**: Historische Gegenquoten wurden
-  nie gespeichert, also lässt sich für sie kein ROI zurückrechnen. Die Wahrscheinlichkeit ist ab
-  dem ersten Lauf korrekt kalibriert, ob sich die Wetten zu den angebotenen Quoten rechnen, ist
-  offen. Über/Unter 3,5 hat gar keinen Spiegelpartner mit Historie und erscheint in der
-  Automatik erst mit eigenen Daten.
+- Der Report druckt außerdem ein **Ablehnungsregister** je Zelle aus Markt und Band samt
+  Verdikt (auf dem heutigen Profil). Der Live-Verlauf im Kelly-Tracker taugt für eine
+  Regeländerung nicht, weil seine ROI-Streuung bei 158 Wetten bei ±9,6 % liegt.
+- **Die Spiegelung der Gegenmärkte ist am 06.10.2026 entfernt** (`derivedFrom`, Befund
+  „abgeleitet“). Sie gab einem Gegenmarkt ohne eigene Zeilen die negierte Abweichung seines
+  Basismarktes und hob damit Unter- und Nein-Chancen an. Die Prämisse („dieselbe Menge von
+  Partien“) galt nie: Das Profil misst je Markt nur Zeilen mit eigenem Vorteil, und die sind bei
+  Basis- und Gegenmarkt zwangsläufig verschiedene Spiele (Σ 1/Quote > 1). Gemessen überschätzt
+  sich das Modell auf **beiden** Seiten (BTTS Nein −3,7, Unter 2,5 −7,8, Unter 3,5 −10,9,
+  1. HZ U1,5 −9,2 Punkte; die Spiegelung hätte +6,3 / +7,1 / +16,0 / +10,0 gesetzt). Sie wirkte in
+  den Analysen vom 10./11.09. (die echte Kelly-Liste vom 10.09. bestand zu 57/57 aus angehobenen
+  Gegenmärkten) und schaltete schon ab der ersten eigenen Zeile um, nicht erst ab 30. Seitdem ist
+  ein Markt ohne eigene abgerechnete Zeilen schlicht nicht empfehlbar. Nicht wieder einbauen.
+- `src/market-profile-service.ts` liest seit 06.10.2026 nur datierte Snapshots (nicht
+  `dashboard-latest.json`), führt je Spiel und Markt **eine** Beobachtung (vorher mit der Auswahl
+  im Schlüssel: 190 Spiele mit veraltetem 1X2-Tipp doppelt) und trägt `settledAt` für die
+  Nachspielung. Zeitpunkte über `Date.parse`.
 - Marktprofil und Edge-Report kosten kein API-Budget - sie lesen nur `output/dashboard-*.json`
   und die abgerechneten Ergebnisse aus SQLite. Je mehr abgerechnet ist, desto belastbarer die
   Korrektur; deshalb gehört `npm run settle` vor jede Bewertung der Automatik.
@@ -1010,7 +1085,7 @@ nachgezogen, nicht gesammelt am Ende.
 ## Quickpicker
 
 Der **Quickpicker** neben dem Filter-Knopf filtert die Tabelle nach einer **Voreinstellung**.
-Es gibt fünf, und sie haben **verschiedene Maßstäbe** - was für die eine gilt, gilt für die
+Es gibt sechs, und sie haben **verschiedene Maßstäbe** - was für die eine gilt, gilt für die
 anderen ausdrücklich nicht.
 
 ### Gemeinsames Gerüst
@@ -1027,13 +1102,34 @@ anderen ausdrücklich nicht.
   Vorgaben, Strengestufen, Maßstab, Spalten, Texte und den Wettschein-Modus. Wer eine dritte
   hinzufügt, ergänzt `QuickpickPresetId`, einen Deskriptor und einen Eintrag in
   `QUICKPICK_COLUMNS` - sonst nichts.
-- **Der Dialog wählt über einen Umschalter und ein Dropdown, nicht über Reiter.** Das Feld
-  `group` im Deskriptor ordnet jede Voreinstellung einem der beiden Umschalter zu
-  (`QUICKPICK_GROUPS` in `src/quickpick.ts`): **Daves Filter** (`daves1x2`, `dominanz`) wählen
-  über Tabelle, H2H und Form eine Mannschaft, **Modell-Filter** (`hz15`, `remis`) über
-  Wahrscheinlichkeiten und Torerwartung des Modells einen Markt. Das Dropdown zeigt nur die
-  Filter der gewählten Gruppe, jeweils mit der Zahl ihrer Treffer. Die Gruppe ist reine
-  Anzeige, keine Regel liest sie.
+- **Der Quickpicker ist seit 10.10.2026 ein nicht-modales Fenster im Leistenstil** (Davids
+  Entscheidungen nach zwei Entwürfen des UX-Agenten; Aufbau in
+  `.claude/skills/betting-ux/references/app-landkarte.md`). Er geht unter der Knopfgruppe an
+  derselben Stelle auf wie das Filtermenü - offen ist höchstens eins -, schließt bei Klick
+  daneben, Wegtabben, Escape, ✕ und Ansichtswechsel und **lässt den Filter dabei an**.
+  Festgelegt sind außerdem:
+  - **Alle sechs Filter stehen als eine Radio-Liste** unter zwei Gruppenüberschriften, je mit
+    der Zahl ihrer Treffer (vorher Umschalter plus Dropdown, zwei Klicks und versteckte Zahlen).
+    Das Feld `group` im Deskriptor ordnet jede Voreinstellung einer Gruppe zu
+    (`QUICKPICK_GROUPS` in `src/quickpick.ts`): **Daves Filter** (`daves1x2`, `dominanz`,
+    `remisScore`) wählen über Tabelle, H2H und Form, **Modell-Filter** (`modell1x2`, `hz15`,
+    `remis`) über Wahrscheinlichkeiten und Torerwartung des Modells. Die Gruppe ist reine
+    Anzeige, keine Regel liest sie.
+  - **Jede Wahl schaltet „Tabelle filtern“ ein** - Filter (auch ein Klick auf den schon
+    gewählten, deshalb `onClick` statt `onChange`), Stufe, Regler, Zusatzschalter,
+    Zurücksetzen. Sortieren und Aufklappen schalten nichts.
+  - **Der Haken steht immer sichtbar** im Fuß: `QuickpickPreset.warnung`, ein Satz, gekürzt
+    aus `honesty` (der volle Absatz steht unter „Worauf dieser Filter achtet“). Sie nennt keine
+    Zahl, die nur für eine Stufe gilt, und gehört bei jeder Nachkalibrierung mit `honesty`
+    geprüft. Bei „Erste Halbzeit“ steht trotz +6,8 % bei Streng „Rechne nicht mit Gewinn“
+    (Schwellen an denselben Daten gesucht, zweite Zeithälfte überall schwächer, Vorgabe −2,2 %).
+  - **„eigene Werte – die Zahlen gelten nicht“** erscheint auch, wenn ein Kernwert abweicht,
+    den keine Stufe setzt (Mindestquote, Quotengrenze, Torerwartung): Verglichen wird mit dem
+    Wert der Stufe, sonst mit `preset.defaults`. Nur Anzeige - `levelOf` bleibt unverändert;
+    „Auf Stufe zurücksetzen“ setzt auch diese Kernwerte zurück, die Zusatzschalter nicht.
+  - **Angepfiffene Spiele kommen nicht in den Wettschein** (wie bei Kelly: ihre Quote stammt
+    von vor dem Anpfiff), ebenso wenig Zeilen mit geschätzter Quote (≈). Beide stehen gezählt
+    neben dem Knopf. Die Prüfung sitzt in `QuickpickUI.tsx`, nicht in der Regel.
 - **Die Messwerte der Stufen sind Zahlen, keine Strings.** `QuickpickLevel.measured` trägt
   `{ n, proTag, trefferquote, roi }`; den Knopftext formatiert `preset.noteOf`. Früher stand
   dort ein Text, den die Rückrechnung wieder zerlegen musste.
@@ -1352,6 +1448,37 @@ anderen ausdrücklich nicht.
   `npm run quickpick-report` gelaufen, auch ohne die 2.000er-Schwelle.
 - Eigener Abweisungsgrund `remisChance`: `remisbild` ist vergeben und meint bei „Erste
   Halbzeit" das **Gegenteil** - dort fliegt eine Partie raus, *weil* sie remisnah ist.
+
+### „Sieger laut Modell": der Favorit des Poisson-Modells (seit 10.10.2026)
+
+- Davids Wunsch vom 10.10.2026: ein 1X2-Filter unter den **Modell-Filtern** (`modell1x2`,
+  `src/quickpick-modell1x2.ts`). Maßstab Trefferquote je Bein, Beine für Kombis.
+- **Die Seite ist der Poisson-Favorit, nicht `pick`.** Der 1X2-Markt trägt als `pick` die Seite
+  aus `src/favorite-criteria.ts` (Quotenmedian) und als `probability` die Poisson-Chance dieser
+  Seite. Der Filter rechnet p(Gegenseite) = 1 − p(pick) − p(Remis) und stützt die größere;
+  in rund 23 % der Spiele ist das die andere Mannschaft („Tabelle tippt anders“). Ihre Quote
+  kommt aus `oddsHome`/`oddsAway`, in Läufen vor schemaVersion 5 aus `counterOddsOf` - dann
+  mit „≈“, nicht im Wettschein (`oddsEstimated` in `src/quickpick-core.ts`, auch im Report).
+- Tore: `probabilityReliable !== false` (`nichtBelastbar`), Quote 1,30-2,00 (Identität, staffelt
+  nie), Siegchance ab 65/60/55/50 % je Stufe (`siegChance`), Vorgabe 60 %.
+- **Vorabmessung des Prüfers (10.10.2026, 6.449 Spiele):** Basisrate 48,0 %; Vorgabe über den
+  ganzen Bestand 66,5 ± 3,1 % bei −1,3 % je Tipp, Vierer geht in 18,8 % durch. **Das Modell
+  trägt über den Tipico-Preis hinaus nichts** (0,07 ± 0,10); gleich viele Spiele nach dem
+  fairen Preis treffen 72,8 %, und wo das Modell ≥ 10 Punkte über fair liegt, nur 50 %. Die
+  Trefferquote kommt aus der Quote - das gehört in jede Aussage darüber. Zusatztore
+  (Favoritenpunkte, Vertrauen, Heimtipp, ohne Spiele zwischen Ligen) bringen nichts Belegbares
+  und sind nicht eingebaut; „Vertrauen 1X2 ≥ 70“ (+5,2 ± 4,5) wäre nur vorab festgelegt zu prüfen.
+- **Gemessen ab 3.2.0, nicht nur an der laufenden Version** (Davids Entscheidung vom
+  10.10.2026, `MODEL_BOUND_SINCE` in `tools/quickpick-report.ts`; die Regel vom 28.09. für
+  hz15 und remis bleibt): Für Ligaspiele rechnen 3.2.0-3.5.0 dasselbe 1X2 (652 von 659
+  identisch). Stand 10.10.2026: Streng 64 Tipps 71,9 %, Ausgewogen 157 Tipps 63,1 % bei
+  −6,6 ± 3,9 % je Tipp, Locker 363 Tipps 62,3 %, Weit 752 Tipps 60,9 %. **Vorbehalt:**
+  Länder- und U21-Spiele rechnet das Modell seit 3.3.0 anders, und dort lagen die schwachen
+  jüngsten Tipps (ab 3.3.0 Vorgabe 47,7 ± 7,5 %, n = 44; nur 3.5.0 22 Tipps 54,5 %). Nachmessen,
+  sobald unter 3.5.0 rund 100 Tipps der Vorgabestufe abgerechnet sind.
+- Nebenbefund des Prüfers: Das 1X2-Modell schätzt Heimsiege zu niedrig (43,8 % eingetreten
+  gegen 40,8 %) und Auswärtssiege zu hoch (30,8 gegen 34,5 %). Geprüft am 10.10.2026, siehe
+  „Heim-/Gast-Aufteilung“ im Abschnitt Märkte.
 
 ### „Remis-Score": Punkte mit Begründung statt Wahrscheinlichkeit
 

@@ -21,6 +21,7 @@ import { DOMINANZ_PRESET, evaluateDominanz, type DominanzQuickpickSettings } fro
 import { HZ15_PRESET, evaluateHz15, type Hz15QuickpickSettings } from "./quickpick-hz15.ts";
 import { REMIS_PRESET, evaluateRemis, type RemisQuickpickSettings } from "./quickpick-remis.ts";
 import { REMIS_SCORE_PRESET, evaluateRemisScore, type RemisScoreQuickpickSettings } from "./quickpick-remisscore.ts";
+import { MODELL1X2_PRESET, evaluateModell1x2, type Modell1x2QuickpickSettings } from "./quickpick-modell1x2.ts";
 
 export * from "./quickpick-core.ts";
 export * from "./quickpick-daves.ts";
@@ -28,6 +29,7 @@ export * from "./quickpick-dominanz.ts";
 export * from "./quickpick-hz15.ts";
 export * from "./quickpick-remis.ts";
 export * from "./quickpick-remisscore.ts";
+export * from "./quickpick-modell1x2.ts";
 
 /**
  * Die Einstellungen der **gerade gewählten** Voreinstellung. Eine diskriminierte Union über
@@ -38,7 +40,8 @@ export type QuickpickSettings =
   | DominanzQuickpickSettings
   | Hz15QuickpickSettings
   | RemisQuickpickSettings
-  | RemisScoreQuickpickSettings;
+  | RemisScoreQuickpickSettings
+  | Modell1x2QuickpickSettings;
 
 /** Die Einstellungen zu einer bestimmten Voreinstellung. */
 export type SettingsOf<I extends QuickpickPresetId> = Extract<QuickpickSettings, { preset: I }>;
@@ -51,7 +54,8 @@ export const QUICKPICK_PRESETS: Record<QuickpickPresetId, AnyQuickpickPreset> = 
   dominanz: DOMINANZ_PRESET as unknown as AnyQuickpickPreset,
   hz15: HZ15_PRESET as unknown as AnyQuickpickPreset,
   remis: REMIS_PRESET as unknown as AnyQuickpickPreset,
-  remisScore: REMIS_SCORE_PRESET as unknown as AnyQuickpickPreset
+  remisScore: REMIS_SCORE_PRESET as unknown as AnyQuickpickPreset,
+  modell1x2: MODELL1X2_PRESET as unknown as AnyQuickpickPreset
 };
 
 /** Stabile Reihenfolge für die Auswahl in der Oberfläche. */
@@ -59,11 +63,12 @@ export const QUICKPICK_PRESET_LIST: AnyQuickpickPreset[] = [
   QUICKPICK_PRESETS.daves1x2,
   QUICKPICK_PRESETS.dominanz,
   QUICKPICK_PRESETS.remisScore,
+  QUICKPICK_PRESETS.modell1x2,
   QUICKPICK_PRESETS.hz15,
   QUICKPICK_PRESETS.remis
 ];
 
-/** Die beiden Gruppen des Umschalters, in der Reihenfolge der Anzeige. */
+/** Die beiden Gruppen der Filterliste, in der Reihenfolge der Anzeige. */
 export const QUICKPICK_GROUPS: Array<{ id: QuickpickGroup; label: string; title: string }> = [
   {
     id: "daves",
@@ -95,6 +100,7 @@ export function evaluateFixture(
     : settings.preset === "hz15" ? evaluateHz15(fixture, settings)
     : settings.preset === "remis" ? evaluateRemis(fixture, settings)
     : settings.preset === "remisScore" ? evaluateRemisScore(fixture, settings)
+    : settings.preset === "modell1x2" ? evaluateModell1x2(fixture, settings)
     : evaluateDaves(fixture, settings);
 }
 

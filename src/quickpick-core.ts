@@ -10,7 +10,7 @@ import type { RecentMatchSummary } from "./types.ts";
  * Hier steht bewusst keine Regel - nur das, woraus Regeln gebaut werden.
  */
 
-export type QuickpickPresetId = "daves1x2" | "dominanz" | "hz15" | "remis" | "remisScore";
+export type QuickpickPresetId = "daves1x2" | "dominanz" | "hz15" | "remis" | "remisScore" | "modell1x2";
 
 /**
  * Die Gruppe, unter der eine Voreinstellung im Dialog erscheint. `daves` wählt über Tabelle,
@@ -74,7 +74,7 @@ export interface QuickpickLevel<V> {
 export interface QuickpickPreset<S> {
   id: QuickpickPresetId;
   label: string;
-  /** Unter welchem Umschalter die Voreinstellung im Dropdown steht. */
+  /** Unter welcher Gruppenüberschrift die Voreinstellung in der Filterliste steht. */
   group: QuickpickGroup;
   description: string;
   criteria: string[];
@@ -92,6 +92,13 @@ export interface QuickpickPreset<S> {
   };
   /** Der Ehrlichkeitsabsatz. Muss zur Messung passen, sonst wirbt die Oberfläche falsch. */
   honesty: string;
+  /**
+   * Der Haken in einem Satz, gekürzt aus `honesty` - steht im Quickpicker immer sichtbar neben
+   * dem Wettschein-Knopf, während `honesty` nur aufgeklappt erscheint. Gekürzt wird die
+   * Begründung, nie die Aussage. Nennt keine Zahl, die nur für eine Stufe gilt (die Zahlen der
+   * Stufen stehen daneben), und wird bei jeder Nachkalibrierung mit `honesty` mitgeprüft.
+   */
+  warnung: string;
   /** Hinweistext am Sammelknopf. Beide Voreinstellungen liefern Beine für Kombis. */
   wettschein: { hinweis: string };
   /** Satz für die leere Trefferliste. */
@@ -136,7 +143,11 @@ export type QuickpickRejection =
   // Gründe der Voreinstellung "Remis-Score". `remisDaten` heißt "zu wenig bewertbar", nicht
   // "unausgeglichen" - dieselbe Trennung wie zwischen `formFehlt` und `venueForm`.
   | "remisScore"
-  | "remisDaten";
+  | "remisDaten"
+  // Gründe der Voreinstellung "Sieger laut Modell". `nichtBelastbar` heißt "das Modell kann
+  // den Klassenunterschied nicht abbilden" (`probabilityReliable: false`), nicht "zu schwach".
+  | "siegChance"
+  | "nichtBelastbar";
 
 export const REJECTION_LABELS: Record<QuickpickRejection, string> = {
   keinTipp: "für dieses Spiel gibt es keinen Sieger-Tipp",
@@ -159,7 +170,9 @@ export const REJECTION_LABELS: Record<QuickpickRejection, string> = {
   hzHistorie: "in der ersten Halbzeit fallen hier selten zwei Tore",
   remisChance: "die Chance auf ein Unentschieden ist zu klein",
   remisScore: "zu wenige Hinweise auf ein Unentschieden",
-  remisDaten: "zu wenige Daten, um den Remis-Score zu bilden"
+  remisDaten: "zu wenige Daten, um den Remis-Score zu bilden",
+  siegChance: "das Modell sieht den Sieger nicht sicher genug",
+  nichtBelastbar: "Spiel zwischen verschiedenen Ligen ohne Stärkevergleich – keine belastbare Siegchance"
 };
 
 export interface QuickpickDominance {
@@ -255,6 +268,24 @@ export interface RemisDetail {
   expectedGoals: number;
 }
 
+/** Was nur die Voreinstellung „Sieger laut Modell" braucht. */
+export interface Modell1x2Detail {
+  /** Modellwahrscheinlichkeit der getippten Seite - das Kerntor. */
+  probability: number;
+  /** Modellwahrscheinlichkeit für ein Remis und für die Gegenseite, nur Einordnung. */
+  drawProbability: number | null;
+  counterProbability: number | null;
+  /** Datenvertrauen des 1X2-Marktes, nur Anzeige. */
+  confidence: number;
+  /**
+   * Ob der 1X2-Tipp des Laufs (`pick`, aus `src/favorite-criteria.ts` über den Quotenmedian)
+   * dieselbe Seite meint wie das Modell. In rund jedem vierten Spiel nicht.
+   */
+  pickAgrees: boolean;
+  /** Wie bei „Dominanz": `geschätzt` heißt, die Quote der Seite stand nicht im Lauf. */
+  oddsSource: "snapshot" | "geschätzt";
+}
+
 export interface QuickpickEvaluation {
   fixtureId: number;
   /**
@@ -290,6 +321,8 @@ export interface QuickpickEvaluation {
   remis?: RemisDetail | null;
   /** Nur bei „remisScore" gesetzt: der ganze Score samt Begründung je Kriterium. */
   remisScore?: DrawSignalResult | null;
+  /** Nur bei „modell1x2" gesetzt. */
+  modell1x2?: Modell1x2Detail | null;
   passes: boolean;
   rejectedBy: QuickpickRejection | null;
 }
@@ -306,7 +339,8 @@ export function emptyRejections(): Record<QuickpickRejection, number> {
     h2hDagegen: 0, keineTabelle: 0, tabelle: 0, serie: 0, formFehlt: 0,
     keineQuote: 0, bilanz: 0, keineDuelle: 0, modellDagegen: 0,
     keinMarkt: 0, torerwartung: 0, remisbild: 0, hzHistorie: 0,
-    remisChance: 0, remisScore: 0, remisDaten: 0
+    remisChance: 0, remisScore: 0, remisDaten: 0,
+    siegChance: 0, nichtBelastbar: 0
   };
 }
 
@@ -479,4 +513,15 @@ export function firstHalfRateOf(
     goals: totals.reduce((sum, total) => sum + total, 0) / totals.length,
     sample: valid.length
   };
+}
+
+/**
+ * Ob die Quote einer Auswahl nur geschätzt ist (`counterOddsOf`). Solche Zeilen tragen in der
+ * App ein „≈", gehen nicht in den Wettschein und werden in der Rückrechnung zum archivierten
+ * Preis abgerechnet. Betrifft die beiden Voreinstellungen, die auch die Seite gegen den Tipp
+ * des Laufs stützen können.
+ */
+export function oddsEstimated(evaluation: QuickpickEvaluation): boolean {
+  return evaluation.dominanz?.oddsSource === "geschätzt"
+    || evaluation.modell1x2?.oddsSource === "geschätzt";
 }

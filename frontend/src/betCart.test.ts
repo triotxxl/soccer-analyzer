@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { canGenerate, combinedOdds, generateCombos, sizeRange, type CartEntry } from "./betCart";
+import { canGenerate, combinedOdds, generateCombos, sizeRange, toCounterCartEntry, type CartEntry } from "./betCart";
+import type { DashboardFixture, DashboardMarket } from "./types";
 
 function entry(id: string, odds: number | null = 2): CartEntry {
   return {
@@ -110,5 +111,49 @@ describe("combinedOdds", () => {
 
   it("ist null für eine leere Liste", () => {
     expect(combinedOdds([])).toBeNull();
+  });
+});
+
+describe("toCounterCartEntry", () => {
+  function market(key: DashboardMarket["key"], probability: number, extra: Partial<DashboardMarket> = {}): DashboardMarket {
+    return {
+      key, label: key, selection: key, pick: key === "1x2" ? "1" : null, selectionTone: "home", probability,
+      odds: 1.8, confidence: 80, score: null, recommendation: { level: "recommended", label: "Empfehlenswert" }, details: [],
+      ...extra
+    };
+  }
+  function partie(oneXTwo: Partial<DashboardMarket> = {}, withDraw = true): DashboardFixture {
+    return {
+      fixtureId: 7, kickoff: "2026-10-06T18:00:00.000Z", country: "Land", league: "Liga", homeTeam: "Heim FC", awayTeam: "Gast FC",
+      markets: [market("1x2", 0.55, oneXTwo), ...(withDraw ? [market("draw", 0.25)] : [])]
+    } as DashboardFixture;
+  }
+
+  it("legt die Seite gegen den Modelltipp mit der Quote aus dem Snapshot an", () => {
+    const fixture = partie({ oddsHome: 1.8, oddsAway: 4.5 });
+    const entry = toCounterCartEntry(fixture, fixture.markets[0]!)!;
+    expect(entry.id).toBe("7:1x2");
+    expect(entry.pick).toBe("2");
+    expect(entry.selection).toBe("Auswärtssieg Gast FC");
+    expect(entry.odds).toBe(4.5);
+    expect(entry.probability).toBeCloseTo(0.2);
+    expect(entry.recommendationLevel).toBe("none");
+  });
+
+  it("schätzt keine Quote, wenn der Snapshot keine führt", () => {
+    const fixture = partie();
+    expect(toCounterCartEntry(fixture, fixture.markets[0]!)!.odds).toBeNull();
+  });
+
+  it("nennt keine Wahrscheinlichkeit, wenn der 1X2-Markt nicht belastbar ist", () => {
+    const fixture = partie({ probabilityReliable: false, oddsAway: 4.5 });
+    expect(toCounterCartEntry(fixture, fixture.markets[0]!)!.probability).toBe(0);
+  });
+
+  it("gibt null ohne Tipp und für andere Märkte", () => {
+    const ohneTipp = partie({ pick: null });
+    expect(toCounterCartEntry(ohneTipp, ohneTipp.markets[0]!)).toBeNull();
+    const fixture = partie();
+    expect(toCounterCartEntry(fixture, fixture.markets[1]!)).toBeNull();
   });
 });

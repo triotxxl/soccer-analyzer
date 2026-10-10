@@ -930,17 +930,17 @@ describe("React-Dashboard", () => {
     let list = screen.getByRole("menu", { name: "Markt hinzufügen: Alpha FC – Gast FC" });
     // Gruppiert wie die Marktliste der Werkzeugleiste.
     expect(within(list).getByRole("group", { name: "Ergebnis" })).toBeInTheDocument();
-    await user.click(within(list).getByRole("menuitemcheckbox", { name: /^1X2.*in den Wettschein$/ }));
+    await user.click(within(list).getByRole("menuitemcheckbox", { name: /^1X2 · Heim.*in den Wettschein$/ }));
     expect(screen.getByRole("button", { name: /Wett-Baukasten öffnen \(1 Wette\)/ })).toBeInTheDocument();
     // Die Liste bleibt offen, der Markt ist als gewählt markiert, der Knopf zählt mit.
-    expect(within(list).getByRole("menuitemcheckbox", { name: /^1X2.*aus dem Wettschein nehmen$/ })).toHaveAttribute("aria-checked", "true");
+    expect(within(list).getByRole("menuitemcheckbox", { name: /^1X2 · Heim.*aus dem Wettschein nehmen$/ })).toHaveAttribute("aria-checked", "true");
     expect(within(list).getByText("1 im Wettschein")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Zum Wett-Baukasten hinzufügen: Alpha FC – Gast FC (1 im Wettschein)" })).toHaveTextContent("1");
 
     // Ein zweiter Klick nimmt ihn wieder heraus, ein dritter legt ihn zurück.
-    await user.click(within(list).getByRole("menuitemcheckbox", { name: /^1X2.*aus dem Wettschein nehmen$/ }));
+    await user.click(within(list).getByRole("menuitemcheckbox", { name: /^1X2 · Heim.*aus dem Wettschein nehmen$/ }));
     expect(screen.queryByRole("button", { name: /Wett-Baukasten öffnen/ })).not.toBeInTheDocument();
-    await user.click(within(list).getByRole("menuitemcheckbox", { name: /^1X2.*in den Wettschein$/ }));
+    await user.click(within(list).getByRole("menuitemcheckbox", { name: /^1X2 · Heim.*in den Wettschein$/ }));
 
     // Escape schließt die Liste und gibt den Fokus an den Knopf zurück.
     await user.keyboard("{Escape}");
@@ -970,6 +970,39 @@ describe("React-Dashboard", () => {
     await user.click(within(builder).getByRole("button", { name: /Kombis mischen/ }));
 
     expect(within(builder).getByText("Kombi 1 · 2er")).toBeInTheDocument();
+  });
+
+  /** Davids Wunsch vom 06.10.2026: beim 1X2 auch die Seite gegen den Modelltipp anbieten. */
+  it("bietet beim 1X2 auch die Gegenseite an und tauscht die Seite im Wettschein", async () => {
+    const current = document();
+    const oneXTwo = current.fixtures[0]!.markets.find((market) => market.key === "1x2")!;
+    oneXTwo.oddsHome = 1.8;
+    oneXTwo.oddsAway = 4.5;
+    vi.stubGlobal("fetch", dashboardFetch(() => current));
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(<App />);
+    expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Zum Wett-Baukasten hinzufügen: Alpha FC – Gast FC" }));
+    const list = screen.getByRole("menu", { name: "Markt hinzufügen: Alpha FC – Gast FC" });
+    const tipp = () => within(list).getByRole("menuitemcheckbox", { name: /^1X2 · Heim · Heimsieg, Quote 1,80/ });
+    const gegen = () => within(list).getByRole("menuitemcheckbox", { name: /^1X2 · Gast · Auswärtssieg Gast FC gegen den Modelltipp, Quote 4,50/ });
+    expect(within(gegen()).getByText("Modell dagegen")).toBeInTheDocument();
+
+    await user.click(tipp());
+    expect(tipp()).toHaveAttribute("aria-checked", "true");
+    expect(gegen()).toHaveAttribute("aria-checked", "false");
+
+    // Die Gegenseite ersetzt den Modelltipp, statt neben ihm zu stehen.
+    await user.click(gegen());
+    expect(gegen()).toHaveAttribute("aria-checked", "true");
+    expect(tipp()).toHaveAttribute("aria-checked", "false");
+    expect(screen.getByRole("button", { name: /Wett-Baukasten öffnen \(1 Wette\)/ })).toBeInTheDocument();
+
+    await user.keyboard("{Escape}");
+    await user.click(screen.getByRole("button", { name: /Wett-Baukasten öffnen/ }));
+    const builder = screen.getByRole("dialog", { name: "Wett-Baukasten" });
+    expect(within(builder).getByText(/Auswärtssieg Gast FC/)).toBeInTheDocument();
   });
 
   it("merkt sich das Schließen des Hinweisbanners über einen Reload hinweg", async () => {
@@ -1200,9 +1233,92 @@ describe("Klassenunterschied", () => {
 
   async function applyQuickpick(user: ReturnType<typeof userEvent.setup>): Promise<void> {
     await user.click(screen.getByRole("button", { name: "Quickpicker öffnen" }));
-    await user.click(screen.getByRole("button", { name: "Filter anwenden" }));
+    await user.click(screen.getByRole("switch", { name: "Tabelle filtern" }));
     await user.keyboard("{Escape}");
   }
+
+  /** Wie das Filtermenü: Ein Klick daneben schließt das Fenster, der Filter bleibt. */
+  it("schließt den Quickpicker beim Klick daneben und behält den Filter", async () => {
+    vi.stubGlobal("fetch", dashboardFetch(() => quickpickDocument()));
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(<App />);
+    expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Quickpicker öffnen" }));
+    await user.click(screen.getByRole("radio", { name: /^Daves 1x2-Filter/ }));
+    expect(screen.queryByText("Zulu FC")).not.toBeInTheDocument();
+
+    await user.click(window.document.body);
+
+    expect(screen.queryByRole("dialog", { name: "Quickpicker" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Zulu FC")).not.toBeInTheDocument();
+    expect(screen.getByText(/Daves 1x2-Filter · 1 von 2/)).toBeInTheDocument();
+  });
+
+  it("gibt den Fokus nach Escape an den Quickpick-Knopf zurück", async () => {
+    vi.stubGlobal("fetch", dashboardFetch(() => quickpickDocument()));
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(<App />);
+    expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Quickpicker öffnen" }));
+    expect(screen.getByRole("heading", { name: "Quickpicker" })).toHaveFocus();
+    await user.keyboard("{Escape}");
+
+    expect(screen.queryByRole("dialog", { name: "Quickpicker" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Quickpicker öffnen" })).toHaveFocus();
+  });
+
+  /** Davids Wunsch vom 10.10.2026: Hinter Filtermenü und Quickpicker tritt der Rest zurück. */
+  it("dunkelt den Rest ab, solange Filtermenü oder Quickpicker offen sind", async () => {
+    vi.stubGlobal("fetch", dashboardFetch(() => quickpickDocument()));
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const { container } = render(<App />);
+    expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
+    expect(container.querySelector(".menu-backdrop")).toBeNull();
+
+    await user.click(screen.getByRole("button", { name: "Quickpicker öffnen" }));
+    expect(container.querySelector(".menu-backdrop")).not.toBeNull();
+    await user.keyboard("{Escape}");
+    expect(container.querySelector(".menu-backdrop")).toBeNull();
+
+    await openFilters(user);
+    expect(container.querySelector(".menu-backdrop")).not.toBeNull();
+  });
+
+  /** Beide Fenster gehen an derselben Stelle auf - offen ist höchstens eins. */
+  it("schließt Quickpicker und Filtermenü gegenseitig", async () => {
+    vi.stubGlobal("fetch", dashboardFetch(() => quickpickDocument()));
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(<App />);
+    expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Quickpicker öffnen" }));
+    // Ohne pointerdown: So prüft der Test die Knöpfe selbst, nicht das Schließen beim Klick daneben.
+    fireEvent.click(screen.getByRole("button", { name: /^Filter(, \d+ aktiv)?$/ }));
+    expect(screen.getByRole("dialog", { name: "Filter" })).toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: "Quickpicker" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Quickpicker öffnen" }));
+    expect(screen.getByRole("dialog", { name: "Quickpicker" })).toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: "Filter" })).not.toBeInTheDocument();
+  });
+
+  /** Das Fenster hängt an der Werkzeugleiste - nach einem Ansichtswechsel darf es nicht wieder aufgehen. */
+  it("schließt den Quickpicker beim Ansichtswechsel", async () => {
+    vi.stubGlobal("fetch", dashboardFetch(() => quickpickDocument()));
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(<App />);
+    expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Quickpicker öffnen" }));
+    const nav = screen.getByRole("navigation", { name: "Ansichten" });
+    fireEvent.click(within(nav).getByRole("button", { name: "Marktprofil" }));
+    fireEvent.click(within(nav).getByRole("button", { name: "Tabelle" }));
+
+    expect(screen.queryByRole("dialog", { name: "Quickpicker" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Quickpicker öffnen" })).toHaveAttribute("aria-expanded", "false");
+  });
 
   it("kürzt die Tabelle auf die Treffer des Quickpickers", async () => {
     vi.stubGlobal("fetch", dashboardFetch(() => quickpickDocument()));

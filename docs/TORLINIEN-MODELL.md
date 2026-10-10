@@ -226,6 +226,17 @@ auf 0.6359 verschlechtert und BTTS von +4,7 auf +5,1 Prozentpunkte. Andere Teile
 Modells gleichen den Skalenversatz offenbar aus. Er bleibt deshalb unangetastet — wer ihn
 anfasst, muss die Gegenrechnung mitliefern.
 
+**Widerlegt am 10.10.2026 (Prüfer-Agent).** Der Skalenversatz *ist* die Ursache. Der
+„Ausgleich“ war die damals 4,6 % zu niedrige Torsumme, die die 6,7 % zu hohen Auswärtstore
+verdeckte. Seit 3.2.0 die Summe anhebt, stehen die Auswärtstore 8-10 % zu hoch (1,347
+erwartet gegen 1,237), und Ligaspiele ab 3.2.0 geben Heimsiegen 2,7 ± 0,8 Punkte zu wenig,
+Auswärtssiegen 4,3 ± 0,7 zu viel. Die damalige „Verschlechterung“ von +0,0017 Brier war auf
+560 Spielen etwa 0,7 Standardfehler; nachgebaut auf 1.997 Spielen +0,0004 ± 0,0013. Die
+Korrektur liegt als `shiftHomeAway` (src/model.ts) bereit - **nach** der Summenkorrektur,
+Summe fest, nur Ligaspiele, `config.goalLineHomeShift` (ab Werk 0, einzuschalten mit 0,054
+und Version 3.6.0 nach der BTTS-Prüfung). Begründung und Messung im Kommentar in
+src/config.ts.
+
 ## Gesamttorverteilung
 
 Für genau `k` Gesamttore gilt:

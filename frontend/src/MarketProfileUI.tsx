@@ -7,8 +7,7 @@ const VERDICT_TONE: Record<MarketVerdict, string> = {
   "tragfähig": "verdict-good",
   "beobachten": "verdict-watch",
   "meiden": "verdict-bad",
-  "zu wenig Daten": "verdict-thin",
-  "abgeleitet": "verdict-derived"
+  "zu wenig Daten": "verdict-thin"
 };
 
 function percent(value: number): string {
@@ -21,7 +20,7 @@ function MetricCells({ metrics }: { metrics: Metrics }) {
     <td>{percent(metrics.predicted)}</td>
     <td>{percent(metrics.hitRate)}</td>
     <td className={metrics.bias < -0.15 ? "profile-bias-bad" : "profile-bias"}>{formatPoints(metrics.bias)}</td>
-    <td className={metrics.roi === null ? "" : metrics.roi >= 0 ? "profile-roi-good" : "profile-roi-bad"}>
+    <td className={metrics.roi >= 0 ? "profile-roi-good" : "profile-roi-bad"}>
       {formatRoi(metrics.roi)}
     </td>
     <td>{formatRoi(metrics.roiFirstHalf)}</td>
@@ -34,7 +33,7 @@ function MetricCells({ metrics }: { metrics: Metrics }) {
  * eigentliche Erkenntnisgewinn: Das Remis verliert über alle Zeilen mit Vorteil Geld und
  * verdient es erst ab etwa sieben Prozentpunkten - eine Zahl je Markt würde das verdecken.
  */
-function MarketRow({ entry, sourceLabel }: { entry: MarketProfileEntry; sourceLabel?: string }) {
+function MarketRow({ entry }: { entry: MarketProfileEntry }) {
   const [open, setOpen] = useState(false);
   return <>
     <tr className="profile-market">
@@ -46,9 +45,6 @@ function MarketRow({ entry, sourceLabel }: { entry: MarketProfileEntry; sourceLa
             : open ? <CaretDown size={11} weight="bold" /> : <CaretRight size={11} weight="bold" />}
           <strong>{entry.marketLabel}</strong>
         </button>
-        {entry.derivedFrom !== undefined && <small className="profile-derived">
-          gespiegelt aus {sourceLabel ?? entry.derivedFrom}
-        </small>}
       </td>
       <MetricCells metrics={entry.metrics} />
       <td><span className={`profile-verdict ${VERDICT_TONE[entry.verdict]}`}>{entry.verdict}</span></td>
@@ -84,8 +80,8 @@ export function MarketProfileView() {
     {profile.overall !== null && <p className="profile-overall">
       Über alle Märkte sagt das Modell <strong>{percent(profile.overall.predicted)}</strong> voraus,
       eingetreten sind <strong>{percent(profile.overall.hitRate)}</strong> – eine Selbstüberschätzung
-      von <strong>{formatPoints(profile.overall.bias)}</strong>. Genau diesen Abschlag zieht die
-      Automatik ab, bevor sie den Einsatz berechnet.
+      von <strong>{formatPoints(profile.overall.bias)}</strong>. Die Automatik zieht je Wettart und
+      Vorsprung ab, worum sich das Modell bisher verschätzt hat, bevor sie den Einsatz berechnet.
     </p>}
 
     <div className="profile-table-scroll">
@@ -104,8 +100,7 @@ export function MarketProfileView() {
           </tr>
         </thead>
         <tbody>
-          {profile.markets.map((entry) => <MarketRow key={entry.marketKey} entry={entry}
-            sourceLabel={profile.markets.find((source) => source.marketKey === entry.derivedFrom)?.marketLabel} />)}
+          {profile.markets.map((entry) => <MarketRow key={entry.marketKey} entry={entry} />)}
         </tbody>
       </table>
     </div>
@@ -113,16 +108,14 @@ export function MarketProfileView() {
     <footer className="profile-footer">
       <p>
         Klappst du eine Zeile auf, siehst du sie danach aufgeteilt, wie viel Vorsprung das
-        Modell behauptet hat. Das ist der eigentliche Punkt: Beim Unentschieden steht über
-        alle Wetten ein klarer Verlust – bei genau sieben bis zehn Punkten Vorsprung aber ein
-        ebenso klarer Gewinn. Darum darf die Automatik aus einer Wettart wählen, die oben als
-        „meiden“ steht. Sie entscheidet nach Vorsprung, nicht nach Wettart.
+        Modell behauptet hat. Je größer der behauptete Vorsprung, desto stärker verschätzt sich
+        das Modell. Darum darf die Automatik aus einer Wettart wählen, die oben als „meiden“
+        steht: Sie entscheidet nach Vorsprung, nicht nach Wettart.
       </p>
       <p>
-        Zeilen mit dem Vermerk „gespiegelt“ wurden nicht selbst gemessen. Sie sind einfach das
-        Gegenteil ihrer Grundwette: Was bei „über 2,5 Tore“ herauskam, gilt umgekehrt für
-        „unter 2,5 Tore“. Nur der Gewinn fehlt dort – dafür hätte man die Gegenquoten von
-        damals gebraucht, und die wurden nie gespeichert.
+        Wichtig: Auch nach dieser Korrektur trafen die Wetten der Automatik, an alten Spielen
+        geprüft, nur so oft, wie die Tipico-Quote ohne Aufschlag es erwarten ließ. Auf Dauer
+        kostet das etwa den Aufschlag – rechne nicht mit Gewinn.
       </p>
       <p className="profile-caveat">
         Der Gewinn ist mit überall gleichem Einsatz gerechnet und in zwei Zeiträume geteilt.

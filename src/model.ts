@@ -298,6 +298,37 @@ export function recalibrateGoals(
   };
 }
 
+/**
+ * Verschiebt die Aufteilung der Torerwartung zwischen Heim und Gast, ohne die Summe zu ändern:
+ * λH' = λH·e^δ·k, λA' = λA·e^−δ·k mit k = (λH + λA) / (λH·e^δ + λA·e^−δ). Das Verhältnis
+ * λH/λA steigt um e^(2δ), Über/Unter bleibt (bis auf die Grenzen) unberührt.
+ *
+ * Grund (Prüfung vom 10.10.2026): Angriff und Abwehr mischen 75 % Wert am Spielort mit 25 %
+ * Gesamtwert, teilen beides aber durch den Ligaschnitt des Spielorts. Das staucht λH/λA bei
+ * Durchschnittsteams um rund 0,89 - etwa die Hälfte des Heimvorteils. Ligaspiele ab 3.2.0:
+ * Heimsiege 2,7 ± 0,8 Punkte zu niedrig, Auswärtssiege 4,3 ± 0,7 zu hoch. Bewusst nicht an der
+ * Wurzel behoben: Das maß an 74.033 nachgebauten Ligaspielen in beiden Zeithälften etwas
+ * schlechter als diese Verschiebung und hätte Spiele zwischen Ligen und Länderspiele ungemessen
+ * mitbewegt. Die Verschiebung kommt **nach** `recalibrateGoals` - die Korrektur vom 02.09.2026
+ * verschob vor der Summenkorrektur, als die Summe noch zu niedrig war und den Fehler verdeckte.
+ */
+export function shiftHomeAway(
+  homeGoals: number,
+  awayGoals: number,
+  delta: number,
+  floor: number,
+  ceiling: number
+): { homeGoals: number; awayGoals: number } {
+  if (delta === 0) return { homeGoals, awayGoals };
+  const shiftedHome = homeGoals * Math.exp(delta);
+  const shiftedAway = awayGoals * Math.exp(-delta);
+  const scale = (homeGoals + awayGoals) / (shiftedHome + shiftedAway);
+  return {
+    homeGoals: clamp(shiftedHome * scale, floor, ceiling),
+    awayGoals: clamp(shiftedAway * scale, floor, ceiling)
+  };
+}
+
 function factorial(value: number): number {
   let result = 1;
   for (let index = 2; index <= value; index += 1) result *= index;
@@ -556,6 +587,11 @@ export function analyzeFixture(
     strengthFactor?: number;
     /** Korrektur der Torsumme; ohne Angabe der Liga-Satz. Länderspiele haben einen eigenen. */
     goalCalibration?: { intercept: number; slope: number };
+    /**
+     * Verschiebung der Heim-/Gast-Aufteilung nach der Summenkorrektur (`shiftHomeAway`). Der
+     * Analyzer setzt sie nur bei Ligaspielen; ohne Angabe 0, also das bisherige Verhalten.
+     */
+    homeShift?: number;
   } = {}
 ): ModelResult {
   const matches = playedMatches(history).filter(
@@ -623,10 +659,17 @@ export function analyzeFixture(
   // auch zwei gleichklassigen Vereinen - und bei ungleichen Paarungen ein zweites Mal
   // zusätzlich zum Stärkefaktor. Der Klassenunterschied gehört allein in `strength`.
   const strength = options.strengthFactor ?? 1;
-  const { homeGoals: expectedHomeGoals, awayGoals: expectedAwayGoals } = recalibrateGoals(
+  const recalibrated = recalibrateGoals(
     clamp(homeBase.homeGoals * homeAttack * awayDefense * strength, 0.2, 4.5),
     clamp(awayBase.awayGoals * awayAttack * homeDefense / strength, 0.2, 4.5),
     options.goalCalibration ?? config.goalLineCalibration,
+    0.2,
+    4.5
+  );
+  const { homeGoals: expectedHomeGoals, awayGoals: expectedAwayGoals } = shiftHomeAway(
+    recalibrated.homeGoals,
+    recalibrated.awayGoals,
+    options.homeShift ?? 0,
     0.2,
     4.5
   );

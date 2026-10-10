@@ -730,7 +730,10 @@ export async function runGoalLineAnalysis(
         rankings,
         sideBaselines,
         strengthFactor: strength?.factor,
-        ...(national ? { goalCalibration: config.goalLineCalibrationNational } : {})
+        ...(national ? { goalCalibration: config.goalLineCalibrationNational } : {}),
+        // Nur Ligaspiele: Zwischen Ligen maß die Verschiebung schlechter, Länderspiele laufen
+        // ebenfalls über `crossLeague` und sind nicht belegt.
+        ...(!crossLeague ? { homeShift: config.goalLineHomeShift } : {})
       });
       const firstHalfModel = analyzeFirstHalfGoals(fixture, history, teamHistory, {
         sideBaselines: firstHalfSideBaselines,

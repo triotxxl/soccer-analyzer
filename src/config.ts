@@ -138,6 +138,20 @@ export const config = {
     intercept: 1.135,
     slope: 0.553
   },
+  // Verschiebung der Heim-/Gast-Aufteilung bei Ligaspielen (`shiftHomeAway` in src/model.ts),
+  // nach der Summenkorrektur, Summe bleibt gleich. **Ab Werk 0 = aus** (Davids Entscheidung
+  // vom 10.10.2026): Eingeschaltet wird nach der vorab festgelegten BTTS-Prüfung
+  // (docs/btts-pruefung.md, etwa Mitte November), weil sich BTTS dabei leicht verschiebt.
+  // Dann 0.054 setzen und goalLineModelVersion auf 3.6.0 erhöhen.
+  //
+  // Gemessen (Prüfung vom 10.10.2026): δ über 74.033 nachgebaute Ligaspiele 0,0539 ± 0,0023,
+  // live 0,059 ± 0,010. Zeit-Split, 1X2-Log-Loss gepaart: nachgebaut −0,0036 ± 0,0004 (Test)
+  // und −0,0023 ± 0,0004 (Gegenprobe), echte Prognosen ab 3.2.0 −0,0035 ± 0,0013 über 4.038
+  // Ligaspiele; Über/Unter unverändert, BTTS −0,0002 ± 0,0001. Gegen Tipico fair schrumpft der
+  // Abstand nur um ein Zehntel (+0,039 -> +0,035). Spiele zwischen Ligen wurden schlechter
+  // (+0,0086 ± 0,0054, dort fehlt der stärkeren Seite etwas anderes), Länderspiele sind nicht
+  // belegt - beide bleiben außen vor. Je Ligaspiel: P(Heim) +3,3, P(Gast) −3,1 Punkte.
+  goalLineHomeShift: 0,
   // Abrechnung fälliger Prognosen am Ende jedes Dashboard-Laufs. Klein gehalten, weil im
   // laufenden Betrieb pro Tag nur Dutzende Partien anfallen; ein Rückstand wird über
   // mehrere Läufe abgetragen. 0 schaltet die automatische Abrechnung ab.

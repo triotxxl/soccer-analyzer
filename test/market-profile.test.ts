@@ -240,54 +240,31 @@ describe("Gegenmärkte", () => {
     }
   });
 
-  it("spiegelt die Messung exakt auf die Gegenrichtung", () => {
-    // 200 Zeilen: behauptet 60 %, eingetreten 45 %.
+  /**
+   * Bis 06.10.2026 wurde ein Gegenmarkt ohne eigene Zeilen aus seinem Basismarkt gespiegelt -
+   * mit falschem Vorzeichen: Das Profil misst je Markt nur Zeilen mit eigenem Vorteil, und die
+   * sind bei Basis- und Gegenmarkt zwangsläufig verschiedene Spiele. Auf beiden Seiten
+   * überschätzt sich das Modell, die Spiegelung hob die Gegenseite aber an.
+   */
+  it("spiegelt keinen Gegenmarkt mehr - ohne eigene Zeilen ist er nicht empfehlbar", () => {
     const profile = buildMarketProfile(observations({
       marketKey: "over25", n: 200, wins: 90, probability: 0.6, odds: 1.9
     }));
-    const source = profile.markets.find((entry) => entry.marketKey === "over25")!;
-    const derived = profile.markets.find((entry) => entry.marketKey === "under25")!;
-
-    assert.equal(derived.derivedFrom, "over25");
-    assert.equal(derived.verdict, "abgeleitet");
-    assert.equal(derived.metrics.n, source.metrics.n);
-    assert.ok(Math.abs(derived.metrics.hitRate - (1 - source.metrics.hitRate)) < 1e-9);
-    assert.ok(Math.abs(derived.metrics.predicted - (1 - source.metrics.predicted)) < 1e-9);
-    assert.ok(Math.abs(derived.metrics.bias + source.metrics.bias) < 1e-9,
-      "die Abweichung muss exakt das Vorzeichen wechseln");
-    // Der Ertrag ist nicht ableitbar - ohne historische Gegenquote gibt es ihn nicht.
-    assert.equal(derived.metrics.roi, null);
-    assert.deepEqual(derived.bands, []);
+    assert.equal(profile.markets.find((entry) => entry.marketKey === "under25"), undefined);
+    assert.equal(calibrateProbability(profile, "under25", 0.4, 0.4 - 1 / 2.3), null);
+    const decision = autoDecide(profile, { marketKey: "under25", probability: 0.5, odds: 2.3, crossLeague: false });
+    assert.equal(decision.accepted, false);
   });
 
-  it("hebt die Wahrscheinlichkeit eines Gegenmarktes an, wenn das Modell die Basis überschätzt", () => {
-    const profile = buildMarketProfile(observations({
-      marketKey: "over25", n: 200, wins: 90, probability: 0.6, odds: 1.9
-    }));
-    const result = calibrateProbability(profile, "under25", 0.4, 0.4 - 1 / 2.4);
-    assert.ok(result !== null);
-    assert.ok(result.bias > 0, "der Abschlag muss nach oben gehen");
-    assert.ok(result.probability > 0.4);
-  });
-
-  it("zieht die eigene Messung der Spiegelung vor, sobald es sie gibt", () => {
+  it("misst einen Gegenmarkt mit eigenen Zeilen wie jeden anderen Markt", () => {
     const profile = buildMarketProfile([
       ...observations({ marketKey: "over25", n: 200, wins: 90, probability: 0.6, odds: 1.9 }),
       ...observations({ marketKey: "under25", n: 60, wins: 20, probability: 0.4, odds: 2.8, startDay: 9 })
     ]);
     const entry = profile.markets.find((item) => item.marketKey === "under25")!;
-    assert.equal(entry.derivedFrom, undefined, "eigene Zeilen schlagen die Spiegelung");
     assert.equal(entry.metrics.n, 60);
-    assert.notEqual(entry.metrics.roi, null);
+    assert.ok(entry.metrics.bias < 0, "die eigene Messung zeigt die Überschätzung, nicht ihr Spiegelbild");
     assert.ok(entry.bands.length > 0);
-  });
-
-  it("spiegelt nicht aus einer zu dünnen Basis", () => {
-    const profile = buildMarketProfile(observations({
-      marketKey: "over25", n: 12, wins: 5, probability: 0.6, odds: 1.9
-    }));
-    assert.equal(profile.markets.find((entry) => entry.marketKey === "under25"), undefined);
-    assert.equal(calibrateProbability(profile, "under25", 0.4, 0.1), null);
   });
 });
 

@@ -14,6 +14,13 @@
  * Wer mit der Trefferquote rechnet, die ein Markt historisch wirklich erreicht hat, bekommt
  * die schwachen Märkte nicht mehr angeboten und setzt auf den übrigen realistische Beträge.
  *
+ * **Grenze dieser Korrektur (Prüfung durch drei Prüfer-Agenten, 06.10.2026):** Über alle
+ * vorgefilterten Zeilen stimmt sie (Treffer − korrigiert +0,4 ± 0,6 Punkte, n = 6.259). Auf den
+ * angenommenen Zeilen liegt sie aber 7,8 ± 1,5 Punkte zu hoch, weil die Auswahl gerade die
+ * Ausrutscher des Modells sucht. Die gewählten Wetten treffen so oft wie der faire Tipico-Preis
+ * (42,8 % gegen 42,8 %, n = 947). Das ist keine Schwäche der Bänder, die sich nachstellen ließe:
+ * Erst eine Korrektur ganz auf den Marktpreis beseitigte sie, und dann bliebe keine Wette übrig.
+ *
  * Die Datei enthält nur reine Funktionen - kein Dateisystem, keine Datenbank -, damit sich
  * die Kalibrierung ohne echte Snapshots prüfen lässt. Das Einsammeln der Beobachtungen
  * übernimmt `market-profile-service.ts`.
@@ -39,12 +46,8 @@ export interface Metrics {
   predicted: number;
   /** `hitRate - predicted`. Negativ heißt: das Modell überschätzt sich. */
   bias: number;
-  /**
-   * Ertrag je gesetzter Einheit bei gleich hohen Einsätzen. `null` bei abgeleiteten Märkten:
-   * Für sie liegen keine historischen Quoten vor, und ein Ertrag, den niemand gemessen hat,
-   * darf nicht als Zahl dastehen.
-   */
-  roi: number | null;
+  /** Ertrag je gesetzter Einheit bei gleich hohen Einsätzen. */
+  roi: number;
   /** Derselbe Ertrag getrennt nach den beiden Zeithälften - `null` bei leerer Hälfte. */
   roiFirstHalf: number | null;
   roiSecondHalf: number | null;
@@ -55,7 +58,7 @@ export interface Metrics {
  * Einschätzung eines Marktes. Sie steuert nur den groben Ausschluss; die eigentliche
  * Auswahl trifft die Korrektur der Wahrscheinlichkeit.
  */
-export type MarketVerdict = "tragfähig" | "beobachten" | "meiden" | "zu wenig Daten" | "abgeleitet";
+export type MarketVerdict = "tragfähig" | "beobachten" | "meiden" | "zu wenig Daten";
 
 export interface EdgeBand {
   label: string;
@@ -78,11 +81,6 @@ export interface MarketProfileEntry {
   metrics: Metrics;
   bands: EdgeBand[];
   verdict: MarketVerdict;
-  /**
-   * Gesetzt, wenn die Kennzahlen nicht gemessen, sondern aus dem Gegenmarkt gespiegelt sind.
-   * Trefferquote und Abweichung stimmen dann exakt, ein Ertrag fehlt.
-   */
-  derivedFrom?: string;
 }
 
 export interface MarketProfile {
@@ -128,10 +126,11 @@ export const RELIABLE_MARKET_SAMPLE = 100;
 function metricsOf(group: MarketObservation[], splitAt: string | null): Metrics | null {
   const n = group.length;
   if (n === 0) return null;
-  const roiOf = (entries: MarketObservation[]): number | null => {
-    if (entries.length === 0) return null;
-    return entries.reduce((sum, entry) => sum + (entry.hit ? entry.odds - 1 : -1), 0) / entries.length;
-  };
+  const roiOf = (entries: MarketObservation[]): number =>
+    entries.reduce((sum, entry) => sum + (entry.hit ? entry.odds - 1 : -1), 0) / entries.length;
+  const halfRoi = (entries: MarketObservation[]): number | null => entries.length === 0 ? null : roiOf(entries);
+  // Zeitpunkte über Date.parse: Anstoßzeiten stehen mal mit Zeitzone, mal in UTC (AGENTS.md).
+  const split = splitAt === null ? null : Date.parse(splitAt);
   const hitRate = group.reduce((sum, entry) => sum + entry.hit, 0) / n;
   const predicted = group.reduce((sum, entry) => sum + entry.probability, 0) / n;
   return {
@@ -140,8 +139,8 @@ function metricsOf(group: MarketObservation[], splitAt: string | null): Metrics 
     predicted,
     bias: hitRate - predicted,
     roi: roiOf(group),
-    roiFirstHalf: splitAt === null ? null : roiOf(group.filter((entry) => entry.kickoff < splitAt)),
-    roiSecondHalf: splitAt === null ? null : roiOf(group.filter((entry) => entry.kickoff >= splitAt)),
+    roiFirstHalf: split === null ? null : halfRoi(group.filter((entry) => Date.parse(entry.kickoff) < split)),
+    roiSecondHalf: split === null ? null : halfRoi(group.filter((entry) => Date.parse(entry.kickoff) >= split)),
     averageOdds: group.reduce((sum, entry) => sum + entry.odds, 0) / n
   };
 }
@@ -153,91 +152,19 @@ function metricsOf(group: MarketObservation[], splitAt: string | null): Metrics 
  */
 function splitPointOf(observations: MarketObservation[]): string | null {
   if (observations.length < 2) return null;
-  const kickoffs = observations.map((entry) => entry.kickoff).sort();
+  const kickoffs = observations.map((entry) => entry.kickoff)
+    .sort((left, right) => Date.parse(left) - Date.parse(right));
   return kickoffs[Math.floor(kickoffs.length / 2)] ?? null;
 }
 
 function verdictOf(metrics: Metrics): MarketVerdict {
   if (metrics.n < MINIMUM_MARKET_SAMPLE) return "zu wenig Daten";
   const { roi, roiFirstHalf: first, roiSecondHalf: second } = metrics;
-  if (roi === null) return "abgeleitet";
   // Verlust über die gesamte Strecke und in beiden Hälften: das ist kein Ausrutscher.
   if (roi < 0 && first !== null && second !== null && first < 0 && second < 0) return "meiden";
   if (metrics.n >= RELIABLE_MARKET_SAMPLE && roi > 0
     && first !== null && second !== null && first > 0 && second > 0) return "tragfähig";
   return "beobachten";
-}
-
-/**
- * Märkte, die dieselbe Partie aus entgegengesetzter Richtung betrachten. Ihre
- * Wahrscheinlichkeiten sind exakt komplementär - das Modell rechnet `under` und `over` aus
- * derselben Torverteilung, und "beide treffen nicht" ist die Gegenwahrscheinlichkeit zu
- * "beide treffen".
- */
-const COMPLEMENT_PAIRS: Array<[string, string]> = [
-  ["btts", "bttsNo"],
-  ["over15", "under15"],
-  ["over25", "under25"],
-  ["over35", "under35"],
-  ["firstHalfOver05", "firstHalfUnder05"],
-  ["firstHalfOver15", "firstHalfUnder15"]
-];
-
-/**
- * Beschriftung für einen Markt, von dem es noch keine einzige abgerechnete Zeile gibt. Sobald
- * eigene Beobachtungen vorliegen, kommt das Label aus dem Snapshot und diese Tabelle wird
- * nicht mehr befragt.
- */
-const DERIVED_LABELS: Record<string, string> = {
-  btts: "BTTS", bttsNo: "BTTS Nein",
-  over15: "Über 1,5", under15: "Unter 1,5",
-  over25: "Über 2,5", under25: "Unter 2,5",
-  over35: "Über 3,5", under35: "Unter 3,5",
-  firstHalfOver05: "1. HZ Ü0,5", firstHalfUnder05: "1. HZ U0,5",
-  firstHalfOver15: "1. HZ Ü1,5", firstHalfUnder15: "1. HZ U1,5"
-};
-
-function complementOf(marketKey: string): string | null {
-  for (const [left, right] of COMPLEMENT_PAIRS) {
-    if (marketKey === left) return right;
-    if (marketKey === right) return left;
-  }
-  return null;
-}
-
-/**
- * Spiegelt die Messung eines Marktes auf seine Gegenrichtung.
- *
- * Das ist keine Schätzung, sondern Arithmetik: Auf derselben Menge von Partien ist die
- * Trefferquote der Gegenrichtung `1 - Trefferquote` und die Prognose `1 - Prognose`, also
- *
- *     bias_gegen = (1 - Trefferquote) - (1 - Prognose) = Prognose - Trefferquote = -bias
- *
- * Aus -9,8 Punkten bei Über 2,5 werden damit +9,8 Punkte bei Unter 2,5: Die Korrektur hebt
- * Unter-Wahrscheinlichkeiten an, weil das Modell Tore überschätzt.
- *
- * Nicht spiegelbar ist der Ertrag - dafür bräuchte es die historischen Gegenquoten, die nie
- * gespeichert wurden. Ebenso entfallen die Edge-Bänder: Der Vorteil des Gegenmarktes ergibt
- * sich aus einer anderen Quote und fiele in ein anderes Band.
- */
-function derivedEntry(source: MarketProfileEntry, marketKey: string): MarketProfileEntry {
-  return {
-    marketKey,
-    marketLabel: DERIVED_LABELS[marketKey] ?? marketKey,
-    metrics: {
-      n: source.metrics.n,
-      hitRate: 1 - source.metrics.hitRate,
-      predicted: 1 - source.metrics.predicted,
-      bias: -source.metrics.bias,
-      roi: null,
-      roiFirstHalf: null,
-      roiSecondHalf: null,
-      averageOdds: source.metrics.averageOdds
-    },
-    bands: [],
-    verdict: "abgeleitet",
-    derivedFrom: source.marketKey
-  };
 }
 
 function bandsOf(group: MarketObservation[], splitAt: string | null): EdgeBand[] {
@@ -283,17 +210,6 @@ export function buildMarketProfile(
       verdict: verdictOf(metrics)
     });
   }
-  // Für jede Gegenrichtung ohne eigene Historie die Messung des Basismarktes spiegeln. Ohne
-  // das bliebe ein neu aufgenommener Markt wochenlang ohne Empfehlung, obwohl seine
-  // Selbstüberschätzung aus den vorhandenen Daten exakt bekannt ist.
-  const measured = new Set(markets.map((entry) => entry.marketKey));
-  for (const entry of [...markets]) {
-    const counterpart = complementOf(entry.marketKey);
-    if (counterpart === null || measured.has(counterpart)) continue;
-    if (entry.metrics.n < MINIMUM_MARKET_SAMPLE) continue;
-    markets.push(derivedEntry(entry, counterpart));
-  }
-
   markets.sort((left, right) => right.metrics.n - left.metrics.n);
 
   return {
@@ -327,8 +243,7 @@ export function marketEntryOf(profile: MarketProfile, marketKey: string): Market
  * daraus ihren Abschlag zieht, und die Auswahlregel, die das Verdikt desselben Bandes liest.
  * Zwei getrennte Suchen könnten auseinanderlaufen, ohne dass es auffiele.
  *
- * `undefined` heißt: Für diesen Vorteil führt der Markt keine Zeilen - bei einem gespiegelten
- * Gegenmarkt trifft das auf jeden Wert zu, weil er gar keine Bänder hat.
+ * `undefined` heißt: Für diesen Vorteil führt der Markt keine Zeilen.
  */
 export function bandFor(entry: MarketProfileEntry, rawEdge: number): EdgeBand | undefined {
   return entry.bands.find((candidate) => rawEdge >= candidate.from && rawEdge < candidate.to);
@@ -387,18 +302,18 @@ export const AUTO_RULE = {
    * misst ausschließlich Zeilen mit `edge > 0`. Der gemessene Bias ist damit eine Aussage
    * über die Grundgesamtheit "Zeilen dieses Marktes mit positivem Modellvorteil". Auf eine
    * Zeile mit negativem Rohvorteil angewendet, extrapoliert er aus seinem eigenen Messbereich
-   * heraus. Bei einem gespiegelten Gegenmarkt kommt hinzu, dass dessen `roi` per Konstruktion
-   * `null` ist - dort gibt es überhaupt keinen Ertragsnachweis, auf den man sich stützen
-   * könnte. Die Grenze lautet deshalb `> 0` und nicht `>= 0`: exakt dieselbe Bedingung, unter
+   * heraus. Die Grenze lautet deshalb `> 0` und nicht `>= 0`: exakt dieselbe Bedingung, unter
    * der das Profil gemessen wurde.
    */
   minRawEdge: 0,
   /**
    * Obergrenze für den rohen Vorteil. Sie ist keine Sicherung gegen kaputte Daten mehr,
-   * sondern der gemessene Qualitätsverfall: Über 1061 abgerechnete Picker-Zeilen fällt der
+   * sondern der gemessene Qualitätsverfall: Über 1061 abgerechnete Picker-Zeilen fiel der
    * ROI monoton mit dem behaupteten Vorteil - 7-10 PP +3,1 %, 10-15 PP -7,1 %,
-   * 15-25 PP -20,1 %, ab 25 PP -84,3 %. Ein großer behaupteter Vorteil misst den eigenen
-   * Modellfehler, nicht eine Nachlässigkeit des Buchmachers.
+   * 15-25 PP -20,1 %, ab 25 PP -84,3 %. Stand 06.10.2026 über 1.796 Zeilen: 7-10 PP -2,0 %,
+   * 10-15 PP -17,0 %, 15-25 PP -28,8 %, ab 25 PP -62,9 % - die Richtung hält. Ein großer
+   * behaupteter Vorteil misst den eigenen Modellfehler, nicht eine Nachlässigkeit des
+   * Buchmachers.
    *
    * 0,15 und nicht 0,10, weil 0,15 bereits eine Grenze in `EDGE_BANDS` ist und damit kein
    * frei gewählter Parameter: Die beiden Bänder darüber sind mit -20,1 % (n=159) und
@@ -440,16 +355,22 @@ export function autoDecide(profile: MarketProfile, input: AutoInput): AutoDecisi
     ({ accepted: false, reason, calibration: null, calibratedEdge: null });
 
   if (input.odds < AUTO_RULE.minOdds) return reject(`Quote unter ${AUTO_RULE.minOdds}`);
-  if (input.crossLeague) return reject("Cross-League: -29,6 % gegen -4,2 % innerhalb einer Liga");
+  // Stand 06.10.2026: -26,0 % zwischen verschiedenen Ligen gegen -4,3 % innerhalb einer Liga.
+  if (input.crossLeague) {
+    return reject("Spiel zwischen verschiedenen Ligen: geprüft deutlich schlechter als innerhalb einer Liga");
+  }
 
+  // Ein Markt ohne eigene abgerechnete Zeilen ist nicht empfehlbar. Bis 06.10.2026 wurde er
+  // aus seinem Gegenmarkt gespiegelt - mit falschem Vorzeichen, siehe AGENTS.md.
   const entry = marketEntryOf(profile, input.marketKey);
   if (entry === null || entry.metrics.n < MINIMUM_MARKET_SAMPLE) {
     return reject("zu wenig abgerechnete Fälle in diesem Markt");
   }
   // Kein Ausschluss nach Markt-Verdikt: Es misst über alle Zeilen mit Vorteil, während die
-  // Automatik nur einen Teil davon wählt. Remis zeigt, warum das schiefgeht - über alle Zeilen
-  // -18,2 %, im Bereich ab 7 PP Vorteil aber +18,4 %. Ein Verdikt über die ganze Menge würde
-  // gerade die tragenden Zeilen mitsperren. Die Auswahl trifft allein die Korrektur unten.
+  // Automatik nur einen Teil davon wählt. Remis zeigte das am 15.09.2026 (über alle Zeilen
+  // -18,2 %, ab 7 PP +18,4 %); am 06.10.2026 lag Remis bei -21,4 % gesamt, 7-10 PP +47,2 %
+  // (n = 115), 10-15 PP -67,6 % (n = 54) - das kann auch Zufall sein. Die Auswahl trifft
+  // allein die Korrektur unten.
 
   const rawEdge = input.probability - 1 / input.odds;
   if (rawEdge <= AUTO_RULE.minRawEdge) {

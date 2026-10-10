@@ -1,3 +1,4 @@
+import { fairProbabilityOf, type FairSource } from "../../src/fair-price.ts";
 import { marketsExcludeEachOther } from "../../src/market-outcome.ts";
 import { autoDecide, AUTO_RULE } from "../../src/market-profile.ts";
 import type { DashboardFixture, DashboardMarket, DashboardMarketKey, MarketProfile } from "./types";
@@ -17,11 +18,12 @@ export interface KellySettings {
   minEdge: number;
   /**
    * Obergrenze für den Edge. Klingt widersinnig, ist aber gemessen: über 13.124 abgerechnete
-   * Marktzeilen aus den Dashboard-Snapshots wächst die Selbstüberschätzung monoton mit dem
-   * behaupteten Vorteil - 7-10 pp Edge liefern -7,9 pp Bias, 10-15 pp schon -16,0 pp,
-   * 15-25 pp -26,2 pp und über 25 pp -51,9 pp. Ein großer Edge misst also nicht den Vorsprung
-   * gegenüber dem Buchmacher, sondern die Wahrscheinlichkeit eines eigenen Rechenfehlers.
-   * `null` schaltet den Deckel ab.
+   * Marktzeilen aus den Dashboard-Snapshots (Stand Anfang September 2026) wuchs die
+   * Selbstüberschätzung monoton mit dem behaupteten Vorteil - 7-10 pp Edge lieferten -7,9 pp
+   * Bias, 10-15 pp schon -16,0 pp, 15-25 pp -26,2 pp und über 25 pp -51,9 pp. Die Richtung hielt
+   * bei der Prüfung vom 06.10.2026. Ein großer Edge misst also nicht den Vorsprung gegenüber dem
+   * Buchmacher, sondern die Wahrscheinlichkeit eines eigenen Rechenfehlers. `null` schaltet den
+   * Deckel ab.
    */
   maxEdge: number | null;
   /** Mindest-Datenvertrauen des Marktes in Prozent. 0 schaltet die Prüfung ab. */
@@ -32,7 +34,11 @@ export interface KellySettings {
    * alle 46 gemessenen Fälle waren Cross-League.
    */
   excludeCrossLeague: boolean;
-  /** Märkte, die gar nicht erst als Kandidat gelten. 1X2 liegt bei -39,3 % ROI. */
+  /**
+   * Märkte, die gar nicht erst als Kandidat gelten - auch in der Automatik (Davids
+   * Entscheidung vom 06.10.2026). 1X2 lag bei -39,3 % ROI, in der Nachspielung der Automatik
+   * vom 06.10.2026 bei -28 % über 35 Wetten (kann auch Zufall sein).
+   */
   disabledMarkets: DashboardMarketKey[];
   allowMultipleMarketsPerGame: boolean;
   enableGameRiskLimit: boolean;
@@ -101,9 +107,11 @@ export function stakeSlots(settings: KellySettings): { plaetze: number; hoechste
  * unbemerkt auf 100 % statt auf der Vorgabe. Ein Knopf, der alles in einem Zug setzt, kann
  * nicht halb angewendet werden.
  *
- * Der Rahmen ist mit 70 % bewusst weit: Er soll die Auswahl der Regel **nicht** abschneiden
- * (0,70 / 0,02 = 35 Plätze bei rund 30 Kandidaten je Lauf). Im Papierbetrieb schützt ein
- * enger Rahmen kein Kapital, er wirft nur Messdaten weg. Für Echtgeld gilt das Gegenteil.
+ * Der Rahmen ist mit 70 % bewusst weit: Er soll die Auswahl der Regel möglichst **nicht**
+ * abschneiden (0,70 / 0,02 = 35 Plätze). Gemessen am 06.10.2026: im Median 12 angenommene Wetten
+ * je 48-Stunden-Analyse, an Wochenenden aber bis 56 - dort schneidet auch dieser Rahmen ab. Im
+ * Papierbetrieb schützt ein enger Rahmen kein Kapital, er wirft nur Messdaten weg. Für Echtgeld
+ * gilt das Gegenteil.
  */
 export const TEST_RUN_SETTINGS = {
   budget: 100,
@@ -137,6 +145,14 @@ export interface KellyCandidate {
   calibratedProbability: number | null;
   calibrationBias: number | null;
   calibratedEdge: number | null;
+  /**
+   * Die Chance, die die Tipico-Quote ohne Aufschlag behauptet (`src/fair-price.ts`). Daran wird
+   * gemessen, was auf Dauer zu erwarten ist: Die gewählten Wetten trafen in der Prüfung vom
+   * 06.10.2026 genau so oft (42,8 % gegen 42,8 % über 947 Wetten). `fairSource` sagt, ob die
+   * Gegenquote im Snapshot stand oder der mittlere Aufschlag sie ersetzen musste.
+   */
+  fairProbability: number;
+  fairSource: FairSource;
   /** Klartext, warum die Zeile in der Liste steht. */
   reason: string | null;
   fullKelly: number;
@@ -226,6 +242,9 @@ function candidateOf(
   const fullKelly = fullKellyOf(stakeProbability, market.odds);
   if (fullKelly <= 0) return null;
   const stakePercent = Math.min(fullKelly * settings.kellyFraction, settings.maxStakePercent);
+  // Eine Quote > 1 liegt hier immer vor, und jeder Markt hat einen mittleren Aufschlag - der
+  // Rückfall auf die rohe Quote greift nur bei einem künftigen Markt ohne Eintrag.
+  const fair = fairProbabilityOf(fixture, market) ?? { probability: impliedProb, source: "geschätzt" as const };
   return {
     fixtureId: fixture.fixtureId,
     homeTeam: fixture.homeTeam,
@@ -243,6 +262,8 @@ function candidateOf(
     calibratedProbability,
     calibrationBias,
     calibratedEdge,
+    fairProbability: fair.probability,
+    fairSource: fair.source,
     reason,
     fullKelly,
     stakePercent,
@@ -281,10 +302,12 @@ function marketCandidates(
  *
  * Auf beide Seiten eines Gegensatzes zu setzen - "beide treffen" und "beide treffen nicht" in
  * derselben Partie - verliert garantiert eine der Wetten, und übrig bleibt die Spanne des
- * Buchmachers. Solange die Gegenmärkte aus ihrem Basismarkt gespiegelt sind, kann das gar
- * nicht auftreten: Die beiden Wahrscheinlichkeiten ergeben zusammen exakt 1, die beiden Quoten
- * wegen der Spanne mehr als 1, also ist höchstens eine Seite im Vorteil. Sobald ein Gegenmarkt
- * aber eigene Messwerte hat, gilt das nicht mehr - und dann greift diese Sicherung.
+ * Buchmachers. Für die beiden Seiten **desselben** Marktes kann das nicht auftreten: Die
+ * Modellwahrscheinlichkeiten ergeben zusammen exakt 1, die Quoten wegen der Spanne mehr als 1,
+ * also hat höchstens eine Seite einen rohen Vorteil (am 06.10.2026 über 8.572 Paare nie
+ * beide), und die Automatik verlangt einen. Greifen kann die Sicherung bei unvereinbaren
+ * Märkten verschiedener Linien (etwa 1. HZ über 1,5 mit Spiel unter 1,5) und im manuellen
+ * Modus, wenn mehrere Märkte je Spiel erlaubt sind.
  *
  * Verglichen wird über den vollen Kelly-Wert und nicht über den Erwartungswert: Er wiegt
  * Trefferchance und Quote gegeneinander ab, und genau nach ihm bemisst sich anschließend auch
@@ -362,6 +385,12 @@ export interface KellyFilterReport {
   overMaxEdge: number;
   /** Kandidaten, die zwar Value hatten, aber nicht mehr ins Budget passten. */
   belowMinStake: number;
+  /**
+   * Kandidaten, die erst durch das Anheben auf den Mindesteinsatz über die Grenze je Spiel
+   * gekommen wären. Sie entfallen, statt die Grenze still zu überschreiten (bis 06.10.2026
+   * standen so 2 € auf einem Spiel mit 1 € Grenze, und der Export meldete 1 €).
+   */
+  overGameLimit: number;
 }
 
 /**
@@ -379,8 +408,8 @@ export interface KellyFilterReport {
 function applyStakeFloor(
   candidates: KellyCandidate[],
   settings: KellySettings
-): { candidates: KellyCandidate[]; dropped: number } {
-  if (settings.minStake <= 0) return { candidates, dropped: 0 };
+): { candidates: KellyCandidate[]; dropped: number; overGameLimit: number } {
+  if (settings.minStake <= 0) return { candidates, dropped: 0, overGameLimit: 0 };
 
   const exposureCap = settings.budget * settings.maxExposurePercent;
   const affordable = Math.floor(exposureCap / settings.minStake);
@@ -394,6 +423,12 @@ function applyStakeFloor(
     ? exposureCap / settings.maxBets
     : Number.POSITIVE_INFINITY;
 
+  // Die Grenze je Spiel hat `applyGameRiskLimit` schon angewandt - aber vor dem Anheben auf den
+  // Mindesteinsatz. Hier wird sie deshalb an den Endbeträgen noch einmal geprüft.
+  const gameLimit = settings.enableGameRiskLimit ? settings.budget * settings.maxRiskPerGame : Number.POSITIVE_INFINITY;
+  const perGame = new Map<number, number>();
+  let overGameLimit = 0;
+
   const kept = new Set<KellyCandidate>();
   const stakes = new Map<KellyCandidate, number>();
   let total = 0;
@@ -406,27 +441,69 @@ function applyStakeFloor(
     // Die Rundung fängt ab, dass sich Gleitkommareste zu einer scheinbaren Überschreitung
     // summieren und die letzte Wette grundlos wegfiele.
     if (Math.round((total + stake) * 100) > Math.round(exposureCap * 100)) break;
+    // Anders als der Rahmen betrifft die Grenze je Spiel nur dieses eine Spiel - eine Wette
+    // weiter unten auf einem anderen Spiel darf deshalb noch nachrücken.
+    const gameTotal = perGame.get(candidate.fixtureId) ?? 0;
+    if (Math.round((gameTotal + stake) * 100) > Math.round(gameLimit * 100)) {
+      overGameLimit += 1;
+      continue;
+    }
     kept.add(candidate);
     stakes.set(candidate, stake);
+    perGame.set(candidate.fixtureId, gameTotal + stake);
     total += stake;
   }
 
   return {
     // Die Güte entscheidet, wer bleibt - die Reihenfolge der Liste bleibt die des Dashboards.
-    candidates: candidates.filter((candidate) => kept.has(candidate)).map((candidate) => ({
-      ...candidate,
-      stake: stakes.get(candidate)!,
-      stakePercent: settings.budget > 0 ? stakes.get(candidate)! / settings.budget : candidate.stakePercent
-    })),
-    dropped: candidates.length - kept.size
+    candidates: candidates.filter((candidate) => kept.has(candidate)).map((candidate) => {
+      const stake = stakes.get(candidate)!;
+      // Der Anteil, auf den die Grenze je Spiel den Einsatz gedrückt hat, gemessen am Betrag
+      // davor - nach einem Anheben auf den Mindesteinsatz oft wieder 100 %.
+      const beforeGameLimit = candidate.stake / candidate.gameScaleFactor;
+      return {
+        ...candidate,
+        stake,
+        stakePercent: settings.budget > 0 ? stake / settings.budget : candidate.stakePercent,
+        gameScaleFactor: beforeGameLimit > 0 ? Math.min(1, stake / beforeGameLimit) : 1
+      };
+    }),
+    dropped: candidates.length - kept.size - overGameLimit,
+    overGameLimit
   };
+}
+
+/** Die Grenze je Spiel, nachgerechnet an den Endbeträgen nach dem Mindesteinsatz. */
+function finalGameLimits(games: GameRiskLimit[], candidates: KellyCandidate[]): GameRiskLimit[] {
+  const finalStake = new Map<number, number>();
+  for (const candidate of candidates) {
+    finalStake.set(candidate.fixtureId, (finalStake.get(candidate.fixtureId) ?? 0) + candidate.stake);
+  }
+  return games.map((game) => {
+    // Ein Spiel ohne verbliebene Wette hat keinen Endbetrag; sein Eintrag bleibt, wie die Grenze
+    // je Spiel ihn gerechnet hat.
+    const stakeAfter = finalStake.get(game.fixtureId);
+    if (stakeAfter === undefined) return game;
+    return { ...game, stakeAfter, scaleFactor: game.stakeBefore > 0 ? stakeAfter / game.stakeBefore : 1 };
+  });
+}
+
+export interface KellyOptions {
+  /**
+   * Zeitpunkt der Auswahl in Millisekunden. Gesetzt fallen Spiele mit Anstoß bis dahin heraus:
+   * Ihre Quote stammt von vor dem Anpfiff und gilt im laufenden Spiel nicht mehr. Die App gibt
+   * ihn immer mit (sonst landeten mit „Laufende / beendete Partien“ angepfiffene Spiele in der
+   * Auswahl), die Nachspielung den Zeitpunkt des Snapshots.
+   */
+  now?: number;
 }
 
 export function computeKellyCandidates(
   fixtures: DashboardFixture[],
   marketFilter: "all" | DashboardMarketKey,
   settings: KellySettings,
-  profile: MarketProfile | null = null
+  profile: MarketProfile | null = null,
+  options: KellyOptions = {}
 ): {
   candidates: KellyCandidate[];
   evaluated: number;
@@ -435,9 +512,10 @@ export function computeKellyCandidates(
   filtered: KellyFilterReport;
 } {
   const candidates: KellyCandidate[] = [];
-  const filtered: KellyFilterReport = { crossLeague: 0, overMaxEdge: 0, belowMinStake: 0 };
+  const filtered: KellyFilterReport = { crossLeague: 0, overMaxEdge: 0, belowMinStake: 0, overGameLimit: 0 };
   let evaluated = 0;
   for (const fixture of fixtures) {
+    if (options.now !== undefined && Date.parse(fixture.kickoff) <= options.now) continue;
     const markets = marketFilter === "all" ? fixture.markets : fixture.markets.filter((market) => market.key === marketFilter);
     if (markets.length === 0) continue;
     evaluated += 1;
@@ -458,8 +536,15 @@ export function computeKellyCandidates(
   // Auswahl eingehalten, eine nachgelagerte Skalierung würde ihn wieder unterschreiten.
   const floored = applyStakeFloor(limited.candidates, settings);
   filtered.belowMinStake = floored.dropped;
+  filtered.overGameLimit = floored.overGameLimit;
   if (settings.minStake > 0) {
-    return { candidates: floored.candidates, evaluated, scaleFactor: 1, gameRiskLimits: limited.games, filtered };
+    return {
+      candidates: floored.candidates,
+      evaluated,
+      scaleFactor: 1,
+      gameRiskLimits: finalGameLimits(limited.games, floored.candidates),
+      filtered
+    };
   }
 
   const totalStake = limited.candidates.reduce((sum, candidate) => sum + candidate.stake, 0);
@@ -511,11 +596,12 @@ export function selectKelly(
   marketFilter: "all" | DashboardMarketKey,
   settings: KellySettings,
   auto: boolean,
-  profile: MarketProfile | null
+  profile: MarketProfile | null,
+  options: KellyOptions = {}
 ): KellySelection {
   const automatic = auto && profile !== null;
   const effectiveSettings = automatic ? recommendedSettings(settings) : settings;
-  const result = computeKellyCandidates(fixtures, marketFilter, effectiveSettings, automatic ? profile : null);
+  const result = computeKellyCandidates(fixtures, marketFilter, effectiveSettings, automatic ? profile : null, options);
   return {
     automatic,
     effectiveSettings,
@@ -681,6 +767,11 @@ const AUTO_STORAGE_KEY = "football-analyzer:kelly-auto";
  * Diese Entscheidungen trifft in der Automatik `autoDecide` anhand der Historie, und ein
  * zusaetzlicher Regler wuerde nur unbemerkt gegen die Korrektur arbeiten.
  *
+ * Ausnahme seit 06.10.2026 (Davids Entscheidung): Die **Marktabwahl** bleibt beim Nutzer. Welche
+ * Wettarten er ueberhaupt spielen will, ist keine Messgroesse. Bis dahin raeumte die Automatik
+ * sie ab - die Entscheidung vom 10.09.2026, Gegenmaerkte abzuwaehlen, war darin gar nicht
+ * umsetzbar, und der Export vom selben Tag bestand ganz aus Gegenmaerkten.
+ *
  * `allowMultipleMarketsPerGame` gehoert zur zweiten Gruppe, auch wenn es wie ein Risikoregler
  * aussieht: Ob mehrere Maerkte derselben Partie zugleich gespielt werden, ist eine Frage der
  * Auswahl. Mehrere Positionen auf eine Partie sind korreliert - ueber die vier Laeufe bis zum
@@ -701,23 +792,23 @@ export function recommendedSettings(base: KellySettings): KellySettings {
     minEdge: 0,
     maxEdge: null,
     minConfidence: 0,
-    disabledMarkets: [],
     excludeCrossLeague: true,
     allowMultipleMarketsPerGame: false
   };
 }
 
 /**
- * Erwarteter Ertrag der Liste auf Basis der korrigierten Wahrscheinlichkeiten.
+ * Was die Liste auf Dauer einbringt: der Ertrag zur fairen Tipico-Chance, also ohne Aufschlag.
  *
- * Bewusst ohne die Modellwahrscheinlichkeit gerechnet: Ueber die 133 gesetzten Wetten
- * versprach sie 51,8 % Treffer, eingetreten sind 41,3 %.
+ * Bis 06.10.2026 stand hier die korrigierte Modellchance. Sie versprach rund +10 % des Einsatzes;
+ * nachgespielt über 947 Wetten traten -5,7 ± 4,1 % ein, und die Treffer lagen genau auf dem
+ * fairen Preis (42,8 % gegen 42,8 %). Die Auswahl sucht die Ausrutscher des Modells, deshalb
+ * liegt jede Modellchance auf den gewählten Zeilen zu hoch. Der faire Preis ist die einzige
+ * gemessen passende Schätzung - und er ergibt um den Aufschlag weniger als den Einsatz.
  */
 export function expectedValueOf(candidates: KellyCandidate[]): number {
-  return candidates.reduce((sum, candidate) => {
-    const probability = candidate.calibratedProbability ?? candidate.probability;
-    return sum + candidate.stake * (probability * candidate.odds - 1);
-  }, 0);
+  return candidates.reduce((sum, candidate) =>
+    sum + candidate.stake * (candidate.fairProbability * candidate.odds - 1), 0);
 }
 
 export function loadKellyAuto(): boolean {

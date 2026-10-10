@@ -10,7 +10,7 @@ type QuickpickSettingKey = QuickpickSettings extends infer S
   : never;
 
 /**
- * Die Regler der Schublade „Strenge", je Voreinstellung.
+ * Die Regler unter „Werte anpassen“ in der Karte Stufe, je Voreinstellung.
  *
  * Sie liegen im Frontend und nicht bei der Regel: Grenzen, Schrittweite und Beschriftung sind
  * Darstellung. Was ein Wert *bewirkt*, steht in `src/quickpick-*.ts`; hier steht nur, wie man
@@ -173,16 +173,36 @@ const REMIS_SCORE: QuickpickParam[] = [
   }
 ];
 
+const MODELL1X2: QuickpickParam[] = [
+  {
+    id: "minWinProbability", label: "Siegchance ab (%)", min: 40, max: 90, step: 1, scale: 100,
+    title: "Wie hoch das Modell die Siegchance der getippten Mannschaft mindestens sehen muss."
+      + " Nur diese Bedingung ändern die Stufen. Unter 50 % stimmen deutlich weniger Tipps."
+  },
+  {
+    id: "maxOdds", label: "Quote bis", min: 1, max: 99, step: 0.05, sliderMax: 4,
+    title: "Höchstquote, ab Werk 2,00. 99 heißt: keine Grenze. Je höher die Quote, desto"
+      + " seltener stimmt der Tipp – ab 2,50 nur noch etwa jeder vierte, auch wenn das Modell"
+      + " sich sicher ist. Dieser Teil kommt vom Buchmacher, nicht vom Modell."
+  },
+  {
+    id: "minOdds", label: "Quote ab", min: 1, max: 3, step: 0.05,
+    title: "Mindestquote. Eine Untergrenze, kein Ziel – für eine Kombi zählt, dass der Tipp"
+      + " durchkommt."
+  }
+];
+
 export const QUICKPICK_PARAMS: Record<QuickpickPresetId, QuickpickParam[]> = {
   daves1x2: DAVES,
   dominanz: DOMINANZ,
   hz15: HZ15,
   remis: REMIS,
-  remisScore: REMIS_SCORE
+  remisScore: REMIS_SCORE,
+  modell1x2: MODELL1X2
 };
 
 /**
- * Die Schalter, die kein Regler sind. Sie stehen in derselben Schublade, weil sie dieselbe
+ * Die Schalter, die kein Regler sind. Sie stehen unter demselben Aufklapper, weil sie dieselbe
  * Frage beantworten - nur eben mit ja oder nein.
  */
 export interface QuickpickToggle {
@@ -204,7 +224,8 @@ export const QUICKPICK_TOGGLES: Record<QuickpickPresetId, QuickpickToggle[]> = {
   }],
   hz15: [],
   remis: [],
-  remisScore: []
+  remisScore: [],
+  modell1x2: []
 };
 
 /** Anzeigewert eines Reglers: Wahrscheinlichkeiten stehen im Modell als 0 bis 1. */

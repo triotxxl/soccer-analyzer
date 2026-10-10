@@ -319,6 +319,11 @@ export const HZ15_PRESET: QuickpickPreset<Hz15QuickpickSettings> = {
     + " größere Teil davon kommt aus der Quotengrenze, also aus der Meinung des Buchmachers –"
     + " das Modell steuert nur wenig bei. Und für Kombis bleibt es schwierig: Ein Schein mit"
     + " vier Spielen geht in 7 von 100 Fällen durch, mit sechs Spielen in 1 bis 2 von 100.",
+  // „Rechne nicht mit Gewinn" trotz +6,8 % bei Streng (Davids Entscheidung vom 10.10.2026): Die
+  // Schwellen wurden an denselben Daten gesucht, die zweite Zeithälfte liegt auf allen Stufen
+  // unter der ersten, und die Vorgabe misst −2,2 %.
+  warnung: "Die Treffer kommen vor allem aus der Quotengrenze, das Modell trägt wenig bei."
+    + " Rechne nicht mit Gewinn.",
   wettschein: {
     hinweis: "Legt jedes gefundene Spiel als „1. Halbzeit über 1,5 Tore“ in den Wettschein."
       + " Ein Sieger-Tipp zum selben Spiel bleibt daneben bestehen."

@@ -46,7 +46,7 @@ die Messung still.
 | Budget | **100,00 je Lauf, fest** | *Kein* Reinvestieren während der Messung — siehe unten |
 | Kelly-Fraktion | **1/4** | Bei voller Fraktion säßen 155 von 158 Wetten am Höchsteinsatz — das wäre flaches Setzen mit Kelly-Etikett, nicht Kelly |
 | Höchsteinsatz je Wette | **2 %** | |
-| **Einsatzrahmen** | **0,70** | bestimmt die **Stückzahl**: `0,70 / 0,02 = 35 Plätze` bei rund 30 Kandidaten je Lauf |
+| **Einsatzrahmen** | **0,70** | bestimmt die **Stückzahl**: `0,70 / 0,02 = 35 Plätze`; gemessen am 06.10.2026 im Median 12 angenommene Wetten je Analyse, am Wochenende bis rund 50 |
 | Mindesteinsatz | **1,00** | jede protokollierte Wette soll eine sein, die real setzbar wäre |
 | Höchstens … Wetten | **leer** | kein zusätzlicher Deckel |
 
@@ -85,6 +85,14 @@ jederzeit nachrechnen — die Messung dagegen nicht reparieren.
 > 2. **ROI über +5 %**
 > 3. `npm run edge-report -- --simulate` ist **ohne den Remis-Markt** an allen drei
 >    Trennstellen positiv
+>
+> **Übertragung der dritten Bedingung (06.10.2026):** `--simulate` misst seit diesem Tag die
+> Regel der App (Nachspielung je Snapshot) statt eines festen Halbzeit-Profils an drei
+> Trennstellen; die Trennstellen gibt es nicht mehr. Die Bedingung lautet seitdem: In der
+> Nachspielung, Rahmen „Testbetrieb“, ist der flache ROI **ohne Remis insgesamt und in beiden
+> Zeithälften positiv**. Das ist nicht schwächer als vorher - drei verschachtelte Prüfmengen
+> waren keine drei Bestätigungen. Stand 06.10.2026: ohne Remis −12,0 ± 4,4 % über 522 Wetten,
+> klar verfehlt.
 
 Zur dritten Bedingung: Der gesamte bisher gemessene Vorsprung der Automatik hängt am
 Remis-Markt. Ohne ihn steht sie out of sample bei **−8,5 bis −9,8 %** (Stand 21.09.2026, drei
@@ -119,14 +127,14 @@ fallen je Lauf eher 25–30 Wetten an statt 40, eine Laufzählung liefe aus dem 
 
 ### Checkliste der Neukalibrierungsprüfung
 
-1. `npm run edge-report -- --simulate` — alle drei Trennstellen, **mit Fehlerbalken** und der
-   Spalte „ohne Remis". Die Schlagzeile ohne Streuung ist wertlos.
+1. `npm run edge-report -- --simulate` — die Nachspielung der App-Regel, **mit Fehlerbalken**,
+   der Zeile „ohne Remis“ und „Treffer − fair“. Die Schlagzeile ohne Streuung ist wertlos.
 2. **Die Entscheidungsschwelle oben prüfen.** Nicht aufweichen.
-3. **Ablehnungsregister lesen:** Tragen die Gegenmärkte inzwischen eigene Bänder im
-   *Trainings*profil statt der Spiegelung? Erst dann lohnt es, die am 15.09.2026 verworfene
-   Ablehnung nach Bandverdikt erneut zu prüfen — vorher hätte sie dort keine Angriffsfläche.
-4. **Zeilen ohne eigenen Modellvorteil:** Solange dort 0 steht, ist `minRawEdge` im Backtest
-   weiterhin unmessbar und steht allein auf dem Argument der Messgrundlage.
+3. **Ablehnungsregister lesen:** Die Spiegelung der Gegenmärkte ist seit 06.10.2026 entfernt;
+   alle Märkte tragen eigene Bänder. Die am 15.09.2026 verworfene Ablehnung nach Bandverdikt nur
+   erneut prüfen, wenn das Register uneinheitliche Zellen zeigt.
+4. **`minRawEdge`** ist auch in der Nachspielung nicht als Ertrag messbar und steht allein auf
+   dem Argument der Messgrundlage.
 5. **Je Markt vergleichen:** Trennt die Regel inzwischen die tragenden Märkte (Über 2,5, BTTS)
    von den leckenden (1. HZ Über, 1X2)? Das ist die Frage, für die dieser Betrieb läuft.
 6. Zählerstand der laufenden Modellfassung in „stärkere Liga gewinnt“ (Gruppe „gemessen“,

@@ -13,17 +13,26 @@
  * Selbstüberschätzung senkt. Deshalb weist der Report jede Kennzahl zusätzlich getrennt nach
  * erster und zweiter Zeithälfte aus - was nur in einer Hälfte funktioniert, ist gefittet.
  *
- * Aufruf: node --env-file-if-exists=.env tools/edge-report.ts [--json <datei>]
+ * Mit `--simulate` folgt die Nachspielung der Kelly-Automatik: für jeden Snapshot genau die
+ * Regel der App (`selectKelly`), gemessen gegen den fairen Tipico-Preis. `--mit-1x2` lässt
+ * dabei 1X2 zu, das ab Werk abgewählt ist. Kein API-Aufruf.
+ *
+ * Aufruf: node --env-file-if-exists=.env tools/edge-report.ts [--json <datei>] [--simulate [--mit-1x2]]
  */
 import fs from "node:fs";
 import path from "node:path";
-import { buildObservations, type EdgeObservation as Observation } from "../src/market-profile-service.ts";
+import { pathToFileURL } from "node:url";
+import { ROOT_DIR } from "../src/config.ts";
+import type { DashboardFixture } from "../src/dashboard.ts";
+import { decideMarket } from "../src/market-outcome.ts";
+import { buildObservations, readOutcomes, type EdgeObservation as Observation } from "../src/market-profile-service.ts";
 import {
   MINIMUM_MARKET_SAMPLE,
-  autoDecide,
   buildMarketProfile,
   type MarketProfile
 } from "../src/market-profile.ts";
+
+const OUTPUT_DIR = path.join(ROOT_DIR, "output");
 
 interface Metrics {
   n: number;
@@ -56,6 +65,37 @@ function metricsOf(group: Observation[]): Metrics | null {
 const percent = (value: number, digits = 1) => `${(value * 100).toFixed(digits).replace(".", ",")} %`;
 const points = (value: number) => `${(value * 100).toFixed(1).replace(".", ",")} PP`;
 
+/**
+ * Flat-ROI mit Standardfehler.
+ *
+ * Ohne die Streuung ist ein ROI auf diesen Stichproben nicht lesbar: Bei 557 Prüfwetten liegt
+ * der Standardfehler bei rund 5 Prozentpunkten, ein Abstand von 8 PP zwischen zwei Regeln ist
+ * also etwa ein Sigma und trägt keine Entscheidung. Gerechnet wird über die empirische
+ * Streuung der Einzelergebnisse statt über eine Näherung aus der mittleren Quote, weil die
+ * Quoten innerhalb einer Auswahl weit auseinanderliegen.
+ */
+function flatRoiOf(entries: Observation[]): { n: number; roi: number; se: number } | null {
+  const n = entries.length;
+  if (n === 0) return null;
+  const profits = entries.map((entry) => (entry.hit ? entry.odds - 1 : -1));
+  const roi = profits.reduce((sum, value) => sum + value, 0) / n;
+  if (n < 2) return { n, roi, se: Number.POSITIVE_INFINITY };
+  const variance = profits.reduce((sum, value) => sum + (value - roi) ** 2, 0) / (n - 1);
+  return { n, roi, se: Math.sqrt(variance / n) };
+}
+
+const signedPercent = (value: number) =>
+  `${value >= 0 ? "+" : "−"}${(Math.abs(value) * 100).toFixed(1).replace(".", ",")}`;
+
+/** "+3,2 ± 4,8 %" - der ROI immer zusammen mit dem, was er aushält. */
+const roiWithError = (entries: Observation[]): string => {
+  const stats = flatRoiOf(entries);
+  if (stats === null) return "-";
+  const error = Number.isFinite(stats.se) ? (stats.se * 100).toFixed(1).replace(".", ",") : "∞";
+  return `${signedPercent(stats.roi)} ± ${error} %`;
+};
+
+
 function printTable(title: string, groups: Array<[string, Observation[]]>, firstHalf: Set<Observation>) {
   console.log(`\n${title}`);
   console.log(`  ${"Gruppe".padEnd(22)}${"n".padStart(6)}${"Prognose".padStart(11)}${"ist".padStart(9)}${"Bias".padStart(11)}${"ROI".padStart(10)}${"ROI 1.H".padStart(10)}${"ROI 2.H".padStart(10)}`);
@@ -81,7 +121,9 @@ console.log(`Abgerechnete Marktbeobachtungen: ${observations.length}`);
 console.log(`Davon durch den Picker-Filter (Edge >= ${points(minEdge)}, Quote >= ${minOdds}): ${selected.length}`);
 const overall = metricsOf(selected);
 if (overall !== null) {
-  console.log(`Gesamt: Prognose ${percent(overall.predicted)} · eingetreten ${percent(overall.hitRate)} · Bias ${points(overall.bias)} · flat-ROI ${percent(overall.roi)} (±${percent(overall.confidenceInterval)})`);
+  // Neben dem ROI sein eigener Standardfehler - bis 06.10.2026 stand hier das 95-%-Intervall der
+  // Trefferquote, das mit dem ROI nichts zu tun hat.
+  console.log(`Gesamt: Prognose ${percent(overall.predicted)} · eingetreten ${percent(overall.hitRate)} · Bias ${points(overall.bias)} · flat-ROI ${roiWithError(selected)}`);
 }
 
 const groupBy = (entries: Observation[], key: (entry: Observation) => string): Array<[string, Observation[]]> => {
@@ -135,84 +177,9 @@ if (jsonIndex !== -1 && process.argv[jsonIndex + 1] !== undefined) {
   console.log(`\nJSON geschrieben: ${target}`);
 }
 
-/**
- * Flat-ROI mit Standardfehler.
- *
- * Ohne die Streuung ist ein ROI auf diesen Stichproben nicht lesbar: Bei 557 Prüfwetten liegt
- * der Standardfehler bei rund 5 Prozentpunkten, ein Abstand von 8 PP zwischen zwei Regeln ist
- * also etwa ein Sigma und trägt keine Entscheidung. Gerechnet wird über die empirische
- * Streuung der Einzelergebnisse statt über eine Näherung aus der mittleren Quote, weil die
- * Quoten innerhalb einer Auswahl weit auseinanderliegen.
- */
-function flatRoiOf(entries: Observation[]): { n: number; roi: number; se: number } | null {
-  const n = entries.length;
-  if (n === 0) return null;
-  const profits = entries.map((entry) => (entry.hit ? entry.odds - 1 : -1));
-  const roi = profits.reduce((sum, value) => sum + value, 0) / n;
-  if (n < 2) return { n, roi, se: Number.POSITIVE_INFINITY };
-  const variance = profits.reduce((sum, value) => sum + (value - roi) ** 2, 0) / (n - 1);
-  return { n, roi, se: Math.sqrt(variance / n) };
-}
-
-const signedPercent = (value: number) =>
-  `${value >= 0 ? "+" : "−"}${(Math.abs(value) * 100).toFixed(1).replace(".", ",")}`;
-
-/** "+3,2 ± 4,8 %" - der ROI immer zusammen mit dem, was er aushält. */
-const roiWithError = (entries: Observation[]): string => {
-  const stats = flatRoiOf(entries);
-  if (stats === null) return "-";
-  const error = Number.isFinite(stats.se) ? (stats.se * 100).toFixed(1).replace(".", ",") : "∞";
-  return `${signedPercent(stats.roi)} ± ${error} %`;
-};
-
-/**
- * Vergleicht zwei Auswahlregeln nur auf den Zeilen, in denen sie sich unterscheiden.
- *
- * Zwei unabhängig verrauschte Gesamt-ROIs gegeneinanderzustellen verschenkt Genauigkeit: Die
- * Zeilen, die beide Regeln nehmen, tragen zu beiden Seiten dasselbe Rauschen bei und sagen
- * über den Unterschied nichts. Übrig bleibt die symmetrische Differenz - und erst deren
- * Abstand, gemessen am gemeinsamen Standardfehler, beantwortet die Frage, ob eine
- * Regeländerung etwas bewirkt hat.
- */
-function printPairedComparison(
-  holdout: Observation[],
-  left: { name: string; rule: (entry: Observation) => boolean },
-  right: { name: string; rule: (entry: Observation) => boolean }
-): void {
-  const shared = holdout.filter((entry) => left.rule(entry) && right.rule(entry));
-  const onlyLeft = holdout.filter((entry) => left.rule(entry) && !right.rule(entry));
-  const onlyRight = holdout.filter((entry) => right.rule(entry) && !left.rule(entry));
-
-  console.log(`\n  Gepaarter Vergleich ${left.name} gegen ${right.name}:`);
-  console.log(`  ${"gemeinsame Zeilen".padEnd(30)}${String(shared.length).padStart(7)}`
-    + `${roiWithError(shared).padStart(18)}   (zählt für den Unterschied nicht)`);
-  console.log(`  ${`nur ${left.name}`.padEnd(30)}${String(onlyLeft.length).padStart(7)}${roiWithError(onlyLeft).padStart(18)}`);
-  console.log(`  ${`nur ${right.name}`.padEnd(30)}${String(onlyRight.length).padStart(7)}${roiWithError(onlyRight).padStart(18)}`);
-
-  const a = flatRoiOf(onlyLeft);
-  const b = flatRoiOf(onlyRight);
-  if (a === null || b === null || !Number.isFinite(a.se) || !Number.isFinite(b.se)) {
-    console.log("  Unterschied: nicht bestimmbar, eine Seite ist leer oder hat nur eine Zeile.");
-    return;
-  }
-  const difference = b.roi - a.roi;
-  const combined = Math.sqrt(a.se ** 2 + b.se ** 2);
-  const sigma = combined === 0 ? 0 : difference / combined;
-  console.log(`  Unterschied ${signedPercent(difference)} ± ${(combined * 100).toFixed(1).replace(".", ",")} %`
-    + ` = ${sigma.toFixed(2).replace(".", ",")} Sigma`
-    + (Math.abs(sigma) < 1 ? "  → im Rauschen, kein messbarer Effekt" : ""));
-}
-
-/**
- * Das Ablehnungsregister: jede Zelle aus Markt und Vorteilsband, wie das Profil sie sieht.
- *
- * Es beantwortet die Frage, ob eine Ablehnung nach Bandverdikt eine Regel ist oder eine
- * umständlich geschriebene Marktsperre: Sind die "meiden"-Zellen genau zwei Märkte, ist es
- * letzteres. Und es zeigt, wie viele Zellen überhaupt genug Fälle in beiden Zeithälften
- * haben, um je ein Verdikt tragen zu können.
- */
+/** Das heutige Profil über alle Daten - für das Ablehnungsregister. */
 function printCellLedger(profile: MarketProfile): void {
-  console.log("\n  Ablehnungsregister des Trainingsprofils (Markt × Vorteilsband):");
+  console.log("\nAblehnungsregister des heutigen Profils (Markt × Vorteilsband):");
   console.log(`  ${"Markt".padEnd(16)}${"Band".padEnd(11)}${"n".padStart(6)}${"ROI".padStart(10)}`
     + `${"1. H".padStart(10)}${"2. H".padStart(10)}  Verdikt`);
   let decidable = 0;
@@ -224,7 +191,7 @@ function printCellLedger(profile: MarketProfile): void {
       if (n >= MINIMUM_MARKET_SAMPLE && first !== null && second !== null) decidable += 1;
       if (bandEntry.verdict === "meiden") { avoid += 1; avoidedMarkets.add(market.marketLabel); }
       console.log(`  ${market.marketLabel.padEnd(16)}${bandEntry.label.padEnd(11)}${String(n).padStart(6)}`
-        + `${(roi === null ? "-" : signedPercent(roi)).padStart(10)}`
+        + `${signedPercent(roi).padStart(10)}`
         + `${(first === null ? "-" : signedPercent(first)).padStart(10)}`
         + `${(second === null ? "-" : signedPercent(second)).padStart(10)}  ${bandEntry.verdict}`);
     }
@@ -233,149 +200,205 @@ function printCellLedger(profile: MarketProfile): void {
     + ` beide Hälften belegt): ${decidable}`);
   console.log(`  Davon "meiden": ${avoid} in ${avoidedMarkets.size} Märkten`
     + (avoidedMarkets.size === 0 ? "" : ` (${[...avoidedMarkets].join(", ")})`));
-
-  const derived = profile.markets.filter((market) => market.derivedFrom !== undefined);
-  console.log(`  Noch gespiegelte Märkte im Trainingsprofil: ${derived.length === 0
-    ? "keine - alle tragen eigene Messwerte"
-    : derived.map((market) => `${market.marketLabel} ← ${market.derivedFrom}`).join(", ")}`);
 }
 
 /**
- * Rückrechnung der Automatik: Trägt die korrigierte Auswahl auf Daten, die sie nie gesehen hat?
+ * Nachspielung der App-Regel (seit 06.10.2026, Befund der drei Prüfer-Agenten).
  *
- * Die Kalibrierung wird ausschließlich aus der ersten Zeithälfte gebildet und auf die zweite
- * angewendet. Eine Korrektur, die aus denselben Zeilen stammt, an denen sie gemessen wird,
- * sieht immer gut aus - deshalb ist allein die Spalte "2. Hälfte" die Antwort auf die Frage,
- * ob die Automatik ausgeliefert werden darf.
+ * Bis dahin bildete `--simulate` ein festes Profil aus der ersten Zeithälfte und zählte jede
+ * angenommene Marktzeile - mehrere je Spiel, ohne Einsatzrahmen, mit flachen Einsätzen. Das
+ * war nicht die Regel der App, und die drei Trennstellen hatten verschachtelte Prüfmengen. Jetzt
+ * läuft für jeden datierten Snapshot genau das, was die App zu diesem Zeitpunkt getan hätte:
+ *
+ * - Profil nur aus Spielen, die vor dem Snapshot abgerechnet waren (`settledAt`),
+ * - Umfang „nächste 48 Std.“ ab dem Snapshot,
+ * - `selectKelly` aus `frontend/src/kelly.ts` mit Automatik und `now` = Snapshot,
+ * - je Spiel die erste Sichtung, abgerechnet mit `decideMarket`,
+ * - gemessen gegen den fairen Tipico-Preis (`src/fair-price.ts`).
+ *
+ * Die Kernfrage ist die Spalte „Treffer − fair“: Liegt sie bei null, weiß das Modell nichts,
+ * was nicht schon in der Quote steht, und auf Dauer kostet jede Wette den Aufschlag.
  */
-if (process.argv.includes("--simulate")) {
-  const playable = observations.filter((entry) => entry.edge > 0);
-  const kickoffs = playable.map((entry) => entry.kickoff).sort();
-  const splitAt = kickoffs[Math.floor(kickoffs.length / 2)]!;
-  const training = playable.filter((entry) => entry.kickoff < splitAt);
-  const holdout = playable.filter((entry) => entry.kickoff >= splitAt);
-  const profile = buildMarketProfile(training);
-
-  const hitRate = (entries: Observation[]): string => entries.length === 0
-    ? "  -"
-    : percent(entries.reduce((sum, entry) => sum + entry.hit, 0) / entries.length);
-
-  // Die heutige Vorgabe als Vergleichslinie, damit der Gewinn nicht gegen nichts gemessen wird.
-  const currentRule = (entry: Observation): boolean =>
-    entry.odds >= 1.5 && entry.edge >= 0.02 && entry.edge <= 0.12
-    && entry.marketKey !== "1x2" && !entry.crossLeague;
-
-  const autoRule = (entry: Observation): boolean =>
-    autoDecide(profile, {
-      marketKey: entry.marketKey,
-      probability: entry.probability,
-      odds: entry.odds,
-      crossLeague: entry.crossLeague
-    }).accepted;
-
-  console.log("\n\nRückrechnung der Automatik");
-  console.log(`  Kalibriert auf ${training.length} Zeilen vor ${splitAt.slice(0, 10)},`
-    + ` geprüft auf ${holdout.length} Zeilen danach.`);
-  console.log(`  ${"Regel".padEnd(24)}${"Wetten".padStart(8)}${"Treffer".padStart(10)}${"flat-ROI".padStart(18)}`);
-  for (const [name, rule] of [["heutige Vorgabe", currentRule], ["Automatik", autoRule]] as const) {
-    const chosen = holdout.filter(rule);
-    console.log(`  ${name.padEnd(24)}${String(chosen.length).padStart(8)}${hitRate(chosen).padStart(10)}${roiWithError(chosen).padStart(18)}`);
-  }
-
-  printPairedComparison(holdout,
-    { name: "Vorgabe", rule: currentRule },
-    { name: "Automatik", rule: autoRule });
-
-  console.log("\n  Zum Vergleich dieselben Regeln auf der Trainingshälfte - hier hat die Automatik");
-  console.log("  die Antworten gekannt, diese Zeilen sind also kein Beleg:");
-  for (const [name, rule] of [["heutige Vorgabe", currentRule], ["Automatik", autoRule]] as const) {
-    const chosen = training.filter(rule);
-    console.log(`  ${name.padEnd(24)}${String(chosen.length).padStart(8)}${hitRate(chosen).padStart(10)}${roiWithError(chosen).padStart(18)}`);
-  }
-
-  const accepted = holdout.filter(autoRule);
-  console.log("\n  Automatik-Auswahl der Prüfhälfte nach Markt:");
-  console.log(`  ${"Markt".padEnd(24)}${"Wetten".padStart(8)}${"Treffer".padStart(10)}${"flat-ROI".padStart(18)}${"davon Edge <= 0".padStart(17)}`);
-  for (const [label, group] of groupBy(accepted, (entry) => entry.marketLabel)) {
-    const withoutEdge = group.filter((entry) => entry.edge <= 0).length;
-    console.log(`  ${label.padEnd(24)}${String(group.length).padStart(8)}${hitRate(group).padStart(10)}`
-      + `${roiWithError(group).padStart(18)}${String(withoutEdge).padStart(17)}`);
-  }
-
-  // Was eine Untergrenze beim rohen Vorteil kosten würde: Diese Zeilen entstehen heute allein
-  // aus der Korrektur, das Modell selbst sieht dort keinen Vorteil.
-  const withoutRawEdge = accepted.filter((entry) => entry.edge <= 0);
-  console.log(`\n  Angenommene Zeilen ohne eigenen Modellvorteil: ${withoutRawEdge.length}`
-    + ` von ${accepted.length}${withoutRawEdge.length === 0 ? "" : ` · ${roiWithError(withoutRawEdge)}`}`);
-
-  // Eine Wette je Partie - so arbeitet die Automatik seit dem 15.09.2026. Die Frage ist, nach
-  // welchem Maßstab die eine ausgewählt wird. Der Backtest kann das messen, weil er die
-  // Partie-ID kennt; die Einsatzhöhe kann er nicht, er rechnet flach.
-  const perFixture = new Map<number, Observation[]>();
-  for (const entry of accepted) {
-    const group = perFixture.get(entry.fixtureId) ?? [];
-    group.push(entry);
-    perFixture.set(entry.fixtureId, group);
-  }
-  const multi = [...perFixture.values()].filter((group) => group.length > 1);
-  const pickBy = (score: (entry: Observation) => number): Observation[] =>
-    [...perFixture.values()].map((group) =>
-      group.reduce((best, entry) => (score(entry) > score(best) ? entry : best)));
-  const fullKellyOf = (entry: Observation): number => {
-    const calibration = autoDecide(profile, {
-      marketKey: entry.marketKey,
-      probability: entry.probability,
-      odds: entry.odds,
-      crossLeague: entry.crossLeague
-    }).calibration;
-    const probability = calibration?.probability ?? entry.probability;
-    return (probability * entry.odds - 1) / (entry.odds - 1);
-  };
-
-  console.log(`\n  Eine Wette je Partie: ${perFixture.size} Partien, davon ${multi.length}`
-    + " mit mehr als einem angenommenen Markt.");
-  console.log(`  ${"Maßstab".padEnd(30)}${"Wetten".padStart(7)}${"flat-ROI".padStart(18)}`);
-  console.log(`  ${"höchster roher Vorteil".padEnd(30)}${String(perFixture.size).padStart(7)}`
-    + `${roiWithError(pickBy((entry) => entry.edge)).padStart(18)}`);
-  console.log(`  ${"höchster voller Kelly-Wert".padEnd(30)}${String(perFixture.size).padStart(7)}`
-    + `${roiWithError(pickBy(fullKellyOf)).padStart(18)}`);
-
-  printCellLedger(profile);
+interface ReplayBet {
+  fixtureId: number;
+  kickoff: string;
+  marketKey: string;
+  marketLabel: string;
+  odds: number;
+  probability: number;
+  calibrated: number;
+  fair: number;
+  fairSource: "quote" | "geschätzt";
+  stake: number;
+  won: boolean;
 }
 
-/**
- * Belastbarkeitsprobe: Ein einzelner Zeitschnitt kann zufällig günstig liegen. Deshalb
- * dieselbe Rückrechnung an mehreren Trennstellen, und zusätzlich ohne den Markt, der am
- * meisten beigetragen hat - trägt das Ergebnis nur eine Handvoll hoher Quoten, ist es kein
- * Ergebnis, sondern Rauschen.
- */
-if (process.argv.includes("--simulate")) {
-  const playable = observations.filter((entry) => entry.edge > 0);
-  const kickoffs = playable.map((entry) => entry.kickoff).sort();
+interface KellyModule {
+  DEFAULT_KELLY_SETTINGS: Record<string, unknown>;
+  TEST_RUN_SETTINGS: Record<string, unknown>;
+  selectKelly(
+    fixtures: DashboardFixture[],
+    marketFilter: "all",
+    settings: Record<string, unknown>,
+    auto: boolean,
+    profile: MarketProfile | null,
+    options: { now?: number }
+  ): {
+    automatic: boolean;
+    candidates: Array<{
+      fixtureId: number; kickoff: string; marketKey: string; marketLabel: string; selection: string;
+      odds: number; probability: number; calibratedProbability: number | null;
+      fairProbability: number; fairSource: "quote" | "geschätzt"; stake: number;
+    }>;
+  };
+}
 
-  console.log("\n  Dieselbe Prüfung an mehreren Trennstellen:");
-  console.log(`  ${"Schnitt".padEnd(12)}${"Training".padStart(9)}${"Prüfung".padStart(8)}${"Wetten".padStart(7)}`
-    + `${"ROI".padStart(18)}${"ohne Remis".padStart(18)}${"Vorgabe".padStart(18)}`);
-  for (const share of [0.4, 0.5, 0.6]) {
-    const splitAt = kickoffs[Math.floor(kickoffs.length * share)]!;
-    const training = playable.filter((entry) => entry.kickoff < splitAt);
-    const holdout = playable.filter((entry) => entry.kickoff >= splitAt);
-    const profile = buildMarketProfile(training);
-    const chosen = holdout.filter((entry) => autoDecide(profile, {
-      marketKey: entry.marketKey,
-      probability: entry.probability,
-      odds: entry.odds,
-      crossLeague: entry.crossLeague
-    }).accepted);
-    const baseline = holdout.filter((entry) => entry.odds >= 1.5 && entry.edge >= 0.02
-      && entry.edge <= 0.12 && entry.marketKey !== "1x2" && !entry.crossLeague);
-    console.log(`  ${splitAt.slice(0, 10).padEnd(12)}${String(training.length).padStart(9)}${String(holdout.length).padStart(8)}`
-      + `${String(chosen.length).padStart(7)}${roiWithError(chosen).padStart(18)}`
-      + `${roiWithError(chosen.filter((entry) => entry.marketKey !== "draw")).padStart(18)}`
-      + `${roiWithError(baseline).padStart(18)}`);
+const berlinDay = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Berlin" });
+const dayOf = (iso: string): string => berlinDay.format(new Date(iso));
+const fixed = (value: number, digits = 1) => value.toFixed(digits).replace(".", ",");
+const pp = (value: number) => `${value >= 0 ? "+" : "−"}${fixed(Math.abs(value) * 100)}`;
+
+/** Flacher ROI mit Standardfehler, einmal unabhängig, einmal je Berliner Anstoßtag gebündelt. */
+function replayRoi(bets: ReplayBet[]): { roi: number; se: number; seDay: number } {
+  const n = bets.length;
+  const profits = bets.map((bet) => (bet.won ? bet.odds - 1 : -1));
+  const roi = profits.reduce((sum, value) => sum + value, 0) / n;
+  const variance = profits.reduce((sum, value) => sum + (value - roi) ** 2, 0) / Math.max(1, n - 1);
+  const byDay = new Map<string, number>();
+  bets.forEach((bet, index) => byDay.set(dayOf(bet.kickoff), (byDay.get(dayOf(bet.kickoff)) ?? 0) + profits[index]! - roi));
+  const days = byDay.size;
+  const clustered = days > 1
+    ? Math.sqrt([...byDay.values()].reduce((sum, value) => sum + value * value, 0) * days / (days - 1)) / n
+    : Number.POSITIVE_INFINITY;
+  return { roi, se: Math.sqrt(variance / n), seDay: clustered };
+}
+
+function printReplayLine(label: string, bets: ReplayBet[]): void {
+  const n = bets.length;
+  if (n < 2) { console.log(`  ${label.padEnd(26)}${String(n).padStart(6)}  zu wenige Wetten`); return; }
+  const mean = (value: (bet: ReplayBet) => number) => bets.reduce((sum, bet) => sum + value(bet), 0) / n;
+  const hit = mean((bet) => (bet.won ? 1 : 0));
+  const fair = mean((bet) => bet.fair);
+  const seFair = Math.sqrt(bets.reduce((sum, bet) => sum + bet.fair * (1 - bet.fair), 0)) / n;
+  const { roi, se, seDay } = replayRoi(bets);
+  const staked = bets.reduce((sum, bet) => sum + bet.stake, 0);
+  const kellyRoi = staked > 0 ? bets.reduce((sum, bet) => sum + bet.stake * (bet.won ? bet.odds - 1 : -1), 0) / staked : 0;
+  console.log(`  ${label.padEnd(26)}${String(n).padStart(6)}`
+    + `${`${fixed(hit * 100)} %`.padStart(9)}${`${fixed(mean((bet) => bet.probability) * 100)} %`.padStart(9)}`
+    + `${`${fixed(mean((bet) => bet.calibrated) * 100)} %`.padStart(9)}${`${fixed(fair * 100)} %`.padStart(9)}`
+    + `${`${pp(hit - fair)} ± ${fixed(seFair * 100)}`.padStart(15)}`
+    + `${`${pp(roi)} ± ${fixed(se * 100)} %`.padStart(17)}${`(Tag ± ${Number.isFinite(seDay) ? fixed(seDay * 100) : "∞"})`.padStart(14)}`
+    + `${`${pp(kellyRoi)} %`.padStart(10)}`);
+}
+
+async function simulate(): Promise<void> {
+  const kellyUrl = pathToFileURL(path.join(ROOT_DIR, "frontend", "src", "kelly.ts")).href;
+  const kelly = await import(kellyUrl) as KellyModule;
+  const outcomes = readOutcomes();
+  const withOneXTwo = process.argv.includes("--mit-1x2");
+
+  const snapshots = fs.readdirSync(OUTPUT_DIR)
+    .filter((file) => /^dashboard-\d{4}-\d{2}-\d{2}.*\.json$/.test(file))
+    .map((file) => {
+      try {
+        const parsed = JSON.parse(fs.readFileSync(path.join(OUTPUT_DIR, file), "utf8")) as
+          { meta?: { createdAt?: string }; fixtures?: DashboardFixture[] };
+        return { t: Date.parse(parsed.meta?.createdAt ?? ""), fixtures: parsed.fixtures ?? [] };
+      } catch {
+        return { t: Number.NaN, fixtures: [] };
+      }
+    })
+    .filter((snapshot) => Number.isFinite(snapshot.t))
+    .sort((left, right) => left.t - right.t);
+
+  // Die Einstellungen der App: ab Werk, Testbetrieb, und ein Rahmen, der nichts abschneidet.
+  // Die Marktabwahl ab Werk (1X2 aus) gilt seit 06.10.2026 auch in der Automatik.
+  const defaults = { ...kelly.DEFAULT_KELLY_SETTINGS, ...(withOneXTwo ? { disabledMarkets: [] } : {}) };
+  const frames: Array<[string, Record<string, unknown>]> = [
+    ["ohne Rahmen", { ...defaults, maxStakePercent: 1, maxExposurePercent: 1e9, minStake: 0, enableGameRiskLimit: false }],
+    ["Testbetrieb", { ...defaults, ...kelly.TEST_RUN_SETTINGS }],
+    ["Vorgabe", defaults]
+  ];
+  const firstSeen = frames.map(() => new Map<number, ReplayBet & { runAt: number }>());
+  const perRun = frames.map(() => [] as number[]);
+
+  let runs = 0;
+  for (const snapshot of snapshots) {
+    const known = observations.filter((entry) => Date.parse(entry.settledAt) < snapshot.t);
+    if (known.length < 100) continue;
+    runs += 1;
+    const profile = buildMarketProfile(known, new Date(snapshot.t));
+    const scope = snapshot.fixtures.filter((fixture) => {
+      const kickoff = Date.parse(fixture.kickoff);
+      return kickoff > snapshot.t && kickoff <= snapshot.t + 48 * 3_600_000;
+    });
+    frames.forEach(([, settings], index) => {
+      const selection = kelly.selectKelly(scope, "all", settings, true, profile, { now: snapshot.t });
+      if (!selection.automatic) return;
+      perRun[index]!.push(selection.candidates.length);
+      for (const candidate of selection.candidates) {
+        if (firstSeen[index]!.has(candidate.fixtureId)) continue;
+        const outcome = outcomes.get(candidate.fixtureId);
+        const won = outcome === undefined ? null : decideMarket(candidate.marketKey, candidate.selection, outcome);
+        if (won === null) continue;
+        firstSeen[index]!.set(candidate.fixtureId, {
+          runAt: snapshot.t,
+          fixtureId: candidate.fixtureId,
+          kickoff: candidate.kickoff,
+          marketKey: candidate.marketKey,
+          marketLabel: candidate.marketLabel,
+          odds: candidate.odds,
+          probability: candidate.probability,
+          calibrated: candidate.calibratedProbability ?? candidate.probability,
+          fair: candidate.fairProbability,
+          fairSource: candidate.fairSource,
+          stake: candidate.stake,
+          won
+        });
+      }
+    });
   }
-  console.log("\n  Lesehinweis: Wechselt der ROI zwischen den Trennstellen das Vorzeichen oder hängt er");
-  console.log("  ganz am Remis, ist die Automatik nicht belegt - dann ist sie bestenfalls die weniger");
-  console.log("  verlustreiche Auswahl, nicht eine gewinnbringende. Die Spalte \"ohne Remis\" ist die");
-  console.log("  eigentliche Frage; liegt ein Unterschied innerhalb des ±-Bereichs, ist er keiner.");
+
+  console.log("\n\nNachspielung der Kelly-Automatik (App-Regel je Snapshot, erste Sichtung je Spiel)");
+  console.log(`  ${runs} Snapshots mit Profil, Abrechnung nach echtem settled_at`
+    + (withOneXTwo ? ", 1X2 zugelassen (--mit-1x2)" : ", Marktabwahl ab Werk (1X2 aus)"));
+  const header = `  ${"".padEnd(26)}${"Wetten".padStart(6)}${"Treffer".padStart(9)}${"Modell".padStart(9)}`
+    + `${"korr.".padStart(9)}${"fair".padStart(9)}${"Treffer−fair".padStart(15)}${"flacher ROI".padStart(17)}`
+    + `${"".padStart(14)}${"Kelly-ROI".padStart(10)}`;
+
+  frames.forEach(([name], index) => {
+    const bets = [...firstSeen[index]!.values()].sort((left, right) => Date.parse(left.kickoff) - Date.parse(right.kickoff));
+    if (bets.length === 0) { console.log(`\n  ${name}: keine Wetten`); return; }
+    const kickoffs = bets.map((bet) => Date.parse(bet.kickoff));
+    const middle = kickoffs[Math.floor(kickoffs.length / 2)]!;
+    console.log(`\n  Rahmen „${name}“`);
+    console.log(header);
+    printReplayLine("alle", bets);
+    printReplayLine("ohne Remis", bets.filter((bet) => bet.marketKey !== "draw"));
+    printReplayLine(`Anstoß vor ${new Date(middle).toISOString().slice(0, 10)}`, bets.filter((bet) => Date.parse(bet.kickoff) < middle));
+    printReplayLine("Anstoß danach", bets.filter((bet) => Date.parse(bet.kickoff) >= middle));
+    printReplayLine("fair aus echter Gegenquote", bets.filter((bet) => bet.fairSource === "quote"));
+    const byMarket = new Map<string, ReplayBet[]>();
+    for (const bet of bets) byMarket.set(bet.marketLabel, [...(byMarket.get(bet.marketLabel) ?? []), bet]);
+    for (const [label, group] of [...byMarket].sort((left, right) => right[1].length - left[1].length)) {
+      printReplayLine(`  ${label}`, group);
+    }
+    const perDay = new Map<string, number>();
+    for (const bet of bets) perDay.set(dayOf(bet.kickoff), (perDay.get(dayOf(bet.kickoff)) ?? 0) + 1);
+    const days = [...perDay.values()].sort((left, right) => left - right);
+    const runsSorted = [...perRun[index]!].sort((left, right) => left - right);
+    console.log(`  Wetten je Anstoßtag: Median ${days[Math.floor(days.length / 2)]}, Mittel`
+      + ` ${fixed(days.reduce((sum, value) => sum + value, 0) / days.length)}, höchstens ${days.at(-1)} (${days.length} Tage)`
+      + ` · je Analyse: Median ${runsSorted[Math.floor(runsSorted.length / 2)]}, höchstens ${runsSorted.at(-1)}`);
+  });
+
+  console.log("\n  Lesehinweis: Maßgeblich ist „Treffer − fair“. Liegt es bei null, trifft die Auswahl nur so");
+  console.log("  oft, wie die Tipico-Quote ohne Aufschlag sagt, und auf Dauer kostet jede Wette den Aufschlag");
+  console.log("  (rund 8 bis 11 %). Ein ROI ist nur mit seinem ± lesbar; „Tag ±“ bündelt Wetten desselben");
+  console.log("  Anstoßtags. Teilmengen nach Markt sind nachträglich herausgegriffen - kann auch Zufall sein.");
+}
+
+if (process.argv.includes("--simulate")) {
+  printCellLedger(buildMarketProfile(observations));
+  await simulate();
 }

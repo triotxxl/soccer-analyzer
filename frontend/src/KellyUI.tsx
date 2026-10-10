@@ -136,10 +136,49 @@ export function NumberField({ label, hint, value, scale = 1, min, max, step, dis
 function stakeSlotHint(settings: KellySettings): string {
   const { plaetze, hoechstens } = stakeSlots(settings);
   if (!Number.isFinite(plaetze)) return "Ohne Höchst- und Mindesteinsatz gibt es keine Grenze für die Zahl der Wetten.";
+  // Das Budget kürzt sich nur heraus, solange der Höchsteinsatz je Wette über dem Mindesteinsatz
+  // liegt. Darunter (ab Werk unter rund 32 €) begrenzt der Mindesteinsatz die Zahl.
+  const budgetMatters = settings.minStake > 0 && settings.budget * settings.maxStakePercent < settings.minStake;
   return `So viele Wetten passen in deinen Rahmen: rund ${plaetze}`
     + `${hoechstens > plaetze ? `, höchstens ${hoechstens} beim kleinsten Einsatz` : ""}.`
-    + " Wie groß dein Budget ist, spielt dafür keine Rolle – nur das Verhältnis der beiden"
-    + " Prozentwerte.";
+    + (budgetMatters
+      ? " Bei deinem Budget begrenzt der Mindesteinsatz die Zahl."
+      : " Wie groß dein Budget ist, spielt dafür keine Rolle – nur das Verhältnis der beiden"
+        + " Prozentwerte.");
+}
+
+/**
+ * Die Korrektur, die bei den gewählten Wetten eines Marktes tatsächlich angewandt wurde - als
+ * Wert oder Spanne. Bis 06.10.2026 stand hier die Abweichung des ganzen Marktes: Bei BTTS Nein
+ * „−3,7“, während die gewählten Wetten um +2,8 Punkte angehoben wurden.
+ */
+function appliedCorrection(candidates: KellyCandidate[], marketKey: string): string | null {
+  const biases = candidates
+    .filter((candidate) => candidate.marketKey === marketKey && candidate.calibrationBias !== null)
+    .map((candidate) => candidate.calibrationBias!);
+  if (biases.length === 0) return null;
+  const low = Math.min(...biases);
+  const high = Math.max(...biases);
+  return Math.abs(high - low) < 0.0005 ? formatPoints(low) : `${formatPoints(low)} bis ${formatPoints(high)}`;
+}
+
+/**
+ * Fast die ganze Liste aus einem Markt, dessen Chancen nach oben korrigiert wurden: Ein
+ * gemeinsamer Fehler des Modells träfe dann fast alle Wetten zugleich. Davids Entscheidung vom
+ * 06.10.2026: nur benennen, die Auswahl nicht ändern.
+ */
+export function concentrationNotice(candidates: KellyCandidate[]): string | null {
+  if (candidates.length < 4) return null;
+  const counts = new Map<string, KellyCandidate[]>();
+  for (const candidate of candidates) {
+    counts.set(candidate.marketKey, [...(counts.get(candidate.marketKey) ?? []), candidate]);
+  }
+  const [, largest] = [...counts].sort((left, right) => right[1].length - left[1].length)[0]!;
+  if (largest.length * 2 <= candidates.length) return null;
+  const raised = largest.filter((candidate) => (candidate.calibrationBias ?? 0) > 0).length;
+  if (raised * 2 <= largest.length) return null;
+  return `${largest.length} von ${candidates.length} Wetten sind ${largest[0]!.marketLabel}, und ihre Chance`
+    + " wurde nach oben korrigiert. Liegt das Modell dort falsch, trifft es fast alle Wetten zugleich.";
 }
 
 function MetricCard({ label, value, note, tone, title }: {
@@ -183,23 +222,29 @@ function AutoSummary({ profile, candidates }: { profile: MarketProfile; candidat
   const idle = profile.markets.filter((entry) => !chosen.has(entry.marketKey));
 
   return <div className="kelly-auto">
+    {/* Die Grundmenge ist `playable`: Nur Spiele mit Vorteil gehen in die Korrektur ein. Bis
+        06.10.2026 stand hier `observations`, rund das Viereinhalbfache. */}
     <p className="kelly-auto-lead">
       Die Auswahl rechnet nicht mit dem, was das Modell verspricht, sondern mit dem, was in
-      {" "}{profile.observations.toLocaleString("de-DE")} alten Wetten wirklich eingetreten ist.
-      Du stellst nur dein Budget ein.
+      {" "}{profile.playable.toLocaleString("de-DE")} alten Spielen mit Vorteil wirklich
+      eingetreten ist. Du stellst nur dein Budget und die Wettarten ein.
     </p>
 
     {active.length > 0 && <p className="kelly-auto-chips">
       <span className="kelly-auto-label">Gespielt wird</span>
-      {active.map((entry) => <span key={entry.marketKey} className="kelly-auto-chip">
-        {entry.marketLabel} <small>{formatPoints(entry.metrics.bias)}</small>
-      </span>)}
+      {active.map((entry) => {
+        const applied = appliedCorrection(candidates, entry.marketKey);
+        return <span key={entry.marketKey} className="kelly-auto-chip"
+          title="So weit wurde die Chance bei diesen Wetten verschoben">
+          {entry.marketLabel}{applied !== null && <> <small>{applied}</small></>}
+        </span>;
+      })}
     </p>}
 
     {idle.length > 0 && <p className="kelly-auto-chips">
       <span className="kelly-auto-label">Nichts gefunden in</span>
       {idle.map((entry) => <span key={entry.marketKey} className="kelly-auto-chip kelly-auto-chip-idle"
-        title={`Eingetreten: ${(entry.metrics.hitRate * 100).toFixed(1)} %, vorhergesagt: ${(entry.metrics.predicted * 100).toFixed(1)} %, aus ${entry.metrics.n} alten Wetten · Gewinn ${formatRoi(entry.metrics.roi)}`}>
+        title={`Eingetreten: ${(entry.metrics.hitRate * 100).toFixed(1)} %, vorhergesagt: ${(entry.metrics.predicted * 100).toFixed(1)} %, aus ${entry.metrics.n} alten Spielen mit Vorteil · Gewinn ${formatRoi(entry.metrics.roi)}`}>
         {entry.marketLabel}
       </span>)}
     </p>}
@@ -207,9 +252,11 @@ function AutoSummary({ profile, candidates }: { profile: MarketProfile; candidat
     <Disclosure open={showDetail} onToggle={() => setShowDetail((value) => !value)}
       label="Woher die Korrektur kommt" openLabel="Weniger anzeigen" />
     {showDetail && <p className="kelly-auto-detail">
-      An Spielen geprüft, die die Korrektur nicht kannte, liegt diese Auswahl im Minus – rechne
-      nicht mit Gewinn. Ob sie weniger verliert als die frühere Vorgabe, kann auch Zufall sein.
-      Ohne das Unentschieden verliert sie deutlich mehr.
+      An alten Spielen geprüft, die die Korrektur nicht kannte, liegt diese Auswahl im Minus –
+      rechne nicht mit Gewinn. Ihre Wetten trafen nur so oft, wie die Tipico-Quote ohne Aufschlag
+      es erwarten ließ. Die Korrektur senkt die Chancen zwar, aber nicht genug: Wer gezielt die
+      Spiele nimmt, bei denen das Modell mehr sieht als die Quote, erwischt gerade seine
+      Ausrutscher. Auf Dauer kostet das etwa den Aufschlag.
     </p>}
   </div>;
 }
@@ -272,6 +319,18 @@ export function KellyDialog({ selection, profileState, marketFilter, marketLabel
   const { totalStake, expected, slots } = selection;
   const set = <K extends keyof KellySettings>(key: K, value: KellySettings[K]) =>
     onSettingsChange({ ...settings, [key]: value });
+  const marketToggles = <SettingField label="Märkte"
+    hint="Abgewählte Wettarten kommen gar nicht erst in die Auswahl. Der Sieger-Tipp (1X2) schnitt geprüft am schlechtesten ab.">
+    <span className="kelly-market-toggles">
+      {MARKET_TOGGLES.map(([key, label]) => <label key={key}>
+        <input type="checkbox" checked={!settings.disabledMarkets.includes(key)}
+          onChange={(event) => set("disabledMarkets", event.target.checked
+            ? settings.disabledMarkets.filter((entry) => entry !== key)
+            : [...settings.disabledMarkets, key])} />
+        {label}
+      </label>)}
+    </span>
+  </SettingField>;
 
   // Exportiert die ganze Auswahl in der Reihenfolge des Dashboards - immer über den Umfang,
   // nie über die Zeilen, die ein Tabellenfilter übrig lässt: Der Testbetrieb verlangt, dass
@@ -312,12 +371,19 @@ export function KellyDialog({ selection, profileState, marketFilter, marketLabel
         ? `, höchstens ${slots.hoechstens} zum Mindesteinsatz von ${formatEuro(settings.minStake)}`
         : ""));
   }
+  if (filtered.overGameLimit > 0) {
+    notices.push(`${filtered.overGameLimit} weitere Auswahlen hätten zum Mindesteinsatz von`
+      + ` ${formatEuro(settings.minStake)} die Grenze je Spiel überschritten und fallen weg`);
+  }
   if (scaleFactor < 1) notices.push(`Gesamtrisiko-Limit erreicht – alle Einsätze auf ${(scaleFactor * 100).toFixed(0)} % skaliert`);
   if (limitedGames.length > 0) {
     notices.push(`Grenze je Spiel ${formatPercent(settings.maxRiskPerGame)}`
       + ` (${formatEuro(limitedGames[0]!.limit)}) greift bei ${limitedGames.length}`
       + ` Spiel${limitedGames.length === 1 ? "" : "en"}`);
   }
+  const concentration = automatic ? concentrationNotice(candidates) : null;
+  if (concentration !== null) notices.push(concentration);
+  const partlyEstimated = candidates.some((candidate) => candidate.fairSource === "geschätzt");
 
   return <div className="overlay-backdrop" onClick={onClose}>
     <div className="kelly-dialog" role="dialog" aria-label="Kelly-Auswahl" onClick={(event) => event.stopPropagation()}>
@@ -361,12 +427,16 @@ export function KellyDialog({ selection, profileState, marketFilter, marketLabel
           <MetricCard label="Wetten" value={String(candidates.length)}
             note={`aus ${evaluated} geprüften Spielen`}
             title={"Geprüft werden die Spiele aus Zeitraum und Wettbewerben im Filter, samt „Nur"
-              + " Ligaspiele“ und angepfiffenen Spielen, und der gewählte Markt. Bewertung und"
+              + " Ligaspiele“, und der gewählte Markt. Angepfiffene Spiele zählen nie mit. Bewertung und"
               + " Klassenunterschied grenzen nur die Tabelle ein."} />
-          {/* Neutral, nicht grün: Die Zahl ist eine Rechnung, keine Messung - und gemessen lag
-              die Auswahl im Minus (Stand 21.09.2026, AGENTS.md). */}
-          <MetricCard label="Erwarteter Ertrag" value={formatSignedEuro(expected)}
-            note={`${automatic ? "auf Basis der Korrektur" : "auf Basis der Modellwerte"}. Gemessen lag die Auswahl bisher im Minus.`} />
+          {/* Zum fairen Tipico-Preis statt zur Modellchance (seit 06.10.2026, Davids
+              Entscheidung): Die gewählten Wetten trafen nachgespielt genau so oft wie dieser
+              Preis, die Modellchance versprach rund +10 % bei rund -6 % eingetreten. Neutral,
+              nicht grün und nicht rot - es ist eine Rechnung, keine Messung. */}
+          <MetricCard label="Auf Dauer" value={formatSignedEuro(expected)}
+            title="Gerechnet mit der Chance, die die Tipico-Quote ohne ihren Aufschlag behauptet. Fehlt die Gegenquote, ist der Aufschlag geschätzt."
+            note={`zur Tipico-Quote ohne Aufschlag${partlyEstimated ? ", teils geschätzt" : ""}.`
+              + " Das Modell trifft geprüft nicht öfter als die Quote."} />
         </div>
 
         {notices.length > 0 && <ul className="kelly-notices">
@@ -408,6 +478,9 @@ export function KellyDialog({ selection, profileState, marketFilter, marketLabel
                 <NumberField label="Höchstens … Wetten" value={settings.maxBets ?? 0} min={0} step={1}
                   hint="0 heißt: keine eigene Grenze. Dann zählt nur, wie viele Wetten in deinen Rahmen passen."
                   onCommit={(value) => set("maxBets", value <= 0 ? null : Math.round(value))} />
+                {/* Seit 06.10.2026 auch in der Automatik (Davids Entscheidung): Welche Wettarten
+                    gespielt werden, ist keine Messgröße. */}
+                {marketToggles}
               </div>
             : <div className="kelly-settings-grid">
                 <NumberField label="Budget (€)" value={settings.budget} min={0} step={5}
@@ -445,18 +518,7 @@ export function KellyDialog({ selection, profileState, marketFilter, marketLabel
                   <input type="checkbox" checked={settings.excludeCrossLeague}
                     onChange={(event) => set("excludeCrossLeague", event.target.checked)} />
                 </SettingField>
-                <SettingField label="Märkte"
-                  hint="Abgewählte Wettarten kommen gar nicht erst in die Auswahl. Der Sieger-Tipp (1X2) schnitt geprüft am schlechtesten ab.">
-                  <span className="kelly-market-toggles">
-                    {MARKET_TOGGLES.map(([key, label]) => <label key={key}>
-                      <input type="checkbox" checked={!settings.disabledMarkets.includes(key)}
-                        onChange={(event) => set("disabledMarkets", event.target.checked
-                          ? settings.disabledMarkets.filter((entry) => entry !== key)
-                          : [...settings.disabledMarkets, key])} />
-                      {label}
-                    </label>)}
-                  </span>
-                </SettingField>
+                {marketToggles}
                 <SettingField label="Mehrere Märkte je Spiel">
                   <input type="checkbox" checked={settings.allowMultipleMarketsPerGame}
                     onChange={(event) => set("allowMultipleMarketsPerGame", event.target.checked)} />
@@ -489,7 +551,7 @@ export function KellyDialog({ selection, profileState, marketFilter, marketLabel
                 <th>{sortHead("odds", "Quote")}</th>
                 <th>{sortHead("probability", "Modell", "Wahrscheinlichkeit laut Modell")}</th>
                 {automatic && <th>{sortHead("calibrated", "Korrigiert",
-                  "Die Chance laut Modell, abzüglich dessen, worum es sich bei dieser Wettart bisher verschätzt hat. Mit diesem Wert rechnet der Einsatz.")}</th>}
+                  "Die Chance laut Modell, verschoben um das, worum es sich bei dieser Wettart und diesem Vorteil bisher verschätzt hat – meist nach unten, manchmal nach oben. Mit diesem Wert rechnet der Einsatz.")}</th>}
                 <th>{sortHead("edge", "Vorteil",
                   "Vorteil (Value): wie viel höher das Modell die Chance sieht, als die Quote hergibt, in Prozentpunkten. Je größer, desto eher ein Fehler des Modells.")}</th>
                 <th>{sortHead("kelly", "Kelly", "Anteil vom Budget nach allen deinen Grenzen; darunter der Wert ohne Grenzen")}</th>
@@ -533,8 +595,15 @@ export function KellyDialog({ selection, profileState, marketFilter, marketLabel
           </div>
           <div>
             <dt>Korrigiert</dt>
-            <dd>die Chance, die das Modell nennt, abzüglich dessen, worum es sich bei dieser
-              Wettart bisher verschätzt hat. Gerechnet wird mit diesem Wert</dd>
+            <dd>die Chance, die das Modell nennt, verschoben um das, worum es sich bei dieser
+              Wettart und diesem Vorteil bisher verschätzt hat – meist nach unten, manchmal nach
+              oben. Gerechnet wird mit diesem Wert</dd>
+          </div>
+          <div>
+            <dt>Auf Dauer</dt>
+            <dd>was die Liste im Schnitt einbringt, wenn die Tipico-Quote ohne ihren Aufschlag
+              die richtige Chance nennt. An alten Spielen geprüft trafen die gewählten Wetten
+              genau so oft – deshalb steht hier fast immer ein Minus</dd>
           </div>
           <div>
             <dt>Grenze je Spiel</dt>

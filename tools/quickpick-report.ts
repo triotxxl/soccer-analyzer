@@ -37,6 +37,7 @@ import {
   QUICKPICK_PRESET_LIST,
   applyLevel,
   evaluateFixture,
+  oddsEstimated,
   type AnyQuickpickPreset,
   type QuickpickLevelId,
   type QuickpickComboMeasurement,
@@ -64,7 +65,29 @@ const RECALIBRATION_STEP = 2_000;
  * Daves Filter, Dominanz und Remis-Score lesen Tabelle, Form und Duelle und bleiben beim
  * ganzen Bestand.
  */
-const MODEL_BOUND_PRESETS = new Set<QuickpickPresetId>(["hz15", "remis"]);
+const MODEL_BOUND_PRESETS = new Set<QuickpickPresetId>(["hz15", "remis", "modell1x2"]);
+
+/**
+ * Ab welcher Version ein modellgebundener Filter gemessen wird, wenn es nicht nur die laufende
+ * sein muss. „Sieger laut Modell" ab 3.2.0 (Davids Entscheidung vom 10.10.2026): Für Ligaspiele
+ * rechnen 3.2.0 bis 3.5.0 dasselbe 1X2 - beim Wechsel 3.4.0 → 3.5.0 blieben 652 von 659
+ * identisch, die Versionen danach änderten Länderspiele, U21, Frauen-Pools und den Teiler
+ * zwischen Ligen. Nur an 3.5.0 standen hinter den Knöpfen rund 20 Tipps.
+ */
+const MODEL_BOUND_SINCE: Partial<Record<QuickpickPresetId, string>> = { modell1x2: "3.2.0" };
+
+/** Vergleicht Versionen wie "3.10.0" numerisch; `null`, wenn eine davon keine ist. */
+function compareVersions(left: string, right: string): number | null {
+  const parse = (value: string) => /^\d+(\.\d+)*$/.test(value) ? value.split(".").map(Number) : null;
+  const a = parse(left);
+  const b = parse(right);
+  if (a === null || b === null) return null;
+  for (let index = 0; index < Math.max(a.length, b.length); index += 1) {
+    const diff = (a[index] ?? 0) - (b[index] ?? 0);
+    if (diff !== 0) return diff;
+  }
+  return 0;
+}
 
 interface StufenStand { n: number; proTag: number; trefferquote: number; roi: number; kombis?: QuickpickComboMeasurement[] }
 interface PresetStand { stand: string; abgerechnet: number; stufen: Record<string, StufenStand> }
@@ -158,7 +181,7 @@ function betsFor(
     // Abgerechnet wird zu dem Preis, den die App gezeigt hätte: dem aus dem Snapshot. Nur wo
     // der Lauf für die gestützte Seite keinen führt und die Regel ihn schätzen musste, tritt
     // der archivierte Preis an seine Stelle - eine Schätzung taugt nicht als Abrechnungskurs.
-    const geschaetzt = evaluation.dominanz?.oddsSource === "geschätzt";
+    const geschaetzt = oddsEstimated(evaluation);
     const odds = geschaetzt ? echterPreis : (evaluation.odds ?? echterPreis);
     if (odds === null) { result.ohnePreis += 1; continue; }
 
@@ -357,12 +380,16 @@ function main(): void {
     }
 
     const modelBound = MODEL_BOUND_PRESETS.has(preset.id);
-    const presetFixtures = modelBound
-      ? fixtures.filter((fixture) => fixture.modelVersion === config.goalLineModelVersion)
-      : fixtures;
+    const since = MODEL_BOUND_SINCE[preset.id];
+    const presetFixtures = !modelBound ? fixtures
+      : since !== undefined
+        ? fixtures.filter((fixture) => (compareVersions(fixture.modelVersion, since) ?? -1) >= 0)
+        : fixtures.filter((fixture) => fixture.modelVersion === config.goalLineModelVersion);
     if (modelBound) {
       const settledHere = presetFixtures.filter((fixture) => outcomes.has(fixture.fixtureId)).length;
-      console.log(`Nur Modellversion ${config.goalLineModelVersion}: ${settledHere} abgerechnete Partien.`);
+      console.log(since !== undefined
+        ? `Modellversionen ab ${since}: ${settledHere} abgerechnete Partien.`
+        : `Nur Modellversion ${config.goalLineModelVersion}: ${settledHere} abgerechnete Partien.`);
     }
 
     console.log(`  ${"Stufe".padEnd(13)}${"n".padStart(6)}${"/Tag".padStart(7)}${"Treffer".padStart(10)}`
