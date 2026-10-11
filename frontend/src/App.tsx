@@ -2,8 +2,11 @@ import {
   Binoculars, CaretLeft, CaretRight, Crosshair, Info, RocketLaunch, Shield, ShieldCheck, WarningCircle, X
 } from "@phosphor-icons/react";
 import { Fragment, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
-import { BetBuilderDrawer, CartAddMenu, CartBadge } from "./BetCartUI";
-import { cartEntryId, toCartEntry, toCounterCartEntry, toQuickpickCartEntry, useBetCart } from "./betCart";
+import { BetSlipWindow, CartAddMenu, CartButton, type CartPutFeedback } from "./BetCartUI";
+import {
+  cartEntryId, cartKey, toCartEntry, toCounterCartEntry, toQuickpickCartEntry, useBetCart, useComboSetup,
+  type CartEntry, type Combo
+} from "./betCart";
 import { countryFlagCode } from "./countryFlags";
 import { FixtureInsightPanels, InsightsNotice, useFixtureInsights } from "./FixtureInsights";
 import { useDashboardData } from "./data";
@@ -30,7 +33,7 @@ import { KellyButton, KellyDialog, formatEuro, kellyProfileNote } from "./KellyU
 import { FilterButton, FilterChip, FilterMenu, FilterSegment, type ClassGapFilter, type FilterMenuActions, type FilterMenuValues, type LevelFilter, type SegmentOption } from "./FilterMenu";
 import { MarketProfileView } from "./MarketProfileUI";
 import { BrandMark, NavRail, type NavKey } from "./NavRail";
-import { QuickpickButton, QuickpickChip, QuickpickDialog } from "./QuickpickUI";
+import { QuickpickButton, QuickpickChip, QuickpickDialog, type QuickpickCartFeedback } from "./QuickpickUI";
 import { applyQuickpick, loadQuickpickStore, saveQuickpickStore, settingsOf, withSettings, QUICKPICK_PRESETS, REJECTION_LABELS, presetOf, type QuickpickFilterReport, type QuickpickPresetId, type QuickpickRejection, type QuickpickStore } from "./quickpick";
 import { TeamCrest } from "./TeamCrest";
 import { useMarketProfile } from "./marketProfile";
@@ -169,11 +172,6 @@ const h2hSortLabels: Record<FormResult, { badge: string; label: string }> = {
   win: { badge: "H", label: "Heimsiege" },
   draw: { badge: "U", label: "Unentschieden" },
   loss: { badge: "A", label: "Auswärtssiege" }
-};
-const resultLabels: Record<FormResult, { text: string; title: string }> = {
-  win: { text: "S", title: "Sieg" },
-  draw: { text: "U", title: "Unentschieden" },
-  loss: { text: "N", title: "Niederlage" }
 };
 
 function berlinDate(value: string, timezone: string): string {
@@ -648,14 +646,103 @@ function firstHalfOverResults(fixture: DashboardFixture, line: FirstHalfOverLine
   });
 }
 
-function FormDots({ results, h2h = false }: { results: FormResult[]; h2h?: boolean }) {
-  const padded: Array<FormResult | null> = [...results.slice(0, 5)];
-  while (padded.length < 5) padded.push(null);
-  return <div className="dot-row">
-    {padded.map((result, index) => result
-      ? <span className={`result-dot ${result} ${index === 0 ? "latest" : ""}`} title={resultLabels[result].title} key={index}>{h2h ? ({ win: "H", draw: "U", loss: "A" } as const)[result] : resultLabels[result].text}</span>
-      : <span className="result-dot missing" title="Keine Daten" key={index}>–</span>)}
-  </div>;
+/**
+ * Ein Strich der Form- und H2H-Spalten. `count` steht nur in den Ansichten "Tore" und
+ * "Tore 1. HZ" im Strich (Davids Entscheidung vom 11.10.2026); ein leerer String hält dort die
+ * Breite, ohne ein "–" zu zeigen, das sich neben Ziffern wie ein Minus läse.
+ */
+type BarTone = FormResult | "hit" | "miss" | "missing";
+interface FormBar { tone: BarTone; title: string; count?: string }
+
+/**
+ * Fünf schmale Striche, links das jüngste Spiel, darunter ein kleiner Strich als Markierung.
+ * Die Striche sind für Screenreader stumm; die Zusammenfassung wandert als unsichtbarer Text in
+ * den Namen der Zeile (die ganze Zeile ist ein Knopf) und nennt deshalb Mannschaft und Markt.
+ */
+function FormBars({ bars, summary, total }: {
+  bars: FormBar[];
+  summary: string;
+  total?: { value: string; title: string; missing: boolean };
+}) {
+  return <span className="form-bars-line">
+    <span className="form-bars" aria-hidden="true" title={summary}>
+      {bars.map((bar, index) => <i
+        className={["form-bar", bar.tone, bar.count !== undefined ? "count" : "", index === 0 && bar.tone !== "missing" ? "latest" : ""].filter(Boolean).join(" ")}
+        title={bar.title} key={index}>{bar.count}</i>)}
+    </span>
+    <span className="visually-hidden">{summary}</span>
+    {total && <strong className={`form-total${total.missing ? " missing" : ""}`} title={total.title} aria-hidden="true">{total.value}</strong>}
+  </span>;
+}
+
+const MISSING_BAR: FormBar = { tone: "missing", title: "Kein Spiel" };
+
+function padBars(bars: FormBar[], counted = false): FormBar[] {
+  const padded = bars.slice(0, 5);
+  while (padded.length < 5) padded.push(counted ? { ...MISSING_BAR, count: "" } : MISSING_BAR);
+  return padded;
+}
+
+/** Stand immer als „Heim Tore:Tore Gast“ - „2:1“ allein ließe offen, wer zwei Tore hatte. */
+function scoreLine(match: MatchSummary): string {
+  return `${match.homeTeam} ${match.homeGoals}:${match.awayGoals} ${match.awayTeam}`;
+}
+
+function matchDate(match: MatchSummary, timezone: string): string {
+  const date = new Date(match.date);
+  if (Number.isNaN(date.getTime())) return "";
+  return new Intl.DateTimeFormat("de-DE", { timeZone: timezone, day: "2-digit", month: "2-digit", year: "2-digit" }).format(date);
+}
+
+function matchDetail(match: MatchSummary | undefined, timezone: string): string {
+  if (!match) return "";
+  const date = matchDate(match, timezone);
+  return ` · ${scoreLine(match)}${date ? ` · ${date}` : ""}`;
+}
+
+function countPhrase(count: number, singular: string, plural: string): string {
+  return `${count} ${count === 1 ? singular : plural}`;
+}
+
+/** Punkte aus der Form: Sieg 3, Unentschieden 1 - dieselbe Rechnung wie `formDelta` der Heatmap. */
+function formPoints(results: FormResult[]): number {
+  return results.reduce((sum, result) => sum + (result === "win" ? 3 : result === "draw" ? 1 : 0), 0);
+}
+
+function FormOutcomeBars({ team, results, matches, timezone }: {
+  team: string;
+  results: FormResult[];
+  matches: MatchSummary[] | undefined;
+  timezone: string;
+}) {
+  // Stand und Datum nur, wenn beide Listen sicher zusammenpassen. Ältere Läufe ohne
+  // `homeMatches` zeigen dann nur das Wort.
+  const aligned = matches !== undefined && matches.length === results.length;
+  const shown = results.slice(0, 5);
+  const words: Record<FormResult, string> = { win: "Sieg", draw: "Unentschieden", loss: "Niederlage" };
+  const bars = padBars(shown.map((result, index) => ({
+    tone: result,
+    title: `${words[result]}${aligned ? matchDetail(matches[index], timezone) : ""}`
+  })));
+  const points = formPoints(shown);
+  const games = shown.length;
+  const parts = [
+    countPhrase(countResults(shown, "win"), "Sieg", "Siege"),
+    countPhrase(countResults(shown, "draw"), "Unentschieden", "Unentschieden"),
+    countPhrase(countResults(shown, "loss"), "Niederlage", "Niederlagen")
+  ].filter((part) => !part.startsWith("0 "));
+  const pointsText = games === 5 ? `${points} Punkte` : `${points} Punkte aus ${countPhrase(games, "Spiel", "Spielen")}`;
+  const summary = games === 0 ? `${team}: keine Spiele` : `${team}: ${pointsText} – ${parts.join(", ")}`;
+  const total = games === 0
+    ? { value: "–", title: "Keine Spiele", missing: true }
+    : {
+      value: String(points),
+      title: games === 5
+        ? `${points} von 15 Punkten aus den letzten 5 Spielen (Sieg 3, Unentschieden 1)`
+        : `${points} Punkte aus ${countPhrase(games, "Spiel", "Spielen")} (Sieg 3, Unentschieden 1)`,
+      missing: false
+    };
+  return <FormBars bars={bars} summary={summary} total={total} />;
 }
 
 /** Welche Kennzahl die beiden neuen Spalten zeigen. */
@@ -759,35 +846,38 @@ function DefenseShield({ profile, team }: { profile: NonNullable<DashboardFixtur
 
 type MatchSummary = DashboardFixture["h2h"]["matches"][number];
 
-function matchViewDots(
+type ViewBarValue = { value: boolean | null; title: string; count?: string };
+
+function matchViewBars(
   matches: MatchSummary[],
   view: Exclude<H2hView, "outcome">,
   overLine: FullTimeOverLine,
   firstHalfOverLine: FirstHalfOverLine,
   /** Bei einem Gegenmarkt zählt das Ausbleiben als Treffer. */
   inverted = false
-): Array<{ value: boolean | null; text: string; title: string }> {
-  const values = view === "btts"
+): ViewBarValue[] {
+  const values: ViewBarValue[] = view === "btts"
     ? matches.map((match) => {
       const both = match.homeGoals > 0 && match.awayGoals > 0;
       const value = inverted ? !both : both;
-      return { value, text: both ? "✓" : "×", title: both ? "BTTS" : "Kein BTTS" };
+      // Kein ✓/× im Strich: Grün ✓ heißt in der Tabelle „empfehlenswert“.
+      return { value, title: `${both ? "Beide Teams treffen" : "Nicht beide Teams treffen"} · Endstand ${scoreLine(match)}` };
     })
-    // Über/Unter zeigt die Torzahl statt eines "Ü"/"U": Die Farbe des Punktes sagt schon,
-    // ob die Linie gerissen wurde, der Buchstabe wiederholt das nur. Die Zahl beantwortet
-    // stattdessen, wie deutlich - ein 5:2 und ein 2:1 sind beide "Ü", aber nicht dasselbe.
+    // Über/Unter zeigt die Torzahl im Strich: Die Farbe sagt schon, ob die Linie gerissen
+    // wurde. Die Zahl beantwortet stattdessen, wie deutlich - ein 5:2 und ein 2:1 sind beide
+    // "Ü", aber nicht dasselbe.
     : view === "firstHalfOver"
       ? matches.map((match) => {
         if (typeof match.halfTimeHomeGoals !== "number" || typeof match.halfTimeAwayGoals !== "number") {
-          return { value: null, text: "–", title: "Kein Halbzeitstand verfügbar" };
+          return { value: null, count: "", title: "Kein Halbzeitstand verfügbar" };
         }
         const goals = match.halfTimeHomeGoals + match.halfTimeAwayGoals;
         const over = goals > firstHalfOverLine;
         const value = inverted ? !over : over;
         return {
           value,
-          text: String(goals),
-          title: `1. Halbzeit ${match.halfTimeHomeGoals}:${match.halfTimeAwayGoals} · ${goals} Tor${goals === 1 ? "" : "e"} · ${over ? "Über" : "Unter"} ${firstHalfOverLine.toLocaleString("de-DE")}`
+          count: String(goals),
+          title: `1. Halbzeit ${match.homeTeam} ${match.halfTimeHomeGoals}:${match.halfTimeAwayGoals} ${match.awayTeam} · ${goals} Tor${goals === 1 ? "" : "e"} · ${over ? "Über" : "Unter"} ${firstHalfOverLine.toLocaleString("de-DE")}`
         };
       })
       : matches.map((match) => {
@@ -796,12 +886,26 @@ function matchViewDots(
         const value = inverted ? !over : over;
         return {
           value,
-          text: String(goals),
-          title: `Endstand ${match.homeGoals}:${match.awayGoals} · ${goals} Tor${goals === 1 ? "" : "e"} · ${over ? "Über" : "Unter"} ${overLine.toLocaleString("de-DE")}`
+          count: String(goals),
+          title: `Endstand ${scoreLine(match)} · ${goals} Tor${goals === 1 ? "" : "e"} · ${over ? "Über" : "Unter"} ${overLine.toLocaleString("de-DE")}`
         };
       });
-  while (values.length < 5) values.push({ value: null, text: "–", title: "Keine Daten" });
+  while (values.length < 5) values.push(view === "btts" ? { value: null, title: "Kein Spiel" } : { value: null, count: "", title: "Kein Spiel" });
   return values.slice(0, 5);
+}
+
+/** Der Markt einer Treffer-Ansicht in Worten, für Zusammenfassung und Spaltenkopf. */
+function viewMarketLabel(
+  view: Exclude<H2hView, "outcome">,
+  overLine: FullTimeOverLine,
+  firstHalfOverLine: FirstHalfOverLine,
+  inverted: boolean
+): string {
+  if (view === "btts") return inverted ? "BTTS Nein" : "BTTS";
+  const direction = inverted ? "Unter" : "Über";
+  return view === "over"
+    ? `${direction} ${overLine.toLocaleString("de-DE")}`
+    : `1. HZ ${direction} ${firstHalfOverLine.toLocaleString("de-DE")}`;
 }
 
 function formMatchesStreak(
@@ -811,7 +915,7 @@ function formMatchesStreak(
   firstHalfOverLine: FirstHalfOverLine,
   inverted = false
 ): number {
-  return consecutive(matchViewDots(matches ?? [], view, overLine, firstHalfOverLine, inverted).map((item) => item.value));
+  return consecutive(matchViewBars(matches ?? [], view, overLine, firstHalfOverLine, inverted).map((item) => item.value));
 }
 
 function columnComparison(
@@ -860,31 +964,81 @@ function columnComparison(
   return compareOutcomeSequences(left.h2h.outcomes, right.h2h.outcomes, target);
 }
 
-function ViewDots({ values }: { values: Array<{ value: boolean | null; text: string; title: string }> }) {
-  return <div className="dot-row">
-    {values.map((item, index) => <span className={`result-dot ${item.value === null ? "missing" : item.value ? "hit" : "miss"} ${index === 0 ? "latest" : ""}`} title={item.title} key={index}>{item.text}</span>)}
-  </div>;
+/** Der Hinweis im Spaltenkopf erklärt die Striche der gerade gewählten Ansicht. */
+function pairHeadTitle(
+  kind: "form" | "h2h",
+  view: H2hView,
+  overLine: FullTimeOverLine,
+  firstHalfOverLine: FirstHalfOverLine,
+  inverted: boolean
+): string {
+  const intro = kind === "h2h"
+    ? "H2H: die direkten Duelle beider Mannschaften. Links das jüngste Spiel, der kleine Strich darunter markiert es."
+    : "Die letzten 5 Spiele, oben Heim, unten Gast. Links das jüngste Spiel, der kleine Strich darunter markiert es.";
+  if (view === "outcome") {
+    return kind === "h2h"
+      ? `${intro} Der Strich hat die Farbe der Mannschaft, die gewann, wie ihr Name links; Grau unentschieden, leer: kein Spiel.`
+      : `${intro} Grün Sieg, Grau Unentschieden, Rot Niederlage, leer: kein Spiel. Rechts die Punkte (Sieg 3, Unentschieden 1).`;
+  }
+  const label = viewMarketLabel(view, overLine, firstHalfOverLine, inverted);
+  const count = view === "over" ? " Die Zahl im Strich: Tore im Spiel."
+    : view === "firstHalfOver" ? " Die Zahl im Strich: Tore in der 1. Halbzeit." : "";
+  return `${intro} Grün: passt zu ${label}, Rot: passt nicht, leer: kein Spiel.${count}`;
 }
 
-function H2hDots({ fixture, view, overLine, firstHalfOverLine, inverted }: {
+function MatchViewBars({ subject, matches, view, overLine, firstHalfOverLine, inverted }: {
+  /** Die Mannschaft der Formreihe oder „H2H“. */
+  subject: string;
+  matches: MatchSummary[] | undefined;
+  view: Exclude<H2hView, "outcome">;
+  overLine: FullTimeOverLine;
+  firstHalfOverLine: FirstHalfOverLine;
+  inverted: boolean;
+}) {
+  const values = matchViewBars(matches ?? [], view, overLine, firstHalfOverLine, inverted);
+  const bars = values.map((item): FormBar => ({
+    tone: item.value === null ? "missing" : item.value ? "hit" : "miss",
+    title: item.title,
+    ...(item.count !== undefined ? { count: item.count } : {})
+  }));
+  const known = values.filter((item) => item.value !== null);
+  const hits = known.filter((item) => item.value === true).length;
+  const label = viewMarketLabel(view, overLine, firstHalfOverLine, inverted);
+  const summary = known.length === 0
+    ? `${subject} ${label}: keine Spiele`
+    : `${subject} ${label}: passt in ${hits} von ${countPhrase(known.length, "Spiel", "Spielen")}`;
+  return <FormBars bars={bars} summary={summary} />;
+}
+
+function H2hBars({ fixture, view, overLine, firstHalfOverLine, inverted, timezone }: {
   fixture: DashboardFixture;
   view: H2hView;
   overLine: FullTimeOverLine;
   firstHalfOverLine: FirstHalfOverLine;
   inverted: boolean;
+  timezone: string;
 }) {
-  if (view === "outcome") return <FormDots results={fixture.h2h.outcomes} h2h />;
-  return <ViewDots values={matchViewDots(fixture.h2h.matches, view, overLine, firstHalfOverLine, inverted)} />;
-}
-
-function FormMatchDots({ matches, view, overLine, firstHalfOverLine, inverted }: {
-  matches: MatchSummary[] | undefined;
-  view: Exclude<FormView, "outcome">;
-  overLine: FullTimeOverLine;
-  firstHalfOverLine: FirstHalfOverLine;
-  inverted: boolean;
-}) {
-  return <ViewDots values={matchViewDots(matches ?? [], view, overLine, firstHalfOverLine, inverted)} />;
+  if (view !== "outcome") {
+    return <MatchViewBars subject="H2H" matches={fixture.h2h.matches} view={view} overLine={overLine}
+      firstHalfOverLine={firstHalfOverLine} inverted={inverted} />;
+  }
+  // H2H aus Sicht der heutigen Heimmannschaft: Der Strich trägt die Farbe der Mannschaft, die
+  // gewann, wie ihr Name in der Spalte „Spiel“. Der Hinweis nennt sie beim Namen.
+  const outcomes = fixture.h2h.outcomes.slice(0, 5);
+  const aligned = fixture.h2h.matches.length === fixture.h2h.outcomes.length;
+  const word = (result: FormResult) => result === "win" ? `Sieg ${fixture.homeTeam}`
+    : result === "loss" ? `Sieg ${fixture.awayTeam}` : "Unentschieden";
+  const bars = padBars(outcomes.map((result, index) => ({
+    tone: result,
+    title: `${word(result)}${aligned ? matchDetail(fixture.h2h.matches[index], timezone) : ""}`
+  })));
+  const parts = [
+    countPhrase(countResults(outcomes, "win"), `Sieg ${fixture.homeTeam}`, `Siege ${fixture.homeTeam}`),
+    countPhrase(countResults(outcomes, "draw"), "Unentschieden", "Unentschieden"),
+    countPhrase(countResults(outcomes, "loss"), `Sieg ${fixture.awayTeam}`, `Siege ${fixture.awayTeam}`)
+  ].filter((part) => !part.startsWith("0 "));
+  const summary = outcomes.length === 0 ? "H2H: keine Duelle" : `H2H: ${parts.join(", ")}`;
+  return <FormBars bars={bars} summary={summary} />;
 }
 
 export function MarketCard({ market, showEdge }: { market: DashboardMarket; showEdge: boolean }) {
@@ -1053,7 +1207,15 @@ function Dashboard({ document }: { document: DashboardDocument }) {
   // Der Abruf hängt allein an der aufgeklappten Partie: zugeklappt kostet die Ansicht nichts.
   const insights = useFixtureInsights(openFixture);
   const [cartMenuFixtureId, setCartMenuFixtureId] = useState<number | null>(null);
-  const [builderOpen, setBuilderOpen] = useState(false);
+  // Der Wettschein hängt wie Filter und Quickpicker als nicht-modales Fenster unter seinem Knopf.
+  const [cartOpen, setCartOpen] = useState(false);
+  const cartAnchorRef = useRef<HTMLDivElement>(null);
+  const cartButtonRef = useRef<HTMLButtonElement>(null);
+  // Die Kombis leben hier statt im Fenster: Sie überstehen das Schließen, nicht aber ein Neuladen
+  // (Davids Entscheidung vom 11.10.2026). `mixedKey` ist der Abdruck des Wettscheins beim Mischen.
+  const [combos, setCombos] = useState<Combo[]>([]);
+  const [mixedKey, setMixedKey] = useState("");
+  const [comboSetup, setComboSetup] = useComboSetup();
   const [kellyOpen, setKellyOpen] = useState(false);
   const [showKelly, setShowKelly] = useState(() => loadKellyVisible());
   const [liveRatedOnly, setLiveRatedOnly] = useState(false);
@@ -1076,12 +1238,16 @@ function Dashboard({ document }: { document: DashboardDocument }) {
   // Beide Voreinstellungen behalten ihre eigenen Regler; gewechselt wird nur, welche aktiv ist.
   const [quickpickStore, setQuickpickStore] = useState<QuickpickStore>(loadQuickpickStore);
   const quickpickSettings = settingsOf(quickpickStore);
-  const { cart, addEntry, replaceEntry, removeEntry, clear: clearCart } = useBetCart();
-  // Ersetzen statt Anhängen: Beim 1X2 teilen sich Modelltipp und Gegenseite eine Kennung,
-  // die Wahl der einen Seite nimmt die andere aus dem Schein.
-  const addFromMenu = (fixture: DashboardFixture, market: DashboardMarket, counterSide: "1" | "2" | null) => {
+  const { cart, lastChange, putEntry, putEntries, removeEntry, removeStarted, clear: clearCart, undo: undoCart } = useBetCart();
+  // Was „Alle n in den Wettschein“ getan hat - der Quickpicker meldet es im Fuß, statt den
+  // Wettschein zu öffnen. `changeId` sagt, ob „Rückgängig“ noch genau diesen Schritt zurücknimmt.
+  const [cartFeedback, setCartFeedback] = useState<QuickpickCartFeedback | null>(null);
+  // Gegensätze ersetzen einander: Beim 1X2 teilen sich Modelltipp und Gegenseite eine Kennung,
+  // und Remis verdrängt einen Sieger-Tipp desselben Spiels (`putEntriesInto`).
+  const addFromMenu = (fixture: DashboardFixture, market: DashboardMarket, counterSide: "1" | "2" | null): CartPutFeedback | null => {
     const entry = counterSide === null ? toCartEntry(fixture, market) : toCounterCartEntry(fixture, market);
-    if (entry) replaceEntry(entry);
+    if (!entry) return null;
+    return { entry, replaced: putEntry(entry) };
   };
   const watchedFixtureIds = useMemo(() => document.fixtures
     .filter((fixture) => !deselectedLeagues.has(leagueKey(fixture.country, fixture.league)))
@@ -1179,9 +1345,14 @@ function Dashboard({ document }: { document: DashboardDocument }) {
     setQuickpickOpen(false);
     if (returnFocus) quickpickButtonRef.current?.focus();
   };
-  // Filtermenü und Quickpicker liegen am selben Platz unter der Leiste - offen ist höchstens eins.
-  const openFilterMenu = () => { setQuickpickOpen(false); setFilterMenuOpen(true); };
-  const openQuickpick = () => { setFilterMenuOpen(false); setQuickpickOpen(true); };
+  const closeCart = (returnFocus: boolean) => {
+    setCartOpen(false);
+    if (returnFocus) cartButtonRef.current?.focus();
+  };
+  // Filtermenü, Quickpicker und Wettschein hängen an der Leiste - offen ist höchstens eins.
+  const openFilterMenu = () => { setQuickpickOpen(false); setCartOpen(false); setFilterMenuOpen(true); };
+  const openQuickpick = () => { setFilterMenuOpen(false); setCartOpen(false); setQuickpickOpen(true); };
+  const openCart = () => { setFilterMenuOpen(false); setQuickpickOpen(false); setCartOpen(true); };
 
   useEffect(() => {
     // Solange der Wettbewerbe-Dialog offen ist, gehört jeder Klick ihm - sonst schlösse ein
@@ -1195,7 +1366,11 @@ function Dashboard({ document }: { document: DashboardDocument }) {
   }, [filterMenuOpen, leagueFilterOpen]);
 
   useEffect(() => {
-    if (!quickpickOpen) return;
+    if (!quickpickOpen) {
+      // Die Rückmeldung gilt dem letzten Klick in diesem Fenster - beim nächsten Öffnen nicht mehr.
+      setCartFeedback(null);
+      return;
+    }
     const closeOutside = (event: PointerEvent) => {
       if (!quickpickAnchorRef.current?.contains(event.target as Node)) setQuickpickOpen(false);
     };
@@ -1204,10 +1379,19 @@ function Dashboard({ document }: { document: DashboardDocument }) {
   }, [quickpickOpen]);
 
   useEffect(() => {
+    if (!cartOpen) return;
+    const closeOutside = (event: PointerEvent) => {
+      if (!cartAnchorRef.current?.contains(event.target as Node)) setCartOpen(false);
+    };
+    window.addEventListener("pointerdown", closeOutside);
+    return () => window.removeEventListener("pointerdown", closeOutside);
+  }, [cartOpen]);
+
+  useEffect(() => {
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
       if (cartMenuFixtureId !== null) setCartMenuFixtureId(null);
-      else if (builderOpen) setBuilderOpen(false);
+      else if (cartOpen) closeCart(true);
       else if (kellyOpen) setKellyOpen(false);
       // Schließt nur das Panel und hebt den Filter nicht auf - das ist der Klick aufs ✕ im
       // Streifen, eine bewusste Handlung statt eines Nebeneffekts vom Wegklicken.
@@ -1219,7 +1403,7 @@ function Dashboard({ document }: { document: DashboardDocument }) {
     };
     window.addEventListener("keydown", closeOnEscape);
     return () => window.removeEventListener("keydown", closeOnEscape);
-  }, [builderOpen, filterMenuOpen, kellyOpen, leagueFilterOpen, openFixture, quickpickOpen, cartMenuFixtureId]);
+  }, [cartOpen, filterMenuOpen, kellyOpen, leagueFilterOpen, openFixture, quickpickOpen, cartMenuFixtureId]);
 
   const selectNav = (key: NavKey) => {
     if (key === "table" || key === "heatmap") {
@@ -1232,6 +1416,7 @@ function Dashboard({ document }: { document: DashboardDocument }) {
     // von selbst wieder auf.
     setFilterMenuOpen(false);
     setQuickpickOpen(false);
+    setCartOpen(false);
   };
 
   useEffect(() => { saveView(view); }, [view]);
@@ -1587,7 +1772,7 @@ function Dashboard({ document }: { document: DashboardDocument }) {
     setFormView(value);
   };
   const displayControls = heatmap ? undefined : <div className="filter-display">
-    <FilterSegment name="points-view" legend="Punkte in Form und H2H" value={h2hView}
+    <FilterSegment name="points-view" legend="Striche in Form und H2H" value={h2hView}
       onChange={setPointsView} options={POINTS_VIEW_OPTIONS} />
     {activeLineView && <div className="filter-display-line">
       <FilterSegment name="points-line" legend="Linie"
@@ -1634,9 +1819,20 @@ function Dashboard({ document }: { document: DashboardDocument }) {
       now={now}
       shownInTable={filtered.length}
       onSettingsChange={(next) => setQuickpickStore((store) => withSettings(store, next))}
-      onPresetChange={(preset: QuickpickPresetId) => setQuickpickStore((store) => ({ ...store, aktiv: preset }))}
+      onPresetChange={(preset: QuickpickPresetId) => {
+        setQuickpickStore((store) => ({ ...store, aktiv: preset }));
+        setCartFeedback(null);
+      }}
       onActiveChange={setQuickpickActive}
+      cartFeedback={cartFeedback}
+      canUndoCart={cartFeedback !== null && cartFeedback.changeId !== null && lastChange?.id === cartFeedback.changeId}
+      onUndoCart={() => {
+        undoCart();
+        setCartFeedback(null);
+      }}
+      onOpenCart={openCart}
       onAddAll={(rows) => {
+        const entries: CartEntry[] = [];
         for (const row of rows) {
           // Eine Voreinstellung ohne Seite stützt eine Torlinie. Dafür gibt es den allgemeinen
           // Konstruktor: Er übernimmt Marktkennung, Beschriftung und Auswahl direkt aus dem
@@ -1644,18 +1840,54 @@ function Dashboard({ document }: { document: DashboardDocument }) {
           // Partie bestehen, statt sie zu verdrängen.
           if (row.evaluation.market !== "1x2") {
             const market = row.fixture.markets.find((entry) => entry.key === row.evaluation.market);
-            if (market) addEntry(toCartEntry(row.fixture, market));
+            if (market) entries.push(toCartEntry(row.fixture, market));
             continue;
           }
           // Die gestützte Seite muss in den Schein, nicht der Modelltipp: Bei „Dominanz" können
           // die beiden auseinanderfallen, und dann wäre der Eintrag schlicht die falsche Wette.
           if (row.evaluation.side === null) continue;
-          addEntry(toQuickpickCartEntry(row.fixture, row.evaluation.side, row.evaluation.odds, null));
+          entries.push(toQuickpickCartEntry(row.fixture, row.evaluation.side, row.evaluation.odds, null));
         }
-        setQuickpickOpen(false);
-        setBuilderOpen(true);
+        // Der Quickpicker bleibt offen (Davids Entscheidung vom 11.10.2026): So lassen sich
+        // mehrere Filter nacheinander einsammeln, und der Fuß sagt, was geschah.
+        const { result, changeId } = putEntries(entries);
+        setCartFeedback({
+          added: result.added.length,
+          unchanged: result.unchanged.length,
+          replaced: result.replaced,
+          changeId
+        });
       }}
       onClose={() => closeQuickpick(true)}
+    />}
+  </div>;
+
+  // Rechts in der Leiste, über dem abgedunkelten Hintergrund wie Filter und Quickpick (z-index 41).
+  const cartControl = <div className="filter-anchor cart-anchor" ref={cartAnchorRef} onBlur={(event) => {
+    const next = event.relatedTarget as Node | null;
+    if (next && !event.currentTarget.contains(next)) setCartOpen(false);
+  }}>
+    <CartButton buttonRef={cartButtonRef} count={cart.length} open={cartOpen}
+      onToggle={() => (cartOpen ? setCartOpen(false) : openCart())} />
+    {cartOpen && <BetSlipWindow
+      cart={cart}
+      now={now}
+      timezone={document.meta.timezone}
+      lastChange={lastChange}
+      setup={comboSetup}
+      combos={combos}
+      combosStale={combos.length > 0 && cartKey(cart) !== mixedKey}
+      onRemove={removeEntry}
+      onRemoveStarted={() => removeStarted(Date.now())}
+      onClear={clearCart}
+      onUndo={undoCart}
+      onSetupChange={setComboSetup}
+      onMix={(next) => {
+        setCombos(next);
+        setMixedKey(cartKey(cart));
+      }}
+      onCombosChange={setCombos}
+      onClose={() => closeCart(true)}
     />}
   </div>;
 
@@ -1783,8 +2015,8 @@ function Dashboard({ document }: { document: DashboardDocument }) {
     switch (column.id) {
       case "match": return sortButton("team", "Spiel");
       case "kickoff": return sortButton("kickoff", "Anstoß", { title: "Anstoß, Land und Liga" });
-      case "form": return <button className={effectiveSortKey === "form" ? "sorted" : undefined} onClick={() => sort("form")}>Letzte 5 Form {pairSortBadge("form")}</button>;
-      case "h2h": return <button className={effectiveSortKey === "h2h" ? "sorted" : undefined} onClick={() => sort("h2h")} title="H2H: die direkten Duelle beider Mannschaften">Letzte 5 H2H {pairSortBadge("h2h")}</button>;
+      case "form": return <button className={effectiveSortKey === "form" ? "sorted" : undefined} onClick={() => sort("form")} title={pairHeadTitle("form", formView, overLine, firstHalfOverLine, counterDirection)}>Letzte 5 Form {pairSortBadge("form")}</button>;
+      case "h2h": return <button className={effectiveSortKey === "h2h" ? "sorted" : undefined} onClick={() => sort("h2h")} title={pairHeadTitle("h2h", h2hView, overLine, firstHalfOverLine, counterDirection)}>Letzte 5 H2H {pairSortBadge("h2h")}</button>;
       case "expected": return sortButton("expected", showFirstHalfExpected ? "Erw. Tore 1. HZ" : "Erw. Tore", {
         title: isGoalLineMarket(marketFilter) || showFirstHalfExpected
           ? "Erwartete Tore laut Modell, groß die Summe beider Mannschaften"
@@ -1839,14 +2071,17 @@ function Dashboard({ document }: { document: DashboardDocument }) {
               : <><small>Heim</small><small>Ausw.</small></>}
           </span>
           <span>{formView === "outcome"
-            ? <><FormDots results={fixture.form.home} /><FormDots results={fixture.form.away} /></>
+            ? <>
+              <FormOutcomeBars team={fixture.homeTeam} results={fixture.form.home} matches={fixture.form.homeMatches} timezone={document.meta.timezone} />
+              <FormOutcomeBars team={fixture.awayTeam} results={fixture.form.away} matches={fixture.form.awayMatches} timezone={document.meta.timezone} />
+            </>
             : <>
-              <FormMatchDots matches={fixture.form.homeMatches} view={formView} overLine={overLine} firstHalfOverLine={firstHalfOverLine} inverted={counterDirection} />
-              <FormMatchDots matches={fixture.form.awayMatches} view={formView} overLine={overLine} firstHalfOverLine={firstHalfOverLine} inverted={counterDirection} />
+              <MatchViewBars subject={fixture.homeTeam} matches={fixture.form.homeMatches} view={formView} overLine={overLine} firstHalfOverLine={firstHalfOverLine} inverted={counterDirection} />
+              <MatchViewBars subject={fixture.awayTeam} matches={fixture.form.awayMatches} view={formView} overLine={overLine} firstHalfOverLine={firstHalfOverLine} inverted={counterDirection} />
             </>}</span>
         </span>); break;
         case "h2h": cells.push(<span className="h2h-cell" key="h2h">
-          <H2hDots fixture={fixture} view={h2hView} overLine={overLine} firstHalfOverLine={firstHalfOverLine} inverted={counterDirection} />
+          <H2hBars fixture={fixture} view={h2hView} overLine={overLine} firstHalfOverLine={firstHalfOverLine} inverted={counterDirection} timezone={document.meta.timezone} />
           {/* Eine Auffälligkeit, kein Grund für einen Tipp - deshalb grau, nie grün oder gold. */}
           {fixture.h2hNotice && <small className="h2h-notice" title={`${fixture.h2hNotice} · eine Auffälligkeit, kein Grund für einen Tipp`}>Remis-Serie</small>}
         </span>); break;
@@ -1924,6 +2159,7 @@ function Dashboard({ document }: { document: DashboardDocument }) {
             {tableModeControl}
             {showKelly && <KellyButton onOpen={() => setKellyOpen(true)} />}
           </div>
+          {cartControl}
         </div>
         {filterStatusRow(<p className="filter-status">
           <span aria-live="polite"><strong>{filtered.length}</strong> Spiele angezeigt</span>
@@ -1949,6 +2185,7 @@ function Dashboard({ document }: { document: DashboardDocument }) {
           fixture={fixture}
           cart={cart}
           open={cartMenuFixtureId === fixture.fixtureId}
+          started={Date.parse(fixture.kickoff) <= now}
           onOpen={() => setCartMenuFixtureId(fixture.fixtureId)}
           onClose={() => setCartMenuFixtureId((current) => current === fixture.fixtureId ? null : current)}
           onSelect={(market, counterSide) => addFromMenu(fixture, market, counterSide)}
@@ -1976,6 +2213,7 @@ function Dashboard({ document }: { document: DashboardDocument }) {
                   fixture={fixture}
                   cart={cart}
                   open={cartMenuFixtureId === fixture.fixtureId}
+                  started={Date.parse(fixture.kickoff) <= now}
                   onOpen={() => setCartMenuFixtureId(fixture.fixtureId)}
                   onClose={() => setCartMenuFixtureId((current) => current === fixture.fixtureId ? null : current)}
                   onSelect={(market, counterSide) => addFromMenu(fixture, market, counterSide)}
@@ -2083,9 +2321,9 @@ function Dashboard({ document }: { document: DashboardDocument }) {
       </>}
     </main>
   </div>
-  {/* Dunkelt den Rest ab, solange Filtermenü oder Quickpicker offen sind. Der Wettbewerbe-Dialog
-      bringt seinen eigenen Hintergrund mit - zwei übereinander dunkelten doppelt ab. */}
-  {(filterMenuOpen || quickpickOpen) && !leagueFilterOpen && <div className="menu-backdrop" aria-hidden />}
+  {/* Dunkelt den Rest ab, solange Filtermenü, Quickpicker oder Wettschein offen sind. Der
+      Wettbewerbe-Dialog bringt seinen eigenen Hintergrund mit - zwei übereinander dunkelten doppelt ab. */}
+  {(filterMenuOpen || quickpickOpen || cartOpen) && !leagueFilterOpen && <div className="menu-backdrop" aria-hidden />}
   {leagueFilterOpen && <LeagueFilterModal
     leagues={availableLeagues}
     statsByKey={leagueStatsByKey}
@@ -2097,8 +2335,6 @@ function Dashboard({ document }: { document: DashboardDocument }) {
     onSelectNone={selectNoneLeagues}
     onClose={() => setLeagueFilterOpen(false)}
   />}
-  <CartBadge count={cart.length} onClick={() => setBuilderOpen(true)} />
-  {builderOpen && <BetBuilderDrawer cart={cart} onRemove={removeEntry} onClear={clearCart} onClose={() => setBuilderOpen(false)} />}
   {kellySelection && kellyOpen && <KellyDialog
     selection={kellySelection}
     profileState={marketProfile}

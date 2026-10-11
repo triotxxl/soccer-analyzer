@@ -202,6 +202,66 @@ describe("React-Dashboard", () => {
     expect(formLabels).toHaveAttribute("title", expect.stringContaining("zu Hause und auswärts zusammen"));
   });
 
+  it("zeigt Form und H2H als Striche mit Punkten, Markierung des jüngsten Spiels und Stand im Hinweis", async () => {
+    const user = userEvent.setup();
+    const current = document();
+    const base = current.fixtures[0]!;
+    current.fixtures[0] = {
+      ...base,
+      form: { ...base.form, home: ["win", "win", "win", "draw", "loss"], away: [] },
+      h2h: {
+        ...base.h2h,
+        outcomes: ["win", "draw", "loss"],
+        matches: [
+          { fixtureId: 9601, teamWasHome: false, date: "2026-05-01T18:00:00.000Z", homeTeam: "Gast FC", awayTeam: "Alpha FC", homeGoals: 1, awayGoals: 2 },
+          { fixtureId: 9602, teamWasHome: true, date: "2025-11-01T18:00:00.000Z", homeTeam: "Alpha FC", awayTeam: "Gast FC", homeGoals: 1, awayGoals: 1 },
+          { fixtureId: 9603, teamWasHome: true, date: "2025-05-01T18:00:00.000Z", homeTeam: "Alpha FC", awayTeam: "Gast FC", homeGoals: 7, awayGoals: 4 }
+        ]
+      }
+    };
+    vi.stubGlobal("fetch", dashboardFetch(() => current));
+    render(<App />);
+    expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
+    const row = globalThis.document.querySelector(".fixture-row")!;
+
+    // Form: Punkte rechts, neutral, und die Zusammenfassung nennt Mannschaft und Punkte.
+    const [homeLine, awayLine] = Array.from(row.querySelectorAll(".form-cell .form-bars-line"));
+    expect(homeLine!.querySelector(".form-total")).toHaveTextContent("10");
+    expect(homeLine!.querySelector(".form-total")).toHaveAttribute("title", "10 von 15 Punkten aus den letzten 5 Spielen (Sieg 3, Unentschieden 1)");
+    expect(homeLine!.querySelector(".form-total")!.className).toBe("form-total");
+    expect(homeLine).toHaveTextContent("Alpha FC: 10 Punkte – 3 Siege, 1 Unentschieden, 1 Niederlage");
+    expect(homeLine!.querySelectorAll(".form-bar")[0]).toHaveClass("win", "latest");
+    // Ohne Spiele: fünf leere Striche, keine Markierung, Punkte als „–“.
+    expect(awayLine!.querySelectorAll(".form-bar.missing")).toHaveLength(5);
+    expect(awayLine!.querySelector(".form-bar.latest")).not.toBeInTheDocument();
+    expect(awayLine!.querySelector(".form-total")).toHaveTextContent("–");
+
+    // H2H: Der Hinweis nennt den Sieger und den Stand in Heim-Gast-Reihenfolge.
+    const h2hBars = Array.from(row.querySelectorAll(".h2h-cell .form-bar"));
+    expect(h2hBars).toHaveLength(5);
+    expect(h2hBars[0]).toHaveAttribute("title", "Sieg Alpha FC · Gast FC 1:2 Alpha FC · 01.05.26");
+    expect(h2hBars[2]).toHaveAttribute("title", expect.stringContaining("Sieg Gast FC"));
+    expect(h2hBars.slice(3).every((bar) => bar.classList.contains("missing"))).toBe(true);
+    expect(row.querySelector(".h2h-cell")).toHaveTextContent("H2H: 1 Sieg Alpha FC, 1 Unentschieden, 1 Sieg Gast FC");
+
+    // Die Legende heißt „Striche“ - die Spalte „Punkte“ ist das 100-Punkte-System.
+    const menu = await openFilters(user);
+    expect(within(menu).getByRole("group", { name: "Striche in Form und H2H" })).toBeInTheDocument();
+    await user.keyboard("{Escape}");
+
+    // BTTS: kein ✓ im Strich, Grün ✓ heißt in der Tabelle „empfehlenswert“.
+    await user.selectOptions(screen.getByLabelText("Markt"), "btts");
+    expect(row.querySelector(".form-cell")).not.toHaveTextContent("✓");
+    expect(row.querySelector(".h2h-cell")).not.toHaveTextContent("✓");
+    expect(row.querySelector(".h2h-cell .form-bar")).toHaveAttribute("title", "Beide Teams treffen · Endstand Gast FC 1:2 Alpha FC");
+
+    // Tore: die Torzahl steht im Strich, auch zweistellig.
+    await user.selectOptions(screen.getByLabelText("Markt"), "over25");
+    expect(Array.from(row.querySelectorAll(".h2h-cell .form-bar")).map((bar) => bar.textContent))
+      .toEqual(["3", "2", "11", "", ""]);
+    expect(row.querySelector(".h2h-cell")).toHaveTextContent("H2H Über 2,5: passt in 2 von 3 Spielen");
+  });
+
   it("stellt jedem Teamnamen der Übersicht sein Wappen voran, ohne URL die Initialen", async () => {
     const current = document();
     current.fixtures[0] = { ...current.fixtures[0]!, homeCrest: "https://media.example/33.png" };
@@ -282,7 +342,7 @@ describe("React-Dashboard", () => {
       const checked = (name: string) =>
         (within(menu).queryByRole("group", { name })?.querySelector("input:checked") as HTMLInputElement | null)?.value;
       const result = {
-        view: checked("Punkte in Form und H2H"),
+        view: checked("Striche in Form und H2H"),
         line: checked("Linie"),
         direction: checked("Richtung")
       };
@@ -480,7 +540,7 @@ describe("React-Dashboard", () => {
     expect(data).toHaveTextContent("85 %");
     expect(data).toHaveTextContent("1 Hinweis");
     expect(data).toHaveAttribute("title", expect.stringContaining("Wenige Spiele in der Saison"));
-    // Eine Auffälligkeit, kein Tipp-Grund: grau unter den H2H-Punkten.
+    // Eine Auffälligkeit, kein Tipp-Grund: grau unter den H2H-Strichen.
     const notice = globalThis.document.querySelector(".fixture-row .h2h-notice")!;
     expect(notice).toHaveTextContent("Remis-Serie");
     expect(notice).toHaveAttribute("title", expect.stringContaining("3 Remis in Folge"));
@@ -509,20 +569,21 @@ describe("React-Dashboard", () => {
     expect(within(line).getAllByRole("radio").map((option) => option.closest("label")!.textContent))
       .toEqual(["0,5", "1,5"]);
     const firstH2h = globalThis.document.querySelector(".fixture-row")!;
-    const dots = () => Array.from(firstH2h.querySelectorAll(".h2h-cell .result-dot"));
-    // Die Punkte zeigen die Halbzeit-Torzahl; ob die Linie gerissen wurde, sagt die Farbe.
+    const dots = () => Array.from(firstH2h.querySelectorAll(".h2h-cell .form-bar"));
+    // Die Striche zeigen die Halbzeit-Torzahl; ob die Linie gerissen wurde, sagt die Farbe.
+    // Ein leeres Feld bleibt ohne "–", das sich neben Ziffern wie ein Minus läse.
     // Die Zahl bleibt deshalb gleich, wenn die Linie wechselt - hit/miss dreht sich.
     const hits = () => dots().map((dot) => dot.classList.contains("hit") ? "Ü" : dot.classList.contains("miss") ? "U" : "–");
-    expect(dots().map((dot) => dot.textContent)).toEqual(["1", "0", "2", "1", "–"]);
+    expect(dots().map((dot) => dot.textContent)).toEqual(["1", "0", "2", "1", ""]);
     expect(hits()).toEqual(["Ü", "U", "Ü", "Ü", "–"]);
 
     await user.click(within(line).getByRole("radio", { name: "1,5" }));
-    expect(dots().map((dot) => dot.textContent)).toEqual(["1", "0", "2", "1", "–"]);
+    expect(dots().map((dot) => dot.textContent)).toEqual(["1", "0", "2", "1", ""]);
     expect(hits()).toEqual(["U", "U", "Ü", "U", "–"]);
 
     // Bei der Gegenrichtung bleibt die Torzahl gleich, aber getroffen hat, wer darunter blieb.
     await user.click(within(direction).getByRole("radio", { name: "Unter" }));
-    expect(dots().map((dot) => dot.textContent)).toEqual(["1", "0", "2", "1", "–"]);
+    expect(dots().map((dot) => dot.textContent)).toEqual(["1", "0", "2", "1", ""]);
     expect(hits()).toEqual(["Ü", "Ü", "U", "Ü", "–"]);
   });
 
@@ -916,14 +977,17 @@ describe("React-Dashboard", () => {
     expect(fetchMock.mock.calls.length).toBeGreaterThanOrEqual(2);
   });
 
-  it("sammelt Wetten über die Marktliste im Warenkorb und mischt eine Kombi", async () => {
+  it("sammelt Tipps über die Marktliste im Wettschein und mischt eine Kombi", async () => {
     vi.stubGlobal("fetch", dashboardFetch(() => document()));
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     render(<App />);
     expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
+    // Der Knopf steht immer in der Leiste, auch leer.
+    expect(screen.getByRole("button", { name: "Wettschein öffnen" })).toBeInTheDocument();
 
     // Überfahren öffnet nichts mehr - erst der Klick (Davids Wunsch vom 30.09.2026).
-    const alphaAdd = screen.getByRole("button", { name: "Zum Wett-Baukasten hinzufügen: Alpha FC – Gast FC" });
+    const alphaAdd = screen.getByRole("button", { name: "In den Wettschein legen: Alpha FC – Gast FC" });
+    expect(alphaAdd).toHaveTextContent("+");
     await user.hover(alphaAdd);
     expect(screen.queryByRole("menu")).not.toBeInTheDocument();
     await user.click(alphaAdd);
@@ -931,15 +995,15 @@ describe("React-Dashboard", () => {
     // Gruppiert wie die Marktliste der Werkzeugleiste.
     expect(within(list).getByRole("group", { name: "Ergebnis" })).toBeInTheDocument();
     await user.click(within(list).getByRole("menuitemcheckbox", { name: /^1X2 · Heim.*in den Wettschein$/ }));
-    expect(screen.getByRole("button", { name: /Wett-Baukasten öffnen \(1 Wette\)/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Wettschein öffnen, 1 Tipp" })).toBeInTheDocument();
     // Die Liste bleibt offen, der Markt ist als gewählt markiert, der Knopf zählt mit.
     expect(within(list).getByRole("menuitemcheckbox", { name: /^1X2 · Heim.*aus dem Wettschein nehmen$/ })).toHaveAttribute("aria-checked", "true");
     expect(within(list).getByText("1 im Wettschein")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Zum Wett-Baukasten hinzufügen: Alpha FC – Gast FC (1 im Wettschein)" })).toHaveTextContent("1");
+    expect(screen.getByRole("button", { name: "In den Wettschein legen: Alpha FC – Gast FC (1 im Wettschein)" })).toHaveTextContent("1");
 
     // Ein zweiter Klick nimmt ihn wieder heraus, ein dritter legt ihn zurück.
     await user.click(within(list).getByRole("menuitemcheckbox", { name: /^1X2 · Heim.*aus dem Wettschein nehmen$/ }));
-    expect(screen.queryByRole("button", { name: /Wett-Baukasten öffnen/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Wettschein öffnen" })).toBeInTheDocument();
     await user.click(within(list).getByRole("menuitemcheckbox", { name: /^1X2 · Heim.*in den Wettschein$/ }));
 
     // Escape schließt die Liste und gibt den Fokus an den Knopf zurück.
@@ -948,7 +1012,7 @@ describe("React-Dashboard", () => {
     expect(screen.getByRole("button", { name: /Alpha FC – Gast FC \(1 im Wettschein\)/ })).toHaveFocus();
 
     // Mit der Tastatur: öffnen, der Fokus steht auf dem ersten Markt, Enter legt ihn hinein.
-    const zuluAdd = screen.getByRole("button", { name: "Zum Wett-Baukasten hinzufügen: Zulu FC – Gast FC" });
+    const zuluAdd = screen.getByRole("button", { name: "In den Wettschein legen: Zulu FC – Gast FC" });
     zuluAdd.focus();
     await user.keyboard("{Enter}");
     list = screen.getByRole("menu", { name: "Markt hinzufügen: Zulu FC – Gast FC" });
@@ -958,18 +1022,33 @@ describe("React-Dashboard", () => {
     expect(items.at(-1)).toHaveFocus();
     await user.keyboard("{ArrowDown}{Enter}");
     expect(items[0]).toHaveAttribute("aria-checked", "true");
-    const cartButton = screen.getByRole("button", { name: /Wett-Baukasten öffnen \(2 Wetten\)/ });
+    await user.keyboard("{Escape}");
 
+    const cartButton = screen.getByRole("button", { name: "Wettschein öffnen, 2 Tipps" });
     await user.click(cartButton);
-    const builder = screen.getByRole("dialog", { name: "Wett-Baukasten" });
-    expect(within(builder).getByText("Ausgewählte Wetten (2)")).toBeInTheDocument();
+    const slip = screen.getByRole("dialog", { name: "Wettschein" });
+    expect(within(slip).getByRole("heading", { name: "Wettschein" })).toHaveFocus();
+    expect(slip.querySelector(".filter-menu-count")).toHaveTextContent("2 Tipps");
+    // Die Warnung steht immer da, auch ohne Kombi.
+    expect(within(slip).getByText(/Eine Kombi geht nur durch, wenn jeder Tipp stimmt/)).toBeInTheDocument();
+    expect(within(slip).getByText("Wähle, wie viele Kombis welcher Größe du willst.")).toBeInTheDocument();
 
-    const countInput = within(builder).getByRole("spinbutton", { name: "Anzahl 2er-Kombis" });
-    await user.clear(countInput);
-    await user.type(countInput, "1");
-    await user.click(within(builder).getByRole("button", { name: /Kombis mischen/ }));
+    await user.click(within(slip).getByRole("button", { name: "Eine 2er-Kombi mehr" }));
+    expect(within(slip).getByRole("spinbutton", { name: "Anzahl 2er-Kombis" })).toHaveValue(1);
+    await user.click(within(slip).getByRole("button", { name: /Kombis mischen/ }));
 
-    expect(within(builder).getByText("Kombi 1 · 2er")).toBeInTheDocument();
+    const combo = within(slip).getByRole("region", { name: "Kombi 1" });
+    expect(within(combo).getByText(/^Kombi 1 · 2 Spiele · ab /)).toBeInTheDocument();
+    // Beim 1X2 steht die Mannschaft dabei - „1X2“ allein verriet beim Übertragen nicht, wer gemeint ist.
+    expect(within(combo).getByText("Heimsieg Alpha FC")).toBeInTheDocument();
+    expect(within(combo).getByText("Heimsieg Zulu FC")).toBeInTheDocument();
+
+    // Escape schließt und gibt den Fokus an den Knopf zurück; die Kombi übersteht das Schließen.
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog", { name: "Wettschein" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Wettschein öffnen, 2 Tipps" })).toHaveFocus();
+    await user.click(screen.getByRole("button", { name: "Wettschein öffnen, 2 Tipps" }));
+    expect(within(screen.getByRole("dialog", { name: "Wettschein" })).getByRole("region", { name: "Kombi 1" })).toBeInTheDocument();
   });
 
   /** Davids Wunsch vom 06.10.2026: beim 1X2 auch die Seite gegen den Modelltipp anbieten. */
@@ -983,7 +1062,7 @@ describe("React-Dashboard", () => {
     render(<App />);
     expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "Zum Wett-Baukasten hinzufügen: Alpha FC – Gast FC" }));
+    await user.click(screen.getByRole("button", { name: "In den Wettschein legen: Alpha FC – Gast FC" }));
     const list = screen.getByRole("menu", { name: "Markt hinzufügen: Alpha FC – Gast FC" });
     const tipp = () => within(list).getByRole("menuitemcheckbox", { name: /^1X2 · Heim · Heimsieg, Quote 1,80/ });
     const gegen = () => within(list).getByRole("menuitemcheckbox", { name: /^1X2 · Gast · Auswärtssieg Gast FC gegen den Modelltipp, Quote 4,50/ });
@@ -993,16 +1072,167 @@ describe("React-Dashboard", () => {
     expect(tipp()).toHaveAttribute("aria-checked", "true");
     expect(gegen()).toHaveAttribute("aria-checked", "false");
 
-    // Die Gegenseite ersetzt den Modelltipp, statt neben ihm zu stehen.
+    // Die Gegenseite ersetzt den Modelltipp, statt neben ihm zu stehen - und die Liste sagt es.
     await user.click(gegen());
     expect(gegen()).toHaveAttribute("aria-checked", "true");
     expect(tipp()).toHaveAttribute("aria-checked", "false");
-    expect(screen.getByRole("button", { name: /Wett-Baukasten öffnen \(1 Wette\)/ })).toBeInTheDocument();
+    expect(within(list).getByText("Auswärtssieg Gast FC ersetzt Heimsieg Alpha FC")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Wettschein öffnen, 1 Tipp" })).toBeInTheDocument();
 
     await user.keyboard("{Escape}");
-    await user.click(screen.getByRole("button", { name: /Wett-Baukasten öffnen/ }));
-    const builder = screen.getByRole("dialog", { name: "Wett-Baukasten" });
-    expect(within(builder).getByText(/Auswärtssieg Gast FC/)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Wettschein öffnen, 1 Tipp" }));
+    const slip = screen.getByRole("dialog", { name: "Wettschein" });
+    expect(within(slip).getByText("Auswärtssieg Gast FC")).toBeInTheDocument();
+  });
+
+  /**
+   * Davids Entscheidung vom 11.10.2026: Gegensätze desselben Spiels ersetzen einander - eine Kombi
+   * mit Remis und Heimsieg verliert sicher. Verträgliche Tipps bleiben nebeneinander.
+   */
+  it("ersetzt Gegensätze desselben Spiels und lässt verträgliche Tipps stehen", async () => {
+    vi.stubGlobal("fetch", dashboardFetch(() => document()));
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(<App />);
+    expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "In den Wettschein legen: Alpha FC – Gast FC" }));
+    const list = screen.getByRole("menu", { name: "Markt hinzufügen: Alpha FC – Gast FC" });
+    const item = (name: RegExp) => within(list).getByRole("menuitemcheckbox", { name });
+
+    await user.click(item(/^Remis · /));
+    await user.click(item(/^1X2 · Heim/));
+    expect(item(/^1X2 · Heim/)).toHaveAttribute("aria-checked", "true");
+    expect(item(/^Remis · /)).toHaveAttribute("aria-checked", "false");
+    expect(within(list).getByText("Heimsieg Alpha FC ersetzt Remis")).toBeInTheDocument();
+
+    // Über 2,5 verträgt sich mit dem Heimsieg - beide bleiben, die Fußzeile zählt wieder.
+    await user.click(item(/^Über 2,5 · /));
+    expect(item(/^1X2 · Heim/)).toHaveAttribute("aria-checked", "true");
+    expect(item(/^Über 2,5 · /)).toHaveAttribute("aria-checked", "true");
+    expect(within(list).getByText("2 im Wettschein")).toBeInTheDocument();
+
+    await user.keyboard("{Escape}");
+    await user.click(screen.getByRole("button", { name: "Wettschein öffnen, 2 Tipps" }));
+    const slip = screen.getByRole("dialog", { name: "Wettschein" });
+    expect(within(slip).getByText("2 Tipps aus einem Spiel – in eine Kombi kommt nur einer.")).toBeInTheDocument();
+    // Zwei Tipps aus einem Spiel ergeben keine Kombi.
+    expect(within(slip).getByText("Ab zwei Tipps aus verschiedenen Spielen lassen sich Kombis bauen.")).toBeInTheDocument();
+    expect(within(slip).getByRole("button", { name: /Kombis mischen/ })).toBeDisabled();
+  });
+
+  it("leert den Wettschein mit einem Klick und holt ihn mit Rückgängig zurück", async () => {
+    vi.stubGlobal("fetch", dashboardFetch(() => document()));
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(<App />);
+    expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "In den Wettschein legen: Alpha FC – Gast FC" }));
+    await user.click(screen.getByRole("menuitemcheckbox", { name: /^1X2 · Heim.*in den Wettschein$/ }));
+    await user.keyboard("{Escape}");
+    await user.click(screen.getByRole("button", { name: "Wettschein öffnen, 1 Tipp" }));
+    const slip = screen.getByRole("dialog", { name: "Wettschein" });
+
+    await user.click(within(slip).getByRole("button", { name: "Wettschein leeren" }));
+    expect(within(slip).getByRole("status")).toHaveTextContent("Wettschein geleert (1 Tipp)");
+    expect(within(slip).getByText(/Noch keine Tipps im Wettschein/)).toBeInTheDocument();
+    const undo = within(slip).getByRole("button", { name: "Rückgängig" });
+    expect(undo).toHaveFocus();
+
+    await user.click(undo);
+    expect(slip.querySelector(".filter-menu-count")).toHaveTextContent("1 Tipp");
+    expect(within(slip).getByText("Heimsieg Alpha FC")).toBeInTheDocument();
+    expect(within(slip).queryByRole("button", { name: "Rückgängig" })).not.toBeInTheDocument();
+  });
+
+  it("hält angepfiffene Spiele aus Wettschein und Kombis heraus", async () => {
+    const current = document();
+    current.fixtures.push(fixture(3, "Läuft FC", "strong", "2026-08-16T11:00:00.000Z"));
+    vi.stubGlobal("fetch", dashboardFetch(() => current));
+    // Ein Tipp aus einer früheren Sitzung, dessen Spiel inzwischen läuft.
+    window.localStorage.setItem("football-analyzer:bet-cart", JSON.stringify([{
+      id: "3:1x2", fixtureId: 3, homeTeam: "Läuft FC", awayTeam: "Gast FC", league: "Bundesliga", country: "Deutschland",
+      kickoff: "2026-08-16T11:00:00.000Z", marketKey: "1x2", marketLabel: "1X2", selection: "Heimsieg", pick: "1",
+      selectionTone: "home", odds: 1.8, probability: 0.7, recommendationLevel: "strong", addedAt: 0
+    }]));
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(<App />);
+    expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
+
+    // Mit „Angepfiffene Spiele zeigen“ steht das Spiel in der Tabelle, sein „+“ ist aber gesperrt.
+    const menu = await openFilters(user);
+    await user.click(within(menu).getByRole("switch", { name: "Angepfiffene Spiele zeigen" }));
+    await user.keyboard("{Escape}");
+    expect(screen.getByRole("button", { name: /In den Wettschein legen: Läuft FC – Gast FC/ })).toBeDisabled();
+
+    await user.click(screen.getByRole("button", { name: "Wettschein öffnen, 1 Tipp" }));
+    const slip = screen.getByRole("dialog", { name: "Wettschein" });
+    expect(slip.querySelector(".filter-menu-count")).toHaveTextContent("1 Tipp · 1 angepfiffen");
+    expect(within(slip).getByText("1 angepfiffen – kommt in keine Kombi")).toBeInTheDocument();
+
+    await user.click(within(slip).getByRole("button", { name: "Angepfiffene Tipps entfernen" }));
+    expect(within(slip).getByRole("status")).toHaveTextContent("1 angepfiffener entfernt");
+    await user.click(within(slip).getByRole("button", { name: "Rückgängig" }));
+    expect(slip.querySelector(".filter-menu-count")).toHaveTextContent("1 angepfiffen");
+  });
+
+  it("merkt sich die Kombi-Größen und behält übertragene Kombis beim Neumischen", async () => {
+    const current = document();
+    current.fixtures.push(
+      fixture(3, "Drei FC", "strong", "2026-08-16T19:00:00.000Z"),
+      fixture(4, "Vier FC", "strong", "2026-08-16T20:00:00.000Z")
+    );
+    vi.stubGlobal("fetch", dashboardFetch(() => current));
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const { unmount } = render(<App />);
+    expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
+
+    for (const team of ["Alpha FC", "Zulu FC", "Drei FC", "Vier FC"]) {
+      await user.click(screen.getByRole("button", { name: `In den Wettschein legen: ${team} – Gast FC` }));
+      await user.click(screen.getByRole("menuitemcheckbox", { name: /^1X2 · Heim.*in den Wettschein$/ }));
+      await user.keyboard("{Escape}");
+    }
+    await user.click(screen.getByRole("button", { name: "Wettschein öffnen, 4 Tipps" }));
+    let slip = screen.getByRole("dialog", { name: "Wettschein" });
+    await user.click(within(slip).getByRole("button", { name: "Eine 2er-Kombi mehr" }));
+    expect(within(slip).getByText("1 Kombi · 2 Plätze · 4 Tipps aus 4 Spielen mischbar")).toBeInTheDocument();
+    await user.click(within(slip).getByRole("button", { name: /Kombis mischen/ }));
+    const first = within(slip).getByRole("region", { name: "Kombi 1" });
+    const firstTips = within(first).getAllByText(/^Heimsieg /).map((node) => node.textContent);
+
+    await user.click(within(first).getByRole("button", { name: "Kombi 1 als übertragen markieren" }));
+    expect(within(slip).getByText("1 von 1 übertragen")).toBeInTheDocument();
+    // Neu mischen: Die übertragene Kombi bleibt, die neue nimmt nur die übrigen Tipps.
+    await user.click(within(slip).getByRole("button", { name: /Kombis mischen/ }));
+    const kept = within(slip).getByRole("region", { name: "Kombi 1" });
+    expect(within(kept).getAllByText(/^Heimsieg /).map((node) => node.textContent)).toEqual(firstTips);
+    expect(within(kept).getByText(/übertragen/)).toBeInTheDocument();
+    const second = within(slip).getByRole("region", { name: "Kombi 2" });
+    for (const tip of within(second).getAllByText(/^Heimsieg /)) expect(firstTips).not.toContain(tip.textContent);
+
+    // Die Größen überstehen ein Neuladen, die Kombis nicht.
+    unmount();
+    render(<App />);
+    expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Wettschein öffnen, 4 Tipps" }));
+    slip = screen.getByRole("dialog", { name: "Wettschein" });
+    expect(within(slip).getByRole("spinbutton", { name: "Anzahl 2er-Kombis" })).toHaveValue(1);
+    expect(within(slip).queryByRole("region", { name: "Kombi 1" })).not.toBeInTheDocument();
+  });
+
+  it("öffnet höchstens eins von Filter, Quickpicker und Wettschein", async () => {
+    vi.stubGlobal("fetch", dashboardFetch(() => document()));
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(<App />);
+    expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Wettschein öffnen" }));
+    expect(screen.getByRole("dialog", { name: "Wettschein" })).toBeInTheDocument();
+    await openFilters(user);
+    expect(screen.queryByRole("dialog", { name: "Wettschein" })).not.toBeInTheDocument();
+    // Der Wettschein-Knopf liegt über dem abgedunkelten Hintergrund und wechselt direkt.
+    await user.click(screen.getByRole("button", { name: "Wettschein öffnen" }));
+    expect(screen.getByRole("dialog", { name: "Wettschein" })).toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: "Filter" })).not.toBeInTheDocument();
   });
 
   it("merkt sich das Schließen des Hinweisbanners über einen Reload hinweg", async () => {
@@ -1382,20 +1612,34 @@ describe("Klassenunterschied", () => {
   });
 
   /**
-   * Der eigentliche Zweck des Filters: Treffer in den Wettschein, dort Kombis bauen.
-   * Deshalb ist der Weg vom Panel zum geöffneten Baukasten ein Test wert.
+   * Der eigentliche Zweck des Filters: Treffer in den Wettschein, dort Kombis bauen. Seit
+   * 11.10.2026 bleibt der Quickpicker dabei offen und meldet im Fuß, was geschah.
    */
-  it("legt die Treffer in den Wettschein und öffnet den Baukasten", async () => {
+  it("legt die Treffer in den Wettschein und meldet es im Quickpicker", async () => {
     vi.stubGlobal("fetch", dashboardFetch(() => quickpickDocument()));
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     render(<App />);
     expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Quickpicker öffnen" }));
-    await user.click(screen.getByRole("button", { name: /in den Wettschein/ }));
+    const dialog = screen.getByRole("dialog", { name: "Quickpicker" });
+    await user.click(within(dialog).getByRole("button", { name: /in den Wettschein/ }));
+    expect(within(dialog).getByRole("status")).toHaveTextContent("1 neu im Wettschein");
+    expect(screen.getByRole("button", { name: "Wettschein öffnen, 1 Tipp" })).toBeInTheDocument();
 
-    const drawer = screen.getByRole("dialog", { name: "Wett-Baukasten" });
-    expect(within(drawer).getAllByText(/Alpha FC/).length).toBeGreaterThan(0);
+    // Rückgängig nimmt genau diesen Schritt zurück.
+    await user.click(within(dialog).getByRole("button", { name: "Rückgängig" }));
+    expect(within(dialog).queryByRole("status")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Wettschein öffnen" })).toBeInTheDocument();
+
+    // Zweimal hintereinander: Beim zweiten Mal ist schon alles drin.
+    await user.click(within(dialog).getByRole("button", { name: /in den Wettschein/ }));
+    await user.click(within(dialog).getByRole("button", { name: /in den Wettschein/ }));
+    expect(within(dialog).getByRole("status")).toHaveTextContent("1 schon drin");
+
+    await user.click(within(dialog).getByRole("button", { name: "Wettschein öffnen" }));
+    const slip = screen.getByRole("dialog", { name: "Wettschein" });
+    expect(within(slip).getAllByText(/Alpha FC/).length).toBeGreaterThan(0);
     expect(screen.queryByRole("dialog", { name: "Quickpicker" })).not.toBeInTheDocument();
   });
 
@@ -1541,9 +1785,9 @@ describe("Heatmap", () => {
     expect(globalThis.document.querySelectorAll(".heatmap-row")).toHaveLength(2);
     expect(globalThis.document.querySelector(".fixture-row")).not.toBeInTheDocument();
     const menu = await openFilters(user);
-    // In der Heatmap wirken die Punkte nicht - der Block entfällt, statt grau dazustehen.
-    expect(within(menu).queryByRole("group", { name: /Punkte in Form und H2H/ })).not.toBeInTheDocument();
-    // Ohne Punkte bleibt die Karte "Form und H2H" leer und entfällt; die Anzeige steht in der Leiste.
+    // In der Heatmap wirken die Striche nicht - der Block entfällt, statt grau dazustehen.
+    expect(within(menu).queryByRole("group", { name: /Striche in Form und H2H/ })).not.toBeInTheDocument();
+    // Ohne Striche bleibt die Karte "Form und H2H" leer und entfällt; die Anzeige steht in der Leiste.
     expect(within(menu).queryByRole("heading", { name: "Form und H2H" })).not.toBeInTheDocument();
     expect(screen.getByRole("radio", { name: "Vorteil & Kelly" })).toBeInTheDocument();
     expect(screen.getByLabelText("Markt")).toBeEnabled();

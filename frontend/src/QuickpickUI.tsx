@@ -1,4 +1,4 @@
-import { CaretRight, Funnel, Info, ShoppingCartSimple, X } from "@phosphor-icons/react";
+import { CaretRight, Funnel, Info, Ticket, X } from "@phosphor-icons/react";
 import { useEffect, useId, useLayoutEffect, useRef, useState, type Ref } from "react";
 import { FilterCard, FilterChip, FilterSegment, FilterSwitch, type SegmentOption } from "./FilterMenu";
 import {
@@ -31,7 +31,34 @@ import {
   storedValue,
   type QuickpickParam
 } from "./quickpickParams";
+import { selectionLabel, shortTipLabel, type CartEntry } from "./betCart";
 import type { DashboardFixture } from "./types";
+
+/** Was „Alle n in den Wettschein“ getan hat; der Fuß meldet es, statt den Wettschein zu öffnen. */
+export interface QuickpickCartFeedback {
+  added: number;
+  unchanged: number;
+  replaced: Array<{ by: CartEntry; old: CartEntry[] }>;
+  /** Kennung der Änderung für „Rückgängig“; `null`, wenn sich nichts geändert hat. */
+  changeId: number | null;
+}
+
+/** „5 neu im Wettschein · 1 ersetzt · 2 schon drin“ - Teile mit 0 fallen weg. */
+function feedbackParts(feedback: QuickpickCartFeedback): Array<{ count: number; label: string; title?: string }> {
+  const parts: Array<{ count: number; label: string; title?: string }> = [];
+  if (feedback.added > 0) parts.push({ count: feedback.added, label: "neu im Wettschein" });
+  if (feedback.replaced.length > 0) {
+    parts.push({
+      count: feedback.replaced.length,
+      label: "ersetzt",
+      title: feedback.replaced
+        .map(({ by, old }) => `${by.homeTeam} – ${by.awayTeam}: ${old.map(shortTipLabel).join(", ")} durch ${selectionLabel(by)} ersetzt`)
+        .join("\n")
+    });
+  }
+  if (feedback.unchanged > 0) parts.push({ count: feedback.unchanged, label: "schon drin" });
+  return parts;
+}
 
 const formatPercent = (value: number) => `${(value * 100).toFixed(1).replace(".", ",")} %`;
 const formatSigned = (value: number) =>
@@ -154,7 +181,8 @@ function Disclosure({ label, title, open, onToggle }: {
  */
 export function QuickpickDialog({
   fixtures, store, active, timezone, now = Date.now(), shownInTable,
-  onSettingsChange, onPresetChange, onActiveChange, onAddAll, onClose
+  onSettingsChange, onPresetChange, onActiveChange, onAddAll, onClose,
+  cartFeedback = null, canUndoCart = false, onUndoCart, onOpenCart
 }: {
   fixtures: DashboardFixture[];
   store: QuickpickStore;
@@ -169,6 +197,11 @@ export function QuickpickDialog({
   onActiveChange(active: boolean): void;
   onAddAll(rows: QuickpickRow[]): void;
   onClose(): void;
+  cartFeedback?: QuickpickCartFeedback | null;
+  /** Nimmt „Rückgängig“ noch genau diesen Schritt zurück? Jede spätere Änderung verwirft es. */
+  canUndoCart?: boolean;
+  onUndoCart?(): void;
+  onOpenCart?(): void;
 }) {
   const settings = settingsOf(store);
   const preset = presetOf(settings);
@@ -525,10 +558,19 @@ export function QuickpickDialog({
         title="Die Quote stammt von vor dem Anpfiff und gilt nicht mehr.">
         {startedCount} schon angepfiffen
       </small>}
+      {cartFeedback && <p className="quickpick-cart-feedback" role="status">
+        {feedbackParts(cartFeedback).map((part, index) => <span key={part.label} title={part.title}>
+          {index > 0 && " · "}<strong>{part.count}</strong> {part.label}
+        </span>)}
+        {canUndoCart && onUndoCart && <> · <button type="button" className="cart-link" onClick={onUndoCart}>Rückgängig</button></>}
+        {onOpenCart && <> · <button type="button" className="cart-link" onClick={onOpenCart}>
+          Wettschein öffnen<span aria-hidden> ›</span>
+        </button></>}
+      </p>}
       <button type="button" className="quickpick-cart" disabled={spielbar.length === 0}
         title={preset.wettschein.hinweis}
         onClick={() => onAddAll(spielbar)}>
-        <ShoppingCartSimple size={14} weight="bold" aria-hidden />
+        <Ticket size={14} weight="bold" aria-hidden />
         {cartLabel}
       </button>
     </div>

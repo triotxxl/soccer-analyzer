@@ -39,7 +39,7 @@ Ausgenommen: Warnungen und Ehrlichkeitshinweise - die werden gekürzt, nicht ent
 
 | Situation | naheliegend | Anmerkung |
 |---|---|---|
-| 2-4 einander ausschließende Optionen, oft gewechselt | Segmentschalter | wie „Daves Filter / Modell-Filter"; im Filtermenü `FilterSegment` (Klassenunterschied, Punkte in Form und H2H, Linie, Richtung) statt Auswahlliste |
+| 2-4 einander ausschließende Optionen, oft gewechselt | Segmentschalter | wie „Daves Filter / Modell-Filter"; im Filtermenü `FilterSegment` (Klassenunterschied, Striche in Form und H2H, Linie, Richtung) statt Auswahlliste |
 | Wechsel zwischen ganzen Ansichten | Eintrag der linken Navigationsleiste | wie Tabelle, Heatmap, Live, Marktprofil; `aria-current`, kein Segmentschalter |
 | andere Spalten derselben Ansicht, blendet nichts aus | Segmentschalter in der Werkzeugleiste | wie „Anzeige: Kennzahlen | Vorteil & Kelly“ (`FilterSegment` mit `toolbar-segment`); kein Ansichtswechsel, deshalb nicht in die Navigationsleiste |
 | viele einander ausschließende Optionen | Auswahlliste (Select) | wie Markt, Sortierung; eingebautes `<select>`, in Chromium per `appearance: base-select` im Leistenstil (Wahl mit Balken links, kein Häkchen), lange Listen mit `optgroup`-Zwischenüberschriften wie die Marktliste - kein eigener Listbox-Baustein |
@@ -52,7 +52,7 @@ Ausgenommen: Warnungen und Ehrlichkeitshinweise - die werden gekürzt, nicht ent
 | getrennte Bereiche derselben Sache | Reiter | vorsichtig: der Quickpicker zeigt seine sechs Filter seit 10.10.2026 als eine Radio-Liste unter zwei Gruppenüberschriften statt Reitern oder Dropdown |
 | Zustand | Abzeichen | wie „Klasse ↑", „Modell dagegen" |
 | einzelne Kennzahl | Zahl mit Beschriftung | wie die Bewertungskacheln im Filtermenü (Wort klein, Zahl groß); als Auswahl zugleich Radio |
-| Verlauf | Punktereihe / Sparkline | wie Form- und H2H-Punkte |
+| Verlauf | Strichreihe / Sparkline | wie die Form- und H2H-Striche (schmal, hochkant, keine Schrift außer Torzahl) |
 
 Das sind Ausgangspunkte, keine Regeln. Jede Empfehlung begründet die Wahl, z. B.: „Kein Regler,
 weil David einen exakten Betrag braucht - Zahlenfeld."

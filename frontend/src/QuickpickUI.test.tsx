@@ -259,6 +259,28 @@ describe("QuickpickDialog", () => {
     expect(screen.getByRole("button", { name: /Alle schon angepfiffen/ })).toBeDisabled();
   });
 
+  /** Seit 11.10.2026 bleibt der Quickpicker offen und sagt im Fuß, was im Wettschein geschah. */
+  it("meldet im Fuß, was im Wettschein geschah", async () => {
+    const onUndoCart = vi.fn();
+    const onOpenCart = vi.fn();
+    const by = { id: "1:draw", fixtureId: 1, homeTeam: "Alpha", awayTeam: "Beta", league: "Liga", country: "Land",
+      kickoff: "2026-09-20T18:00:00.000Z", marketKey: "draw" as const, marketLabel: "Remis", selection: "Unentschieden (X)",
+      pick: null, selectionTone: "neutral" as const, odds: 3.2, probability: 0.3, recommendationLevel: "none" as const, addedAt: 0 };
+    const old = { ...by, id: "1:1x2", marketKey: "1x2" as const, marketLabel: "1X2", selection: "Heimsieg Alpha", pick: "1" as const };
+    render(<QuickpickDialog fixtures={[fixture(1, "Alpha", "Beta", 75)]} store={DEFAULT_QUICKPICK_STORE} active={false}
+      timezone="Europe/Berlin" now={BEFORE_KICKOFF} onSettingsChange={() => undefined} onPresetChange={() => undefined}
+      onActiveChange={() => undefined} onAddAll={() => undefined} onClose={() => undefined}
+      cartFeedback={{ added: 3, unchanged: 2, replaced: [{ by, old: [old] }], changeId: 1 }} canUndoCart
+      onUndoCart={onUndoCart} onOpenCart={onOpenCart} />);
+    const status = screen.getByRole("status");
+    expect(status).toHaveTextContent("3 neu im Wettschein · 1 ersetzt · 2 schon drin · Rückgängig · Wettschein öffnen");
+    expect(status.querySelector("[title]")).toHaveAttribute("title", "Alpha – Beta: Heimsieg Alpha durch Remis · Unentschieden (X) ersetzt");
+    await userEvent.click(within(status).getByRole("button", { name: "Rückgängig" }));
+    await userEvent.click(within(status).getByRole("button", { name: "Wettschein öffnen" }));
+    expect(onUndoCart).toHaveBeenCalledOnce();
+    expect(onOpenCart).toHaveBeenCalledOnce();
+  });
+
   describe("Strengestufen", () => {
     const stufen = () => within(screen.getByRole("group", { name: "Strengestufe" }));
 

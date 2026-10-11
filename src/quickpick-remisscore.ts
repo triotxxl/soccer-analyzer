@@ -211,8 +211,8 @@ export const REMIS_SCORE_PRESET: QuickpickPreset<RemisScoreQuickpickSettings> = 
   warnung: "Die Punkte je Hinweis sind gesetzt, nicht gemessen, und geprüft ist erst wenig – das"
     + " kann auch Zufall sein. Rechne nicht mit Gewinn.",
   wettschein: {
-    hinweis: "Legt jedes gefundene Spiel als „Unentschieden“ in den Wettschein. Ein"
-      + " Sieger-Tipp zum selben Spiel bleibt daneben bestehen."
+    hinweis: "Legt jedes gefundene Spiel als „Unentschieden“ in den Wettschein. Ein Sieger-Tipp"
+      + " zum selben Spiel wird dabei ersetzt – beides zugleich verliert sicher."
   },
   leerSatz: "Kein Spiel sammelt genug Hinweise auf ein Unentschieden.",
   defaults: DEFAULT_REMIS_SCORE_SETTINGS,

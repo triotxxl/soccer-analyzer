@@ -346,6 +346,64 @@ fieldset.filter-field { min-width: 0; margin-inline: 0; padding: 0; border: 0; }
    derselben Stelle auf wie das Filtermenue und passt in dieselbe Breitenrechnung. */
 /* Nur die Gruppe mit Filter und Quickpick liegt ueber dem abgedunkelten Hintergrund. */
 .toolbar-filters { position: relative; z-index: 41; }
+
+/* Wettschein (seit 11.10.2026): Knopf rechts in der Leiste, Fenster rechts darunter verankert. Der
+   Anker liegt wie .toolbar-filters ueber dem abgedunkelten Hintergrund, damit man direkt zwischen
+   Filter, Quickpick und Wettschein wechseln kann. Farbregeln wie im Filtermenue: Gruen nur als
+   Balken an einer Wahl (Kombi-Groesse mit Anzahl), nie an Quoten - auch nicht an der Kombi-Quote. */
+.cart-anchor { z-index: 41; margin-left: auto; }
+.filter-menu.cart-window { left: auto; right: 0; width: min(900px, calc(100vw - 140px)); max-height: calc(100vh - var(--cart-top, 128px) - 16px); }
+.cart-body { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; flex: 1 1 auto; min-height: 0; padding: 14px 16px; }
+.cart-column { position: relative; display: grid; gap: 12px; align-content: start; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+@media (max-width: 900px) {
+  .cart-body { grid-template-columns: minmax(0, 1fr); overflow-y: auto; }
+  .cart-column { overflow: visible; }
+}
+.cart-tips .filter-card-head h4:focus { outline: none; }
+.cart-status { margin: 0; padding: 6px 10px; border-radius: 6px; background: var(--bg); color: var(--text); font-size: 11px; }
+.cart-link { padding: 0; border: 0; background: transparent; color: var(--text); font-size: inherit; font-weight: 600; text-decoration: underline; text-underline-offset: 2px; }
+.cart-link:hover { color: #ffffff; }
+.cart-games { display: grid; gap: 10px; }
+.cart-game { display: grid; gap: 4px; }
+.cart-game + .cart-game { padding-top: 10px; border-top: 1px solid var(--line); }
+.cart-game-head { display: grid; gap: 2px; min-width: 0; }
+.cart-game-head small { color: var(--muted); font-size: 10px; font-variant-numeric: tabular-nums; }
+.cart-game-head strong { overflow: hidden; color: var(--text); font-size: 12px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.cart-game.started .cart-game-head strong, .cart-game.started .cart-game-head small { color: var(--dim); }
+.cart-tip-list { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
+.cart-tip { display: grid; grid-template-columns: minmax(0, 1fr) 14px 40px 22px; align-items: center; gap: 6px; min-height: 28px; padding: 0 4px 0 10px; border-radius: 6px; background: var(--bg); color: var(--muted); font-size: 12px; }
+.cart-tip-label { display: grid; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cart-tip-label small { color: var(--dim); font-size: 10px; }
+.cart-tip.muted { color: var(--dim); }
+.cart-tip .level-glyph { width: auto; text-align: center; }
+.cart-tip-odds { color: var(--text); font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; }
+.cart-tip.muted .cart-tip-odds { color: var(--dim); }
+.cart-remove { display: grid; place-items: center; width: 22px; height: 22px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: var(--muted); }
+.cart-remove:hover { background: #222222; color: var(--text); }
+.cart-started { grid-template-columns: minmax(0, 1fr) auto; align-items: center; }
+.cart-sizes { display: grid; gap: 2px; }
+.cart-size { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) 26px 52px 26px; align-items: center; gap: 4px; min-height: 32px; padding: 0 6px 0 14px; border-radius: 6px; background: var(--bg); color: var(--muted); font-size: 12px; }
+.cart-size.active { background: #37373d; color: var(--text); font-weight: 600; }
+.cart-size.active::before { content: ""; position: absolute; top: 6px; bottom: 6px; left: 0; width: 3px; border-radius: 0 3px 3px 0; background: var(--green); }
+.cart-size input { height: 24px; padding: 0 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--text); font-size: 12px; font-variant-numeric: tabular-nums; text-align: right; }
+.cart-step { display: grid; place-items: center; width: 26px; height: 24px; padding: 0; border: 1px solid var(--line); border-radius: 6px; background: transparent; color: var(--muted); }
+.cart-step:hover:not(:disabled) { border-color: var(--muted); color: var(--text); }
+.cart-step:disabled { color: var(--dim); opacity: .5; cursor: default; }
+.cart-summary { color: var(--text); }
+.cart-combos { gap: 10px; }
+.cart-combo { display: grid; gap: 6px; padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); }
+.cart-combo.transferred { opacity: .55; }
+.cart-combo-head { display: grid; grid-template-columns: minmax(0, 1fr) auto 22px; align-items: center; gap: 8px; }
+.cart-combo-head strong { overflow: hidden; font-size: 12px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.cart-combo-odds { color: var(--text); font-family: var(--mono); font-size: 12px; font-variant-numeric: tabular-nums; }
+.cart-combo-state { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; color: var(--muted); font-size: 11px; }
+.cart-combo-state .filter-reset { height: 24px; font-size: 11px; }
+.cart-combo-started { color: var(--muted); }
+.cart-combo-list { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
+.cart-combo-list li { display: grid; grid-template-columns: 64px minmax(0, 1fr) minmax(0, 1fr) 40px; gap: 8px; align-items: baseline; padding: 3px 0; border-top: 1px solid var(--line); font-size: 11px; }
+.cart-combo-when { color: var(--muted); font-variant-numeric: tabular-nums; }
+.cart-combo-game, .cart-combo-tip { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cart-combo-tip { color: var(--muted); }
 .quickpick-anchor { position: static; }
 .filter-menu.quickpick-menu { width: min(940px, calc(100vw - 140px)); height: min(720px, calc(100vh - var(--quickpick-top, 128px) - 16px)); min-height: 320px; max-height: none; }
 .quickpick-menu .filter-menu-head .filter-switch-row { flex: 0 0 auto; }
@@ -456,6 +514,9 @@ fieldset.filter-field { min-width: 0; margin-inline: 0; padding: 0; border: 0; }
 .quickpick-footer { display: flex; flex-wrap: wrap; gap: 8px 12px; flex: 0 0 auto; align-items: center; padding: 10px 16px; border-top: 1px solid var(--line); }
 .quickpick-warning { flex: 1 1 320px; min-width: 0; }
 .quickpick-cart-note { color: var(--muted); font-size: 11px; white-space: nowrap; }
+/* Eigene Zeile ganz oben im Fuss, damit Warnung und Knopf an ihrem Platz bleiben. */
+.quickpick-cart-feedback { order: -1; flex: 1 0 100%; margin: 0; color: var(--muted); font-size: 11px; }
+.quickpick-cart-feedback strong { color: var(--text); font-variant-numeric: tabular-nums; }
 .quickpick-cart { display: flex; gap: 7px; align-items: center; height: 32px; padding: 0 14px; border: 1px solid var(--text); border-radius: 8px; background: var(--text); color: var(--bg); font-size: 12px; font-weight: 700; white-space: nowrap; }
 .quickpick-cart:hover:not(:disabled) { border-color: #ffffff; background: #ffffff; }
 .quickpick-cart:disabled { border-color: var(--line); background: transparent; color: var(--dim); cursor: default; }
@@ -592,6 +653,9 @@ fieldset.filter-field { min-width: 0; margin-inline: 0; padding: 0; border: 0; }
 .cart-menu-item .level-glyph { width: auto; text-align: center; }
 .cart-menu-odds { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; }
 .cart-menu-foot { margin-top: 4px; padding: 8px 10px 4px; border-top: 1px solid var(--line); color: var(--muted); font-size: 11px; }
+.cart-menu-foot:empty { display: none; }
+.cart-menu-item[aria-disabled="true"] { color: var(--dim); cursor: default; }
+.cart-menu-item[aria-disabled="true"]:hover { background: transparent; color: var(--dim); }
 @media (prefers-reduced-motion: reduce) {
   .cart-add, .cart-menu { transition: none; animation: none; }
   .insight-loading i { animation: none; }
@@ -619,16 +683,28 @@ fieldset.filter-field { min-width: 0; margin-inline: 0; padding: 0; border: 0; }
 .defense-shield.fallback { color: #9aa0a6; }
 .country-flag { width: 1.2em; margin-bottom: -.1em; border-radius: 2px; vertical-align: middle; }
 .form-cell { display: grid; grid-template-columns: 43px 1fr; align-items: center; gap: 9px; }
-.form-labels { display: grid; min-width: 43px; gap: 5px; }
-.form-labels small { display: flex; height: 23px; align-items: center; justify-content: flex-end; color: var(--muted); font-size: 9px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
-.form-cell > span:last-child { display: grid; justify-items: center; gap: 5px; }
-.dot-row { display: flex; gap: 4px; }
-.result-dot { display: grid; place-items: center; width: 23px; height: 23px; flex: 0 0 auto; border-radius: 50%; color: #1e1e1e; font-size: 8px; font-weight: 800; }
-.result-dot.win { background: var(--green); }
-.result-dot.draw { background: #858585; }
-.result-dot.loss { background: var(--red); }
-.h2h-cell .result-dot.win { background: var(--home); }
-.h2h-cell .result-dot.loss { background: var(--away); }
+.form-labels { display: grid; min-width: 43px; gap: 6px; }
+.form-labels small { display: flex; height: 18px; align-items: center; justify-content: flex-end; color: var(--muted); font-size: 9px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+.form-cell > span:last-child { display: grid; justify-items: start; gap: 6px; }
+/* Form und H2H als schmale Striche (seit 11.10.2026 statt Kreisen). 18 px Höhe und 6 px
+   Reihenabstand entsprechen den Teamzeilen, die Heimreihe steht also auf Höhe des Heimnamens.
+   Remis #6a6a6a ist dunkler als Rot: So bleiben beide auch bei Rot-Grün-Schwäche trennbar. */
+.form-bars-line { display: flex; align-items: center; gap: 8px; }
+.form-bars { display: flex; gap: 3px; }
+.form-bar { position: relative; width: 6px; height: 18px; flex: none; border-radius: 3px; background: #6a6a6a; font-style: normal; }
+.form-bar.win, .form-bar.hit { background: var(--green); }
+.form-bar.loss, .form-bar.miss { background: var(--red); }
+.form-bar.draw { background: #6a6a6a; }
+.h2h-cell .form-bar.win { background: var(--home); }
+.h2h-cell .form-bar.loss { background: var(--away); }
+.form-bar.missing { background: transparent; box-shadow: inset 0 0 0 1px var(--line); }
+.fixture-row[aria-expanded="true"] .form-bar.missing { box-shadow: inset 0 0 0 1px var(--dim); }
+/* Jüngstes Spiel: kleiner Strich darunter, 1 px Luft zum eigenen, 3 px zur nächsten Reihe. */
+.form-bar.latest::after { content: ""; position: absolute; left: 0; right: 0; bottom: -3px; height: 2px; border-radius: 1px; background: var(--dim); }
+/* Torzahl im Strich (Tore, Tore 1. HZ); min-width statt fester Breite, damit 10+ Tore passen. */
+.form-bar.count { display: grid; place-items: center; width: auto; min-width: 10px; padding: 0 2px; border-radius: 5px; color: #1e1e1e; font-size: 9px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
+.form-total { min-width: 2ch; color: var(--text); font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; text-align: right; cursor: help; }
+.form-total.missing { color: var(--dim); font-weight: 400; }
 .h2h-cell { display: grid; justify-items: center; gap: 4px; }
 .h2h-notice { color: var(--muted); font-size: 10px; cursor: help; }
 /* Anstoß als eigene Spalte: Uhrzeit (und Klassenunterschied), darunter Land und Liga. */
@@ -658,10 +734,6 @@ fieldset.filter-field { min-width: 0; margin-inline: 0; padding: 0; border: 0; }
 .day-divider h3 { margin: 0; color: var(--muted); font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; }
 .day-divider span { color: var(--dim); font-size: 11px; }
 .detail-recent { color: var(--muted); }
-.result-dot.hit { background: var(--green); }
-.result-dot.miss { background: var(--red); }
-.result-dot.missing { background: #333333; color: #858585; }
-.result-dot.latest { box-shadow: 0 0 0 1px #1e1e1e, 0 0 0 2px var(--accent); }
 .expected-cell { display: flex; align-items: center; justify-content: center; gap: 7px; font-size: 12px; white-space: nowrap; }
 .expected-cell i { color: #737373; font-style: normal; }
 .score-cell { display: grid; justify-items: center; gap: 5px; }
@@ -866,9 +938,6 @@ fieldset.filter-field { min-width: 0; margin-inline: 0; padding: 0; border: 0; }
 .connection-warning { position: fixed; right: 18px; bottom: 18px; z-index: 20; display: flex; align-items: center; gap: 8px; max-width: 460px; padding: 10px 14px; border: 1px solid #6a4423; border-radius: 10px; background: #332415; color: #e2984a; font-size: 10px; box-shadow: 0 12px 35px rgba(0,0,0,.45); }
 .connection-warning svg { flex: 0 0 auto; }
 
-.bet-cart-badge { position: fixed; right: 24px; bottom: 24px; z-index: 55; display: flex; align-items: center; gap: 8px; height: 44px; padding: 0 16px; border: 1px solid var(--line); border-radius: 22px; background: #1e1e1e; color: #d4d4d4; font-weight: 700; font-size: 12px; box-shadow: 0 12px 30px rgba(0,0,0,.5); }
-.bet-cart-badge:hover { border-color: var(--accent); color: var(--accent); }
-.bet-cart-badge span { display: grid; place-items: center; min-width: 20px; height: 20px; padding: 0 4px; border-radius: 10px; background: var(--accent-soft); color: #d7ecff; font-size: 11px; }
 
 .overlay-backdrop { position: fixed; inset: 0; z-index: 60; background: rgba(4,4,10,.72); }
 /* Abgedunkelter, leicht weichgezeichneter Hintergrund unter Filtermenue und Quickpicker (Davids
@@ -889,42 +958,6 @@ fieldset.filter-field { min-width: 0; margin-inline: 0; padding: 0; border: 0; }
 .overlay-head-actions { display: flex; align-items: center; gap: 8px; }
 .overlay-head-actions button:disabled { opacity: .4; }
 
-.bet-builder-drawer { position: fixed; top: 0; right: 0; bottom: 0; z-index: 61; display: flex; flex-direction: column; width: min(460px, 100vw); border-left: 1px solid #4a4a4a; background: #1e1e1e; box-shadow: -20px 0 50px rgba(0,0,0,.5); overflow: hidden; }
-.bet-builder-drawer.has-combos { width: min(880px, 100vw); }
-.bet-builder-empty { padding: 24px 16px; color: #969696; font-size: 11px; line-height: 1.6; }
-.bet-builder-body { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow-y: auto; }
-.bet-builder-drawer.has-combos .bet-builder-body { flex-direction: row; overflow-y: hidden; }
-.bet-builder-results { flex: 1; min-width: 0; padding: 16px; overflow-y: auto; }
-.bet-builder-results h3 { margin: 0 0 12px; color: #9d9d9d; font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
-.bet-builder-controls { flex: 0 0 auto; overflow-y: auto; }
-.bet-builder-drawer.has-combos .bet-builder-controls { flex: 0 0 320px; border-left: 1px solid var(--line-soft); }
-.bet-builder-section { padding: 14px 16px; border-bottom: 1px solid var(--line-soft); }
-.bet-builder-section h3 { margin: 0 0 10px; color: #9d9d9d; font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
-.cart-entry-list { display: grid; gap: 7px; margin: 0 0 10px; padding: 0; list-style: none; }
-.cart-entry-list li { display: flex; align-items: center; gap: 8px; padding: 8px 9px; border: 1px solid var(--line-soft); border-radius: 9px; background: #252526; }
-.cart-entry-list li > span:first-child { flex: 1; display: grid; gap: 2px; min-width: 0; }
-.cart-entry-list li strong { font-size: 11px; }
-.cart-entry-list li small { overflow: hidden; color: #969696; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
-.cart-entry-odd { flex: 0 0 auto; font-size: 12px; color: var(--text); }
-.cart-entry-list li button { display: grid; place-items: center; width: 22px; height: 22px; flex: 0 0 auto; border: 0; border-radius: 50%; background: transparent; color: #808080; }
-.cart-entry-list li button:hover { color: var(--red); }
-.combo-size-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(78px, 1fr)); gap: 7px; margin-bottom: 10px; }
-.combo-size-row { display: grid; gap: 4px; padding: 7px 8px; border: 1px solid var(--line); border-radius: 8px; background: #202020; font-size: 10px; color: #a0a0a0; }
-.combo-size-row input { width: 100%; padding: 3px 4px; border: 1px solid var(--line); border-radius: 5px; background: #1a1a1a; color: var(--text); font-size: 11px; }
-.bet-builder-warning { margin: 10px 0 0; color: var(--gold); font-size: 10px; line-height: 1.5; }
-.bet-builder-note { margin: 10px 0 0; color: #a0a0a0; font-size: 10px; line-height: 1.5; }
-.ghost-button { display: inline-flex; align-items: center; gap: 6px; padding: 7px 11px; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: #a0a0a0; font-size: 10px; font-weight: 700; }
-.ghost-button:hover { border-color: var(--red); color: var(--red); }
-.primary-button { display: flex; align-items: center; justify-content: center; gap: 7px; width: 100%; height: 38px; margin-top: 10px; border: 1px solid #007acc; border-radius: 9px; background: #0e639c; color: #ffffff; font-size: 11px; font-weight: 800; }
-.primary-button:disabled { cursor: not-allowed; opacity: .4; }
-.combo-list { display: grid; gap: 12px; }
-.combo-card { padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; background: #252526; }
-.combo-card-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
-.combo-card-head strong { flex: 1; font-size: 13px; }
-.combo-card-head span { color: var(--green); font-size: 14px; font-weight: 800; }
-.combo-card-head button { display: grid; place-items: center; width: 22px; height: 22px; border: 0; border-radius: 50%; background: transparent; color: #808080; }
-.combo-card-head button:hover { color: var(--red); }
-.combo-card ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 5px; color: #c2c2c2; font-size: 12px; line-height: 1.6; }
 
 .density-compact .market-card { padding: 6px 8px; }
 
@@ -1048,6 +1081,7 @@ fieldset.filter-field { min-width: 0; margin-inline: 0; padding: 0; border: 0; }
   .nav-rail-foot { font-size: 8px; }
   /* Die Werkzeugleiste scrollt hier seitlich und schnitte ein absolut gesetztes Menue ab. */
   .filter-menu, .filter-menu.single { position: fixed; top: 64px; right: 8px; left: 64px; width: auto; }
+  .filter-menu.cart-window { left: 64px; width: auto; }
   .day-range { grid-template-columns: minmax(0, 1fr); }
   .quick-range { justify-self: start; min-width: 120px; }
   .toolbar-row { gap: 8px; }
@@ -1056,16 +1090,12 @@ fieldset.filter-field { min-width: 0; margin-inline: 0; padding: 0; border: 0; }
   .banner p { font-size: 9px; }
   .live-panel { left: 12px !important; width: calc(100vw - 24px) !important; }
   .view-toolbar { gap: 8px; overflow-x: auto; }
-  .bet-builder-drawer { width: 100vw; }
   .league-filter-modal { width: 100vw; height: 100vh; max-height: 100vh; border-radius: 0; }
   .kelly-dialog { width: 100vw; height: 100vh; max-height: 100vh; border-radius: 0; }
-  .bet-builder-drawer.has-combos .bet-builder-body { flex-direction: column; overflow-y: auto; }
-  .bet-builder-drawer.has-combos .bet-builder-controls { flex: 0 0 auto; border-left: 0; border-top: 1px solid var(--line-soft); }
   .table-with-detail { flex-direction: column; }
   .table-scroll { margin: 0 0 12px; }
   .fixture-detail-panel { width: auto; min-width: 0; flex: 0 0 auto; border-left: 0; border-top: 1px solid var(--line); }
   .period-row, .period-axis { grid-template-columns: 16px 36px 17px repeat(6, minmax(0, 1fr)); }
-  .bet-cart-badge { right: 14px; bottom: 14px; }
 }
 
 /* Marktprofil: was die eigenen abgerechneten Partien über die Märkte sagen. */
@@ -1141,7 +1171,9 @@ fieldset.filter-field { min-width: 0; margin-inline: 0; padding: 0; border: 0; }
 .heatmap-row-wrap.open { background: #252526; box-shadow: inset 3px 0 0 var(--accent); }
 .heatmap-row { height: 34px; padding: 0 10px 0 38px; border: 0; background: transparent; text-align: left; }
 .heatmap-row-wrap .cart-add-hub { --hub-size: 22px; }
-.cart-add-hub.compact .cart-add:not(.has-entries) { font-size: 14px; font-weight: 500; letter-spacing: 0; }
+.cart-add:not(.has-entries) { font-size: 14px; font-weight: 500; letter-spacing: 0; }
+.cart-add:disabled { opacity: .35; cursor: default; }
+.cart-add:disabled:hover { background: var(--bg); color: var(--muted); }
 .heatmap-time { display: flex; align-items: baseline; gap: 6px; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .heatmap-time small { color: #6f6f6f; font-size: 10px; }
 .heatmap-time strong { color: #e0e0e0; font-size: 13px; font-weight: 700; }

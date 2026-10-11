@@ -275,7 +275,7 @@ export function FilterMenu({ values, actions, rangeControl, displayControls }: {
   actions: FilterMenuActions;
   /** Der Zeitraumblock mit den Tageskacheln, fertig aus dem Dashboard. */
   rangeControl?: ReactNode;
-  /** Punkte in Form und H2H samt Linie; ihre Kopplung an den Markt bleibt im Dashboard. */
+  /** Striche in Form und H2H samt Linie; ihre Kopplung an den Markt bleibt im Dashboard. */
   displayControls?: ReactNode;
 }) {
   const headingRef = useRef<HTMLHeadingElement>(null);

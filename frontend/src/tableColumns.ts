@@ -26,13 +26,14 @@ export interface TableColumn {
   fr: number;
 }
 
-// Form 184 und H2H 134 sind die gemessenen Breiten von fünf Punkten samt Beschriftung (siehe
-// den früheren Kommentar in styles.css); die übrigen Minima tragen ihren längsten Inhalt.
+// Form und H2H tragen seit 11.10.2026 schmale Striche statt Kreisen; ihre Untergrenze ist der
+// Spaltenkopf „Letzte 5 …“ samt Sortierabzeichen, nicht mehr der Inhalt. Die übrigen Minima
+// tragen ihren längsten Inhalt.
 const COLUMNS: Record<TableColumnId, TableColumn> = {
   match: { id: "match", min: 200, fr: 1.6 },
   kickoff: { id: "kickoff", min: 128, fr: 0.8 },
-  form: { id: "form", min: 184, fr: 1 },
-  h2h: { id: "h2h", min: 134, fr: 0.8 },
+  form: { id: "form", min: 128, fr: 1 },
+  h2h: { id: "h2h", min: 120, fr: 0.8 },
   expected: { id: "expected", min: 84, fr: 0.5 },
   points: { id: "points", min: 52, fr: 0.34 },
   shots: { id: "shots", min: 56, fr: 0.34 },

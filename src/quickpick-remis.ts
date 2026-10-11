@@ -284,8 +284,8 @@ export const REMIS_PRESET: QuickpickPreset<RemisQuickpickSettings> = {
   warnung: "Mit dem heutigen Modell stimmen kaum mehr Tipps als ganz ohne Filter. Rechne nicht"
     + " mit Gewinn.",
   wettschein: {
-    hinweis: "Legt jedes gefundene Spiel als „Unentschieden“ in den Wettschein. Ein"
-      + " Sieger-Tipp zum selben Spiel bleibt daneben bestehen."
+    hinweis: "Legt jedes gefundene Spiel als „Unentschieden“ in den Wettschein. Ein Sieger-Tipp"
+      + " zum selben Spiel wird dabei ersetzt – beides zugleich verliert sicher."
   },
   leerSatz: "Kein Spiel endet wahrscheinlich genug unentschieden – jedenfalls nicht zu diesem Preis.",
   defaults: DEFAULT_REMIS_SETTINGS,

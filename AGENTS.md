@@ -263,8 +263,10 @@ Benutzer auf Deutsch und führe Analyseaufträge selbstständig über die vorhan
   über der Tabelle liegt und nichts verdrängt. **Seit 10.10.2026 dunkelt ein weichgezeichneter
   Hintergrund (`.menu-backdrop`) den Rest ab, solange Filtermenü oder Quickpicker offen sind**
   (Davids Wunsch); nur die Gruppe mit Filter und Quickpick (`.toolbar-filters`) bleibt darüber, ein
-  Klick auf den Hintergrund schließt, ein Fokus-Gefängnis gibt es nicht. Baukasten, Kelly-Dialog
-  und Wettbewerbe-Dialog (`.overlay-backdrop`) sind dabei ebenfalls weichgezeichnet. Markt und Sortierung bleiben sichtbar in der Leiste,
+  Klick auf den Hintergrund schließt, ein Fokus-Gefängnis gibt es nicht. Seit 11.10.2026 gilt
+  dasselbe für den **Wettschein** (Knopf rechts in der Leiste, `.cart-anchor` ebenfalls über dem
+  Hintergrund); Kelly-Dialog und Wettbewerbe-Dialog (`.overlay-backdrop`) sind dabei ebenfalls
+  weichgezeichnet. Markt und Sortierung bleiben sichtbar in der Leiste,
   weil sie nichts ausblenden. **Werkzeugleiste seit 28.09.2026 im Leistenstil** (Entwurf des
   UX-Agenten, Davids Entscheidung): links Filter und Quickpick (beide blenden aus), eine Trennlinie,
   dann Markt, Sortierung, Anzeige und direkt daneben „Kelly-Auswahl“ (nur im Kelly-Modus).
@@ -285,7 +287,7 @@ Benutzer auf Deutsch und führe Analyseaufträge selbstständig über die vorhan
   zweiter Klick = Zeitraum, während der Wahl zeigt das Überfahren den künftigen Zeitraum. Alles
   wirkt ohne Übernehmen sofort; `next48` bleibt dabei strikt. Form und H2H teilen sich einen Umschalter (beide Zustände bleiben, weil die Sortierung
   je Spalte liest). Das Menü hat zwei Spalten aus Karten: links der Umfang (`scopedFixtures`, gilt
-  auch für Kelly und Quickpick), rechts, was nur die Tabelle eingrenzt, und die Punkte in Form und H2H (Gruppe „Form und H2H“). Der Kopf
+  auch für Kelly und Quickpick), rechts, was nur die Tabelle eingrenzt, und die Striche in Form und H2H (Gruppe „Form und H2H“). Der Kopf
   zählt die angezeigten Spiele aus `filtered`, weil das Menü die Statuszeile verdeckt. Grün markiert im Menü die
   Wahl nur als Linie und Schalterbahn, nie als Fläche oder Häkchen (Grün ✓ heißt in der Tabelle
   „Empfehlenswert“); Blau ist dort nur Tastaturfokus. Seit 28.09.2026 im Leistenstil: Die Wahl
@@ -327,12 +329,28 @@ Benutzer auf Deutsch und führe Analyseaufträge selbstständig über die vorhan
   Detailansicht (aus dem Snapshot, sofort da) und in der Heatmap. Bei „Alle Märkte“ statt
   vierzehn Kästchen die 1X2-Zelle und „Empfohlene Märkte“ (höchstens drei mit ✓/★, ★ zuerst,
   1X2 und Märkte ohne belastbare Wahrscheinlichkeit nie). Eine H2H-Remisserie steht grau als
-  „Remis-Serie“ unter den H2H-Punkten. Kelly-Spalten (Tipp, Modell, Korrigiert, Kelly-Einsatz)
+  „Remis-Serie“ unter den H2H-Strichen. **Form und H2H sind seit 11.10.2026 schmale Striche**
+  statt Kreisen (Aufbau in `references/app-landkarte.md`); die Zahl rechts neben der Form ist
+  neutral, weil Grün in der Tabelle „Empfehlenswert“ heißt. Kelly-Spalten (Tipp, Modell, Korrigiert, Kelly-Einsatz)
   gab es vom 28. bis 29.09.2026 und gibt es nicht mehr - nicht wieder einbauen, ohne David zu
   fragen. Sortierbar ist nur, was zu
   sehen ist; eine gemerkte Sortierung auf eine ausgeblendete Spalte fällt auf den Anstoß zurück,
   ohne gelöscht zu werden. Bei Sortierung nach Anstoß trennt eine leise Zeile die Tage (Berliner
   Zeit), das Datum fällt dann aus der Zeile.
+- **Wettschein** (seit 11.10.2026, `frontend/src/BetCartUI.tsx`, Logik `frontend/src/betCart.ts`;
+  Davids Entscheidungen nach zwei Runden des UX-Agenten, vorher „Warenkorb“/„Wett-Baukasten“ als
+  Seitenleiste): Knopf „Wettschein“ rechts in der Leiste, Fenster im Leistenstil wie Filter und
+  Quickpicker, offen ist höchstens eins. Regeln, die nicht zurückgebaut werden sollen:
+  **Gegensätze desselben Spiels ersetzen einander** beim Hineinlegen (`putEntriesInto` über
+  `marketsExcludeEachOther`; vorher landeten Remis und Heimsieg zugleich in einer Kombi, die sicher
+  verliert), **je Kombi höchstens ein Tipp pro Spiel** (Quoten zweier Tipps eines Spiels zu
+  multiplizieren gäbe einen falschen Kombi-Preis), **angepfiffene Tipps und Tipps ohne Quote sind
+  nicht mischbar** (`isPlayable`), der „+“-Knopf ist nach dem Anpfiff gesperrt. Leeren und
+  „Angepfiffene entfernen“ wirken sofort und lassen sich einmal zurücknehmen (`lastChange`), statt
+  vorher zu fragen. Größen und Modus der Kombis werden gemerkt (`football-analyzer:combo-setup`),
+  die Kombis nur bis zum Neuladen; „Als übertragen markieren“ hält eine Kombi beim Neumischen fest.
+  Die Kombi-Quote ist neutral, nie grün; Einsatz, Gewinn, Modellwahrscheinlichkeit und Vorteil
+  zeigt der Wettschein bewusst nicht. Die Warnung im Fuß steht immer da.
 - **Der Kelly-Dialog heißt „Kelly-Auswahl“ und führt die Liste der Wetten** (seit 29.09.2026
   wieder, Davids Entscheidung): Modus, Kennzahlen, Hinweise, Einstellungen, dann die sortierbare
   Liste (Spiel, Markt, Quote, Modell, Korrigiert nur in der Automatik, Vorteil grau mit „nach
@@ -674,7 +692,7 @@ nachgezogen, nicht gesammelt am Ende.
 - Ein neuer Markt braucht Einträge in `DashboardMarketKey`, `thresholds`, der Marktliste,
   `decideMarket` (`src/market-outcome.ts`), `MARKET_OPTIONS`, `MARKET_TOGGLES` und
   `MARKET_GROUP_OF` (`frontend/src/App.tsx`, Gruppe in der Marktliste der Werkzeugleiste und in
-  der Marktauswahl am „Add“-Knopf). `MARKET_GROUP_OF` und `thresholds` sind als vollständige
+  der Marktauswahl am „+“-Knopf). `MARKET_GROUP_OF` und `thresholds` sind als vollständige
   Records notiert, der Compiler erzwingt sie also. `RADIAL_LABELS` gibt es seit 30.09.2026 nicht
   mehr: Das Radialmenü wurde durch eine Liste ersetzt, die die vollen Marktnamen zeigt.
 
@@ -1130,6 +1148,11 @@ anderen ausdrücklich nicht.
   - **Angepfiffene Spiele kommen nicht in den Wettschein** (wie bei Kelly: ihre Quote stammt
     von vor dem Anpfiff), ebenso wenig Zeilen mit geschätzter Quote (≈). Beide stehen gezählt
     neben dem Knopf. Die Prüfung sitzt in `QuickpickUI.tsx`, nicht in der Regel.
+  - **„Alle n in den Wettschein“ öffnet den Wettschein nicht mehr** (seit 11.10.2026, Davids
+    Entscheidung): Der Quickpicker bleibt offen und meldet im Fuß „n neu im Wettschein · r ersetzt
+    · u schon drin · Rückgängig · Wettschein öffnen ›“ - so lassen sich mehrere Filter nacheinander
+    einsammeln. Remis-Filter ersetzen dabei einen Sieger-Tipp desselben Spiels (Hinweistext in
+    `src/quickpick-remis.ts` und `src/quickpick-remisscore.ts`).
 - **Die Messwerte der Stufen sind Zahlen, keine Strings.** `QuickpickLevel.measured` trägt
   `{ n, proTag, trefferquote, roi }`; den Knopftext formatiert `preset.noteOf`. Früher stand
   dort ein Text, den die Rückrechnung wieder zerlegen musste.
@@ -1168,8 +1191,8 @@ anderen ausdrücklich nicht.
 
 ### „Daves 1x2-Filter": klar überlegene Mannschaften
 
-- Zweck ist die Kombi: Die Treffer gehen per Knopf in den Wettschein, wo der Baukasten daraus
-  Kombis baut. Maßstab ist deshalb die **Trefferquote je Bein**, nicht der Ertrag einer
+- Zweck ist die Kombi: Die Treffer gehen per Knopf in den Wettschein, wo daraus Kombis
+  entstehen. Maßstab ist deshalb die **Trefferquote je Bein**, nicht der Ertrag einer
   Einzelwette - eine Kombi multipliziert beides. Bei -10 % je Bein bleibt von einer
   Sechserkombi im Erwartungswert die Hälfte des Einsatzes übrig.
 - **Er rechnet keine eigene Punktzahl**, sondern ist eine Folge unabhängiger Tore mit je einer

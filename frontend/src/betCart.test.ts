@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { canGenerate, combinedOdds, generateCombos, sizeRange, toCounterCartEntry, type CartEntry } from "./betCart";
+import {
+  canGenerate, combinedOdds, generateCombos, isPlayable, putEntriesInto, selectionLabel, sizeRange, toCounterCartEntry,
+  type CartEntry
+} from "./betCart";
 import type { DashboardFixture, DashboardMarket } from "./types";
 
 function entry(id: string, odds: number | null = 2): CartEntry {
@@ -68,7 +71,7 @@ describe("generateCombos", () => {
 
   /**
    * Der Kern des Auffüllens: Es ist kein freies Ziehen. Jede Wette kommt einmal an die
-   * Reihe, bevor sich die erste wiederholt - nur die Plätze, die der Warenkorb nicht mehr
+   * Reihe, bevor sich die erste wiederholt - nur die Plätze, die der Wettschein nicht mehr
    * deckt, werden aus schon Verwendetem aufgefüllt.
    */
   it("auffüllen: vergibt erst jede Wette einmal, dann erst wiederholt sich etwas", () => {
@@ -85,7 +88,7 @@ describe("generateCombos", () => {
     }
   });
 
-  it("auffüllen: lässt mehr Plätze zu als der Warenkorb Wetten hat", () => {
+  it("auffüllen: lässt mehr Plätze zu als der Wettschein Tipps hat", () => {
     const pool = [entry("1"), entry("2"), entry("3")];
     expect(canGenerate(pool, [{ size: 2, count: 5 }], "auffuellen")).toBe(true);
     expect(canGenerate(pool, [{ size: 2, count: 5 }], "einmalig")).toBe(false);
@@ -155,5 +158,113 @@ describe("toCounterCartEntry", () => {
     expect(toCounterCartEntry(ohneTipp, ohneTipp.markets[0]!)).toBeNull();
     const fixture = partie();
     expect(toCounterCartEntry(fixture, fixture.markets[1]!)).toBeNull();
+  });
+});
+
+/** Ein Tipp aus einem bestimmten Spiel und Markt - für die Regeln „ein Spiel je Kombi“ und „Gegensätze ersetzen“. */
+function tip(fixtureId: number, marketKey: CartEntry["marketKey"], selection: string, pick: "1" | "2" | null = null): CartEntry {
+  return {
+    ...entry(String(fixtureId)), id: `${fixtureId}:${marketKey}`, fixtureId, marketKey, marketLabel: marketKey, selection, pick
+  };
+}
+
+describe("ein Spiel je Kombi", () => {
+  // Spiel 1 trägt drei Tipps, die Spiele 2-4 je einen.
+  const pool = [
+    tip(1, "1x2", "Heimsieg", "1"), tip(1, "over25", "Mindestens 3 Tore"), tip(1, "btts", "Beide Teams treffen: Ja"),
+    tip(2, "1x2", "Heimsieg", "1"), tip(3, "1x2", "Heimsieg", "1"), tip(4, "1x2", "Heimsieg", "1")
+  ];
+
+  it("ohne Wiederholung: keine Kombi enthält ein Spiel zweimal", () => {
+    for (let versuch = 0; versuch < 30; versuch += 1) {
+      const combos = generateCombos(pool, [{ size: 2, count: 3 }], "einmalig");
+      expect(combos).toHaveLength(3);
+      for (const combo of combos) expect(new Set(combo.entries.map((item) => item.fixtureId)).size).toBe(2);
+      const used = combos.flatMap((combo) => combo.entries.map((item) => item.id));
+      expect(new Set(used).size).toBe(6);
+    }
+  });
+
+  it("ohne Wiederholung: erkennt, wenn zu viele Tipps aus einem Spiel stammen", () => {
+    // Eine 4er-Kombi nimmt jedes Spiel einmal; für die 2er bleiben nur Tipps aus Spiel 1.
+    expect(canGenerate(pool, [{ size: 4, count: 1 }, { size: 2, count: 1 }], "einmalig")).toBe(false);
+    expect(generateCombos(pool, [{ size: 4, count: 1 }, { size: 2, count: 1 }], "einmalig")).toEqual([]);
+    expect(canGenerate(pool, [{ size: 5, count: 1 }], "einmalig")).toBe(false);
+  });
+
+  it("auffüllen: jede Kombi aus verschiedenen Spielen, Größe höchstens die Zahl der Spiele", () => {
+    expect(canGenerate(pool, [{ size: 5, count: 1 }], "auffuellen")).toBe(false);
+    for (let versuch = 0; versuch < 30; versuch += 1) {
+      for (const combo of generateCombos(pool, [{ size: 4, count: 3 }], "auffuellen")) {
+        expect(new Set(combo.entries.map((item) => item.fixtureId)).size).toBe(4);
+      }
+    }
+  });
+
+  it("behält übertragene Kombis und vergibt ihre Tipps ohne Wiederholung nicht erneut", () => {
+    const four = [entry("1"), entry("2"), entry("3"), entry("4")];
+    const [first] = generateCombos(four, [{ size: 2, count: 1 }], "einmalig");
+    const kept = { ...first!, transferred: true };
+    for (let versuch = 0; versuch < 20; versuch += 1) {
+      const combos = generateCombos(four, [{ size: 2, count: 1 }], "einmalig", [kept]);
+      expect(combos).toHaveLength(2);
+      expect(combos[0]).toBe(kept);
+      const keptIds = kept.entries.map((item) => item.id);
+      for (const item of combos[1]!.entries) expect(keptIds).not.toContain(item.id);
+    }
+    // Für eine zweite neue 2er reicht der Rest nicht mehr.
+    expect(canGenerate(four, [{ size: 2, count: 2 }], "einmalig", [kept])).toBe(false);
+  });
+});
+
+describe("putEntriesInto", () => {
+  it("ersetzt Gegensätze desselben Spiels und lässt verträgliche Tipps stehen", () => {
+    const heim = tip(1, "1x2", "Heimsieg Alpha", "1");
+    const remis = tip(1, "draw", "Unentschieden (X)");
+    const ueber = tip(1, "over25", "Mindestens 3 Tore");
+    const unter = tip(1, "under25", "Höchstens 2 Tore");
+    let { cart, result } = putEntriesInto([remis, tip(2, "draw", "Unentschieden (X)")], [heim]);
+    expect(cart.map((item) => item.id)).toEqual(["2:draw", "1:1x2"]);
+    expect(result.replaced).toEqual([{ by: heim, old: [remis] }]);
+
+    ({ cart, result } = putEntriesInto(cart, [ueber]));
+    expect(result.added).toEqual([ueber]);
+    expect(cart).toHaveLength(3);
+
+    ({ cart, result } = putEntriesInto(cart, [unter]));
+    expect(result.replaced).toEqual([{ by: unter, old: [ueber] }]);
+    expect(cart.map((item) => item.id)).toEqual(["2:draw", "1:1x2", "1:under25"]);
+  });
+
+  it("tauscht die 1X2-Seite an ihrer Stelle und meldet Unverändertes", () => {
+    const heim = tip(1, "1x2", "Heimsieg Alpha", "1");
+    const gast = tip(1, "1x2", "Auswärtssieg Beta", "2");
+    const other = tip(2, "over25", "Mindestens 3 Tore");
+    const { cart, result } = putEntriesInto([heim, other], [gast, other]);
+    expect(cart).toEqual([gast, other]);
+    expect(result.replaced).toEqual([{ by: gast, old: [heim] }]);
+    expect(result.unchanged).toEqual([other]);
+  });
+
+  it("verdrängt nichts mit einer Auswahl, die es nicht entscheiden kann", () => {
+    const fremd = tip(1, "1x2", "Irgendwas", "1");
+    const ueber = tip(1, "over25", "Mindestens 3 Tore");
+    expect(putEntriesInto([ueber], [{ ...fremd, id: "1:fremd" }]).cart).toHaveLength(2);
+  });
+});
+
+describe("isPlayable und selectionLabel", () => {
+  const now = Date.parse("2026-08-17T12:00:00.000Z");
+
+  it("mischbar nur vor dem Anpfiff und mit Quote", () => {
+    expect(isPlayable(entry("1"), now)).toBe(true);
+    expect(isPlayable({ ...entry("1"), kickoff: "2026-08-17T11:00:00.000Z" }, now)).toBe(false);
+    expect(isPlayable(entry("1", null), now)).toBe(false);
+  });
+
+  it("nennt beim 1X2 die Mannschaft, sonst Markt und Auswahl", () => {
+    expect(selectionLabel(entry("1"))).toBe("Heimsieg Team 1A");
+    expect(selectionLabel({ ...entry("1"), pick: "2", selection: "Auswärtssieg" })).toBe("Auswärtssieg Team 1B");
+    expect(selectionLabel(tip(1, "over25", "Mindestens 3 Tore"))).toBe("over25 · Mindestens 3 Tore");
   });
 });
