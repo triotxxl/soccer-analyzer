@@ -1,4 +1,5 @@
 import { Broadcast, ChartBar, ClockCounterClockwise, GridFour, SoccerBall, Table, type Icon } from "@phosphor-icons/react";
+import type { ReactNode } from "react";
 
 /**
  * Die vier Ansichten der linken Leiste. Tabelle und Heatmap sind intern dieselbe Ansicht
@@ -29,32 +30,41 @@ function dataTimestampParts(value: string, timezone: string): [string, string] {
   ];
 }
 
-export function NavRail({ active, onSelect, createdAt, timezone }: {
+/**
+ * Die Leiste: oben die Ansichten als `<nav>`, unten die Einstellungen und der Datenstand. Beide
+ * stehen außerhalb von `<nav>` - sie sind keine Ansichten (seit 11.10.2026).
+ */
+export function NavRail({ active, onSelect, createdAt, timezone, settings }: {
   active: NavKey;
   onSelect: (key: NavKey) => void;
   createdAt: string;
   timezone: string;
+  /** Knopf und Fenster der Einstellungen, gebaut in `App` wie Filter und Wettschein. */
+  settings?: ReactNode;
 }) {
   const [day, time] = dataTimestampParts(createdAt, timezone);
-  return <nav className="nav-rail" aria-label="Ansichten">
-    <BrandMark />
-    <div className="nav-rail-items">
-      {NAV_ITEMS.map(([key, label, ItemIcon]) => {
-        const current = active === key;
-        // Nur aria-current, kein aria-pressed daneben: Der Name kommt allein aus dem sichtbaren
-        // Text, damit Screenreader und Tests denselben Namen sehen.
-        return <button key={key} type="button" className={key === "live" ? "live" : undefined}
-          aria-current={current ? "page" : undefined} onClick={() => onSelect(key)}>
-          <ItemIcon size={22} weight={current ? "fill" : "duotone"} aria-hidden />
-          <span className="nav-rail-label">{label}</span>
-        </button>;
-      })}
-    </div>
+  return <div className="nav-rail">
+    <nav className="nav-rail-nav" aria-label="Ansichten">
+      <BrandMark />
+      <div className="nav-rail-items">
+        {NAV_ITEMS.map(([key, label, ItemIcon]) => {
+          const current = active === key;
+          // Nur aria-current, kein aria-pressed daneben: Der Name kommt allein aus dem sichtbaren
+          // Text, damit Screenreader und Tests denselben Namen sehen.
+          return <button key={key} type="button" className={key === "live" ? "live" : undefined}
+            aria-current={current ? "page" : undefined} onClick={() => onSelect(key)}>
+            <ItemIcon size={22} weight={current ? "fill" : "duotone"} aria-hidden />
+            <span className="nav-rail-label">{label}</span>
+          </button>;
+        })}
+      </div>
+    </nav>
+    {settings}
     <p className="nav-rail-foot">
       <ClockCounterClockwise size={16} weight="bold" aria-hidden />
       <span className="visually-hidden">Datenstand: </span>
       <span>{day}</span>
       <span>{time}</span>
     </p>
-  </nav>;
+  </div>;
 }

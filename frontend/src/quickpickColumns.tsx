@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { formatOdd } from "./App";
 import { DRAW_SIGNAL_CONFIG, DRAW_SIGNAL_META, formatDrawPoints } from "../../src/draw-signals.ts";
 import { oddsEstimated, type QuickpickEvaluation, type QuickpickPresetId } from "./quickpick";
+import { countryName, leagueName, teamName, type NameSource } from "./names";
 import type { DashboardFixture } from "./types";
 
 /**
@@ -13,6 +14,8 @@ import type { DashboardFixture } from "./types";
 export interface QuickpickRow {
   fixture: DashboardFixture;
   evaluation: QuickpickEvaluation;
+  /** Welche Namen die Spalten zeigen (Einstellungen, `names.ts`). Pflicht, damit keine Spalte sie vergisst. */
+  names: NameSource;
 }
 
 export interface QuickpickColumn {
@@ -42,15 +45,15 @@ function strongPercent(evaluation: QuickpickEvaluation): number {
 }
 
 function teamOf(row: QuickpickRow): string {
-  return row.evaluation.side === "1" ? row.fixture.homeTeam : row.fixture.awayTeam;
+  return teamName(row.fixture, row.evaluation.side === "1" ? "home" : "away", row.names);
 }
 
 const partie: QuickpickColumn = {
   key: "team", label: "Partie", sortable: true,
-  value: (row) => `${row.fixture.homeTeam} ${row.fixture.awayTeam}`,
+  value: (row) => `${teamName(row.fixture, "home", row.names)} ${teamName(row.fixture, "away", row.names)}`,
   cell: (row) => ({
-    main: `${row.fixture.homeTeam} – ${row.fixture.awayTeam}`,
-    note: `${row.fixture.country} · ${row.fixture.league}`
+    main: `${teamName(row.fixture, "home", row.names)} – ${teamName(row.fixture, "away", row.names)}`,
+    note: `${countryName(row.fixture, row.names)} · ${leagueName(row.fixture, row.names)}`
   })
 };
 

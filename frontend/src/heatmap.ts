@@ -1,3 +1,4 @@
+import { teamName, type NameSource } from "./names";
 import { venueFormPercent } from "../../src/quickpick-core.ts";
 import { edgeOf } from "./kelly";
 import type { DashboardFixture, DashboardMarket, DashboardMarketKey } from "./types";
@@ -143,9 +144,10 @@ export function formatDelta(value: number, digits: number): string {
 
 export type HeatmapColumn = "kickoff" | "team" | HeatMetric | "drawScore" | `market:${DashboardMarketKey}`;
 
-export function heatmapSortValue(fixture: DashboardFixture, column: HeatmapColumn): number | string | null {
+/** `names`: sortiert wird nach den angezeigten Namen (Einstellungen, `names.ts`). */
+export function heatmapSortValue(fixture: DashboardFixture, column: HeatmapColumn, names: NameSource): number | string | null {
   if (column === "kickoff") return Date.parse(fixture.kickoff);
-  if (column === "team") return `${fixture.homeTeam} ${fixture.awayTeam}`;
+  if (column === "team") return `${teamName(fixture, "home", names)} ${teamName(fixture, "away", names)}`;
   if (column === "elo") return eloDelta(fixture)?.value ?? null;
   if (column === "form") return formDelta(fixture)?.value ?? null;
   if (column === "xg") return expectedGoalsDelta(fixture).value;
@@ -157,10 +159,10 @@ export function heatmapSortValue(fixture: DashboardFixture, column: HeatmapColum
 }
 
 /** Fehlende Werte stehen in beiden Richtungen am Ende, Gleichstand nach Anstoß. */
-export function sortHeatmap(fixtures: DashboardFixture[], column: HeatmapColumn, direction: 1 | -1): DashboardFixture[] {
+export function sortHeatmap(fixtures: DashboardFixture[], column: HeatmapColumn, direction: 1 | -1, names: NameSource): DashboardFixture[] {
   return [...fixtures].sort((left, right) => {
-    const a = heatmapSortValue(left, column);
-    const b = heatmapSortValue(right, column);
+    const a = heatmapSortValue(left, column, names);
+    const b = heatmapSortValue(right, column, names);
     if (a === null && b === null) return Date.parse(left.kickoff) - Date.parse(right.kickoff);
     if (a === null) return 1;
     if (b === null) return -1;

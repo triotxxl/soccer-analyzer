@@ -128,10 +128,17 @@ export interface KellyCandidate {
   awayTeam: string;
   league: string;
   country: string;
+  /**
+   * Die Tipico-Namen, nur für die Anzeige im Dialog (seit 11.10.2026). Im Export stehen sie
+   * zusätzlich; Namen und `selection` oben bleiben bei API-Football.
+   */
+  tipico?: DashboardFixture["tipico"];
   kickoff: string;
   marketKey: DashboardMarketKey;
   marketLabel: string;
   selection: string;
+  /** Die Seite beim 1X2 - der Dialog baut daraus den Tipp mit dem gewählten Namen. */
+  pick: DashboardMarket["pick"];
   odds: number;
   /** Was das Modell sagt - unverändert, damit alte Ausfuhren vergleichbar bleiben. */
   probability: number;
@@ -251,10 +258,12 @@ function candidateOf(
     awayTeam: fixture.awayTeam,
     league: fixture.league,
     country: fixture.country,
+    ...(fixture.tipico ? { tipico: fixture.tipico } : {}),
     kickoff: fixture.kickoff,
     marketKey: market.key,
     marketLabel: market.label,
     selection: market.selection,
+    pick: market.pick,
     odds: market.odds,
     probability: market.probability,
     impliedProbability: impliedProb,

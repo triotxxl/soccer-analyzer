@@ -32,6 +32,7 @@ import {
   type QuickpickParam
 } from "./quickpickParams";
 import { selectionLabel, shortTipLabel, type CartEntry } from "./betCart";
+import { leagueName, teamName, useNames, type NameSource } from "./names";
 import type { DashboardFixture } from "./types";
 
 /** Was „Alle n in den Wettschein“ getan hat; der Fuß meldet es, statt den Wettschein zu öffnen. */
@@ -44,7 +45,7 @@ export interface QuickpickCartFeedback {
 }
 
 /** „5 neu im Wettschein · 1 ersetzt · 2 schon drin“ - Teile mit 0 fallen weg. */
-function feedbackParts(feedback: QuickpickCartFeedback): Array<{ count: number; label: string; title?: string }> {
+function feedbackParts(feedback: QuickpickCartFeedback, names: NameSource): Array<{ count: number; label: string; title?: string }> {
   const parts: Array<{ count: number; label: string; title?: string }> = [];
   if (feedback.added > 0) parts.push({ count: feedback.added, label: "neu im Wettschein" });
   if (feedback.replaced.length > 0) {
@@ -52,7 +53,7 @@ function feedbackParts(feedback: QuickpickCartFeedback): Array<{ count: number; 
       count: feedback.replaced.length,
       label: "ersetzt",
       title: feedback.replaced
-        .map(({ by, old }) => `${by.homeTeam} – ${by.awayTeam}: ${old.map(shortTipLabel).join(", ")} durch ${selectionLabel(by)} ersetzt`)
+        .map(({ by, old }) => `${teamName(by, "home", names)} – ${teamName(by, "away", names)}: ${old.map((entry) => shortTipLabel(entry, names)).join(", ")} durch ${selectionLabel(by, names)} ersetzt`)
         .join("\n")
     });
   }
@@ -282,13 +283,14 @@ export function QuickpickDialog({
   // Wie im Kelly-Dialog: bei jedem Render neu gerechnet, kein Zwischenspeicher. Die Liste
   // kann dadurch nicht von dem abweichen, was die Tabelle zeigt.
   const { evaluations, report } = applyQuickpick(fixtures, settings);
+  const names = useNames();
   // Die Zahl hinter jedem Filter: wie viele Spiele er mit **seinen** Einstellungen findet,
   // damit der Wechsel nicht blind geschieht.
   const passedOf = (id: QuickpickPresetId) =>
     id === preset.id ? report.passed : applyQuickpick(fixtures, store[id]).report.passed;
 
   const rows: QuickpickRow[] = fixtures
-    .map((fixture) => ({ fixture, evaluation: evaluations.get(fixture.fixtureId)! }))
+    .map((fixture) => ({ fixture, evaluation: evaluations.get(fixture.fixtureId)!, names }))
     .filter((row) => row.evaluation.passes);
 
   const sortValue = (row: QuickpickRow): number => {
@@ -501,10 +503,10 @@ export function QuickpickDialog({
                 onClick={() => setOpenRow(open ? null : row.fixture.fixtureId)}>
                 <span className="quickpick-when">
                   <small>{kickoff(row.fixture.kickoff)}</small>
-                  <small className="quickpick-league">{row.fixture.league}</small>
+                  <small className="quickpick-league">{leagueName(row.fixture, names)}</small>
                 </span>
                 <span className="quickpick-match">
-                  <strong>{row.fixture.homeTeam} – {row.fixture.awayTeam}</strong>
+                  <strong>{teamName(row.fixture, "home", names)} – {teamName(row.fixture, "away", names)}</strong>
                   <span className="quickpick-pick" title={pickCell.mainTitle}>{pickCell.main}</span>
                   {pickCell.note === undefined ? null
                     : <small className="quickpick-pick-note">{pickCell.note}</small>}
@@ -559,7 +561,7 @@ export function QuickpickDialog({
         {startedCount} schon angepfiffen
       </small>}
       {cartFeedback && <p className="quickpick-cart-feedback" role="status">
-        {feedbackParts(cartFeedback).map((part, index) => <span key={part.label} title={part.title}>
+        {feedbackParts(cartFeedback, names).map((part, index) => <span key={part.label} title={part.title}>
           {index > 0 && " · "}<strong>{part.count}</strong> {part.label}
         </span>)}
         {canUndoCart && onUndoCart && <> · <button type="button" className="cart-link" onClick={onUndoCart}>Rückgängig</button></>}

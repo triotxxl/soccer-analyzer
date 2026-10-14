@@ -940,7 +940,8 @@ describe("React-Dashboard", () => {
       .toEqual(["Tabelle", "Heatmap", "Live", "Marktprofil"]);
     expect(within(nav).getByRole("button", { name: "Tabelle" })).toHaveAttribute("aria-current", "page");
     expect(within(nav).getByRole("button", { name: "Heatmap" })).not.toHaveAttribute("aria-current");
-    expect(within(nav).getByText(/Datenstand:/)).toBeInTheDocument();
+    // Datenstand und Einstellungen stehen in der Leiste, aber außerhalb von <nav> - sie sind keine Ansichten.
+    expect(screen.getByText(/Datenstand:/)).toBeInTheDocument();
 
     await user.click(within(nav).getByRole("button", { name: "Heatmap" }));
     expect(within(nav).getByRole("button", { name: "Heatmap" })).toHaveAttribute("aria-current", "page");
@@ -1064,7 +1065,7 @@ describe("React-Dashboard", () => {
 
     await user.click(screen.getByRole("button", { name: "In den Wettschein legen: Alpha FC – Gast FC" }));
     const list = screen.getByRole("menu", { name: "Markt hinzufügen: Alpha FC – Gast FC" });
-    const tipp = () => within(list).getByRole("menuitemcheckbox", { name: /^1X2 · Heim · Heimsieg, Quote 1,80/ });
+    const tipp = () => within(list).getByRole("menuitemcheckbox", { name: /^1X2 · Heim · Heimsieg Alpha FC, Quote 1,80/ });
     const gegen = () => within(list).getByRole("menuitemcheckbox", { name: /^1X2 · Gast · Auswärtssieg Gast FC gegen den Modelltipp, Quote 4,50/ });
     expect(within(gegen()).getByText("Modell dagegen")).toBeInTheDocument();
 

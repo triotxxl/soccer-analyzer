@@ -8,6 +8,7 @@
  * Kein Vorteil, keine Quote in der Zeile: Die Quote stammt von vor dem Anpfiff und ist im Spiel
  * veraltet (Davids Entscheidung vom 28.09.2026).
  */
+import { teamName, type NameSource } from "./names";
 import type { DashboardMarketKey, LiveBoardMatch } from "./types";
 
 export type LiveQuestion =
@@ -120,7 +121,7 @@ export function chanceOf(match: LiveBoardMatch, question: LiveQuestion): number 
 }
 
 /** Was der Stand über eine Torlinie oder BTTS sicher sagt, als Satz. null bei offener Lage ohne Tatsache. */
-export function standText(match: LiveBoardMatch, question: LiveQuestion): string | null {
+export function standText(match: LiveBoardMatch, question: LiveQuestion, names: NameSource): string | null {
   if (!isLine(question) && question !== "btts" && question !== "bttsNo") return null;
   const stand = match.marketStands[question];
   if (!stand) return null;
@@ -134,7 +135,7 @@ export function standText(match: LiveBoardMatch, question: LiveQuestion): string
         const home = match.goals.home ?? 0;
         const away = match.goals.away ?? 0;
         if (home === 0 && away === 0) return "noch kein Team getroffen";
-        return home === 0 ? `${match.homeTeam} darf nicht treffen` : `${match.awayTeam} darf nicht treffen`;
+        return home === 0 ? `${teamName(match, "home", names)} darf nicht treffen` : `${teamName(match, "away", names)} darf nicht treffen`;
       }
       return stand.goalsToSpare === 0 ? "kein Tor Luft" : `noch ${goals(stand.goalsToSpare)} Luft`;
     case "needs":
@@ -142,7 +143,7 @@ export function standText(match: LiveBoardMatch, question: LiveQuestion): string
         const home = match.goals.home ?? 0;
         const away = match.goals.away ?? 0;
         if (home === 0 && away === 0) return "beide fehlen noch";
-        return home === 0 ? `${match.homeTeam} fehlt noch` : `${match.awayTeam} fehlt noch`;
+        return home === 0 ? `${teamName(match, "home", names)} fehlt noch` : `${teamName(match, "away", names)} fehlt noch`;
       }
       return `noch ${goals(stand.goalsNeeded)} nötig`;
   }

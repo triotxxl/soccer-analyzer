@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { decideMarket, marketsExcludeEachOther } from "../../src/market-outcome.ts";
+import { teamName, type NameSource } from "./names";
 import type { DashboardFixture, DashboardMarket, DashboardMarketKey, RecommendationLevel } from "./types";
 
 const STORAGE_KEY = "football-analyzer:bet-cart";
@@ -12,6 +13,12 @@ export interface CartEntry {
   awayTeam: string;
   league: string;
   country: string;
+  /**
+   * Die Tipico-Namen beim Hineinlegen (seit 11.10.2026), nur für die Anzeige. Die Felder oben und
+   * `selection` bleiben bei API-Football - `sameTip` und `marketsExcludeEachOther` vergleichen
+   * sie. Ältere Einträge tragen das Feld nicht und zeigen die Namen von API-Football.
+   */
+  tipico?: DashboardFixture["tipico"];
   kickoff: string;
   marketKey: DashboardMarketKey;
   marketLabel: string;
@@ -70,6 +77,7 @@ export function toCartEntry(fixture: DashboardFixture, market: DashboardMarket):
     awayTeam: fixture.awayTeam,
     league: fixture.league,
     country: fixture.country,
+    ...(fixture.tipico ? { tipico: fixture.tipico } : {}),
     kickoff: fixture.kickoff,
     marketKey: market.key,
     marketLabel: market.label,
@@ -106,6 +114,7 @@ export function toQuickpickCartEntry(
     awayTeam: fixture.awayTeam,
     league: fixture.league,
     country: fixture.country,
+    ...(fixture.tipico ? { tipico: fixture.tipico } : {}),
     kickoff: fixture.kickoff,
     marketKey: "1x2",
     marketLabel: "1X2",
@@ -148,18 +157,18 @@ export function isPlayable(entry: CartEntry, now: number): boolean {
 /**
  * Der Tipp in Worten. Beim 1X2 mit der Mannschaft - „1X2 · Heimsieg“ verriet beim Übertragen zu
  * Tipico nicht, wer gemeint ist. Die Seite kommt aus `pick`, weil ältere Einträge die Mannschaft
- * nicht in `selection` tragen.
+ * nicht in `selection` tragen. Der Name folgt der Einstellung; `selection` bleibt unberührt.
  */
-export function selectionLabel(entry: CartEntry): string {
+export function selectionLabel(entry: CartEntry, names: NameSource): string {
   if (entry.marketKey === "1x2" && entry.pick !== null) {
-    return entry.pick === "1" ? `Heimsieg ${entry.homeTeam}` : `Auswärtssieg ${entry.awayTeam}`;
+    return entry.pick === "1" ? `Heimsieg ${teamName(entry, "home", names)}` : `Auswärtssieg ${teamName(entry, "away", names)}`;
   }
   return `${entry.marketLabel} · ${entry.selection}`;
 }
 
 /** Kurzform für Rückmeldungen („Heimsieg Alpha FC ersetzt Remis“). */
-export function shortTipLabel(entry: CartEntry): string {
-  return entry.marketKey === "1x2" ? selectionLabel(entry) : entry.marketLabel;
+export function shortTipLabel(entry: CartEntry, names: NameSource): string {
+  return entry.marketKey === "1x2" ? selectionLabel(entry, names) : entry.marketLabel;
 }
 
 /** Ein beliebiger Ausgang mit Pausenstand - nur um zu prüfen, ob `decideMarket` die Auswahl kennt. */

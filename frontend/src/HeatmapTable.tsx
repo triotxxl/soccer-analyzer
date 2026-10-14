@@ -1,3 +1,4 @@
+import { countryName, leagueName, selectionText, teamName, useNames } from "./names";
 import { useMemo, type CSSProperties, type ReactNode } from "react";
 import { ClassGapBadge, formatOdd, formatPercent, kickoffParts, sortStateLabel } from "./App";
 import {
@@ -25,7 +26,7 @@ function HeatCell({ heat, text, title, faint = false }: { heat: Heat | null; tex
   >{text}</span>;
 }
 
-function OddsCell({ market, showEdge }: { market: DashboardMarket | undefined; showEdge: boolean }) {
+function OddsCell({ market, showEdge, selection }: { market: DashboardMarket | undefined; showEdge: boolean; selection: string }) {
   if (!market || market.odds === null) {
     return <span className="odds-cell missing" title="Keine Tipico-Quote für diesen Markt">–</span>;
   }
@@ -33,7 +34,7 @@ function OddsCell({ market, showEdge }: { market: DashboardMarket | undefined; s
   const reliable = market.probabilityReliable !== false;
   const edge = showEdge ? edgeOf(market) : null;
   const title = [
-    market.selection,
+    selection,
     reliable ? `Modell ${formatPercent(market.probability)}` : "Ligastärke unbekannt – keine belastbare Wahrscheinlichkeit",
     market.recommendation.label,
     edge !== null ? `Value ${formatDelta(edge * 100, 1)} Prozentpunkte` : null
@@ -44,7 +45,10 @@ function OddsCell({ market, showEdge }: { market: DashboardMarket | undefined; s
   </span>;
 }
 
-function eloCell(fixture: DashboardFixture) {
+/** Die Namen beider Teams nach Einstellung - nur für die Hinweise beim Überfahren. */
+type Pair = { home: string; away: string };
+
+function eloCell(fixture: DashboardFixture, team: Pair) {
   const delta = eloDelta(fixture);
   if (!delta) {
     const mixed = fixture.homeElo && fixture.awayElo;
@@ -53,34 +57,34 @@ function eloCell(fixture: DashboardFixture) {
       : "Kein Elo für beide Teams vorhanden"} />;
   }
   return <HeatCell heat={heatOf(delta.value, HEAT_SCALE.elo)} text={formatDelta(delta.value, 0)} faint={delta.lowConfidence}
-    title={`Elo ${fixture.homeTeam} ${delta.home}, ${fixture.awayTeam} ${delta.away} · Vertrauen ${delta.confidence} %`
+    title={`Elo ${team.home} ${delta.home}, ${team.away} ${delta.away} · Vertrauen ${delta.confidence} %`
       + (delta.lowConfidence ? " – steht auf wenigen Spielen" : "")
       + " · nur zur Einordnung, geht in keinen Tipp ein"} />;
 }
 
-function formCell(fixture: DashboardFixture) {
+function formCell(fixture: DashboardFixture, team: Pair) {
   const delta = formDelta(fixture);
   if (!delta) return <HeatCell heat={null} text="–" title="Zu wenige Spiele für einen Formvergleich" />;
   const scope = fixture.form.scope === "overall" ? "alle Spiele" : "nur Heim- bzw. Auswärtsspiele";
   return <HeatCell heat={heatOf(delta.value, HEAT_SCALE.form)} text={formatDelta(delta.value, 0)}
-    title={`Punkte aus den letzten Spielen (Sieg 3, Remis 1), ${scope}: ${fixture.homeTeam} ${delta.homePoints} aus ${delta.homeGames},`
-      + ` ${fixture.awayTeam} ${delta.awayPoints} aus ${delta.awayGames}`} />;
+    title={`Punkte aus den letzten Spielen (Sieg 3, Remis 1), ${scope}: ${team.home} ${delta.homePoints} aus ${delta.homeGames},`
+      + ` ${team.away} ${delta.awayPoints} aus ${delta.awayGames}`} />;
 }
 
-function xgCell(fixture: DashboardFixture) {
+function xgCell(fixture: DashboardFixture, team: Pair) {
   const delta = expectedGoalsDelta(fixture);
   const goals = (value: number) => value.toFixed(2).replace(".", ",");
   return <HeatCell heat={heatOf(delta.value, HEAT_SCALE.xg)} text={formatDelta(delta.value, 2)}
-    title={`xG (erwartete Tore) laut Modell: ${fixture.homeTeam} ${goals(delta.home)}, ${fixture.awayTeam} ${goals(delta.away)}`} />;
+    title={`xG (erwartete Tore) laut Modell: ${team.home} ${goals(delta.home)}, ${team.away} ${goals(delta.away)}`} />;
 }
 
-function recentCell(fixture: DashboardFixture, field: "shotsOnGoal" | "corners") {
+function recentCell(fixture: DashboardFixture, field: "shotsOnGoal" | "corners", team: Pair) {
   const label = field === "shotsOnGoal" ? "Schüsse aufs Tor" : "Ecken";
   const delta = recentDelta(fixture, field);
   if (!delta) return <HeatCell heat={null} text="–" title={`${label}: für diese Liga gibt es keine Zahlen`} />;
   const average = (value: number) => value.toFixed(1).replace(".", ",");
   return <HeatCell heat={heatOf(delta.value, HEAT_SCALE[field === "shotsOnGoal" ? "shots" : "corners"])} text={formatDelta(delta.value, 1)}
-    title={`${label} im Schnitt der letzten fünf Spiele: ${fixture.homeTeam} ${average(delta.home)}, ${fixture.awayTeam} ${average(delta.away)}`} />;
+    title={`${label} im Schnitt der letzten fünf Spiele: ${team.home} ${average(delta.home)}, ${team.away} ${average(delta.away)}`} />;
 }
 
 function drawScoreCell(fixture: DashboardFixture) {
@@ -108,7 +112,8 @@ export function HeatmapTable({ fixtures, markets, timezone, now, showEdge, openF
   sort: HeatmapSort;
   onSortChange(sort: HeatmapSort): void;
 }) {
-  const rows = useMemo(() => sort ? sortHeatmap(fixtures, sort.column, sort.direction) : fixtures, [fixtures, sort]);
+  const names = useNames();
+  const rows = useMemo(() => sort ? sortHeatmap(fixtures, sort.column, sort.direction, names) : fixtures, [fixtures, sort, names]);
 
   const toggleSort = (column: HeatmapColumn) => {
     if (sort?.column === column) { onSortChange({ column, direction: sort.direction === 1 ? -1 : 1 }); return; }
@@ -151,6 +156,7 @@ export function HeatmapTable({ fixtures, markets, timezone, now, showEdge, openF
         const time = kickoffParts(fixture.kickoff, timezone);
         const started = Date.parse(fixture.kickoff) < now;
         const open = openFixture === fixture.fixtureId;
+        const team = { home: teamName(fixture, "home", names), away: teamName(fixture, "away", names) };
         return <article className={`heatmap-row-wrap${open ? " open" : ""}`} style={style} key={fixture.fixtureId}>
           <div className="fixture-row-wrap">
             {cartSlot(fixture)}
@@ -159,19 +165,23 @@ export function HeatmapTable({ fixtures, markets, timezone, now, showEdge, openF
                 <small>{time.day}</small><strong>{time.clock}</strong>
               </span>
               <span className="heatmap-teams">
-                <strong className="home">{fixture.homeTeam}</strong>
+                <strong className="home">{team.home}</strong>
                 <i aria-hidden>–</i>
-                <strong className="away">{fixture.awayTeam}</strong>
-                <small className="heatmap-league" title={`${fixture.country} · ${fixture.league}`}>{fixture.league}</small>
-                {fixture.classGap && <ClassGapBadge gap={fixture.classGap} homeTeam={fixture.homeTeam} awayTeam={fixture.awayTeam} />}
+                <strong className="away">{team.away}</strong>
+                <small className="heatmap-league" title={`${countryName(fixture, names)} · ${leagueName(fixture, names)}`}>{leagueName(fixture, names)}</small>
+                {fixture.classGap && <ClassGapBadge gap={fixture.classGap} homeTeam={team.home} awayTeam={team.away} />}
               </span>
-              {eloCell(fixture)}
-              {formCell(fixture)}
-              {xgCell(fixture)}
-              {recentCell(fixture, "shotsOnGoal")}
-              {recentCell(fixture, "corners")}
+              {eloCell(fixture, team)}
+              {formCell(fixture, team)}
+              {xgCell(fixture, team)}
+              {recentCell(fixture, "shotsOnGoal", team)}
+              {recentCell(fixture, "corners", team)}
               {drawScoreCell(fixture)}
-              {markets.map((market) => <OddsCell key={market.key} market={fixture.markets.find((item) => item.key === market.key)} showEdge={showEdge} />)}
+              {markets.map((market) => {
+                const shown = fixture.markets.find((item) => item.key === market.key);
+                return <OddsCell key={market.key} market={shown} showEdge={showEdge}
+                  selection={shown ? selectionText(fixture, shown, names) : ""} />;
+              })}
             </button>
           </div>
         </article>;

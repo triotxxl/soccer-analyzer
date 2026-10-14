@@ -9,6 +9,7 @@ import {
   type CartChange, type CartEntry, type Combo, type ComboFillMode, type ComboSetup, type ComboSizeConfig
 } from "./betCart";
 import { FilterCard, FilterSegment, type SegmentOption } from "./FilterMenu";
+import { leagueName, selectionText, teamName, useNames, type NameSource } from "./names";
 import type { DashboardFixture, DashboardMarket } from "./types";
 
 /** Abstand der Liste zum Knopf und zum Fensterrand. */
@@ -48,19 +49,20 @@ interface MenuItem {
   /** Gesetzt nur für die Gegenseite; der Modelltipp trägt seine Seite in `market.pick`. */
   counterSide: "1" | "2" | null;
   label: string;
+  /** Nur Anzeige, nach Namens-Einstellung. Hineingelegt wird über `market` und `counterSide`. */
   selection: string;
   odds: number | null;
 }
 
-function menuItems(fixture: DashboardFixture, market: DashboardMarket): MenuItem[] {
-  const own: MenuItem = { market, counterSide: null, label: menuLabel(market), selection: market.selection, odds: market.odds };
+function menuItems(fixture: DashboardFixture, market: DashboardMarket, names: NameSource): MenuItem[] {
+  const own: MenuItem = { market, counterSide: null, label: menuLabel(market), selection: selectionText(fixture, market, names), odds: market.odds };
   const counter = toCounterCartEntry(fixture, market);
   if (!counter?.pick) return [own];
   return [own, {
     market,
     counterSide: counter.pick,
     label: `1X2 · ${counter.pick === "2" ? "Gast" : "Heim"}`,
-    selection: counter.selection,
+    selection: selectionText(fixture, { key: "1x2", pick: counter.pick, selection: counter.selection }, names),
     odds: counter.odds
   }];
 }
@@ -142,7 +144,8 @@ export function CartAddMenu({ fixture, cart, open, started = false, onOpen, onCl
     entry.id === cartEntryId(fixture.fixtureId, market.key)
     && (market.key !== "1x2" || entry.pick === (counterSide ?? market.pick)));
   const count = fixture.markets.filter((market) => cart.some((entry) => entry.id === cartEntryId(fixture.fixtureId, market.key))).length;
-  const partie = `${fixture.homeTeam} – ${fixture.awayTeam}`;
+  const names = useNames();
+  const partie = `${teamName(fixture, "home", names)} – ${teamName(fixture, "away", names)}`;
   const groups = MARKET_GROUPS
     .map((group) => ({ group, markets: fixture.markets.filter((market) => marketGroupOf(market.key) === group) }))
     .filter((item) => item.markets.length > 0);
@@ -150,7 +153,7 @@ export function CartAddMenu({ fixture, cart, open, started = false, onOpen, onCl
   const select = (market: DashboardMarket, counterSide: "1" | "2" | null) => {
     const feedback = onSelect(market, counterSide);
     setNote(feedback && feedback.replaced.length > 0
-      ? `${shortTipLabel(feedback.entry)} ersetzt ${feedback.replaced.map(shortTipLabel).join(", ")}`
+      ? `${shortTipLabel(feedback.entry, names)} ersetzt ${feedback.replaced.map((entry) => shortTipLabel(entry, names)).join(", ")}`
       : null);
   };
 
@@ -213,7 +216,7 @@ export function CartAddMenu({ fixture, cart, open, started = false, onOpen, onCl
       </div>
       {groups.map(({ group, markets }) => <div className="cart-menu-group" role="group" aria-label={group} key={group}>
         <div className="cart-menu-group-title" aria-hidden>{group}</div>
-        {markets.flatMap((market) => menuItems(fixture, market)).map((item) => {
+        {markets.flatMap((market) => menuItems(fixture, market, names)).map((item) => {
           const { market, counterSide, selection } = item;
           const added = inCart(item);
           // Ohne Quote kein Preis - hinein kommt so ein Tipp nicht, heraus darf er immer.
@@ -352,6 +355,7 @@ export function BetSlipWindow({
   onCombosChange(combos: Combo[]): void;
   onClose(): void;
 }) {
+  const names = useNames();
   const windowRef = useRef<HTMLDivElement>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const tipsHeadingRef = useRef<HTMLHeadingElement>(null);
@@ -486,18 +490,18 @@ export function BetSlipWindow({
             : <div className="cart-games">
               {games.map((entries) => {
                 const first = entries[0]!;
-                const partie = `${first.homeTeam} – ${first.awayTeam}`;
+                const partie = `${teamName(first, "home", names)} – ${teamName(first, "away", names)}`;
                 const started = isStarted(first);
                 return <section key={first.fixtureId} className={`cart-game${started ? " started" : ""}`} aria-label={partie}>
                   <div className="cart-game-head">
                     <small title={started ? "Die Quote stammt von vor dem Anpfiff und gilt nicht mehr." : undefined}>
-                      {started ? "angepfiffen" : time(first.kickoff)} · {first.league}
+                      {started ? "angepfiffen" : time(first.kickoff)} · {leagueName(first, names)}
                     </small>
                     <strong>{partie}</strong>
                   </div>
                   <ul className="cart-tip-list">
                     {entries.map((entry) => {
-                      const label = selectionLabel(entry);
+                      const label = selectionLabel(entry, names);
                       return <li key={entry.id} className={`cart-tip${isPlayable(entry, now) ? "" : " muted"}`}>
                         <span className="cart-tip-label">
                           {label}
@@ -583,8 +587,8 @@ export function BetSlipWindow({
               <ul className="cart-combo-list">
                 {entries.map((entry) => <li key={entry.id}>
                   <span className="cart-combo-when">{isStarted(entry) ? "angepfiffen" : time(entry.kickoff)}</span>
-                  <span className="cart-combo-game">{entry.homeTeam} – {entry.awayTeam}</span>
-                  <span className="cart-combo-tip">{selectionLabel(entry)}</span>
+                  <span className="cart-combo-game">{teamName(entry, "home", names)} – {teamName(entry, "away", names)}</span>
+                  <span className="cart-combo-tip">{selectionLabel(entry, names)}</span>
                   <span className="cart-tip-odds">{formatOdd(entry.odds)}</span>
                 </li>)}
               </ul>

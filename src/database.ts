@@ -2427,6 +2427,23 @@ export class AnalyzerDatabase {
     return result;
   }
 
+  /**
+   * Die Tipico-Teamnamen und den Tipico-Wettbewerb je API-Fixture, jeweils vom zuletzt gesehenen
+   * Ereignis. Für `tools/add-tipico-names.ts`, das ältere Snapshots ohne API-Aufruf ergänzt.
+   */
+  tipicoEventsForFixtures(fixtureIds: number[]): Map<number, { homeTeam: string; awayTeam: string; competitionId: number }> {
+    const statement = this.db.prepare(`
+      SELECT home_team, away_team, tipico_competition_id FROM tipico_fixtures
+      WHERE api_fixture_id = ? ORDER BY julianday(last_seen_at) DESC LIMIT 1
+    `);
+    const result = new Map<number, { homeTeam: string; awayTeam: string; competitionId: number }>();
+    for (const fixtureId of fixtureIds) {
+      const row = statement.get(fixtureId) as { home_team: string; away_team: string; tipico_competition_id: number } | undefined;
+      if (row) result.set(fixtureId, { homeTeam: row.home_team, awayTeam: row.away_team, competitionId: row.tipico_competition_id });
+    }
+    return result;
+  }
+
   saveTipicoFixtureMapping(
     match: LiveMatchSelection,
     fixture: ApiFixture

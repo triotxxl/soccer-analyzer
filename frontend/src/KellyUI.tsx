@@ -3,6 +3,7 @@ import { useState, type ReactNode } from "react";
 import { formatOdd, formatPercent, sortStateLabel } from "./App";
 import { TEST_RUN_SETTINGS, buildKellyExport, kellyExportFileName, stakeSlots, type KellyCandidate, type KellySelection, type KellySettings } from "./kelly";
 import { formatPoints, formatRoi, type MarketProfileState } from "./marketProfile";
+import { countryName, leagueName, selectionText, teamName, useNames, type NameSource } from "./names";
 import type { DashboardMarketKey, MarketProfile } from "./types";
 
 export function KellyButton({ onOpen }: { onOpen(): void }) {
@@ -30,8 +31,8 @@ export function fractionLabel(fraction: number): string {
 
 type KellySortKey = "team" | "market" | "odds" | "probability" | "calibrated" | "edge" | "kelly" | "stake";
 
-function sortValue(candidate: KellyCandidate, key: KellySortKey): number | string {
-  if (key === "team") return `${candidate.homeTeam} ${candidate.awayTeam}`;
+function sortValue(candidate: KellyCandidate, key: KellySortKey, names: NameSource): number | string {
+  if (key === "team") return `${teamName(candidate, "home", names)} ${teamName(candidate, "away", names)}`;
   if (key === "market") return candidate.marketLabel;
   if (key === "odds") return candidate.odds;
   if (key === "probability") return candidate.probability;
@@ -286,6 +287,7 @@ export function KellyDialog({ selection, profileState, marketFilter, marketLabel
   onSettingsChange(settings: KellySettings): void;
   onClose(): void;
 }) {
+  const names = useNames();
   const [sortKey, setSortKey] = useState<KellySortKey>("stake");
   const [sortDirection, setSortDirection] = useState<1 | -1>(-1);
   const [showSettings, setShowSettings] = useState(false);
@@ -298,8 +300,8 @@ export function KellyDialog({ selection, profileState, marketFilter, marketLabel
   const loading = auto && profile === null && (profileState.status === "loading" || profileState.status === "idle");
   const limitedGames = gameRiskLimits.filter((game) => game.scaleFactor < 1);
   const sorted = [...candidates].sort((left, right) => {
-    const leftValue = sortValue(left, sortKey);
-    const rightValue = sortValue(right, sortKey);
+    const leftValue = sortValue(left, sortKey, names);
+    const rightValue = sortValue(right, sortKey, names);
     const comparison = typeof leftValue === "string" && typeof rightValue === "string"
       ? leftValue.localeCompare(rightValue, "de")
       : (leftValue as number) - (rightValue as number);
@@ -560,8 +562,8 @@ export function KellyDialog({ selection, profileState, marketFilter, marketLabel
             </thead>
             <tbody>
               {!loading && sorted.map((candidate) => <tr key={`${candidate.fixtureId}:${candidate.marketKey}`}>
-                <td><strong>{candidate.homeTeam} – {candidate.awayTeam}</strong><small>{candidate.country} · {candidate.league}</small></td>
-                <td><strong>{candidate.marketLabel}</strong><small>{candidate.selection}</small></td>
+                <td><strong>{teamName(candidate, "home", names)} – {teamName(candidate, "away", names)}</strong><small>{countryName(candidate, names)} · {leagueName(candidate, names)}</small></td>
+                <td><strong>{candidate.marketLabel}</strong><small>{selectionText(candidate, { key: candidate.marketKey, pick: candidate.pick, selection: candidate.selection }, names)}</small></td>
                 <td>{formatOdd(candidate.odds)}</td>
                 <td>{formatPercent(candidate.probability)}</td>
                 {automatic && <td className="kelly-calibrated">

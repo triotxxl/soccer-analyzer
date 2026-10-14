@@ -22,6 +22,11 @@ export interface DashboardInput {
    */
   tipicoOddsByFixture?: Map<number, TipicoOdds>;
   /**
+   * Tipico-Namen je Fixture-ID, über dieselbe Zuordnung wie `tipicoOddsByFixture`. Nur Anzeige:
+   * Die App zeigt sie ab Werk statt der Namen von API-Football (Einstellungen, seit 11.10.2026).
+   */
+  tipicoNamesByFixture?: Map<number, TipicoNames>;
+  /**
    * Torschüsse und Ecken der jüngsten Partien, gesammelt von `collectRecentStats`. Fehlt die
    * Angabe, bleiben die beiden Spalten leer - das Dokument entsteht trotzdem.
    */
@@ -109,6 +114,14 @@ export interface ClassGap {
   label: string;
 }
 
+/** Wie Tipico Spiel und Wettbewerb nennt - Land deutsch, Liga samt Runde („…, Apertura, Gruppe A“). */
+export interface TipicoNames {
+  homeTeam: string;
+  awayTeam: string;
+  country: string;
+  league: string;
+}
+
 export interface DashboardFixture {
   fixtureId: number;
   kickoff: string;
@@ -116,6 +129,12 @@ export interface DashboardFixture {
   league: string;
   homeTeam: string;
   awayTeam: string;
+  /**
+   * Ab schemaVersion 8: die Namen aus der data.json. **Nur Anzeige** - Vergleiche, Schlüssel
+   * (`leagueKey`), Flaggen, Wettschein-Gleichheit und Exporte bleiben auf den Feldern oben. Fehlt
+   * in älteren Läufen und bei Spielen ohne zugeordnetes Tipico-Ereignis.
+   */
+  tipico?: TipicoNames;
   /**
    * Wappen-URLs von API-Football. Sie fehlen, wenn die Fixture-Antwort sie nicht führt, und
    * in jedem Snapshot vor dieser Ergänzung; die App zeigt dann die Initialen des Teams.
@@ -190,7 +209,7 @@ export interface DashboardFixture {
 }
 
 export interface DashboardDocument {
-  schemaVersion: 1 | 2 | 3 | 4 | 5 | 6 | 7;
+  schemaVersion: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
   meta: {
     createdAt: string;
     timezone: string;
@@ -497,6 +516,7 @@ export function buildDashboardDocument(input: DashboardInput): DashboardDocument
     return {
       fixtureId: row.fixtureId, kickoff: row.kickoff, country: row.country, league: row.league,
       homeTeam: row.homeTeam, awayTeam: row.awayTeam, modelVersion: row.modelVersion, crossLeague,
+      ...(input.tipicoNamesByFixture?.has(row.fixtureId) ? { tipico: input.tipicoNamesByFixture.get(row.fixtureId)! } : {}),
       ...(row.homeTeamId !== undefined && input.elo?.has(row.homeTeamId) ? { homeElo: input.elo.get(row.homeTeamId)! } : {}),
       ...(row.awayTeamId !== undefined && input.elo?.has(row.awayTeamId) ? { awayElo: input.elo.get(row.awayTeamId)! } : {}),
       ...(row.homeCrest ? { homeCrest: row.homeCrest } : {}),
@@ -548,7 +568,7 @@ export function buildDashboardDocument(input: DashboardInput): DashboardDocument
   const createdAt = Date.parse(input.createdAt);
   const latestKickoff = fixtures.reduce((latest, fixture) => Math.max(latest, Date.parse(fixture.kickoff)), createdAt);
   return {
-    schemaVersion: 7,
+    schemaVersion: 8,
     meta: {
       createdAt: input.createdAt, timezone: config.timezone, sourceFile: input.sourceFile,
       totalTipicoEvents: input.totalTipicoEvents, selectedTipicoEvents: input.selectedTipicoEvents,

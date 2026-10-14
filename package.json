@@ -37,6 +37,7 @@
     "backfill-results": "node tools/backfill-results.ts",
     "backfill-half-stats": "node --env-file-if-exists=.env tools/backfill-half-stats.ts",
     "coverage": "node --env-file-if-exists=.env tools/coverage.ts",
+    "add-tipico-names": "node tools/add-tipico-names.ts",
     "prepare-analysis": "node --env-file-if-exists=.env tools/prepare-analysis.ts"
   },
   "engines": {

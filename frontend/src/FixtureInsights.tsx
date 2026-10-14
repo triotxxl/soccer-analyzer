@@ -682,10 +682,22 @@ function TrendsPanel({ insights, scope }: { insights: FixtureInsightsData; scope
  * keinen weiteren Aufruf aus. Bis die Daten stehen - und wenn sie ausbleiben - zeigt die
  * App weiter die direkten Duelle aus dem Dashboard-Lauf.
  */
-export function FixtureInsightPanels({ insights, timezone }: {
+export function FixtureInsightPanels({ insights: loaded, timezone, homeName, awayName, leagueName }: {
   insights: FixtureInsightsData;
   timezone: string;
+  /**
+   * Die Namen der beiden Mannschaften und der Liga nach Einstellung (`names.ts`). Ersetzt werden
+   * nur diese beiden Teams, erkannt an der Team-ID; alle übrigen kennt nur API-Football. Die Panels
+   * vergleichen nie über Namen, das Umbenennen ändert also nur die Anzeige.
+   */
+  homeName?: string;
+  awayName?: string;
+  leagueName?: string;
 }) {
+  const insights = useMemo(
+    () => renamedInsights(loaded, homeName, awayName, leagueName),
+    [loaded, homeName, awayName, leagueName]
+  );
   // Stabile Identität, damit die Umschalter in den Panels nicht bei jedem Rendern neu rechnen.
   const scope: LeagueScope = useMemo(
     () => ({ id: insights.league.id, season: insights.league.season }),
@@ -697,6 +709,30 @@ export function FixtureInsightPanels({ insights, timezone }: {
     <MatchStatsPanel insights={insights} scope={scope} />
     <TrendsPanel insights={insights} scope={scope} />
   </>;
+}
+
+function renamedInsights(
+  insights: FixtureInsightsData,
+  homeName: string | undefined,
+  awayName: string | undefined,
+  leagueName: string | undefined
+): FixtureInsightsData {
+  if (homeName === undefined && awayName === undefined && leagueName === undefined) return insights;
+  const names = new Map<number, string>();
+  if (homeName !== undefined) names.set(insights.home.id, homeName);
+  if (awayName !== undefined) names.set(insights.away.id, awayName);
+  const team = <T extends { id: number; name: string }>(item: T): T =>
+    names.has(item.id) ? { ...item, name: names.get(item.id)! } : item;
+  const match = (item: InsightMatch): InsightMatch => ({ ...item, home: team(item.home), away: team(item.away) });
+  return {
+    ...insights,
+    league: leagueName === undefined ? insights.league : { ...insights.league, name: leagueName },
+    home: team(insights.home),
+    away: team(insights.away),
+    homeMatches: insights.homeMatches.map(match),
+    awayMatches: insights.awayMatches.map(match),
+    h2h: insights.h2h.map(match)
+  };
 }
 
 export function InsightsNotice({ state }: { state: InsightsLoadState }) {

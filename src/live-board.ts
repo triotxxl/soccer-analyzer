@@ -36,6 +36,8 @@ export interface LiveBoardMatch {
   league: string;
   homeTeam: string;
   awayTeam: string;
+  /** Die Tipico-Namen aus dem Snapshot, nur für die Anzeige (Einstellungen in der App). */
+  tipico?: DashboardFixture["tipico"];
   status: { short: string; long: string };
   elapsed: number | null;
   extra: number | null;
@@ -272,6 +274,7 @@ export function toBoardMatch(
     league: dashboard.league,
     homeTeam: dashboard.homeTeam,
     awayTeam: dashboard.awayTeam,
+    ...(dashboard.tipico ? { tipico: dashboard.tipico } : {}),
     status: { short: status.short, long: status.long },
     elapsed: status.elapsed,
     extra: status.extra ?? null,

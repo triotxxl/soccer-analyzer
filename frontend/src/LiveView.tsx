@@ -2,6 +2,7 @@ import { Binoculars, Broadcast, Info, WarningCircle } from "@phosphor-icons/reac
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from "react";
 import { CountryFlag, formatOdd } from "./App";
 import type { LiveLoadState } from "./liveData";
+import { countryName, leagueName, teamName, useNames, type NameSource } from "./names";
 import {
   blockedText,
   chanceOf,
@@ -114,7 +115,7 @@ function resultText(result: NonNullable<LiveBoardMatch["live"]["result"]>): stri
 }
 
 /** Die Zelle mit der Antwort auf die gewählte Frage und die Zelle daneben. */
-function questionCells(match: LiveBoardMatch, question: LiveQuestion): [ReactNode, ReactNode] {
+function questionCells(match: LiveBoardMatch, question: LiveQuestion, names: NameSource): [ReactNode, ReactNode] {
   const live = match.live;
   const blocked = blockedText(match);
   const market = prematchMarket(match, question);
@@ -129,10 +130,10 @@ function questionCells(match: LiveBoardMatch, question: LiveQuestion): [ReactNod
   }
 
   if (question === "btts" || question === "bttsNo") {
-    return [<span className="live-fact">{standText(match, question) ?? "–"}</span>, <PrematchHint market={market} />];
+    return [<span className="live-fact">{standText(match, question, names) ?? "–"}</span>, <PrematchHint market={market} />];
   }
 
-  const stand = standText(match, question);
+  const stand = standText(match, question, names);
   if (isDecided(match, question)) {
     return [<span className="live-fact">{stand}</span>, <PrematchHint market={market} />];
   }
@@ -244,7 +245,10 @@ function LiveRow({ match, question, open, onToggle }: {
   open: boolean;
   onToggle(fixtureId: number, anchor: PanelAnchor): void;
 }) {
-  const [main, secondary] = questionCells(match, question);
+  const names = useNames();
+  const homeName = teamName(match, "home", names);
+  const awayName = teamName(match, "away", names);
+  const [main, secondary] = questionCells(match, question, names);
   const missing = match.metricsAvailable ? undefined : statisticsMissingText(match);
   const { home, away } = match.metrics;
   // Seit 29.09.2026 per Klick statt beim Überfahren (Davids Wunsch): Das Fenster ging sonst
@@ -253,7 +257,7 @@ function LiveRow({ match, question, open, onToggle }: {
     className={`live-row${open ? " open" : ""}`}
     tabIndex={0}
     title="Klicken für die Kennzahlen"
-    aria-label={`${match.homeTeam} gegen ${match.awayTeam}, ${match.goals.home ?? 0} zu ${match.goals.away ?? 0}, ${minuteLabel(match)}`}
+    aria-label={`${homeName} gegen ${awayName}, ${match.goals.home ?? 0} zu ${match.goals.away ?? 0}, ${minuteLabel(match)}`}
     onClick={(event) => {
       // Sonst schlösse der Klick-daneben-Wächter das eben geöffnete Fenster gleich wieder.
       event.stopPropagation();
@@ -268,9 +272,9 @@ function LiveRow({ match, question, open, onToggle }: {
   >
     <span className="live-minute live">{minuteLabel(match)}</span>
     <span className="live-teams">
-      <span className="live-team"><strong>{match.homeTeam}</strong><RedChip count={match.cards?.home.red ?? 0} /></span>
-      <span className="live-team"><strong>{match.awayTeam}</strong><RedChip count={match.cards?.away.red ?? 0} /></span>
-      <small className="live-league"><CountryFlag country={match.country} /> {match.country} · {match.league}</small>
+      <span className="live-team"><strong>{homeName}</strong><RedChip count={match.cards?.home.red ?? 0} /></span>
+      <span className="live-team"><strong>{awayName}</strong><RedChip count={match.cards?.away.red ?? 0} /></span>
+      <small className="live-league"><CountryFlag country={match.country} /> {countryName(match, names)} · {leagueName(match, names)}</small>
     </span>
     <span className="live-score">
       <strong>{match.goals.home ?? 0}</strong>
@@ -349,6 +353,7 @@ export function LiveMetricsPanel({ match, question, anchor, panelRef }: {
   anchor: PanelAnchor;
   panelRef: RefObject<HTMLDivElement | null>;
 }) {
+  const names = useNames();
   const [height, setHeight] = useState(0);
   // Die Höhe hängt am Inhalt (Ereignisse, Statistik); gemessen vor dem Zeichnen, damit das
   // Fenster nicht sichtbar springt. Neu gemessen bei jedem Abruf, der den Inhalt ändert.
@@ -364,11 +369,13 @@ export function LiveMetricsPanel({ match, question, anchor, panelRef }: {
   const context = CONTEXT_METRICS
     .filter(({ key }) => match.metrics.home[key] !== null || match.metrics.away[key] !== null)
     .map(({ key, label, unit }) => <span key={key}>{label} <strong>{metricText(match.metrics.home[key], unit)}</strong> : <strong>{metricText(match.metrics.away[key], unit)}</strong></span>);
-  return <div className="live-panel" ref={panelRef} style={panelStyle(anchor, height)} role="dialog" aria-label={`Live-Kennzahlen ${match.homeTeam} gegen ${match.awayTeam}`}>
+  const home = teamName(match, "home", names);
+  const away = teamName(match, "away", names);
+  return <div className="live-panel" ref={panelRef} style={panelStyle(anchor, height)} role="dialog" aria-label={`Live-Kennzahlen ${home} gegen ${away}`}>
     <div className="live-panel-head">
       <span className="live-minute live">{minuteLabel(match)}</span>
-      <strong>{match.homeTeam} {match.goals.home ?? 0}:{match.goals.away ?? 0} {match.awayTeam}</strong>
-      <small><CountryFlag country={match.country} /> {match.country} · {match.league}
+      <strong>{home} {match.goals.home ?? 0}:{match.goals.away ?? 0} {away}</strong>
+      <small><CountryFlag country={match.country} /> {countryName(match, names)} · {leagueName(match, names)}
         {match.halfTime.home !== null && <> · HZ {match.halfTime.home}:{match.halfTime.away ?? 0}</>}</small>
     </div>
     <LiveChancesSection match={match} />

@@ -2,6 +2,7 @@ import { CaretRight, Info, MagnifyingGlass, SlidersHorizontal, X } from "@phosph
 import { useEffect, useId, useRef, useState, type ReactNode, type Ref } from "react";
 import { countryFlagCode } from "./countryFlags";
 import type { LiveChanceMin, LivePhase } from "./liveQuestions";
+import { competitionCountry, competitionLeague, competitionMatches, useNames } from "./names";
 
 export type LevelFilter = "all" | "strong" | "recommended";
 export type ClassGapFilter = "all" | "only" | "hide";
@@ -128,6 +129,9 @@ export interface LeagueEntry {
   key: string;
   country: string;
   league: string;
+  /** Alle Tipico-Bezeichnungen der Spiele dieser API-Liga (Anzeige und Suche, `names.ts`). */
+  tipicoCountries?: string[];
+  tipicoLeagues?: string[];
 }
 
 const QUICK_SEARCH_LIMIT = 8;
@@ -146,9 +150,10 @@ function LeagueQuickSearch({ leagues, deselected, selected, hideHits, onToggle, 
   onOnly(key: string): void;
   onOpenList(): void;
 }) {
+  const names = useNames();
   const [query, setQuery] = useState("");
   const needle = query.trim().toLowerCase();
-  const hits = needle ? leagues.filter((item) => `${item.country} ${item.league}`.toLowerCase().includes(needle)) : [];
+  const hits = needle ? leagues.filter((item) => competitionMatches(item, needle)) : [];
   const all = selected.selected === selected.total;
   return <div className="league-quick">
     {/* Ein Feld für eine Sache: links suchen, rechts die ganze Liste mit den Liga-Werten. */}
@@ -165,7 +170,7 @@ function LeagueQuickSearch({ leagues, deselected, selected, hideHits, onToggle, 
     </div>
     {needle && !hideHits && <ul className="league-quick-hits">
       {hits.slice(0, QUICK_SEARCH_LIMIT).map((item) => {
-        const name = `${item.country} · ${item.league}`;
+        const name = `${competitionCountry(item, names)} · ${competitionLeague(item, names)}`;
         const code = countryFlagCode(item.country);
         return <li key={item.key}>
           <label className="check-row">

@@ -27,7 +27,7 @@ import { buildLeagueStrength } from "./strength-builder.ts";
 import { applyGoalLineFilters } from "./goal-line-filter.ts";
 import { formatVenueFormResult, runVenueFormFilter } from "./venue-form.ts";
 import { importTipicoData } from "./tipico.ts";
-import { writeDashboard, type TeamElo } from "./dashboard.ts";
+import { writeDashboard, type TeamElo, type TipicoNames } from "./dashboard.ts";
 import { collectRecentStats, RECENT_STATS_WINDOW, type MatchSideStats } from "./recent-stats.ts";
 import { getEloByTeam } from "./elo-store.ts";
 import { autoUpdateElo } from "./elo-update.ts";
@@ -609,12 +609,21 @@ async function dashboard(args: ParsedArgs): Promise<void> {
     // trägt die Quoten, nicht noch einmal der Namensvergleich.
     const fixtureByEvent = database.apiFixtureIdsForTipicoEvents(imported.events.map((event) => event.tipicoEventId));
     const tipicoOddsByFixture = new Map<number, TipicoOdds>();
+    const tipicoNamesByFixture = new Map<number, TipicoNames>();
     for (const event of imported.events) {
       const fixtureId = fixtureByEvent.get(event.tipicoEventId);
-      if (fixtureId !== undefined) tipicoOddsByFixture.set(fixtureId, event.odds);
+      if (fixtureId === undefined) continue;
+      tipicoOddsByFixture.set(fixtureId, event.odds);
+      tipicoNamesByFixture.set(fixtureId, {
+        homeTeam: event.homeTeam,
+        awayTeam: event.awayTeam,
+        country: event.competition.country,
+        league: event.competition.league
+      });
     }
     const files = await writeDashboard({
       tipicoOddsByFixture,
+      tipicoNamesByFixture,
       recentStats,
       elo,
       cardData: database.cardDataByLeague(),

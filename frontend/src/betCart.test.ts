@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
-  canGenerate, combinedOdds, generateCombos, isPlayable, putEntriesInto, selectionLabel, sizeRange, toCounterCartEntry,
+  canGenerate, combinedOdds, generateCombos, isPlayable, putEntriesInto, selectionLabel, shortTipLabel, sizeRange, toCartEntry, toCounterCartEntry,
+  toQuickpickCartEntry,
   type CartEntry
 } from "./betCart";
 import type { DashboardFixture, DashboardMarket } from "./types";
@@ -263,8 +264,42 @@ describe("isPlayable und selectionLabel", () => {
   });
 
   it("nennt beim 1X2 die Mannschaft, sonst Markt und Auswahl", () => {
-    expect(selectionLabel(entry("1"))).toBe("Heimsieg Team 1A");
-    expect(selectionLabel({ ...entry("1"), pick: "2", selection: "Auswärtssieg" })).toBe("Auswärtssieg Team 1B");
-    expect(selectionLabel(tip(1, "over25", "Mindestens 3 Tore"))).toBe("over25 · Mindestens 3 Tore");
+    expect(selectionLabel(entry("1"), "tipico")).toBe("Heimsieg Team 1A");
+    expect(selectionLabel({ ...entry("1"), pick: "2", selection: "Auswärtssieg" }, "tipico")).toBe("Auswärtssieg Team 1B");
+    expect(selectionLabel(tip(1, "over25", "Mindestens 3 Tore"), "tipico")).toBe("over25 · Mindestens 3 Tore");
+  });
+});
+
+describe("Tipico-Namen im Wettschein", () => {
+  const tipico = { homeTeam: "Hapoel Jerusalem", awayTeam: "Maccabi Haifa", country: "Israel", league: "Premier League" };
+  const game = {
+    fixtureId: 7, homeTeam: "Hapoel Katamon", awayTeam: "Maccabi Haifa", league: "Ligat Ha'al", country: "Israel",
+    kickoff: "2026-08-17T18:00:00.000Z", tipico, markets: []
+  } as unknown as DashboardFixture;
+  const oneXTwo = {
+    key: "1x2", label: "1X2", selection: "Heimsieg Hapoel Katamon", pick: "1", selectionTone: "home",
+    probability: 0.6, odds: 1.9, confidence: 80, score: 70,
+    recommendation: { level: "recommended", label: "Empfehlenswert" }, details: []
+  } as DashboardMarket;
+
+  it("zeigt den gewählten Namen, ohne den gespeicherten Tipp-Text zu ändern", () => {
+    const fromMenu = toCartEntry(game, oneXTwo);
+    expect(fromMenu.selection).toBe("Heimsieg Hapoel Katamon");
+    expect(selectionLabel(fromMenu, "tipico")).toBe("Heimsieg Hapoel Jerusalem");
+    expect(selectionLabel(fromMenu, "api")).toBe("Heimsieg Hapoel Katamon");
+    expect(shortTipLabel(fromMenu, "tipico")).toBe("Heimsieg Hapoel Jerusalem");
+  });
+
+  it("ein Eintrag aus der Zeit vor den Tipico-Namen zeigt die Namen von API-Football", () => {
+    expect(selectionLabel(entry("1"), "tipico")).toBe("Heimsieg Team 1A");
+  });
+
+  it("derselbe Tipp über „+“ und über den Quickpicker bleibt derselbe Tipp", () => {
+    // Die Gleichheit hängt an `selection` - beide Wege bauen ihn mit dem Namen von API-Football.
+    const fromMenu = toCartEntry(game, oneXTwo);
+    const fromQuickpick = toQuickpickCartEntry(game, "1", 1.9, 0.6);
+    const { result } = putEntriesInto([fromMenu], [fromQuickpick]);
+    expect(result.unchanged).toHaveLength(1);
+    expect(result.added).toHaveLength(0);
   });
 });

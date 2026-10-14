@@ -90,7 +90,7 @@ describe("Heatmap-Werte", () => {
     const strong = fixture({ fixtureId: 1, homeElo: elo(1900), awayElo: elo(1600) });
     const weak = fixture({ fixtureId: 2, homeElo: elo(1600), awayElo: elo(1900) });
     const none = fixture({ fixtureId: 3 });
-    expect(sortHeatmap([none, weak, strong], "elo", -1).map((item) => item.fixtureId)).toEqual([1, 2, 3]);
-    expect(sortHeatmap([none, strong, weak], "elo", 1).map((item) => item.fixtureId)).toEqual([2, 1, 3]);
+    expect(sortHeatmap([none, weak, strong], "elo", -1, "api").map((item) => item.fixtureId)).toEqual([1, 2, 3]);
+    expect(sortHeatmap([none, strong, weak], "elo", 1, "api").map((item) => item.fixtureId)).toEqual([2, 1, 3]);
   });
 });
