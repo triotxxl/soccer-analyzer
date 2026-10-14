@@ -1110,6 +1110,22 @@ nachgezogen, nicht gesammelt am Ende.
   K 20 statt 30 und Heimvorteil 50 statt 60 waren vor dem Nachladen nur minimal und
   uneinheitlich besser - nicht übernommen, auf dem vollen Bestand nicht neu gemessen.
 
+## Kombi-Auswahl nach fairem Preis
+
+- Davids Auftrag vom 12.10.2026: „die besten Tipps bis … für eine lange Kombi, Quote ab 1,50,
+  besser 1,60“, **je Spiel nur ein Tipp**. Arbeitsanleitung im Skill `.claude/skills/kombi-tipps/`
+  (für Prüfer-Agent und Hauptsitzung), Regel in `src/kombi-tipps.ts` (`KOMBI_RULE`, `KOMBI_FLAGS`),
+  Werkzeug `npm run kombi-tipps -- --bis <Zeit>` (0 Aufrufe, schreibt nichts, vom Wächter des
+  Prüfers erlaubt). `--ab` in der Vergangenheit stellt eine frühere Liste nach und markiert
+  abgerechnete Tipps ✓/✗; `--messen` misst die Regel an den archivierten Snapshots.
+- Rangfolge nach **fairer Tipico-Chance**, nicht nach dem Modell: Die Regel sucht die Tipps mit der
+  höchsten Trefferchance je Quote, keinen Vorteil. Gemessen am 13.10.2026 über 3.630 Spiele:
+  57,4 % Treffer gegen 57,2 % fair, **Ertrag je Tipp −7,9 ± 1,3 %** (der Aufschlag). Eine
+  4er-Kombi kostet auf Dauer rund 30 % des Einsatzes. Sie ist eine nachgelagerte Auswahl über
+  Tipico-Preise und ändert weder Tipp noch Wahrscheinlichkeit des Modells.
+- Eine Liste, die gut getroffen hat, ist kein Beleg (17 von 24 kommen ohne Vorteil etwa jedes fünfte
+  Mal vor). Regeländerungen nur mit vorab festgelegter Alternative und `--messen` auf zwei Zeiträumen.
+
 ## Quickpicker
 
 Der **Quickpicker** neben dem Filter-Knopf filtert die Tabelle nach einer **Voreinstellung**.
