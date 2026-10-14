@@ -380,6 +380,38 @@ export const ELO_TEAM_MERGES: EloTeamMerge[] = [
 export const ELO_EXCLUDE_TEAM_PATTERN = /(\s(W|U-?\d{2})$|\b(women|ladies|femen[ií]n?[oa]?|feminino|femminile|frauen)\b)/i;
 
 /**
+ * Zweite Mannschaften, die API-Football mit Altersangabe führt („Juventus U23", „Jong PSV U21"),
+ * aber eine ganze Saison in einer Männerliga spielen. Sie sind dieselbe Art Team wie „Borussia
+ * Dortmund II" und fielen nur über den Namen heraus (Davids Entscheidung vom 11.10.2026). Gewertet
+ * werden ausschließlich ihre **Ligaspiele gegen Männer-Teams** (`classifyMatch`); Premier League 2,
+ * EFL Trophy, Testspiele und Jugendpokale bleiben draußen. Ausgewählt am 11.10.2026 aus
+ * `elo_matches` (Ligaspiele seit 2021 gegen Gegner ohne Altersangabe). Bewusst nicht dabei:
+ * Auswahlteams von Verbänden (Qatar U23, HK U23 - sie können Nationalteam-IDs tragen) und
+ * Teams mit nur einzelnen Ligaspielen (Feyenoord U21, Groningen U21).
+ */
+export const ELO_SENIOR_RESERVE_TEAMS: ReadonlySet<number> = new Set([
+  1715, // Juventus U23 - Serie C
+  26355, // Inter U23 - Serie C
+  411, // Jong PSV U21 - Eerste Divisie
+  6771, // Hearts U21 - Lowland League
+  6779, // Rangers U21 - Lowland League
+  22416, // Dinamo Zagreb U21 - Prva NL
+  24236, // Narva U21 - Esiliiga B
+  25403, // Pärnu JK Vaprus U21 - Esiliiga B
+  3773, // Sydney FC U23 - NPL New South Wales
+  14025, // Western Sydney Wanderers U23 - NPL New South Wales
+  27474, // Western Sydney Wanderers U21 - NPL New South Wales
+  23508, // Devonport U21 - Tasmania Northern Championship
+  23509, // Launceston U21 - Tasmania Northern Championship
+  23510, // Launceston United U21 - Tasmania Northern Championship
+  23512, // Riverside Olympic U21 - Tasmania Northern Championship
+  27750, // Ulverstone U21 - Tasmania Northern Championship
+  23522, // Glenorchy Knights U21 - Tasmania Southern Championship
+  23526, // South East Utd. U21 - Tasmania Southern Championship
+  25952 // BFF Academy U20 - Bhutan Premier League
+]);
+
+/**
  * Frauen-, Jugend-, Reserve- und Olympia-Wettbewerbe. Ihre Teams spielen nie gegen die
  * Männer-Teams und bildeten eigene Inseln bei 1500, die die Rangliste verfälschen.
  */

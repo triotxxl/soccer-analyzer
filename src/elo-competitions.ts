@@ -1,6 +1,6 @@
 import {
   ELO_COMPETITIONS, ELO_EXCLUDE_PATTERN, ELO_EXCLUDE_TEAM_PATTERN, ELO_NATIONAL_CATEGORY_COMPETITIONS, ELO_WOMEN_CLUB_COMPETITIONS,
-  ELO_YOUTH_PATTERN, nationalCategoryOf,
+  ELO_SENIOR_RESERVE_TEAMS, ELO_YOUTH_PATTERN, nationalCategoryOf,
   type EloCompetitionKind, type EloSystem
 } from "./elo-config.ts";
 
@@ -45,6 +45,25 @@ const FRIENDLY_PATTERN = /\b(friendl(?:y|ies)|freundschaft(?:sspiel)?|testimonia
 const SUPER_CUP_PATTERN = /\b(super ?cup|supercopa|supercoppa|super ?coupe|troph[ée]e des champions|community shield|supercupa|superpuchar|supertaça|supercup)\b/i;
 const NEUTRAL = new Set(ELO_COMPETITIONS.neutral);
 
+type ClassifiableMatch = Pick<EloMatch, "leagueId" | "leagueName" | "leagueType" | "country">
+  & Partial<Pick<EloMatch, "homeId" | "homeName" | "awayId" | "awayName">>;
+
+/**
+ * Jugend- und Frauenteams am Namen erkennen. Ausnahme: eine zweite Mannschaft aus
+ * `ELO_SENIOR_RESERVE_TEAMS` in einem Ligaspiel gegen ein Team ohne Altersangabe - dort spielt sie
+ * im Männerbetrieb wie „Borussia Dortmund II".
+ */
+function isExcludedTeam(match: ClassifiableMatch, side: "home" | "away"): boolean {
+  const name = side === "home" ? match.homeName : match.awayName;
+  if (!name || !ELO_EXCLUDE_TEAM_PATTERN.test(name)) return false;
+  const id = side === "home" ? match.homeId : match.awayId;
+  const opponent = side === "home" ? match.awayName : match.homeName;
+  const seniorLeagueGame = id !== undefined && ELO_SENIOR_RESERVE_TEAMS.has(id)
+    && match.leagueType?.toLocaleLowerCase() === "league"
+    && opponent !== undefined && !ELO_EXCLUDE_TEAM_PATTERN.test(opponent);
+  return !seniorLeagueGame;
+}
+
 /**
  * Ordnet ein Spiel einem System und einem Wettbewerbstyp zu.
  *
@@ -54,7 +73,7 @@ const NEUTRAL = new Set(ELO_COMPETITIONS.neutral);
  * Skalen vermischen.
  */
 export function classifyMatch(
-  match: Pick<EloMatch, "leagueId" | "leagueName" | "leagueType" | "country"> & Partial<Pick<EloMatch, "homeName" | "awayName">>
+  match: ClassifiableMatch
 ): Classification {
   // Jugend- und Frauen-Nationalteams vor dem Ausschluss: Ihre Wettbewerbe und Namen tragen genau
   // die Muster („U21", „Women", „ W"), an denen der Ausschluss sonst greift. Beide Teams müssen
@@ -87,7 +106,7 @@ export function classifyMatch(
     }
   }
   if (ELO_EXCLUDE_PATTERN.test(match.leagueName)) return { excluded: true, reason: "jugendFrauen" };
-  if ((match.homeName && ELO_EXCLUDE_TEAM_PATTERN.test(match.homeName)) || (match.awayName && ELO_EXCLUDE_TEAM_PATTERN.test(match.awayName))) {
+  if (isExcludedTeam(match, "home") || isExcludedTeam(match, "away")) {
     return { excluded: true, reason: "jugendFrauen" };
   }
 

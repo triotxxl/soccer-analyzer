@@ -458,6 +458,22 @@ test("gemischte Altersklassen und Vereins-Jugend bleiben ausgeschlossen", () => 
   assert.equal(classifyMatch({ ...world, leagueId: 850, leagueName: "UEFA U21 Championship - Qualification", homeName: "Iceland", awayName: "Norway" }).excluded, true);
 });
 
+test("zweite Mannschaften mit Altersangabe zählen nur mit Ligaspielen gegen Männer-Teams", () => {
+  const serieC = { leagueId: 138, leagueName: "Serie C - Girone A", leagueType: "League", country: "Italy" } as const;
+  // Juventus U23 spielt Serie C wie eine zweite Mannschaft - als Verein gewertet.
+  const league = classifyMatch({ ...serieC, homeId: 1715, homeName: "Juventus U23", awayId: 5, awayName: "Lumezzane" });
+  assert.equal(league.excluded, false);
+  assert.equal(!league.excluded && league.system, "club");
+  assert.equal(classifyMatch({ ...serieC, homeId: 5, homeName: "Lumezzane", awayId: 1715, awayName: "Juventus U23" }).excluded, false);
+  // Pokal, Testspiel und Jugendgegner bleiben draußen.
+  assert.equal(classifyMatch({ leagueId: 891, leagueName: "Coppa Italia Serie C", leagueType: "Cup", country: "Italy", homeId: 1715, homeName: "Juventus U23", awayId: 5, awayName: "Lumezzane" }).excluded, true);
+  assert.equal(classifyMatch({ ...serieC, homeId: 1715, homeName: "Juventus U23", awayId: 1716, awayName: "Atalanta U23" }).excluded, true);
+  // Ohne Listeneintrag zählt der Name wie bisher - auch in einer Männerliga.
+  assert.equal(classifyMatch({ ...serieC, homeId: 999999, homeName: "Somebody U23", awayId: 5, awayName: "Lumezzane" }).excluded, true);
+  // Premier-League-U21 in der EFL Trophy bleibt draußen.
+  assert.equal(classifyMatch({ leagueId: 46, leagueName: "EFL Trophy", leagueType: "Cup", country: "England", homeId: 1, homeName: "Reading", awayId: 7192, awayName: "Chelsea U21" }).excluded, true);
+});
+
 test("ohne Verbandsspiel im Fenster gilt der Verband aus älteren Spielen", () => {
   const world = { leagueType: "Cup", country: "World" } as const;
   // Albanien U21 spielt als Gastgeber nur Testspiele - zuletzt vor drei Jahren in der Quali.

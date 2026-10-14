@@ -1041,6 +1041,16 @@ nachgezogen, nicht gesammelt am Ende.
   (York United → Inter Toronto FC, Dépor FC → Atlético FC) und brauchen keinen Eintrag. Neue
   Einträge nur mit Beleg: gleiche Liga, gleiche Gegner, nahtlos anschließende Spielpläne. Die
   Rangliste zeigt seitdem den jüngsten Namen eines Teams, nicht den seines ersten Spiels.
+- **Zweite Mannschaften mit Altersangabe (`ELO_SENIOR_RESERVE_TEAMS`, seit 11.10.2026, Davids
+  Entscheidung):** „Juventus U23“, „Jong PSV U21“ usw. fielen nur über den Namen heraus, obwohl sie
+  eine ganze Saison in einer Männerliga spielen wie „Borussia Dortmund II“. Die Liste (19 Team-IDs,
+  aus `elo_matches` gewählt) lässt **nur ihre Ligaspiele gegen Teams ohne Altersangabe** zu;
+  Premier League 2, EFL Trophy, Testspiele und Pokale bleiben draußen, die Premier-League-U21 also
+  ohne Elo. Verbands-Auswahlteams (Qatar U23, HK U23) bewusst nicht. Geprüft: Nationalteam-Skalen
+  unverändert, Vereinswerte nur in den betroffenen Ligen bewegt (1.183 Teams, größte Änderung
+  Burnie Utd. +137 in Tasmanien, außerhalb von Italien, Niederlande, Schottland, Kroatien, Estland,
+  Australien und Bhutan keine Änderung ≥ 1 Punkt). Neue Einträge nur für Teams, die eine ganze
+  Saison in einer Männerliga spielen.
 - **Gefunden, gemessen, nicht übernommen (26.09.2026):** Die Liga-Mitnahme folgt der Liga des
   letzten Ligaspiels. API-Football führt aber auch parallele Wettbewerbe als Liga
   (brasilianische Staatsmeisterschaften, „USL League One Cup", eigene Play-off-Ligen). In
