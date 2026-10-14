@@ -349,6 +349,11 @@
     "country": "Bosnia",
     "league": "Premijer Liga"
   },
+  "bosnien and herzegowina|prva liga federacije bih": {
+    "leagueId": 316,
+    "country": "Bosnia",
+    "league": "1st League - FBiH"
+  },
   "brasilien|brasileiro serie a": {
     "leagueId": 71,
     "country": "Brazil",
@@ -934,6 +939,11 @@
     "country": "World",
     "league": "AFC Champions League Two"
   },
+  "international clubs|afc cl 2 gruppe b": {
+    "leagueId": 18,
+    "country": "World",
+    "league": "AFC Champions League Two"
+  },
   "international clubs|afc cl 2 gruppe c": {
     "leagueId": 18,
     "country": "World",
@@ -1400,6 +1410,11 @@
     "league": "Segunda División"
   },
   "peru|segunda division hauptrunde gruppe a": {
+    "leagueId": 282,
+    "country": "Peru",
+    "league": "Segunda División"
+  },
+  "peru|segunda division hauptrunde gruppe b": {
     "leagueId": 282,
     "country": "Peru",
     "league": "Segunda División"
