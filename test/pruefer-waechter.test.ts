@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import path from "node:path";
 import test from "node:test";
-import { checkCommand, checkReadPath, checkToolCall, isTemp, parseShell, stripHeredocs } from "../.claude/hooks/pruefer-waechter.ts";
+import { readFileSync } from "node:fs";
+import { ALLOWED_SCRIPTS, BLOCKED_SCRIPTS, checkCommand, checkReadPath, checkToolCall, isTemp, parseShell, stripHeredocs } from "../.claude/hooks/pruefer-waechter.ts";
 
 const SCRATCH = "C:/Users/David/AppData/Local/Temp/claude/sitzung/scratchpad";
 const allowed = (command: string) => assert.equal(checkCommand(command), null, command);
@@ -151,6 +152,18 @@ test("Werkzeuge ohne Befehl: Read und Grep nur auf .env gesperrt, unlesbare Aufr
   assert.match(checkToolCall({ tool_name: "Read", tool_input: { file_path: "C:/repo/.env" } }) ?? "", /API-Schlüssel/);
   assert.match(checkToolCall({ tool_name: "Bash", tool_input: {} }) ?? "", /nicht lesbar/);
   assert.match(checkToolCall({ tool_name: "PowerShell", tool_input: { command: "npm run settle" } }) ?? "", /API-Football/);
+});
+
+test("jedes npm-Skript ist eingeordnet - ein neues fällt hier auf statt still gesperrt zu sein", () => {
+  const scripts = Object.keys((JSON.parse(readFileSync("package.json", "utf8")) as { scripts: Record<string, string> }).scripts);
+  const unknown = scripts.filter((script) => !ALLOWED_SCRIPTS.has(script) && !(script in BLOCKED_SCRIPTS));
+  assert.deepEqual(unknown, [], "in .claude/hooks/pruefer-waechter.ts eintragen");
+  allowed("npm run btts-check");
+  allowed("npm run live-model-report -- --since 2026-09-30 --min-model 3.4.0");
+  allowed("npm run coverage");
+  allowed("npm run kombi-tipps -- --bis 2026-10-14 --anzahl 24");
+  allowed("npm run kombi-tipps -- --messen");
+  blocked("npm run prepare-analysis -- --dates next48", /API-Football/);
 });
 
 test("als Hook: Rückgabe 2 mit Begründung sperrt, 0 lässt durch", () => {

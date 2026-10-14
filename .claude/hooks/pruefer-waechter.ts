@@ -30,7 +30,7 @@ const LOCAL_ONLY = "Der Prüfer arbeitet nur mit lokalen Daten - melde der Haupt
 const ENV_LOCKED = ".env enthält den API-Schlüssel und bleibt ungelesen.";
 
 /** npm-Skripte, die API-Football aufrufen, Daten schreiben oder einen Server starten. */
-const BLOCKED_SCRIPTS: Readonly<Record<string, string>> = {
+export const BLOCKED_SCRIPTS: Readonly<Record<string, string>> = {
   analyze: "ruft API-Football auf",
   dashboard: "ruft API-Football auf",
   draw: "ruft API-Football auf",
@@ -47,15 +47,24 @@ const BLOCKED_SCRIPTS: Readonly<Record<string, string>> = {
   "backfill-results": "schreibt in die Datenbank",
   "backfill-half-stats": "ruft API-Football auf und schreibt in die Datenbank",
   "kelly-tracker": "schreibt docs/kelly-tracker.json",
+  "prepare-analysis": "kann API-Football aufrufen (Ligaliste, Ansetzungen) und schreibt in den Cache",
+  "add-tipico-names": "schreibt in die Dashboard-Snapshots unter output/",
   app: "startet den Server der App",
   "app:build": "schreibt den Build der App",
   "app:preview": "startet einen Server"
 };
 
-/** Ohne API-Kosten und ohne Schreibzugriff. Sonderfälle (elo, --write, --json) prüft `checkScript`. */
-const ALLOWED_SCRIPTS = new Set([
+/**
+ * Ohne API-Kosten und ohne Schreibzugriff. Sonderfälle (elo, --write, --json) prüft `checkScript`.
+ * `btts-check` und `live-model-report` sind die vorab festgelegten Nachmessungen, die der Prüfer
+ * ungefragt laufen lässt; beide lesen nur Snapshots und die Datenbank (`readOnly`). `coverage`
+ * öffnet die Datenbank wie `report` über `AnalyzerDatabase`, schreibt aber nichts. `kombi-tipps`
+ * liest den Snapshot und die Datenbank (`readOnly`) und druckt nur.
+ */
+export const ALLOWED_SCRIPTS = new Set([
   "test", "typecheck", "app:test", "report", "edge-report", "edge-report:simulate",
-  "quickpick-report", "draw-signals-report", "elo-backtest", "elo", "snapshot-history"
+  "quickpick-report", "draw-signals-report", "elo-backtest", "elo", "snapshot-history",
+  "btts-check", "live-model-report", "coverage", "kombi-tipps"
 ]);
 
 /** `npm run elo -- <befehl>`: nur diese beiden lesen bloß. */
