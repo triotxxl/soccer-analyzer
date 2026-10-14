@@ -59,11 +59,11 @@ Markt (z. B. Über 2,5)
     Nutzer - und werden aus dem manuellen Modus geerbt. Die Kopfzeile nennt den Einsatzrahmen, weil
     ein geerbter Rahmen von 100 % schon einmal unbemerkt blieb. Nicht verstecken. Seit 06.10.2026
     bleibt auch die **Marktabwahl** beim Nutzer (Feld „Märkte“ in beiden Modi).
-12. **„Auf Dauer“ statt „Erwarteter Ertrag“** (seit 06.10.2026): Die Kennzahl im Kelly-Dialog
+11. **„Auf Dauer“ statt „Erwarteter Ertrag“** (seit 06.10.2026): Die Kennzahl im Kelly-Dialog
     rechnet zum fairen Tipico-Preis (ohne Aufschlag) und ist deshalb fast immer negativ. Die frühere
     Rechnung zur korrigierten Modellchance versprach rund +10 %, eingetreten waren rund −6 %. Nie
     wieder eine Ertragszahl aus der Modellchance zeigen; neutral, nicht grün oder rot.
-11. **Remis-Punkte** (100-Punkte-System, Remis-Score) werden nur angezeigt, nie in der UI neu
+12. **Remis-Punkte** (100-Punkte-System, Remis-Score) werden nur angezeigt, nie in der UI neu
     gewichtet. Bei Spielen zwischen Ligen heißt 0 „zu wenig Daten", nicht „kein Kandidat".
 
 ## Einfache Sprache (Auszug aus dem Wörterbuch in AGENTS.md)

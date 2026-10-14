@@ -562,6 +562,13 @@ nachgezogen, nicht gesammelt am Ende.
   Beschriftungen, Filter und Abläufe der App und schlägt begründete Änderungen vor; Davids Wunsch:
   bei UI/UX-Aufträgen automatisch einsetzen. Er arbeitet **nur lesend** (Read, Grep, Glob, kein
   Bash, deshalb kein Wächter); umgesetzt wird von der Hauptsitzung nach Davids Entscheidung.
+- **Was die Hauptsitzung ihm mitgibt:** den Bildpfad eines Screenshots (nicht nur eine Beschreibung -
+  er kann Bilder lesen), Davids Wortlaut und bei einer Planprüfung den Planpfad samt Davids
+  Entscheidungen. Seine „Offenen Entscheidungen“ (höchstens drei, empfohlene Wahl zuerst) gehen
+  unverändert als Auswahlfrage an David. Pixelmaße, die er schätzt, misst die Hauptsitzung nach der
+  Umsetzung in der laufenden App nach. Modus **Planprüfung** (seit 11.10.2026): Plan oder fertige
+  Änderung als „muss / sollte / kann“ - am 11.10.2026 fand er so zwei sichtbare Fehler im Plan der
+  Form-Striche.
 - Sein Fachwissen steht im Skill `.claude/skills/betting-ux/` (Landkarte der App, Wett-Begriffe und
   Projektregeln, Prioritäten und Bedienelemente, Review-Format). Der Skill ist auch für die
   Hauptsitzung gedacht, wenn sie UI-Vorschläge umsetzt. Allgemeine UX-Regeln kommen aus

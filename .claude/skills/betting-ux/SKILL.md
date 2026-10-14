@@ -20,7 +20,7 @@ verfolgen.
 
 | Datei | Wann |
 |---|---|
-| `references/app-landkarte.md` | immer: Ansichten, Dateien, Tokens, was schon versteckt ist |
+| `references/app-landkarte.md` | immer: die Übersicht, „Was schon bewusst versteckt …“ und „Design-System“; von den „Einzelheiten je Ansicht“ nur die geprüfte Ansicht |
 | `references/wett-begriffe.md` | sobald Quote, Wahrscheinlichkeit, Vorteil, Kelly, Einsatz, Empfehlungsstufe oder Warnungen berührt sind |
 | `references/prioritaeten-und-controls.md` | bei Informationshierarchie, Einklappen, Wahl eines Bedienelements, Dichte |
 | `references/review-format.md` | für jeden Review- oder Vorschlagsbericht |
@@ -41,10 +41,15 @@ verfolgen.
    Vorschlag, der ihn dauerhaft sichtbar macht. Live zeigt ihn nie.
 5. **Kein Vorschlag verändert Tipp, Wahrscheinlichkeit oder Empfehlungsstufe.** Die UI zeigt, was das
    Modell rechnet; sie rechnet nichts um.
-6. **Textänderungen ziehen Tests nach.** Rund 360 Text- und Rollenabfragen in
-   `frontend/src/*.test.tsx`; jede geänderte Beschriftung nennt die betroffenen Tests.
+6. **Textänderungen ziehen Tests nach.** Rund 1.000 Text-, Rollen- und Attributabfragen in
+   `frontend/src/*.test.tsx` (Stand 11.10.2026); jede geänderte Beschriftung nennt die betroffenen
+   Tests, Negativabfragen (`not.toBeInTheDocument`) eingeschlossen - sie laufen nach einer
+   Umbenennung sonst still ins Leere.
 7. **Kein Umbau aus Prinzip.** Was funktioniert, wird als solches benannt und bleibt.
-8. **Handy-Breite (390-430 px) ist eine Randnotiz.** Die App läuft lokal am Desktop; grobe Brüche
+8. **Farbe trägt nie allein eine Bedeutung.** Grün, Gold, Rot, `--home`/`--away` sind belegt
+   (Design-System in der Landkarte); wo Farbe etwas unterscheidet, braucht es ein zweites Merkmal
+   (Helligkeit, Form, Text, Tooltip) - Rot und Grau bzw. Rot und Grün auf Rot-Grün-Schwäche prüfen.
+9. **Handy-Breite (390-430 px) ist eine Randnotiz.** Die App läuft lokal am Desktop; grobe Brüche
    nennen, keine eigenen Mobil-Entwürfe (Davids Entscheidung vom 27.09.2026).
 
 Allgemeine UX-Regeln (Kontrast, Fokus, Tastatur, Formulare, Navigation) stehen in
