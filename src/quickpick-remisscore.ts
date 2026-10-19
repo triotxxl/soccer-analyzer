@@ -217,7 +217,7 @@ export const REMIS_SCORE_PRESET: QuickpickPreset<RemisScoreQuickpickSettings> = 
   leerSatz: "Kein Spiel sammelt genug Hinweise auf ein Unentschieden.",
   defaults: DEFAULT_REMIS_SCORE_SETTINGS,
   levels: REMIS_SCORE_LEVELS,
-  defaultSort: "remisscore",
+  defaultSort: "kickoff",
   evaluate: (fixture, settings) => evaluateRemisScore(fixture, settings),
   noteOf: remisScoreNote
 };

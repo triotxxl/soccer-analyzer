@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import {
   competitionCountry, competitionLabel, competitionLeague, competitionMatches, competitionVariants, displayTeam,
-  leagueName, loadNameSource, saveNameSource, selectionText, teamName
+  fixtureMatches, leagueName, loadNameSource, saveNameSource, selectionText, teamName
 } from "./names";
 
 const tipico = { homeTeam: "Hapoel Jerusalem", awayTeam: "Maccabi Haifa", country: "Israel", league: "Premier League" };
@@ -70,5 +70,28 @@ describe("Liste „Wettbewerbe“", () => {
     expect(competitionMatches(italy, "italy serie")).toBe(true);
     expect(competitionMatches(entry, "gruppe b")).toBe(true);
     expect(competitionMatches(entry, "honduras")).toBe(false);
+  });
+});
+
+describe("Suche über der Tabelle", () => {
+  it("findet Mannschaft, Wettbewerb und Land unter beiden Namen", () => {
+    expect(fixtureMatches(fixture, "katamon")).toBe(true);
+    expect(fixtureMatches(fixture, "Hapoel Jerusalem")).toBe(true);
+    expect(fixtureMatches(fixture, "ligat")).toBe(true);
+    expect(fixtureMatches(fixture, "premier league")).toBe(true);
+    expect(fixtureMatches(fixture, "ISRAEL")).toBe(true);
+    expect(fixtureMatches(plain, "jerusalem")).toBe(false);
+  });
+
+  it("verlangt jedes Wort, egal wo, und übersieht Akzente", () => {
+    expect(fixtureMatches(fixture, "israel haifa")).toBe(true);
+    expect(fixtureMatches(fixture, "israel bayern")).toBe(false);
+    expect(fixtureMatches({ ...plain, homeTeam: "Atlético Madrid" }, "atletico")).toBe(true);
+    expect(fixtureMatches({ ...plain, homeTeam: "Atletico Madrid" }, "Atlético")).toBe(true);
+  });
+
+  it("lässt bei leerer Suche alles durch", () => {
+    expect(fixtureMatches(plain, "")).toBe(true);
+    expect(fixtureMatches(plain, "   ")).toBe(true);
   });
 });

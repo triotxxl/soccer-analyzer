@@ -436,6 +436,45 @@ export function combinedOdds(entries: CartEntry[]): number | null {
   return entries.reduce((product, entry) => product * (entry.odds ?? 1), 1);
 }
 
+/** Steht immer im Fuß des Wettscheins und als letzte Zeile jeder Kopie (Davids Wahl vom 14.10.2026). */
+export const COMBO_WARNING = "Eine Kombi geht nur durch, wenn jeder Tipp stimmt – mit jedem Spiel mehr seltener."
+  + " Rechne nicht mit Gewinn.";
+
+function copyOdd(value: number | null): string {
+  return value === null ? "–" : value.toFixed(2).replace(".", ",");
+}
+
+/** „Mi 14.10. 21:00“ - mit Datum, weil die Kopie später und außerhalb der App gelesen wird. */
+function copyKickoff(value: string, timezone: string): string {
+  const date = new Date(value);
+  const weekday = new Intl.DateTimeFormat("de-DE", { timeZone: timezone, weekday: "short" }).format(date);
+  const day = new Intl.DateTimeFormat("de-DE", { timeZone: timezone, day: "2-digit", month: "2-digit" }).format(date);
+  const clock = new Intl.DateTimeFormat("de-DE", { timeZone: timezone, hour: "2-digit", minute: "2-digit" }).format(date);
+  return `${weekday} ${day} ${clock}`;
+}
+
+/**
+ * Kombis als Text für die Zwischenablage (seit 14.10.2026, Davids Entscheidungen nach dem Entwurf
+ * des UX-Agenten): je Kombi eine Kopfzeile mit Kombi-Quote, je Tipp Anstoß mit Datum, Spiel, Tipp
+ * und Quote, am Ende einmal die Warnung. Wie im Wettschein selbst nie Einsatz, Gewinn,
+ * Modellwahrscheinlichkeit, Vorteil oder ✓/★. Namen folgen der Einstellung - mit Tipico-Namen
+ * findet man das Spiel dort schneller.
+ */
+export function comboCopyText(items: Array<{ combo: Combo; number: number }>, names: NameSource, timezone: string): string {
+  const blocks = items.map(({ combo, number }) => {
+    const entries = [...combo.entries].sort((left, right) => Date.parse(left.kickoff) - Date.parse(right.kickoff));
+    const head = `Kombi ${number} · ${entries.length} Spiele · Quote ${copyOdd(combo.combinedOdds)}`;
+    const lines = entries.map((entry) => [
+      copyKickoff(entry.kickoff, timezone),
+      `${teamName(entry, "home", names)} – ${teamName(entry, "away", names)}`,
+      selectionLabel(entry, names),
+      copyOdd(entry.odds)
+    ].join(" | "));
+    return [head, ...lines].join("\n");
+  });
+  return [...blocks, COMBO_WARNING].join("\n\n");
+}
+
 function comboId(size: number, index: number): string {
   return `${size}-${index}-${Math.random().toString(36).slice(2, 8)}`;
 }

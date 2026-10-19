@@ -1,11 +1,11 @@
-import { CaretRight, Info, Minus, Plus, Shuffle, Ticket, X } from "@phosphor-icons/react";
+import { Copy, Info, Minus, Plus, Shuffle, Ticket, X } from "@phosphor-icons/react";
 import {
   useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type Ref
 } from "react";
 import { MARKET_GROUPS, formatOdd, levelGlyph, marketGroupOf } from "./App";
 import {
-  canGenerate, cartEntryId, fixtureCount, generateCombos, isPlayable, requestedTotal, selectionLabel,
-  shortTipLabel, toCounterCartEntry,
+  COMBO_WARNING, canGenerate, cartEntryId, comboCopyText, fixtureCount, generateCombos, isPlayable, requestedTotal,
+  selectionLabel, shortTipLabel, toCounterCartEntry,
   type CartChange, type CartEntry, type Combo, type ComboFillMode, type ComboSetup, type ComboSizeConfig
 } from "./betCart";
 import { FilterCard, FilterSegment, type SegmentOption } from "./FilterMenu";
@@ -294,8 +294,31 @@ const MODE_OPTIONS: ReadonlyArray<SegmentOption<ComboFillMode>> = [
   }
 ];
 
-const COMBO_WARNING = "Eine Kombi geht nur durch, wenn jeder Tipp stimmt – mit jedem Spiel mehr seltener."
-  + " Rechne nicht mit Gewinn.";
+/** So lange zeigt ein Kopier-Knopf „Kopiert“. */
+const COPIED_MS = 2000;
+
+/**
+ * Nur wenn die Zwischenablage fehlt oder ablehnt (kein sicherer Kontext, etwa Aufruf über eine
+ * LAN-Adresse statt localhost): der Text, markiert zum Kopieren mit Strg+C. Im Erfolgsfall steht
+ * er nicht im DOM - sonst stünde jeder Tipp doppelt im Wettschein.
+ */
+function CopyFallback({ label, text, onClose }: { label: string; text: string; onClose(): void }) {
+  const fieldRef = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    fieldRef.current?.focus();
+    fieldRef.current?.select();
+  }, [text]);
+  return <div className="cart-copy-fallback">
+    <p className="filter-note warning">
+      <Info size={13} weight="bold" aria-hidden />
+      <span>Kopieren ging nicht. Der Text ist markiert – kopiere ihn mit Strg+C.</span>
+      <button type="button" className="cart-remove" aria-label="Textfeld schließen" title="Schließen"
+        onClick={onClose}><X size={12} weight="bold" aria-hidden /></button>
+    </p>
+    <textarea ref={fieldRef} readOnly value={text} aria-label={`Text zum Kopieren: ${label}`}
+      rows={Math.min(12, text.split("\n").length)} />
+  </div>;
+}
 
 function tips(count: number): string {
   return `${count} ${count === 1 ? "Tipp" : "Tipps"}`;
@@ -328,8 +351,9 @@ function byGame(cart: CartEntry[]): CartEntry[][] {
 /**
  * Der Wettschein (seit 11.10.2026, Davids Entscheidungen nach zwei Entwürfen des UX-Agenten):
  * ein nicht-modales Fenster unter seinem Knopf rechts in der Werkzeugleiste, im Leistenstil wie
- * Filtermenü und Quickpicker. Links die Tipps je Spiel nach Anstoß, rechts „Kombis bauen“ und
- * die gemischten Kombis, unten immer die Warnung. Angepfiffene Tipps und Tipps ohne Quote
+ * Filtermenü und Quickpicker. Seit 14.10.2026 über die ganze Breite der Leiste: oben ein Streifen
+ * „Kombis bauen“, darunter links die Tipps je Spiel nach Anstoß, rechts breiter die gemischten
+ * Kombis ungekürzt und kopierbar, unten immer die Warnung. Angepfiffene Tipps und Tipps ohne Quote
  * bleiben sichtbar, kommen aber in keine Kombi. Leeren und „Angepfiffene entfernen“ wirken
  * sofort und lassen sich zurücknehmen - statt einer Rückfrage vorher. Öffnen, Schließen und
  * Fokus regelt das Dashboard; die Kombis liegen dort, damit sie das Schließen überstehen.
@@ -360,17 +384,36 @@ export function BetSlipWindow({
   const headingRef = useRef<HTMLHeadingElement>(null);
   const tipsHeadingRef = useRef<HTMLHeadingElement>(null);
   const undoRef = useRef<HTMLButtonElement>(null);
+  const combosRef = useRef<HTMLDivElement>(null);
   // Wohin der Fokus nach dem nächsten Zeichnen soll: ✕ eines Tipps, „Rückgängig“ oder die Karte.
   const [pendingFocus, setPendingFocus] = useState<string | null>(null);
-  const [largerOpen, setLargerOpen] = useState(false);
+  // Größere Kombis, die in diesem Fenster hinzugefügt wurden - sie bleiben stehen, auch wenn ihre
+  // Anzahl wieder auf 0 geht, damit der Fokus nicht mit dem Feld verschwindet.
+  const [addedSizes, setAddedSizes] = useState<number[]>([]);
+  const [otherSize, setOtherSize] = useState("");
   const [announcement, setAnnouncement] = useState("");
+  // Welcher Kopier-Knopf gerade „Kopiert“ zeigt: die Kennung einer Kombi oder „all“.
+  const [copied, setCopied] = useState<string | null>(null);
+  const [copyFallback, setCopyFallback] = useState<{ key: string; label: string; text: string } | null>(null);
+  const copiedTimer = useRef<number | undefined>(undefined);
+  useEffect(() => () => window.clearTimeout(copiedTimer.current), []);
 
   useEffect(() => { headingRef.current?.focus(); }, []);
   // Die Höhe richtet sich wie beim Quickpicker nach dem tatsächlichen Abstand vom oberen Rand.
+  // Die Breite reicht seit 14.10.2026 vom Anfang der Werkzeugleiste bis zum Wettschein-Knopf
+  // (Davids Wunsch: „darf gern die ganze Breite nutzen“). Gemessen statt per CSS, weil der Anker
+  // sonst seinen Platz über dem abgedunkelten Hintergrund verlöre. In jsdom ist die Breite 0,
+  // dann gilt die feste Breite aus dem CSS.
   useLayoutEffect(() => {
     const place = () => {
       const element = windowRef.current;
-      if (element) element.style.setProperty("--cart-top", `${Math.max(0, element.getBoundingClientRect().top)}px`);
+      if (!element) return;
+      element.style.setProperty("--cart-top", `${Math.max(0, element.getBoundingClientRect().top)}px`);
+      const row = element.closest(".toolbar-row");
+      const anchor = element.parentElement;
+      if (!row || !anchor) return;
+      const span = anchor.getBoundingClientRect().right - row.getBoundingClientRect().left;
+      if (span > 0) element.style.setProperty("--cart-width", `${span}px`);
     };
     place();
     window.addEventListener("resize", place);
@@ -409,7 +452,10 @@ export function BetSlipWindow({
   const largerSizes = upper > VISIBLE_MAX_SIZE
     ? Array.from({ length: upper - VISIBLE_MAX_SIZE }, (_, index) => index + VISIBLE_MAX_SIZE + 1)
     : [];
-  const showLarger = largerOpen || largerSizes.some((size) => (setup.counts[size] ?? 0) > 0);
+  // Größere Kombis stehen nur einzeln da: gewählte und in diesem Fenster hinzugefügte. Bis
+  // 14.10.2026 klappte eine gewählte 10er-Kombi alle Größen bis zur Zahl der Spiele auf - bei
+  // 86 Tipps 77 Zeilen, die Kombis und „Kombis mischen“ aus dem Fenster schoben.
+  const shownLarger = largerSizes.filter((size) => (setup.counts[size] ?? 0) > 0 || addedSizes.includes(size));
   const sizeConfig: ComboSizeConfig[] = [...visibleSizes, ...largerSizes].map((size) => ({ size, count: setup.counts[size] ?? 0 }));
   const comboTotal = sizeConfig.reduce((sum, item) => sum + item.count, 0);
   const places = requestedTotal(sizeConfig);
@@ -420,6 +466,14 @@ export function BetSlipWindow({
 
   const setCount = (size: number, value: number) =>
     onSetupChange({ ...setup, counts: { ...setup.counts, [size]: Math.max(0, Math.floor(value) || 0) } });
+  const otherValue = Math.floor(Number(otherSize));
+  const otherValid = otherValue > VISIBLE_MAX_SIZE && otherValue <= upper;
+  const addSize = () => {
+    if (!otherValid) return;
+    if (!addedSizes.includes(otherValue)) setAddedSizes([...addedSizes, otherValue]);
+    if ((setup.counts[otherValue] ?? 0) === 0) setCount(otherValue, 1);
+    setOtherSize("");
+  };
 
   const remove = (id: string) => {
     const index = ordered.findIndex((entry) => entry.id === id);
@@ -436,7 +490,41 @@ export function BetSlipWindow({
     onMix(next);
     const fresh = next.length - kept.length;
     setAnnouncement(`${fresh} ${fresh === 1 ? "Kombi" : "Kombis"} gemischt`);
+    setCopyFallback(null);
+    combosRef.current?.scrollTo?.({ top: 0 });
   };
+
+  // Kopiert wird nur, was sich noch setzen lässt: Eine Kombi mit angepfiffenem Spiel trägt eine
+  // Quote von vor dem Anpfiff (dieselbe Regel wie `isPlayable`). Kopieren markiert nicht als
+  // übertragen - das bleibt ein eigener Klick.
+  const numbered = combos.map((combo, index) => ({ combo, number: index + 1 }));
+  const copyable = numbered.filter(({ combo }) => !combo.entries.some(isStarted));
+  const copy = async (key: string, label: string, items: typeof numbered, done: string) => {
+    const text = comboCopyText(items, names, timezone);
+    try {
+      if (!navigator.clipboard?.writeText) throw new Error("Keine Zwischenablage");
+      await navigator.clipboard.writeText(text);
+      setCopyFallback(null);
+      setCopied(key);
+      window.clearTimeout(copiedTimer.current);
+      copiedTimer.current = window.setTimeout(() => setCopied(null), COPIED_MS);
+      setAnnouncement(done);
+    } catch {
+      setCopied(null);
+      setCopyFallback({ key, label, text });
+    }
+  };
+  const copyOne = (combo: Combo, number: number) =>
+    copy(combo.id, `Kombi ${number}`, [{ combo, number }], `Kombi ${number} kopiert (${tips(combo.entries.length)})`);
+  const copyAll = () => {
+    const skipped = combos.length - copyable.length;
+    const done = `${copyable.length} ${copyable.length === 1 ? "Kombi" : "Kombis"} kopiert`
+      + (skipped > 0 ? ` · ${skipped} mit angepfiffenem Spiel ausgelassen` : "");
+    return copy("all", "alle Kombis", copyable, done);
+  };
+  const fallbackFor = (key: string) => copyFallback?.key === key
+    ? <CopyFallback label={copyFallback.label} text={copyFallback.text} onClose={() => setCopyFallback(null)} />
+    : null;
   const updateCombo = (id: string, change: Partial<Combo> | null) =>
     onCombosChange(change === null
       ? combos.filter((combo) => combo.id !== id)
@@ -474,12 +562,47 @@ export function BetSlipWindow({
         onClick={onClose}><X size={14} weight="bold" aria-hidden /></button>
     </div>
 
+    {/* Selten geändert und gemerkt - deshalb ein fester Streifen über den Listen statt einer
+        Spalte, die die Kombis nach unten schiebt. */}
+    <FilterCard title="Kombis bauen" className="cart-setup">
+      {gameCount < 2
+        ? <p className="filter-note">Ab zwei Tipps aus verschiedenen Spielen lassen sich Kombis bauen.</p>
+        : <>
+          <div className="cart-setup-row">
+            <div className="cart-sizes" role="group" aria-label="Kombi-Größen">
+              {visibleSizes.map(sizeRow)}
+              {shownLarger.map(sizeRow)}
+              {largerSizes.length > 0 && <form className="cart-other-size" onSubmit={(event) => { event.preventDefault(); addSize(); }}>
+                <input type="number" min={VISIBLE_MAX_SIZE + 1} max={upper} placeholder={`${VISIBLE_MAX_SIZE + 1}–${upper}`}
+                  aria-label={`Andere Kombi-Größe, ${VISIBLE_MAX_SIZE + 1} bis ${upper}`} value={otherSize}
+                  onChange={(event) => setOtherSize(event.target.value)} />
+                <button type="submit" className="filter-reset" aria-label="Kombi-Größe hinzufügen" disabled={!otherValid}
+                  title={`Eine Kombi-Größe von ${VISIBLE_MAX_SIZE + 1} bis ${upper} Spielen hinzufügen`}>
+                  <Plus size={12} weight="bold" aria-hidden />Größe
+                </button>
+              </form>}
+            </div>
+            <FilterSegment className="toolbar-segment cart-mode" name="combo-mode" legend="Wiederholung" value={setup.mode}
+              onChange={(mode) => onSetupChange({ ...setup, mode })} options={MODE_OPTIONS} />
+            <p className="filter-note cart-summary">
+              {comboTotal === 0
+                ? "Wähle, wie viele Kombis welcher Größe du willst."
+                : `${comboTotal} ${comboTotal === 1 ? "Kombi" : "Kombis"} · ${places} Plätze · ${tips(pool.length)} aus ${gameCount} Spielen mischbar`}
+            </p>
+          </div>
+          {refill > 0 && <p className="filter-note">
+            {refill} von {places} Plätzen {refill === 1 ? "wird" : "werden"} mit schon verwendeten Tipps aufgefüllt.
+            {" "}In einer Kombi kommt jeder Tipp nur einmal vor.
+          </p>}
+          {message && <p className="filter-note warning"><Info size={13} weight="bold" aria-hidden />{message}</p>}
+        </>}
+    </FilterCard>
+
     <div className="cart-body">
       <div className="cart-column">
         <div className="filter-card cart-tips">
           <div className="filter-card-head">
             <h4 ref={tipsHeadingRef} tabIndex={-1}>Tipps</h4>
-            {cart.length > 0 && <span className="filter-card-aside">nach Anstoß</span>}
           </div>
           {changeNote && <p className="cart-status" role="status">
             {changeNote} · <button ref={undoRef} type="button" className="cart-link" onClick={onUndo}>Rückgängig</button>
@@ -494,10 +617,11 @@ export function BetSlipWindow({
                 const started = isStarted(first);
                 return <section key={first.fixtureId} className={`cart-game${started ? " started" : ""}`} aria-label={partie}>
                   <div className="cart-game-head">
-                    <small title={started ? "Die Quote stammt von vor dem Anpfiff und gilt nicht mehr." : undefined}>
-                      {started ? "angepfiffen" : time(first.kickoff)} · {leagueName(first, names)}
+                    <small className="cart-game-when" title={started ? "Die Quote stammt von vor dem Anpfiff und gilt nicht mehr." : undefined}>
+                      {started ? "angepfiffen" : time(first.kickoff)}
                     </small>
                     <strong>{partie}</strong>
+                    <small className="cart-game-league" title={leagueName(first, names)}>{leagueName(first, names)}</small>
                   </div>
                   <ul className="cart-tip-list">
                     {entries.map((entry) => {
@@ -533,57 +657,45 @@ export function BetSlipWindow({
         </div>
       </div>
 
-      <div className="cart-column">
-        <FilterCard title="Kombis bauen" aside={gameCount >= 2 ? `aus ${tips(pool.length)}` : undefined}>
-          {gameCount < 2
-            ? <p className="filter-note">Ab zwei Tipps aus verschiedenen Spielen lassen sich Kombis bauen.</p>
-            : <>
-              <div className="cart-sizes" role="group" aria-label="Kombi-Größen">
-                {visibleSizes.map(sizeRow)}
-                {showLarger && largerSizes.map(sizeRow)}
-              </div>
-              {largerSizes.length > 0 && <button type="button" className={`quickpick-disclosure${showLarger ? " open" : ""}`}
-                aria-expanded={showLarger} onClick={() => setLargerOpen((value) => !value)}>
-                <CaretRight size={12} weight="bold" aria-hidden />Größere Kombis
-              </button>}
-              <FilterSegment name="combo-mode" legend="Wiederholung" value={setup.mode}
-                onChange={(mode) => onSetupChange({ ...setup, mode })} options={MODE_OPTIONS} />
-              <p className="filter-note cart-summary">
-                {comboTotal === 0
-                  ? "Wähle, wie viele Kombis welcher Größe du willst."
-                  : `${comboTotal} ${comboTotal === 1 ? "Kombi" : "Kombis"} · ${places} Plätze · ${tips(pool.length)} aus ${gameCount} Spielen mischbar`}
-              </p>
-              {refill > 0 && <p className="filter-note">
-                {refill} von {places} Plätzen {refill === 1 ? "wird" : "werden"} mit schon verwendeten Tipps aufgefüllt.
-                {" "}In einer Kombi kommt jeder Tipp nur einmal vor.
-              </p>}
-              {message && <p className="filter-note warning"><Info size={13} weight="bold" aria-hidden />{message}</p>}
-            </>}
-        </FilterCard>
-
-        {combos.length > 0 && <div className="filter-card cart-combos">
-          <div className="filter-card-head"><h4>Kombis ({combos.length})</h4></div>
+      <div className="cart-column" ref={combosRef}>
+        <div className="filter-card cart-combos">
+          <div className="filter-card-head">
+            <h4>Kombis{combos.length > 0 ? ` (${combos.length})` : ""}</h4>
+            {combos.length > 0 && <button type="button" className="filter-reset cart-copy" aria-label="Alle Kombis kopieren"
+              disabled={copyable.length === 0}
+              title={copyable.length < combos.length ? "Kombis mit angepfiffenem Spiel werden ausgelassen." : "Alle Kombis in die Zwischenablage"}
+              onClick={() => void copyAll()}>
+              <Copy size={13} weight="bold" aria-hidden />{copied === "all" ? "Kopiert" : "Alle kopieren"}
+            </button>}
+          </div>
+          {fallbackFor("all")}
+          {combos.length === 0 && <p className="filter-note">
+            {gameCount >= 2 ? "Noch keine Kombis. Wähle oben die Größen und drück „Kombis mischen“." : "Noch keine Kombis."}
+          </p>}
           {combosStale && <p className="filter-note">Der Wettschein hat sich geändert – „Kombis mischen“ baut neu.</p>}
-          {combos.map((combo, index) => {
-            const number = index + 1;
+          {numbered.map(({ combo, number }) => {
             const entries = [...combo.entries].sort((left, right) => Date.parse(left.kickoff) - Date.parse(right.kickoff));
             const started = entries.some(isStarted);
             return <section key={combo.id} className={`cart-combo${combo.transferred ? " transferred" : ""}`} aria-label={`Kombi ${number}`}>
               <div className="cart-combo-head">
                 <strong>Kombi {number} · {entries.length} Spiele · ab {time(entries[0]!.kickoff)}</strong>
                 <span className="cart-combo-odds">Quote {formatOdd(combo.combinedOdds)}</span>
-                <button type="button" className="cart-remove" aria-label={`Kombi ${number} verwerfen`} title="Kombi verwerfen"
-                  onClick={() => updateCombo(combo.id, null)}><X size={12} weight="bold" aria-hidden /></button>
-              </div>
-              <div className="cart-combo-state">
+                <button type="button" className="filter-reset cart-copy" aria-label={`Kombi ${number} kopieren`} disabled={started}
+                  title={started ? "Ein Spiel läuft schon – die Quote gilt nicht mehr. Neu mischen." : "In die Zwischenablage"}
+                  onClick={() => void copyOne(combo, number)}>
+                  <Copy size={13} weight="bold" aria-hidden />{copied === combo.id ? "Kopiert" : "Kopieren"}
+                </button>
                 {combo.transferred
-                  ? <span>übertragen · <button type="button" className="cart-link" aria-label={`Kombi ${number}: Übertragen zurücknehmen`}
+                  ? <span className="cart-combo-state">übertragen · <button type="button" className="cart-link" aria-label={`Kombi ${number}: Übertragen zurücknehmen`}
                     onClick={() => updateCombo(combo.id, { transferred: false })}>Zurücknehmen</button></span>
                   : <button type="button" className="filter-reset" aria-label={`Kombi ${number} als übertragen markieren`}
                     title="Für dich zum Abhaken: Übertragene Kombis bleiben beim Neumischen stehen."
                     onClick={() => updateCombo(combo.id, { transferred: true })}>Als übertragen markieren</button>}
-                {started && <span className="cart-combo-started">Spiel angepfiffen – neu mischen</span>}
+                <button type="button" className="cart-remove" aria-label={`Kombi ${number} verwerfen`} title="Kombi verwerfen"
+                  onClick={() => updateCombo(combo.id, null)}><X size={12} weight="bold" aria-hidden /></button>
               </div>
+              {started && <p className="cart-combo-started">Spiel angepfiffen – neu mischen</p>}
+              {fallbackFor(combo.id)}
               <ul className="cart-combo-list">
                 {entries.map((entry) => <li key={entry.id}>
                   <span className="cart-combo-when">{isStarted(entry) ? "angepfiffen" : time(entry.kickoff)}</span>
@@ -595,7 +707,7 @@ export function BetSlipWindow({
             </section>;
           })}
           {transferredCount > 0 && <p className="filter-note">{transferredCount} von {combos.length} übertragen</p>}
-        </div>}
+        </div>
         <p className="visually-hidden" aria-live="polite">{announcement}</p>
       </div>
     </div>

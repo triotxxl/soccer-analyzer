@@ -37,6 +37,7 @@ import {
   QUICKPICK_PRESET_LIST,
   applyLevel,
   evaluateFixture,
+  levelOf,
   oddsEstimated,
   type AnyQuickpickPreset,
   type QuickpickLevelId,
@@ -445,7 +446,9 @@ function main(): void {
         if (Math.abs(gemessen - imCode) > toleranz) {
           abweichungen.push(`${preset.label} / ${level.label}: ${percent(gemessen)} gegen ${percent(imCode)} im Code`);
         }
-        if (Math.abs(perDay - level.measured.proTag) > 1) {
+        // Relativ statt fest ±1: Bei „Kombi-Tipps“ sind es 60-110 Tipps je Tag, und die Zahl
+        // hängt am Umfang der Analysen. Für die kleinen Filter bleibt es bei rund einem Tipp.
+        if (Math.abs(perDay - level.measured.proTag) > Math.max(1, 0.25 * level.measured.proTag)) {
           abweichungen.push(`${preset.label} / ${level.label}: ${perDay.toFixed(1)} Tipps/Tag gegen ${level.measured.proTag} im Code`);
         }
       }
@@ -453,9 +456,12 @@ function main(): void {
 
     // Kurze Kombis aus den Treffern derselben Stufe. Die Spalte "erwartet" ist das, was der
     // Ertrag je Bein verspricht - läuft sie weit von "Ertrag" weg, ist die Stichprobe zu klein.
-    const beste = stufen.ausgewogen?.kombis ?? Object.values(stufen)[0]?.kombis;
+    // Aus der Vorgabestufe des Filters - bei „Kombi-Tipps“ ist das „Streng“, sonst „Ausgewogen“.
+    const vorgabe = levelOf(preset.defaults as QuickpickSettings) ?? "ausgewogen";
+    const beste = stufen[vorgabe]?.kombis ?? Object.values(stufen)[0]?.kombis;
+    const vorgabeLabel = preset.levels.find((level) => level.id === vorgabe)?.label ?? vorgabe;
     if (beste && beste.length > 0) {
-      console.log(`  Kurze Kombis aus der Stufe „Ausgewogen“, gezogen über ${fensterTage} Spieltage:`);
+      console.log(`  Kurze Kombis aus der Stufe „${vorgabeLabel}“, gezogen über ${fensterTage} Spieltage:`);
       console.log(`    ${"Beine".padEnd(7)}${"Kombis".padStart(8)}${"Treffer".padStart(10)}${"Quote Ø".padStart(10)}${"Ertrag".padStart(10)}${"erwartet".padStart(11)}`);
       for (const kombi of beste) {
         console.log(`    ${String(kombi.beine).padEnd(7)}${String(kombi.n).padStart(8)}`

@@ -192,13 +192,27 @@ const MODELL1X2: QuickpickParam[] = [
   }
 ];
 
+const KOMBI: QuickpickParam[] = [
+  {
+    id: "minOdds", label: "Quote ab", min: 1.2, max: 3, step: 0.05,
+    title: "Kein Tipp unter dieser Quote. Geprüft ist nur 1,60 – mit einem anderen Wert gelten die"
+      + " Zahlen auf den Stufen nicht."
+  },
+  {
+    id: "maxOdds", label: "Quote bis", min: 1.2, max: 99, step: 0.05, sliderMax: 3,
+    title: "Höchstquote des Tipps – nur diese Grenze unterscheidet die Stufen. 99 heißt: keine Grenze."
+      + " Je näher an der Mindestquote, desto wahrscheinlicher der Tipp."
+  }
+];
+
 export const QUICKPICK_PARAMS: Record<QuickpickPresetId, QuickpickParam[]> = {
   daves1x2: DAVES,
   dominanz: DOMINANZ,
   hz15: HZ15,
   remis: REMIS,
   remisScore: REMIS_SCORE,
-  modell1x2: MODELL1X2
+  modell1x2: MODELL1X2,
+  kombi: KOMBI
 };
 
 /**
@@ -225,7 +239,8 @@ export const QUICKPICK_TOGGLES: Record<QuickpickPresetId, QuickpickToggle[]> = {
   hz15: [],
   remis: [],
   remisScore: [],
-  modell1x2: []
+  modell1x2: [],
+  kombi: []
 };
 
 /** Anzeigewert eines Reglers: Wahrscheinlichkeiten stehen im Modell als 0 bis 1. */

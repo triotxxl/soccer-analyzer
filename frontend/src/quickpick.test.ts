@@ -23,6 +23,8 @@ import {
   DEFAULT_HZ15_SETTINGS,
   DEFAULT_REMIS_SETTINGS,
   DEFAULT_MODELL1X2_SETTINGS,
+  DEFAULT_KOMBI_SETTINGS,
+  KOMBI_LEVELS,
   oddsEstimated,
   HZ15_LEVELS,
   REMIS_LEVELS,
@@ -31,6 +33,7 @@ import {
   type DominanzQuickpickSettings
 } from "./quickpick";
 import { cartEntryId, toCartEntry } from "./betCart";
+import { KOMBI_RULE, chooseTip, tipsOf } from "../../src/kombi-tipps.ts";
 import type { DashboardFixture, FormResult } from "./types";
 
 function settings(overrides: Partial<DavesQuickpickSettings> = {}): DavesQuickpickSettings {
@@ -1047,5 +1050,127 @@ describe("Sieger laut Modell", () => {
     expect(store.modell1x2.minWinProbability).toBe(0.72);
     expect(store.remis).toEqual(DEFAULT_REMIS_SETTINGS);
     expect(settingsOf({ ...store, aktiv: "modell1x2" }).preset).toBe("modell1x2");
+  });
+});
+
+describe("Kombi-Tipps ab 1,60", () => {
+  type Market = DashboardFixture["markets"][number];
+  const zweiweg = (key: Market["key"], selection: string, odds: number, probability: number): Market => ({
+    key, label: key === "over25" ? "Über 2,5" : key === "under25" ? "Unter 2,5" : key === "btts" ? "BTTS" : "BTTS Nein",
+    selection, pick: null, selectionTone: "neutral", probability, odds, confidence: 80, score: null,
+    recommendation: { level: "none", label: "Nicht empfehlenswert" }, details: []
+  });
+
+  /**
+   * Über 2,5 zu 1,62 ist der wahrscheinlichste Tipp ab 1,60 (fair rund 58 %), BTTS zu 1,70 der
+   * nächste. Die 1X2-Quoten sind unauffällig, das Modell liegt nah an Tipico.
+   */
+  function kombiSpiel(patch: {
+    oneXTwo?: Partial<Market>; draw?: Partial<Market>; over?: number; under?: number; btts?: number; bttsNo?: number;
+    fixtureId?: number; kickoff?: string;
+  } = {}): DashboardFixture {
+    return fixture({
+      fixtureId: patch.fixtureId ?? 1,
+      kickoff: patch.kickoff ?? "2026-09-20T18:00:00.000Z",
+      markets: [
+        { ...fixture().markets[0]!, probability: 0.5, odds: 2.4, oddsHome: 2.4, oddsAway: 3.2, ...patch.oneXTwo },
+        {
+          key: "draw", label: "Remis", selection: "Unentschieden (X)", pick: null, selectionTone: "draw",
+          probability: 0.27, odds: 3.3, confidence: 80, score: 20,
+          recommendation: { level: "none", label: "Nicht empfehlenswert" }, details: [], ...patch.draw
+        },
+        zweiweg("over25", "Mindestens 3 Tore", patch.over ?? 1.62, 0.58),
+        zweiweg("under25", "Höchstens 2 Tore", patch.under ?? 2.25, 0.42),
+        zweiweg("btts", "Beide Teams treffen: Ja", patch.btts ?? 1.7, 0.55),
+        zweiweg("bttsNo", "Beide Teams treffen: Nein", patch.bttsNo ?? 2.05, 0.45)
+      ]
+    });
+  }
+  const weit = { ...DEFAULT_KOMBI_SETTINGS, maxOdds: 99 };
+
+  it("nimmt je Spiel den Tipp mit der höchsten Chance laut Tipico ab 1,60", () => {
+    const evaluation = evaluateFixture(kombiSpiel(), DEFAULT_KOMBI_SETTINGS);
+    expect(evaluation.passes).toBe(true);
+    expect(evaluation.market).toBe("over25");
+    expect(evaluation.selection).toBe("Mindestens 3 Tore");
+    expect(evaluation.side).toBeNull();
+    expect(evaluation.odds).toBe(1.62);
+    expect(evaluation.kombi?.chosen.fair).toBeCloseTo((1 / 1.62) / (1 / 1.62 + 1 / 2.25), 10);
+    expect(evaluation.kombi?.ersatz?.marketKey).toBe("btts");
+    expect(evaluation.kombi?.flags).toEqual([]);
+  });
+
+  /** Dieselbe Regel wie `npm run kombi-tipps -- --min-quote 1.6`, keine zweite Fassung. */
+  it("wählt in der Stufe „Weit“ genau den Tipp des Werkzeugs mit Mindestquote 1,60", () => {
+    for (const spiel of [kombiSpiel(), kombiSpiel({ over: 1.55 }), kombiSpiel({ btts: 1.6, bttsNo: 2.4 })]) {
+      const werkzeug = chooseTip(tipsOf(spiel), { ...KOMBI_RULE, minOdds: 1.6, preferredOdds: 1.6 })!.chosen;
+      expect(evaluateFixture(spiel, weit).kombi?.chosen).toEqual(werkzeug);
+    }
+  });
+
+  it("nimmt nie einen Tipp unter der Mindestquote und prüft die Höchstquote am gewählten Tipp", () => {
+    const spiel = kombiSpiel({ over: 1.55, under: 2.4 });
+    expect(evaluateFixture(spiel, weit).kombi?.chosen.marketKey).toBe("btts");
+    expect(evaluateFixture(spiel, DEFAULT_KOMBI_SETTINGS).rejectedBy).toBe("quote");
+    expect(evaluateFixture(spiel, weit).passes).toBe(true);
+  });
+
+  /** Ohne Seite übersprängen Wettschein und Rückrechnung den Tipp; `pick` ist hier die andere Mannschaft. */
+  it("setzt beim 1X2 die Mannschaft des Tipps, nicht den Tipp der Tabelle", () => {
+    const spiel = kombiSpiel({
+      oneXTwo: { pick: "1", probability: 0.2, odds: 5, oddsHome: 5, oddsAway: 1.62 },
+      draw: { odds: 3.8, probability: 0.25 },
+      over: 1.9, under: 1.9
+    });
+    const evaluation = evaluateFixture(spiel, DEFAULT_KOMBI_SETTINGS);
+    expect(evaluation.passes).toBe(true);
+    expect(evaluation.market).toBe("1x2");
+    expect(evaluation.side).toBe("2");
+    expect(evaluation.pick).toBe("1");
+    expect(evaluation.selection).toBe("Auswärtssieg Beta");
+  });
+
+  it("lässt auffällige Spiele weg und nennt den Grund", () => {
+    const evaluation = evaluateFixture(kombiSpiel({ oneXTwo: { odds: 1.02, oddsHome: 1.02, oddsAway: 19 }, draw: { odds: 9.5 } }), weit);
+    expect(evaluation.rejectedBy).toBe("auffaellig");
+    expect(evaluation.kombi?.flags.map((flag) => flag.code)).toContain("quote");
+  });
+
+  it("weist ein Spiel ohne Tipp ab der Mindestquote ab", () => {
+    expect(evaluateFixture(kombiSpiel({ over: 1.4, under: 2.9, btts: 1.5, bttsNo: 2.5 }), {
+      ...DEFAULT_KOMBI_SETTINGS, minOdds: 3.5
+    }).rejectedBy).toBe("keinKombiTipp");
+  });
+
+  /** „Nur die besten N“ wirkt im Umfang, nicht in der Regel - die Rückrechnung misst ohne Grenze. */
+  it("kürzt mit „Nur die besten“ nach der Chance laut Tipico, ohne die Bewertung je Spiel zu ändern", () => {
+    const spiele = [
+      kombiSpiel({ fixtureId: 1, over: 1.64, under: 2.2 }),
+      kombiSpiel({ fixtureId: 2, over: 1.61, under: 2.3 }),
+      kombiSpiel({ fixtureId: 3, over: 1.63, under: 2.25 })
+    ];
+    const { passing, report, evaluations } = applyQuickpick(spiele, { ...DEFAULT_KOMBI_SETTINGS, limit: 2 });
+    expect([...passing].sort()).toEqual([2, 3]);
+    expect(report.passed).toBe(2);
+    expect(report.rejected.nichtUnterDenBesten).toBe(1);
+    expect(evaluations.get(1)?.rejectedBy).toBe("nichtUnterDenBesten");
+    expect(evaluateFixture(spiele[0]!, { ...DEFAULT_KOMBI_SETTINGS, limit: 2 }).passes).toBe(true);
+    expect(applyQuickpick(spiele, DEFAULT_KOMBI_SETTINGS).report.passed).toBe(3);
+  });
+
+  it("hat „Streng“ als Vorgabe und beschriftet die Stufen mit der Trefferquote", () => {
+    expect(levelOf(DEFAULT_KOMBI_SETTINGS)).toBe("streng");
+    expect(DEFAULT_KOMBI_SETTINGS.minOdds).toBe(1.6);
+    expect(KOMBI_LEVELS.map((level) => level.values.maxOdds)).toEqual([1.65, 1.7, 1.8, 99]);
+    expect(QUICKPICK_PRESETS.kombi.group).toBe("tipico");
+    expect(QUICKPICK_PRESETS.kombi.defaultSort).toBe("strength");
+    expect(QUICKPICK_PRESETS.kombi.noteOf(KOMBI_LEVELS[0]!.measured)).toMatch(/Treffer$/);
+  });
+
+  it("merkt sich „Nur die besten“ über das Neuladen", () => {
+    saveQuickpickStore(withSettings(loadQuickpickStore(), { ...DEFAULT_KOMBI_SETTINGS, limit: 24 }));
+    expect(loadQuickpickStore().kombi.limit).toBe(24);
+    saveQuickpickStore(withSettings(loadQuickpickStore(), { ...DEFAULT_KOMBI_SETTINGS, limit: null }));
+    expect(loadQuickpickStore().kombi.limit).toBeNull();
   });
 });

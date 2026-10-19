@@ -26,7 +26,7 @@ import { DatabaseSync } from "node:sqlite";
 import { DB_FILE, ROOT_DIR } from "../src/config.ts";
 import type { DashboardDocument, DashboardFixture } from "../src/dashboard.ts";
 import {
-  KOMBI_RULE, chooseTip, comboStats, flagsOf, parseBerlin, splitIntoCombos, tipsOf,
+  KOMBI_RULE, chooseTip, comboStats, flagText, flagsOf, parseBerlin, splitIntoCombos, tipsOf,
   type KombiChoice, type KombiRule
 } from "../src/kombi-tipps.ts";
 import { decideMarket } from "../src/market-outcome.ts";
@@ -86,7 +86,9 @@ function select(): void {
   const database = fs.existsSync(DB_FILE) ? new DatabaseSync(DB_FILE, { readOnly: true }) : null;
   const tipico = new Map<number, { kickoff: string; seen: string }>();
   for (const row of (database?.prepare(
-    "SELECT api_fixture_id AS id, kickoff, last_seen_at AS seen FROM tipico_fixtures WHERE api_fixture_id IS NOT NULL"
+    // Die zuletzt gesehene Zeile gewinnt: Einige Fixtures sind mehreren Tipico-Ereignissen
+    // zugeordnet, und die ältere Zeile trägt einen überholten Anstoß.
+    "SELECT api_fixture_id AS id, kickoff, last_seen_at AS seen FROM tipico_fixtures WHERE api_fixture_id IS NOT NULL ORDER BY julianday(last_seen_at)"
   ).all() ?? []) as Array<{ id: number; kickoff: string; seen: string }>) tipico.set(row.id, row);
   database?.close();
 
@@ -103,7 +105,7 @@ function select(): void {
   for (const fixture of window) {
     const choice = chooseTip(candidatesOf(fixture), rule);
     if (choice === null) { withoutTip += 1; continue; }
-    const flags = flagsOf(fixture, tipico.get(fixture.fixtureId)?.kickoff);
+    const flags = flagsOf(fixture, tipico.get(fixture.fixtureId)?.kickoff).map(flagText);
     (flags.length > 0 ? flagged : clean).push({ fixture, choice, flags });
   }
   const byFair = (left: Row, right: Row) => right.choice.chosen.fair - left.choice.chosen.fair;

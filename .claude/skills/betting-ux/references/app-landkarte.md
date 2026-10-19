@@ -1,4 +1,4 @@
-# Landkarte der App (Stand 11.10.2026)
+# Landkarte der App (Stand 14.10.2026)
 
 Lokale React-App (`npm run app`), liest nur `output/dashboard-latest.json` und ein paar lokale
 Endpunkte. Nutzer ist David allein, am Desktop, dunkles Layout. Die App ist **tabellenbasiert** -
@@ -14,7 +14,7 @@ Ansicht unter „Einzelheiten je Ansicht“ lesen, dazu immer „Was schon bewus
 | Ansicht | Datei | Hauptaufgabe | Dichte |
 |---|---|---|---|
 | Navigationsleiste | `NavRail.tsx` (`nav.nav-rail`, „Ansichten“) | Ansicht wählen: Tabelle, Heatmap, Live, Marktprofil (Icon + Text, aktiv `aria-current`); oben das grüne Markenzeichen (`BrandMark`, auch im Lade-/Leerbildschirm), unten der Datenstand als Kurztext | LOW |
-| Werkzeugleiste | `App.tsx` (`.view-toolbar`) | Filter, Quickpick, Markt, Sortierung, Anzeige, Kelly-Auswahl, Wettschein; darunter Statuszeile und Schildchen | MEDIUM |
+| Werkzeugleiste | `App.tsx` (`.view-toolbar`) | Filter, Quickpick, Suche, Markt, Sortierung, Anzeige, Kelly-Auswahl, Wettschein; darunter Statuszeile und Schildchen | MEDIUM |
 | Filtermenü | `FilterMenu.tsx` (Darstellung), Zustand und Schließregeln in `App.tsx` | Umfang und Tabelle eingrenzen; nicht-modales Fenster | MEDIUM |
 | Pre-Match · Tabelle | `App.tsx` | interessante Spiele finden und vergleichen | HIGH |
 | Pre-Match · Heatmap | `HeatmapTable.tsx`, Rechnung `heatmap.ts` | Stärkeunterschiede je Spiel auf einen Blick (Δ Elo, Δ Form, Δ xG = Torerwartung des Modells, Δ Schüsse aufs Tor, Δ Ecken, Remis-Punkte, Quoten) | HIGH |
@@ -30,14 +30,28 @@ Ansicht unter „Einzelheiten je Ansicht“ lesen, dazu immer „Was schon bewus
 ### Werkzeugleiste
 
 - Oben seit 28.09.2026 in dieser Reihenfolge: **Filter-Knopf** (Zähler = Zahl der Schildchen)
-  und **Quickpick** beisammen links (beide blenden Spiele aus), eine senkrechte Trennlinie, dann
+  und **Quickpick** beisammen links (beide blenden Spiele aus), daneben das **Suchfeld** (seit
+  14.10.2026, siehe unten), eine senkrechte Trennlinie, dann
   Markt, Sortierung + Richtung (ein Baustein), Segment **„Anzeige: Kennzahlen | Vorteil &
   Kelly“** (ab Werk Kennzahlen, nur Tabelle und Heatmap) und direkt daneben **„Kelly-Auswahl“**
   (nur im Kelly-Modus, heißt wie der Dialog), ganz rechts der Knopf **„Wettschein“** (seit
   11.10.2026, immer sichtbar, Zähler wie beim Filter, nur Tabelle und Heatmap).
+- **Suche** (seit 14.10.2026, Davids Wunsch): `<input type="search">` „Spiele suchen“, Platzhalter
+  „Mannschaft, Liga, Land“ (seit 15.10.2026, der längere war abgeschnitten), 170-230 px - gibt bei
+  knapper Breite als Erste nach, bevor der Wettschein umbricht -, so dicht an Quickpick wie innerhalb
+  der Gruppe, gefüllt mit `#37373d` und fett wie ein aktiver Knopf (ohne grünen Balken),
+  Lupe links, eigenes ✕ „Suche leeren“ (Browser-Kreuz ausgeblendet), Escape leert. Freitext über
+  Mannschaften, Wettbewerb und Land unter Tipico- **und** API-Namen, ohne Akzente, jedes Wort muss
+  vorkommen (`fixtureMatches` in `names.ts`). Grenzt wie Quickpick nur `filtered` ein - Kelly
+  und Zähler im Filtermenü bleiben unberührt. **Nicht gemerkt** und **kein Schildchen** (das Feld
+  zeigt sich selbst); „Filter zurücksetzen“ leert sie. Leere Tabelle: „Kein Spiel passt zu „…““
+  mit Knopf „Suche leeren“, vor der Meldung des Quickpickers.
 - **Leistenstil:** alles 32 px hoch, ruhend `--bg`, Überfahren `#222`, offen/aktiv `#37373d` mit
   fetter Schrift; aktiver Quickpick zusätzlich mit grünem Balken unten, offener Filter ohne (offen
-  ist keine Wahl); Beschriftungen 10 px `--muted` in Großbuchstaben.
+  ist keine Wahl). **Keine sichtbaren Überschriften** über Markt, Sortierung und Anzeige (seit
+  15.10.2026, Davids Entscheidung nach Review des UX-Agenten: nur drei Elemente trugen eine, die
+  Leiste wirkte zweistöckig) - die Namen bleiben für den Screenreader und als Tooltip. Die Leiste
+  ist eine mittig ausgerichtete Zeile, 12 px unter dem Hinweiskasten.
 - Markt und Sortierung bleiben **eingebaute `<select>`**, in Chromium über
   `appearance: base-select` gestaltet: geöffnete Liste auf `--bg` mit Schatten wie das
   Filtermenü, Wahl `#37373d`, fett, **grüner Balken links** wie in der Leiste, **kein Häkchen**
@@ -46,10 +60,13 @@ Ansicht unter „Einzelheiten je Ansicht“ lesen, dazu immer „Was schon bewus
   1. Halbzeit; Gruppen ohne verfügbaren Markt fehlen. Die Sortierliste ist ungegliedert.
 - Darunter (immer da): „{n} Spiele angezeigt · Nächste 48 Stunden ab jetzt“ (ein eigener
   Zeitraum steht nur im Schildchen) und ein Schildchen mit ✕ je Filter, der Spiele ausblendet
-  oder den Umfang ändert (Quickpick-Schildchen öffnet den Quickpicker).
+  oder den Umfang ändert (Quickpick-Schildchen öffnet den Quickpicker). In Tabelle und Heatmap
+  ohne eigene Unterkante, 8 px über dem Tabellenrahmen (wirkt als dessen Überschrift); Live behält
+  die Linie.
 - Im Kelly-Modus zusätzlich die Kelly-Zeile (Markt, Wetten, Einsatz von Budget,
   Automatik/Manuell bzw. „Automatik wird geladen …“, Einsatzrahmen mit Plätzen) und die feste
-  Warnzeile.
+  Warnzeile - seit 15.10.2026 zusammen in einem leise gerahmten Kasten (`.kelly-status`, `--surface`,
+  kein Grün; Davids Entscheidung).
 - Filtermenü, Quickpicker und Wettschein dunkeln den Rest mit weichgezeichnetem Hintergrund ab
   (`.menu-backdrop`); offen ist höchstens eins.
 - **In Live** (seit 29.09.2026): Filter-Knopf, Trennlinie, **eigener „Markt“ = Live-Frage**
@@ -151,7 +168,8 @@ Ansicht unter „Einzelheiten je Ansicht“ lesen, dazu immer „Was schon bewus
   bleibt**, Fokus zurück an den Knopf.
 - Kopf: „Quickpicker“, „**n** von m Spielen passen“ (bei Abweichung „· Tabelle zeigt k“),
   Schalter **„Tabelle filtern“**, ✕.
-- Links die Karte **Filter** (alle sechs als Radio-Liste unter „Daves Filter“ / „Modell-Filter“,
+- Links die Karte **Filter** (alle sieben als Radio-Liste unter „Daves Filter“ / „Modell-Filter“ /
+  „Tipico-Filter“,
   Zahl der Treffer rechts, 0 in `--dim`; Aufklapper „Worauf dieser Filter achtet“ mit
   Beschreibung, Kriterien und vollem `honesty`) und die Karte **Stufe** (vier Radio-Zeilen mit
   „Treffer je Tipp“ bzw. „Gewinn je Tipp“ und „je Tag“, darunter der Hinweis der Stufe;
@@ -162,7 +180,18 @@ Ansicht unter „Einzelheiten je Ansicht“ lesen, dazu immer „Was schon bewus
 - Rechts **Gefundene Spiele** (Sortierung als Segment Anstoß · Quote · Stärke, Zeile mit
   Anstoß/Liga, Spiel, Tipp neutral grau, Stärke als Text, Quote; aufgeklappt die Werte des
   Filters; leer: Leersatz plus die drei häufigsten Gründe; Aufklapper „Woran die übrigen n Spiele
-  scheitern“).
+  scheitern“). Die Sortierung beginnt mit `preset.defaultSort` (nur „Kombi-Tipps“ startet mit
+  Stärke, alle anderen mit Anstoß).
+- **„Kombi-Tipps ab 1,60“** (seit 14.10.2026, Gruppe „Tipico-Filter“): je Spiel ein Tipp aus allen
+  Wettarten nach der Chance laut Tipico. Zeile: Tipp im Wortlaut des Wettscheins („Über 2,5 ·
+  Mindestens 3 Tore“, „Auswärtssieg Gast FC“), Stärke „Tipico 57 %“, Quote (kein Hinweis
+  „knapp über der Mindestquote“ - er stand bei fast jeder Zeile). Aufgeklappt Ersatz (nächstbester Tipp
+  desselben Spiels), Hinweise, „Modell zum Tipp“ ohne Zusatz in `--muted` (`.quickpick-fact-quiet`) -
+  **die Modellchance nie in die Zeile**.
+  Im Kopf von „Gefundene Spiele“ das Zahlenfeld **„Nur die besten“** (leer = alle, gemerkt), der
+  Kopf sagt dann „· die besten n von m“. Unter der Liste leise „n auffällige Spiele weggelassen ›“ (nur Spiele im Quotenbereich der Stufe),
+  aufgeklappt Anstoß · Spiel · Grund ohne Tipp, Quote und Prozentzahlen (`kombiFlagLabel`; ein großer
+  Abstand Modell/Tipico heißt dort „meist ein Fehler des Modells oder der Daten“).
 - Fuß: **Warnzeile `warnung` immer sichtbar**, „n ohne echte Quote“, „n schon angepfiffen“ (beide
   nicht in den Wettschein), einziger gefüllter Knopf „Alle n in den Wettschein“ (hell auf dunkel).
   Danach **bleibt der Quickpicker offen** (seit 11.10.2026) und zeigt darüber eine Statuszeile
@@ -178,24 +207,42 @@ Ansicht unter „Einzelheiten je Ansicht“ lesen, dazu immer „Was schon bewus
 
 - Seit 11.10.2026 **im Leistenstil** (Davids Entscheidungen nach zwei Runden des UX-Agenten;
   vorher „Wett-Baukasten“ als Seitenleiste mit schwebender Pille): nicht-modales Fenster
-  (`role="dialog"`, „Wettschein“) rechts unter seinem Knopf, rund 900 px, `.menu-backdrop`
+  (`role="dialog"`, „Wettschein“) rechts unter seinem Knopf, seit 14.10.2026 **so breit wie die
+  Werkzeugleiste** (vom Filter-Knopf bis zum Wettschein-Knopf, `place()` misst `--cart-width`;
+  bei 1463 px Fensterbreite rund 1310 px, vorher fest 900 px), `.menu-backdrop`
   dahinter, offen ist höchstens eins von Filter, Quickpicker und Wettschein; Klick daneben,
   Wegtabben, Escape (Fokus zurück an den Knopf), ✕ und Ansichtswechsel schließen.
 - Kopf: „Wettschein“, „**n** Tipps · k angepfiffen“, „Leeren“ (ein Klick, danach „Wettschein
   geleert (n Tipps) · Rückgängig“), ✕.
-- Links Karte **Tipps**: je Spiel nach Anstoß (Tag Uhrzeit · Liga, Spiel), je Tipp Auswahl (1X2
-  mit Mannschaft: „Heimsieg Bayern“), ✓/★, Quote, ✕; angepfiffen bzw. ohne Quote grau („kommt in
-  keine Kombi“), „k angepfiffen … · Entfernen“ (mit Rückgängig), „2 Tipps aus einem Spiel – in
-  eine Kombi kommt nur einer“.
-- Rechts Karte **Kombis bauen**: Zeilen 2er-8er mit „−“ [Feld] „+“ (Zeile mit Anzahl > 0:
-  #37373d, fett, grüner Balken), „Größere Kombis ›“, Segment **Wiederholung** Ohne · Auffüllen,
-  Zusammenfassung „k Kombis · p Plätze · m Tipps aus s Spielen mischbar“ bzw. „Wähle, wie viele
-  Kombis …“, Hinweise bei zu wenigen Tipps/Spielen. Größen und Modus gemerkt
-  (`football-analyzer:combo-setup`), die Kombis nur bis zum Neuladen.
-- Karte **Kombis (k)**: Kopf „Kombi 1 · 4 Spiele · ab Sa 15:30“, „Quote 6,12“ **neutral**, ✕,
-  Knopf „Als übertragen markieren“ (neutral, kein Grün, kein Häkchen; dann gedimmt „übertragen ·
-  Zurücknehmen“), Zeilen nach Anstoß (Anstoß, Spiel, Auswahl, Quote), „Spiel angepfiffen – neu
+- Darunter fester Streifen **Kombis bauen** (seit 14.10.2026, vorher rechte Spalte, die die Kombis
+  nach unten schob): Größen 2er-8er **nebeneinander** mit „−“ [Feld] „+“ (Größe mit Anzahl > 0:
+  #37373d, fett, grüner Balken **unten**), größere Größen nur einzeln (gewählte und über das Feld
+  „Andere Größe“ [9–n] „+ Größe“ hinzugefügte; bis 14.10.2026 klappte eine gewählte 10er-Kombi alle
+  Größen bis zur Spielzahl auf und schob Kombis und Fuß aus dem Fenster), Segment **Wiederholung** Ohne ·
+  Auffüllen (kleine Leistenfassung), rechts Zusammenfassung „k Kombis · p Plätze · m Tipps aus s
+  Spielen mischbar“ bzw. „Wähle, wie viele Kombis …“, darunter Hinweise bei zu wenigen
+  Tipps/Spielen. Größen und Modus gemerkt (`football-analyzer:combo-setup`), die Kombis nur bis
+  zum Neuladen.
+- Darunter zwei Spalten 2 : 3, jede scrollt für sich.
+- Links Karte **Tipps**: je Spiel nach Anstoß zwei Zeilen - Anstoß, Spiel, Liga rechts (nur die
+  Liga gekürzt, voller Name im Tooltip), darunter je Tipp Auswahl (1X2 mit Mannschaft: „Heimsieg
+  Bayern“), ✓/★, Quote, ✕; angepfiffen bzw. ohne Quote grau („kommt in keine Kombi“), „k
+  angepfiffen … · Entfernen“ (mit Rückgängig), „2 Tipps aus einem Spiel – in eine Kombi kommt nur
+  einer“.
+- Rechts Karte **Kombis (k)** mit „Alle kopieren“; ohne Kombis „Noch keine Kombis. Wähle oben die
+  Größen und drück „Kombis mischen“.“ Je Kombi **eine Kopfzeile**: „Kombi 1 · 4 Spiele · ab Sa
+  15:30“, „Quote 6,12“ **neutral**, „Kopieren“, „Als übertragen markieren“ (neutral, kein Grün,
+  kein Häkchen; dann gedimmt „übertragen · Zurücknehmen“), ✕. Zeilen nach Anstoß, **eine je Tipp,
+  nichts gekürzt** (Anstoß, Spiel, Auswahl hell wie das Spiel, Quote), „Spiel angepfiffen – neu
   mischen“, „x von k übertragen“, „Der Wettschein hat sich geändert …“.
+- **Kopieren** (seit 14.10.2026, Davids Entscheidungen): je Kombi und „Alle kopieren“, beide
+  neutral. Text aus `comboCopyText` (`betCart.ts`): Kopf „Kombi 1 · 4 Spiele · Quote 6,12“, je Tipp
+  „Mi 14.10. 21:00 | Heim – Gast | Tipp | 1,60“ (mit Datum, ohne Liga, Namen nach Einstellung),
+  Kombis durch eine Leerzeile getrennt, **die Warnung einmal als letzte Zeile**. Nie ✓/★, Einsatz,
+  Gewinn, Modellchance, Vorteil, „übertragen“. Kombis mit angepfiffenem Spiel: „Kopieren“
+  gesperrt, bei „Alle kopieren“ ausgelassen (Rückmeldung nennt die Zahl). Rückmeldung: Knopf 2 s
+  „Kopiert“ (kein Häkchen) plus Live-Region. Ohne Zwischenablage: markiertes Textfeld mit
+  „Kopieren ging nicht. … Strg+C.“ und ✕. Kopieren markiert **nicht** als übertragen.
 - Fuß: **Warnung immer sichtbar** („Eine Kombi geht nur durch, wenn jeder Tipp stimmt … Rechne
   nicht mit Gewinn.“), einziger gefüllter Knopf „Kombis mischen“.
 - Regeln: **je Kombi höchstens ein Tipp pro Spiel**, **Gegensätze ersetzen einander** beim

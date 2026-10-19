@@ -228,7 +228,7 @@ export const DAVES_PRESET: QuickpickPreset<DavesQuickpickSettings> = {
   leerSatz: "Kein Spiel ist nach diesen Kriterien klar überlegen.",
   defaults: DEFAULT_QUICKPICK_SETTINGS,
   levels: QUICKPICK_LEVELS,
-  defaultSort: "tabelle",
+  defaultSort: "kickoff",
   evaluate: (fixture, settings) => evaluateDaves(fixture, settings),
   noteOf: davesNote
 };

@@ -12,6 +12,7 @@ import {
   DEFAULT_REMIS_SETTINGS,
   DEFAULT_REMIS_SCORE_SETTINGS,
   DEFAULT_MODELL1X2_SETTINGS,
+  DEFAULT_KOMBI_SETTINGS,
   QUICKPICK_PRESETS,
   type DavesQuickpickSettings,
   type QuickpickPresetId,
@@ -20,7 +21,8 @@ import {
   type Hz15QuickpickSettings,
   type RemisQuickpickSettings,
   type RemisScoreQuickpickSettings,
-  type Modell1x2QuickpickSettings
+  type Modell1x2QuickpickSettings,
+  type KombiQuickpickSettings
 } from "../../src/quickpick.ts";
 
 const STORAGE_KEY = "football-analyzer:quickpick-settings";
@@ -38,6 +40,7 @@ export interface QuickpickStore {
   remis: RemisQuickpickSettings;
   remisScore: RemisScoreQuickpickSettings;
   modell1x2: Modell1x2QuickpickSettings;
+  kombi: KombiQuickpickSettings;
 }
 
 export const DEFAULT_QUICKPICK_STORE: QuickpickStore = {
@@ -47,7 +50,8 @@ export const DEFAULT_QUICKPICK_STORE: QuickpickStore = {
   hz15: DEFAULT_HZ15_SETTINGS,
   remis: DEFAULT_REMIS_SETTINGS,
   remisScore: DEFAULT_REMIS_SCORE_SETTINGS,
-  modell1x2: DEFAULT_MODELL1X2_SETTINGS
+  modell1x2: DEFAULT_MODELL1X2_SETTINGS,
+  kombi: DEFAULT_KOMBI_SETTINGS
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -69,6 +73,8 @@ function mergeBranch<S extends object>(defaults: S, stored: unknown): S {
     // Vorgabe null ist oder eine Zahl erwartet wird.
     if (typeof value === typeof expected && value !== null) result[key] = value;
     else if (value === null && (expected === null || typeof expected === "number")) result[key] = value;
+    // Umgekehrt: `limit` der Kombi-Tipps ist ab Werk null (alle) und trägt gespeichert eine Zahl.
+    else if (expected === null && typeof value === "number") result[key] = value;
   }
   return result as S;
 }
@@ -88,7 +94,7 @@ export function loadQuickpickStore(): QuickpickStore {
     if (parsed.daves1x2 === undefined && parsed.dominanz === undefined
       && parsed.underdog === undefined && parsed.hz15 === undefined
       && parsed.remis === undefined && parsed.remisScore === undefined
-      && parsed.modell1x2 === undefined) {
+      && parsed.modell1x2 === undefined && parsed.kombi === undefined) {
       return { ...DEFAULT_QUICKPICK_STORE, daves1x2: mergeBranch(DEFAULT_QUICKPICK_SETTINGS, parsed) };
     }
 
@@ -107,7 +113,8 @@ export function loadQuickpickStore(): QuickpickStore {
       hz15: mergeBranch(DEFAULT_HZ15_SETTINGS, parsed.hz15),
       remis: mergeBranch(DEFAULT_REMIS_SETTINGS, parsed.remis),
       remisScore: mergeBranch(DEFAULT_REMIS_SCORE_SETTINGS, parsed.remisScore),
-      modell1x2: mergeBranch(DEFAULT_MODELL1X2_SETTINGS, parsed.modell1x2)
+      modell1x2: mergeBranch(DEFAULT_MODELL1X2_SETTINGS, parsed.modell1x2),
+      kombi: mergeBranch(DEFAULT_KOMBI_SETTINGS, parsed.kombi)
     };
   } catch {
     return DEFAULT_QUICKPICK_STORE;
@@ -130,6 +137,7 @@ export function settingsOf(store: QuickpickStore): QuickpickSettings {
     : store.aktiv === "remis" ? store.remis
     : store.aktiv === "remisScore" ? store.remisScore
     : store.aktiv === "modell1x2" ? store.modell1x2
+    : store.aktiv === "kombi" ? store.kombi
     : store.daves1x2;
 }
 
@@ -140,6 +148,7 @@ export function withSettings(store: QuickpickStore, settings: QuickpickSettings)
     : settings.preset === "remis" ? { ...store, remis: settings }
     : settings.preset === "remisScore" ? { ...store, remisScore: settings }
     : settings.preset === "modell1x2" ? { ...store, modell1x2: settings }
+    : settings.preset === "kombi" ? { ...store, kombi: settings }
     : { ...store, daves1x2: settings };
 }
 

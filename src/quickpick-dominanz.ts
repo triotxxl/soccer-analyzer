@@ -316,7 +316,7 @@ export const DOMINANZ_PRESET: QuickpickPreset<DominanzQuickpickSettings> = {
   leerSatz: "Kein Spiel zeigt eine so klar überlegene Mannschaft zu diesem Preis.",
   defaults: DEFAULT_DOMINANZ_SETTINGS,
   levels: DOMINANZ_LEVELS,
-  defaultSort: "serie",
+  defaultSort: "kickoff",
   evaluate: (fixture, settings) => evaluateDominanz(fixture, settings),
   noteOf: dominanzNote
 };

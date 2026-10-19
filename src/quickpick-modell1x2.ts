@@ -276,7 +276,7 @@ export const MODELL1X2_PRESET: QuickpickPreset<Modell1x2QuickpickSettings> = {
   leerSatz: "Bei keinem Spiel sieht das Modell den Sieger sicher genug.",
   defaults: DEFAULT_MODELL1X2_SETTINGS,
   levels: MODELL1X2_LEVELS,
-  defaultSort: "siegchance",
+  defaultSort: "kickoff",
   evaluate: (fixture, settings) => evaluateModell1x2(fixture, settings),
   noteOf: modell1x2Note
 };

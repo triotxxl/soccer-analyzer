@@ -270,6 +270,12 @@ Benutzer auf Deutsch und führe Analyseaufträge selbstständig über die vorhan
   weil sie nichts ausblenden. **Werkzeugleiste seit 28.09.2026 im Leistenstil** (Entwurf des
   UX-Agenten, Davids Entscheidung): links Filter und Quickpick (beide blenden aus), eine Trennlinie,
   dann Markt, Sortierung, Anzeige und direkt daneben „Kelly-Auswahl“ (nur im Kelly-Modus).
+  **Seit 14.10.2026 steht links der Linie ein Suchfeld** (Davids Wunsch): Freitext über
+  Mannschaften, Wettbewerb und Land unter Tipico- und API-Namen (`fixtureMatches` in
+  `frontend/src/names.ts`, ohne Akzente, jedes Wort muss vorkommen). Es grenzt wie der Quickpick
+  nur `filtered` ein, nicht `scopedFixtures` (Kelly und Zähler bleiben), wird nicht gemerkt
+  (dieselbe Falle wie ein gemerkter Quickpick) und braucht kein Schildchen, weil das Feld sich
+  selbst zeigt; „Filter zurücksetzen“ leert es.
   Markt und Sortierung bleiben **eingebaute `<select>`** und werden in Chromium über
   `appearance: base-select` gestaltet (Wahl mit grünem Balken links, kein Häkchen, Marktliste mit
   `optgroup`-Gruppen) - bewusst kein eigener Listbox-Baustein: Tastatur, Screenreader und die rund
@@ -351,6 +357,12 @@ Benutzer auf Deutsch und führe Analyseaufträge selbstständig über die vorhan
   die Kombis nur bis zum Neuladen; „Als übertragen markieren“ hält eine Kombi beim Neumischen fest.
   Die Kombi-Quote ist neutral, nie grün; Einsatz, Gewinn, Modellwahrscheinlichkeit und Vorteil
   zeigt der Wettschein bewusst nicht. Die Warnung im Fuß steht immer da.
+  **Seit 14.10.2026 so breit wie die Werkzeugleiste** (Davids Wunsch, Entwurf des UX-Agenten):
+  oben fester Streifen „Kombis bauen“, darunter Tipps links und Kombis rechts (2 : 3), Kombi-Zeilen
+  ungekürzt. **Kopieren** je Kombi und „Alle kopieren“ (`comboCopyText` in `betCart.ts`): Anstoß
+  mit Datum, Spiel, Tipp, Quote, Kombi-Quote und **immer die Warnung als letzte Zeile**; was der
+  Wettschein nicht zeigt, steht auch nicht in der Kopie. Kombis mit angepfiffenem Spiel werden nicht
+  kopiert, Kopieren markiert nicht als übertragen, ohne Zwischenablage erscheint der Text markiert.
 - **Der Kelly-Dialog heißt „Kelly-Auswahl“ und führt die Liste der Wetten** (seit 29.09.2026
   wieder, Davids Entscheidung): Modus, Kennzahlen, Hinweise, Einstellungen, dann die sortierbare
   Liste (Spiel, Markt, Quote, Modell, Korrigiert nur in der Automatik, Vorteil grau mit „nach
@@ -1132,11 +1144,15 @@ nachgezogen, nicht gesammelt am Ende.
   Tipico-Preise und ändert weder Tipp noch Wahrscheinlichkeit des Modells.
 - Eine Liste, die gut getroffen hat, ist kein Beleg (17 von 24 kommen ohne Vorteil etwa jedes fünfte
   Mal vor). Regeländerungen nur mit vorab festgelegter Alternative und `--messen` auf zwei Zeiträumen.
+- **Seit 14.10.2026 auch ohne Agent in der App:** Quickpick-Voreinstellung „Kombi-Tipps ab 1,60“
+  (Abschnitt „Quickpicker“). Dieselbe Regel mit Mindestquote 1,60 ohne Vorliebe, Stufe „Weit“ =
+  `npm run kombi-tipps -- --min-quote 1.6`; nur die Anstoßprüfung fehlt dort. `flagsOf` liefert
+  seitdem Codes (`KombiFlag`), `flagText` die bisherigen Zeilen der Kommandozeile.
 
 ## Quickpicker
 
 Der **Quickpicker** neben dem Filter-Knopf filtert die Tabelle nach einer **Voreinstellung**.
-Es gibt sechs, und sie haben **verschiedene Maßstäbe** - was für die eine gilt, gilt für die
+Es gibt sieben, und sie haben **verschiedene Maßstäbe** - was für die eine gilt, gilt für die
 anderen ausdrücklich nicht.
 
 ### Gemeinsames Gerüst
@@ -1150,21 +1166,28 @@ anderen ausdrücklich nicht.
   liegt auch die Weiche `evaluateFixture`. Importpfad für App, Tests und Rückrechnung bleibt
   `src/quickpick.ts` - dieselbe Begründung wie bei `autoDecide`.
 - Eine Voreinstellung bringt über `QuickpickPreset` alles mit, was sie unterscheidet: Tore,
-  Vorgaben, Strengestufen, Maßstab, Spalten, Texte und den Wettschein-Modus. Wer eine dritte
-  hinzufügt, ergänzt `QuickpickPresetId`, einen Deskriptor und einen Eintrag in
-  `QUICKPICK_COLUMNS` - sonst nichts.
+  Vorgaben, Strengestufen, Maßstab, Startsortierung (`defaultSort`), Texte und den
+  Wettschein-Modus. Wer eine neue hinzufügt, ergänzt: `QuickpickPresetId`, den Deskriptor in
+  `src/quickpick-<id>.ts`, `QUICKPICK_PRESETS`/`QUICKPICK_PRESET_LIST`, die Weiche in
+  `evaluateFixture`, `QuickpickSettings`, Abweisungsgründe in `REJECTION_LABELS` und
+  `emptyRejections` (`src/quickpick-core.ts`), im Frontend `QuickpickStore` samt
+  `loadQuickpickStore`/`settingsOf`/`withSettings` und der Altbestandsprüfung
+  (`frontend/src/quickpick.ts`), `QUICKPICK_PARAMS`/`QUICKPICK_TOGGLES`,
+  `QUICKPICK_COLUMNS` und einen **eigenen Zweig in `strengthOf`** - ohne ihn fällt sie still in
+  den Remis-Zweig, und der Compiler merkt es nicht.
 - **Der Quickpicker ist seit 10.10.2026 ein nicht-modales Fenster im Leistenstil** (Davids
   Entscheidungen nach zwei Entwürfen des UX-Agenten; Aufbau in
   `.claude/skills/betting-ux/references/app-landkarte.md`). Er geht unter der Knopfgruppe an
   derselben Stelle auf wie das Filtermenü - offen ist höchstens eins -, schließt bei Klick
   daneben, Wegtabben, Escape, ✕ und Ansichtswechsel und **lässt den Filter dabei an**.
   Festgelegt sind außerdem:
-  - **Alle sechs Filter stehen als eine Radio-Liste** unter zwei Gruppenüberschriften, je mit
+  - **Alle sieben Filter stehen als eine Radio-Liste** unter drei Gruppenüberschriften, je mit
     der Zahl ihrer Treffer (vorher Umschalter plus Dropdown, zwei Klicks und versteckte Zahlen).
     Das Feld `group` im Deskriptor ordnet jede Voreinstellung einer Gruppe zu
     (`QUICKPICK_GROUPS` in `src/quickpick.ts`): **Daves Filter** (`daves1x2`, `dominanz`,
     `remisScore`) wählen über Tabelle, H2H und Form, **Modell-Filter** (`modell1x2`, `hz15`,
-    `remis`) über Wahrscheinlichkeiten und Torerwartung des Modells. Die Gruppe ist reine
+    `remis`) über Wahrscheinlichkeiten und Torerwartung des Modells, **Tipico-Filter**
+    (`kombi`, seit 14.10.2026) über die Tipico-Quote ohne Aufschlag. Die Gruppe ist reine
     Anzeige, keine Regel liest sie.
   - **Jede Wahl schaltet „Tabelle filtern“ ein** - Filter (auch ein Klick auf den schon
     gewählten, deshalb `onClick` statt `onChange`), Stufe, Regler, Zusatzschalter,
@@ -1304,7 +1327,10 @@ anderen ausdrücklich nicht.
 - **Nachkalibrieren mit `npm run quickpick-report`** (mit `--preset <id>` auch einzeln): Der
   Report rechnet jede Stufe **jeder** Voreinstellung zurück, vergleicht das Ergebnis mit den
   Zahlen auf den Knöpfen und meldet eine Abweichung. Die Toleranz richtet sich nach dem
-  Maßstab: 3 Punkte Trefferquote bei Daves, 5 Punkte Ertrag bei der Dominanz. Er hält seinen Stand in `docs/quickpick-kalibrierung.json` und nennt,
+  Maßstab: 3 Punkte Trefferquote bei Daves, 5 Punkte Ertrag bei der Dominanz; Tipps je Tag dürfen
+  um 25 %, mindestens einen Tipp abweichen (seit 14.10.2026, vorher fest ±1 - bei 60-110 Tipps je
+  Tag der Kombi-Tipps eine Dauermeldung). Die Kombi-Tabelle kommt aus der Vorgabestufe des Filters
+  (`levelOf(preset.defaults)`), nicht fest aus „Ausgewogen“. Er hält seinen Stand in `docs/quickpick-kalibrierung.json` und nennt,
   wie viele Partien seit dem letzten Kalibrierpunkt dazugekommen sind; fällig ist die
   Nachkalibrierung alle **2.000 abgerechneten Partien**. Mit `--write` wird ein neuer Punkt
   festgehalten. Kostet kein API-Budget. Stand 21.09.2026 (Daves): streng 3,2/Tag bei 64,2 %,
@@ -1535,6 +1561,45 @@ anderen ausdrücklich nicht.
 - Nebenbefund des Prüfers: Das 1X2-Modell schätzt Heimsiege zu niedrig (43,8 % eingetreten
   gegen 40,8 %) und Auswärtssiege zu hoch (30,8 gegen 34,5 %). Geprüft am 10.10.2026, siehe
   „Heim-/Gast-Aufteilung“ im Abschnitt Märkte.
+
+### „Kombi-Tipps ab 1,60": der wahrscheinlichste Tipp je Spiel (seit 14.10.2026)
+
+- Davids Auftrag vom 14.10.2026: „die sichersten Tipps mit Quote mindestens 1,6“ ohne Agent, als
+  Filter (`kombi`, `src/quickpick-kombi.ts`, Gruppe **Tipico-Filter**). Maßstab Trefferquote
+  je Tipp, die Tipps sind Beine für Kombis.
+- **Die Regel ist die der Kombi-Auswahl** (`tipsOf`, `chooseTip`, `flagsOf` aus
+  `src/kombi-tipps.ts`, unverändert): je Spiel ein Tipp aus allen 14 Märkten, der mit der höchsten
+  **fairen Tipico-Chance** („Chance laut Tipico“) ab `minOdds` 1,60 (Identität, Abweichung =
+  „eigene Werte“), `preferredOdds = minOdds`. Nur echte Gegenquote, `probabilityReliable !==
+  false`. Auffällige Spiele fallen weg (`auffaellig`, geprüft nach der Höchstquote, damit nur Spiele der
+  gewählten Stufe zählen) und stehen leise unter der Liste mit Grund in
+  einfacher Sprache (`kombiFlagLabel`), **ohne Tipp, Quote und Prozentzahlen**. Die
+  **Anstoßprüfung fehlt**: Der Snapshot trägt den Tipico-Anstoß nicht (an alten Spielen 12 von 3.913
+  Spielen, alle richtig zugeordnet) - keine neue schemaVersion.
+- **Stufen über eine Höchstquote des gewählten Tipps** (bis 1,65 / 1,70 / 1,80 / ohne), vorab vom
+  Prüfer festgelegt: Bei fester Mindestquote staffelt eine Mindest-Chance fast dasselbe
+  (Überschneidung 86-99 %), die Höchstquote ist verständlicher und hängt nur am gezeigten Preis.
+  Vorgabe **„Streng“** (strengste Stufe mit Median ≥ 12 Tipps je Tag). Gemessen 10.09.-15.10.2026
+  (`npm run quickpick-report -- --preset kombi`, Kalibrierpunkt 14.10.2026): Streng 2.038 Tipps,
+  59,3/Tag, **57,5 %** Treffer bei 56,8 % fair, −6,9 ± 1,8 % je Tipp; Weit 3.902, 54,8 %, −7,9 %.
+  Alle Stufen treffen so oft wie der faire Preis - **der Verlust je Tipp ist der Aufschlag**, ein
+  4er geht in rund 11 % der Fälle auf und kostet auf Dauer rund ein Viertel des Einsatzes.
+- **Keine Zusatzbedingung „für mehr Sicherheit“:** 1X2-Favorit bis 1,90 (+3,0 ± 3,3) und „Modell ≥ 8
+  Punkte unter fair“ (+2,4 ± 2,2) tragen nicht in beiden Zeithälften. Nur vorab festgelegt neu messen.
+- **Modellchance nur aufgeklappt, grau, ohne Abstand** (Spalte „Modell zum Tipp“, ohne Zusatz - die Erklärung steht im Tooltip; Davids Entscheidung vom
+  14.10.2026): Neben der Tipico-Chance würde der Abstand als Vorteil gelesen. Die Zeile zeigt den
+  Tipp im Wortlaut des Wettscheins, „Tipico x %“ und die Quote; aufgeklappt Ersatz (nächstbester
+  Tipp desselben Spiels ab der Mindestquote, falls die Quote bei Tipico gefallen ist), Hinweise und
+  Modell. Ein Hinweis „knapp über der Mindestquote“ je Zeile wurde am 14.10.2026 gebaut und wieder
+  entfernt: In der Vorgabe stand er bei fast jeder Zeile; die Kriterien sagen es einmal.
+- **Startsortierung nach Chance laut Tipico** (`defaultSort: "strength"`, die übrigen sechs
+  `"kickoff"`). **„Nur die besten …“** (`limit`, gemerkt, kein Regler) kürzt in
+  `applyQuickpick` - nicht in der Regel - nach `kombi.chosen.fair` auf die obersten N, Rest
+  `nichtUnterDenBesten`; Liste, Tabelle und Wettschein-Knopf folgen. Die Rückrechnung ruft
+  `evaluateFixture` und misst die Stufen ohne Grenze.
+- Nicht in `MODEL_BOUND_PRESETS`: Auswahl und Preis hängen nicht am Modell. Der Wettschein mischt
+  die Kombis weiter zufällig (Davids Entscheidung vom 14.10.2026); ein Modus „nach Anstoß“ wäre
+  eine eigene Änderung am Wettschein für alle Filter.
 
 ### „Remis-Score": Punkte mit Begründung statt Wahrscheinlichkeit
 

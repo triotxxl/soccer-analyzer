@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { DashboardFixture, DashboardMarket } from "../src/dashboard.ts";
-import { KOMBI_RULE, chooseTip, comboStats, flagsOf, parseBerlin, splitIntoCombos, tipsOf, type KombiTip } from "../src/kombi-tipps.ts";
+import { KOMBI_RULE, chooseTip, comboStats, flagText, flagsOf, parseBerlin, splitIntoCombos, tipsOf, type KombiTip } from "../src/kombi-tipps.ts";
 
 function market(key: DashboardMarket["key"], odds: number | null, extra: Partial<DashboardMarket> = {}): DashboardMarket {
   return {
@@ -68,8 +68,20 @@ describe("flagsOf", () => {
       market("1x2", 1.02, { pick: "1", probability: 0.65, oddsHome: 1.02, oddsAway: 19 }),
       market("draw", 9.5, { probability: 0.2 })
     ]));
-    assert.ok(flags.some((flag) => flag.startsWith("1X2-Quote 1,02") || flag.startsWith("1X2-Quote 1.02")));
-    assert.ok(flags.some((flag) => flag.includes("Modell 65 %")));
+    assert.deepEqual(flags.find((flag) => flag.code === "quote"), { code: "quote", odds: 1.02 });
+    const gap = flags.find((flag) => flag.code === "modellAbstand");
+    assert.ok(gap && gap.code === "modellAbstand" && gap.side === "1" && gap.model === 0.65);
+    // Die Kommandozeile druckt dieselben Zeilen wie vor der Umstellung auf Codes.
+    const texts = flags.map(flagText);
+    assert.ok(texts.includes("1X2-Quote 1.02"));
+    assert.ok(texts.some((text) => text.startsWith("1X2 Heim: Modell 65 % gegen fair ")));
+  });
+
+  it("formuliert jeden Grund für die Kommandozeile wie bisher", () => {
+    assert.equal(flagText({ code: "aufschlag", book: 1.2345 }), "1X2-Aufschlag 1.234");
+    assert.equal(flagText({ code: "gleicheQuoten" }), "1X2 dreimal dieselbe Quote");
+    assert.equal(flagText({ code: "modellAbstand", side: "2", model: 0.1, fair: 0.42 }), "1X2 Gast: Modell 10 % gegen fair 42 %");
+    assert.equal(flagText({ code: "anstoss", tipico: "A", api: "B" }), "Anstoß Tipico A gegen API B");
   });
 
   it("meldet einen Anstoß, der bei Tipico über eine Stunde abweicht", () => {

@@ -1,5 +1,6 @@
 import type { DashboardFixture, DashboardMarket, DashboardMarketKey, FormResult } from "./dashboard.ts";
 import type { DrawSignalResult } from "./draw-signals.ts";
+import type { KombiFlag, KombiTip } from "./kombi-tipps.ts";
 import type { RecentMatchSummary } from "./types.ts";
 
 /**
@@ -10,14 +11,18 @@ import type { RecentMatchSummary } from "./types.ts";
  * Hier steht bewusst keine Regel - nur das, woraus Regeln gebaut werden.
  */
 
-export type QuickpickPresetId = "daves1x2" | "dominanz" | "hz15" | "remis" | "remisScore" | "modell1x2";
+export type QuickpickPresetId = "daves1x2" | "dominanz" | "hz15" | "remis" | "remisScore" | "modell1x2" | "kombi";
 
 /**
  * Die Gruppe, unter der eine Voreinstellung im Dialog erscheint. `daves` wählt über Tabelle,
  * H2H und Form eine Mannschaft aus, `modell` über die Wahrscheinlichkeiten und Torerwartungen
- * des Modells einen Markt. Rein eine Frage der Anzeige - keine Regel liest das Feld.
+ * des Modells einen Markt, `tipico` über die Tipico-Quote ohne Aufschlag. Rein eine Frage der
+ * Anzeige - keine Regel liest das Feld.
  */
-export type QuickpickGroup = "daves" | "modell";
+export type QuickpickGroup = "daves" | "modell" | "tipico";
+
+/** Wonach die Trefferliste im Quickpicker sortiert werden kann. */
+export type QuickpickSortKey = "kickoff" | "odds" | "strength";
 
 export type QuickpickLevelId = "streng" | "ausgewogen" | "locker" | "weit";
 
@@ -105,7 +110,11 @@ export interface QuickpickPreset<S> {
   leerSatz: string;
   defaults: S;
   levels: Array<QuickpickLevel<Partial<S>>>;
-  defaultSort: string;
+  /**
+   * Wonach die Trefferliste beim Öffnen und beim Wechsel auf diesen Filter sortiert ist. Fast
+   * überall nach Anstoß; bei „Kombi-Tipps“ nach der Chance, damit die besten Tipps oben stehen.
+   */
+  defaultSort: QuickpickSortKey;
   evaluate(fixture: DashboardFixture, settings: S): QuickpickEvaluation;
   /** Formatiert die Messung für den Knopf. Jede Voreinstellung nennt ihre eigene Größe. */
   noteOf(measured: QuickpickMeasurement | null): string;
@@ -147,7 +156,14 @@ export type QuickpickRejection =
   // Gründe der Voreinstellung "Sieger laut Modell". `nichtBelastbar` heißt "das Modell kann
   // den Klassenunterschied nicht abbilden" (`probabilityReliable: false`), nicht "zu schwach".
   | "siegChance"
-  | "nichtBelastbar";
+  | "nichtBelastbar"
+  // Gründe der Voreinstellung "Kombi-Tipps". `auffaellig` heißt "die Quoten sehen nach einem
+  // Datenfehler aus oder Modell und Tipico liegen weit auseinander", nicht "zu unsicher".
+  // `nichtUnterDenBesten` vergibt `applyQuickpick`, nicht die Regel: Das Spiel bestand, gehört aber
+  // nicht zu den besten N.
+  | "keinKombiTipp"
+  | "auffaellig"
+  | "nichtUnterDenBesten";
 
 export const REJECTION_LABELS: Record<QuickpickRejection, string> = {
   keinTipp: "für dieses Spiel gibt es keinen Sieger-Tipp",
@@ -172,7 +188,10 @@ export const REJECTION_LABELS: Record<QuickpickRejection, string> = {
   remisScore: "zu wenige Hinweise auf ein Unentschieden",
   remisDaten: "zu wenige Daten, um den Remis-Score zu bilden",
   siegChance: "das Modell sieht den Sieger nicht sicher genug",
-  nichtBelastbar: "Spiel zwischen verschiedenen Ligen ohne Stärkevergleich – keine belastbare Siegchance"
+  nichtBelastbar: "Spiel zwischen verschiedenen Ligen ohne Stärkevergleich – keine belastbare Siegchance",
+  keinKombiTipp: "kein Tipp ab der Mindestquote, bei dem Tipico auch die Gegenseite anbietet",
+  auffaellig: "auffällige Quoten, oder Modell und Tipico liegen weit auseinander – lieber weglassen",
+  nichtUnterDenBesten: "zählt nicht zu den besten – Feld „Nur die besten“"
 };
 
 export interface QuickpickDominance {
@@ -268,6 +287,16 @@ export interface RemisDetail {
   expectedGoals: number;
 }
 
+/** Was nur die Voreinstellung „Kombi-Tipps" braucht. */
+export interface KombiDetail {
+  /** Der gewählte Tipp; `fair` ist die Chance laut Tipico, `model` nur Anzeige. */
+  chosen: KombiTip;
+  /** Der nächstbeste Tipp desselben Spiels ab der Mindestquote - falls die Quote bei Tipico gefallen ist. */
+  ersatz: KombiTip | null;
+  /** Warum das Spiel auffällig ist; leer = unauffällig. */
+  flags: KombiFlag[];
+}
+
 /** Was nur die Voreinstellung „Sieger laut Modell" braucht. */
 export interface Modell1x2Detail {
   /** Modellwahrscheinlichkeit der getippten Seite - das Kerntor. */
@@ -323,6 +352,8 @@ export interface QuickpickEvaluation {
   remisScore?: DrawSignalResult | null;
   /** Nur bei „modell1x2" gesetzt. */
   modell1x2?: Modell1x2Detail | null;
+  /** Nur bei „kombi" gesetzt. */
+  kombi?: KombiDetail | null;
   passes: boolean;
   rejectedBy: QuickpickRejection | null;
 }
@@ -340,7 +371,8 @@ export function emptyRejections(): Record<QuickpickRejection, number> {
     keineQuote: 0, bilanz: 0, keineDuelle: 0, modellDagegen: 0,
     keinMarkt: 0, torerwartung: 0, remisbild: 0, hzHistorie: 0,
     remisChance: 0, remisScore: 0, remisDaten: 0,
-    siegChance: 0, nichtBelastbar: 0
+    siegChance: 0, nichtBelastbar: 0,
+    keinKombiTipp: 0, auffaellig: 0, nichtUnterDenBesten: 0
   };
 }
 

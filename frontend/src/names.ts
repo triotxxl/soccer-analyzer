@@ -139,3 +139,23 @@ export function competitionMatches(entry: CompetitionNames, needle: string): boo
   return countries.some((country) => leagues.some((league) => `${country} ${league}`.toLowerCase().includes(query)))
     || [...countries, ...leagues].some((name) => name.toLowerCase().includes(query));
 }
+
+/** Für die Suche: klein und ohne Akzente, damit „atletico“ auch „Atlético“ findet. */
+export function searchKey(text: string): string {
+  return text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+}
+
+/**
+ * Die Suche über der Tabelle (seit 14.10.2026, Davids Wunsch): Mannschaften, Wettbewerb und Land,
+ * jeweils unter beiden Namen - gleich wie der Schalter in den Einstellungen steht, denn gesucht
+ * wird oft mit dem Namen, den man bei Tipico gesehen hat. Mehrere Wörter müssen alle vorkommen,
+ * egal wo („england premier“, „bayern bundesliga“). Leer heißt: alles passt.
+ */
+export function fixtureMatches(item: Named, query: string): boolean {
+  const words = searchKey(query).split(/\s+/).filter((word) => word.length > 0);
+  if (words.length === 0) return true;
+  const fields = [item.homeTeam, item.awayTeam, item.country, item.league,
+    item.tipico?.homeTeam, item.tipico?.awayTeam, item.tipico?.country, item.tipico?.league];
+  const haystack = searchKey(fields.filter((field): field is string => !!field).join(" | "));
+  return words.every((word) => haystack.includes(word));
+}

@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { formatOdd } from "./App";
 import { DRAW_SIGNAL_CONFIG, DRAW_SIGNAL_META, formatDrawPoints } from "../../src/draw-signals.ts";
+import type { KombiFlag, KombiTip } from "../../src/kombi-tipps.ts";
 import { oddsEstimated, type QuickpickEvaluation, type QuickpickPresetId } from "./quickpick";
 import { countryName, leagueName, teamName, type NameSource } from "./names";
 import type { DashboardFixture } from "./types";
@@ -487,13 +488,114 @@ const MODELL1X2_COLUMNS: QuickpickColumn[] = [
   }
 ];
 
+/**
+ * Ein Tipp der Kombi-Tipps im Wortlaut des Wettscheins (`selectionLabel` in `betCart.ts`): beim
+ * 1X2 mit der Mannschaft nach Namens-Einstellung, sonst „Markt · Auswahl“. `tip.selection` trägt
+ * beim 1X2 die Namen von API-Football und taugt deshalb nicht für die Anzeige.
+ */
+export function kombiTipLabel(row: QuickpickRow, tip: KombiTip): string {
+  if (tip.marketKey === "1x2" && tip.side !== undefined) {
+    return tip.side === "1"
+      ? `Heimsieg ${teamName(row.fixture, "home", row.names)}`
+      : `Auswärtssieg ${teamName(row.fixture, "away", row.names)}`;
+  }
+  const market = row.fixture.markets.find((entry) => entry.key === tip.marketKey);
+  return `${market?.label ?? tip.marketKey} · ${tip.selection}`;
+}
+
+const tipicoPercent = (fair: number) => `${Math.round(fair * 100)} %`;
+
+/**
+ * Warum ein Spiel auffällig ist, in einfacher Sprache. Bewusst **ohne** Quote und Prozentzahlen:
+ * Eine Quote lüde dazu ein, den Tipp von Hand nachzulegen, die beiden Prozentzahlen beim Abstand
+ * wären ein Vorteil in Zahlen - den zeigt die App nur unter „Vorteil & Kelly“.
+ */
+export function kombiFlagLabel(flag: KombiFlag): string {
+  switch (flag.code) {
+    case "quote": return "Eine Sieger-Quote fast bei 1,00 – so niedrig ist meist ein Fehler in den Daten";
+    case "aufschlag": return "Die drei Sieger-Quoten passen nicht zusammen – vermutlich falsch eingelesen";
+    case "gleicheQuoten": return "Dreimal dieselbe Quote – vermutlich ein Platzhalter";
+    case "modellAbstand": return "Modell und Tipico liegen beim Sieger sehr weit auseinander – meist ein Fehler des Modells oder der Daten";
+    case "anstoss": return "Anstoß bei Tipico und in den Spieldaten über eine Stunde auseinander – Zuordnung fraglich";
+  }
+}
+
+/**
+ * Die Spalten der Voreinstellung „Kombi-Tipps ab 1,60“. Der Tipp wechselt je Spiel die Wettart.
+ * Die Modellchance steht nur aufgeklappt und ohne Abstand zur Tipico-Chance - nebeneinander in
+ * der Zeile würde der Abstand als Vorteil gelesen (Davids Entscheidung vom 14.10.2026).
+ */
+const KOMBI_COLUMNS: QuickpickColumn[] = [
+  partie,
+  {
+    key: "tipp", label: "Tipp", sortable: false, className: "quickpick-side",
+    cell: (row) => {
+      const detail = row.evaluation.kombi;
+      if (detail == null) return { main: "–" };
+      return {
+        main: kombiTipLabel(row, detail.chosen),
+        // Kein Hinweis „knapp über der Mindestquote“ in der Zeile: Er stand am 14.10.2026 bei fast
+        // jeder Zeile der Vorgabe und sagte damit nichts mehr. Die Kriterien nennen es einmal.
+        mainTitle: "Der Tipp, dem die Tipico-Quote ohne Aufschlag die höchste Chance gibt – je Spiel nur einer."
+      };
+    }
+  },
+  {
+    key: "ersatz", label: "Ersatz", sortable: false,
+    cell: (row) => {
+      const ersatz = row.evaluation.kombi?.ersatz ?? null;
+      if (ersatz === null) return { main: "–", note: "kein zweiter Tipp ab der Mindestquote" };
+      return {
+        main: kombiTipLabel(row, ersatz),
+        mainTitle: "Falls die Quote bei Tipico unter die Mindestquote gefallen ist: der nächstwahrscheinliche"
+          + " Tipp desselben Spiels.",
+        note: `${formatOdd(ersatz.odds)} · Tipico ${tipicoPercent(ersatz.fair)}`
+      };
+    }
+  },
+  {
+    key: "hinweise", label: "Hinweise", sortable: false,
+    cell: (row) => {
+      const detail = row.evaluation.kombi;
+      const hints: string[] = [];
+      if (row.fixture.crossLeague) hints.push("Spiel zwischen verschiedenen Ligen");
+      if (detail != null && detail.chosen.confidence < 60) hints.push("wenig Daten");
+      return {
+        main: hints.length === 0 ? "keine" : hints.join(" · "),
+        mainTitle: "Betrifft das Modell, nicht die Quote – der Tipp bleibt in der Liste.",
+        note: "nur Einordnung"
+      };
+    }
+  },
+  {
+    key: "modell", label: "Modell zum Tipp", ariaLabel: "Chance laut Modell für den Tipp oben, nicht für den Ersatz", sortable: false, className: "quickpick-fact-quiet",
+    cell: (row) => {
+      const detail = row.evaluation.kombi;
+      return {
+        main: detail == null ? "–" : `${Math.round(detail.chosen.model * 100)} %`,
+        mainTitle: "Was das Modell dem Tipp oben gibt (nicht dem Ersatz). Es entscheidet hier nicht mit: Wo es mehr sieht als"
+          + " Tipico, ist das meist ein Fehler des Modells, kein Vorteil.",
+      };
+    }
+  },
+  {
+    key: "quote", label: "Quote", sortable: true,
+    value: (row) => row.evaluation.odds ?? -1,
+    cell: (row) => ({
+      main: row.evaluation.odds === null ? "–" : formatOdd(row.evaluation.odds),
+      mainTitle: "Die Tipico-Quote dieses Tipps aus der letzten Analyse. Vor dem Setzen in der Tipico-App prüfen."
+    })
+  }
+];
+
 const QUICKPICK_COLUMNS: Record<QuickpickPresetId, QuickpickColumn[]> = {
   daves1x2: DAVES_COLUMNS,
   dominanz: DOMINANZ_COLUMNS,
   hz15: HZ15_COLUMNS,
   remis: REMIS_COLUMNS,
   remisScore: REMIS_SCORE_COLUMNS,
-  modell1x2: MODELL1X2_COLUMNS
+  modell1x2: MODELL1X2_COLUMNS,
+  kombi: KOMBI_COLUMNS
 };
 
 /**
@@ -577,6 +679,16 @@ export function strengthOf(preset: QuickpickPresetId, row: QuickpickRow): Quickp
     return {
       percent, label: `Sieg ${percent} %`, gut: 70, mittel: 60,
       title: "Wie hoch das Modell die Siegchance der getippten Mannschaft sieht."
+    };
+  }
+  if (preset === "kombi") {
+    const detail = evaluation.kombi;
+    if (detail === null || detail === undefined) return null;
+    // Ungerundet, damit die Sortierung „Stärke“ die Rangfolge des Werkzeugs genau nachbildet.
+    return {
+      percent: detail.chosen.fair * 100, label: `Tipico ${tipicoPercent(detail.chosen.fair)}`, gut: 57, mittel: 55,
+      title: "Die Chance, die Tipico diesem Tipp gibt – aus der Quote ohne Aufschlag gerechnet. Ab Werk"
+        + " ist die Liste danach sortiert, und „Nur die besten“ zählt danach."
     };
   }
   if (preset === "remisScore") {

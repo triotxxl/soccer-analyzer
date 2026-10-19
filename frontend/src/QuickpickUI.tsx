@@ -3,6 +3,7 @@ import { useEffect, useId, useLayoutEffect, useRef, useState, type Ref } from "r
 import { FilterCard, FilterChip, FilterSegment, FilterSwitch, type SegmentOption } from "./FilterMenu";
 import {
   QUICKPICK_GROUPS,
+  QUICKPICK_PRESETS,
   QUICKPICK_PRESET_LIST,
   REJECTION_LABELS,
   applyLevel,
@@ -15,10 +16,12 @@ import {
   type QuickpickPresetId,
   type QuickpickRejection,
   type QuickpickSettings,
+  type QuickpickSortKey,
   type QuickpickStore
 } from "./quickpick";
 import {
   factColumns,
+  kombiFlagLabel,
   oddsColumn,
   pickColumn,
   strengthOf,
@@ -69,7 +72,7 @@ const formatDecimal = (value: number) => value.toFixed(1).replace(".", ",");
 const spieleWort = (count: number) => (count === 1 ? "Spiel" : "Spiele");
 
 /** Wonach die Trefferliste sortiert wird. Bewusst wenige Möglichkeiten - es ist eine Liste. */
-type SortKey = "kickoff" | "odds" | "strength";
+type SortKey = QuickpickSortKey;
 
 const SORT_OPTIONS: ReadonlyArray<SegmentOption<SortKey>> = [
   { value: "kickoff", label: "Anstoß" },
@@ -225,7 +228,10 @@ export function QuickpickDialog({
   const [openRow, setOpenRow] = useState<number | null>(null);
   const [kombiOpen, setKombiOpen] = useState(false);
   const [rejectionsOpen, setRejectionsOpen] = useState(false);
-  const [sortKey, setSortKey] = useState<SortKey>("kickoff");
+  // Beim Öffnen und beim Wechsel die Sortierung des Filters: bei „Kombi-Tipps“ nach der Chance,
+  // damit die besten Tipps oben stehen, sonst nach Anstoß.
+  const [sortKey, setSortKey] = useState<SortKey>(preset.defaultSort);
+  const [flaggedOpen, setFlaggedOpen] = useState(false);
   // Welche Stufe die Regler zuletzt gesetzt hat. Sobald ein Regler abweicht, liefert
   // `levelOf` null - ohne dieses Gedächtnis wüsste „Auf Stufe zurücksetzen" nicht, wohin.
   const [levelMemory, setLevelMemory] = useState<Partial<Record<QuickpickPresetId, QuickpickLevelId>>>({});
@@ -235,6 +241,7 @@ export function QuickpickDialog({
     if (id !== preset.id) {
       onPresetChange(id);
       setOpenRow(null);
+      setSortKey(QUICKPICK_PRESETS[id].defaultSort);
     }
     // Auch beim schon gewählten Filter: Ein Klick darauf heißt „filtern“.
     onActiveChange(true);
@@ -306,6 +313,22 @@ export function QuickpickDialog({
     .filter(([, count]) => count > 0)
     .sort((left, right) => right[1] - left[1]);
   const rejectedCount = report.evaluated - report.passed;
+  // Nur bei „Kombi-Tipps“: was „Nur die besten …“ abgeschnitten hat, und welche Spiele als
+  // auffällig weggelassen wurden - genannt mit Grund, aber ohne Tipp und Quote, damit niemand
+  // einen Tipp zu 1,02 von Hand nachlegt.
+  const limit = settings.preset === "kombi" ? settings.limit : null;
+  const cutByLimit = report.rejected.nichtUnterDenBesten;
+  const flagged = fixtures
+    .map((fixture) => ({ fixture, evaluation: evaluations.get(fixture.fixtureId)! }))
+    .filter((entry) => entry.evaluation.rejectedBy === "auffaellig")
+    .sort((left, right) => Date.parse(left.fixture.kickoff) - Date.parse(right.fixture.kickoff));
+  const setLimit = (raw: string) => {
+    if (settings.preset !== "kombi") return;
+    const parsed = Math.floor(Number(raw));
+    // Leer heißt „alle“; ein halb getipptes oder unsinniges Feld ändert nichts.
+    if (raw.trim() === "") activate({ ...settings, limit: null });
+    else if (Number.isFinite(parsed) && parsed >= 1) activate({ ...settings, limit: parsed });
+  };
 
   /** Eine gerechnete Quote ist kein Preis und darf nicht in den Wettschein. */
   const estimated = (row: QuickpickRow) => oddsEstimated(row.evaluation);
@@ -347,6 +370,9 @@ export function QuickpickDialog({
       <h2 ref={headingRef} tabIndex={-1}>Quickpicker</h2>
       <p className="filter-menu-count">
         <strong>{report.passed}</strong> von {report.evaluated} Spielen passen
+        {cutByLimit > 0 && <span title="Gezeigt werden nur die Spiele mit der höchsten Chance laut Tipico.">
+          {" · "}die besten {report.passed} von {report.passed + cutByLimit}
+        </span>}
         {tableDiffers && <span title="Bewertung oder Klassenunterschied im Filtermenü grenzen die Tabelle weiter ein.">
           {" · "}Tabelle zeigt {shownInTable}
         </span>}
@@ -432,7 +458,9 @@ export function QuickpickDialog({
             {kombiOpen && <section aria-label="Kombi-Chancen" className="quickpick-kombis">
               <strong>Was Kombis aus dieser Stufe gebracht hätten</strong>
               {kombis.length === 0
-                ? <small>Für diese Stufe wurde noch nichts an alten Spielen geprüft.</small>
+                ? <small>{measured === null
+                  ? "Für diese Stufe wurde noch nichts an alten Spielen geprüft."
+                  : "Kombis wurden für diese Stufe nicht an alten Spielen geprüft – nur die einzelnen Tipps."}</small>
                 : <>
                   <table>
                     <thead>
@@ -489,8 +517,17 @@ export function QuickpickDialog({
       </div>
 
       <FilterCard title="Gefundene Spiele" className="quickpick-results"
-        aside={<FilterSegment<SortKey> name="quickpick-sort" legend="Sortiert nach" className="quickpick-sort"
-          value={sortKey} onChange={setSortKey} options={SORT_OPTIONS} />}>
+        aside={<span className="quickpick-results-tools">
+          {settings.preset === "kombi" && <label className="quickpick-limit"
+            title="Nur die Spiele mit der höchsten Chance laut Tipico – für Liste, Tabelle und Wettschein. Leer heißt alle.">
+            Nur die besten
+            <input type="number" min={1} step={1} inputMode="numeric" placeholder="alle"
+              title="Nur die Spiele mit der höchsten Chance laut Tipico – für Liste, Tabelle und Wettschein. Leer heißt alle."
+              value={limit ?? ""} onChange={(event) => setLimit(event.target.value)} />
+          </label>}
+          <FilterSegment<SortKey> name="quickpick-sort" legend="Sortiert nach" className="quickpick-sort"
+            value={sortKey} onChange={setSortKey} options={SORT_OPTIONS} />
+        </span>}>
         <div className="quickpick-list">
           {sorted.map((row) => {
             const open = openRow === row.fixture.fixtureId;
@@ -520,7 +557,7 @@ export function QuickpickDialog({
               {open && <div className="quickpick-facts">
                 {facts.map((column) => {
                   const cell = column.cell(row);
-                  return <span key={column.key} className="quickpick-fact">
+                  return <span key={column.key} className={["quickpick-fact", column.className].filter(Boolean).join(" ")}>
                     <small title={column.ariaLabel}>{column.label}</small>
                     <span title={cell.mainTitle}>{cell.main}</span>
                     {cell.note === undefined ? null
@@ -538,6 +575,22 @@ export function QuickpickDialog({
             </>}
           </div>}
         </div>
+        {flagged.length > 0 && <div className="filter-card-rule">
+          <Disclosure label={flagged.length === 1
+            ? "1 auffälliges Spiel weggelassen"
+            : `${flagged.length} auffällige Spiele weggelassen`}
+            title="Spiele, deren Quoten nach einem Fehler aussehen oder bei denen Modell und Tipico sehr weit auseinanderliegen"
+            open={flaggedOpen} onToggle={() => setFlaggedOpen((value) => !value)} />
+          {flaggedOpen && <ul className="quickpick-rejections quickpick-flagged">
+            {flagged.map(({ fixture, evaluation }) => <li key={fixture.fixtureId}>
+              <span className="quickpick-flagged-when">{kickoff(fixture.kickoff)}</span>
+              <span>
+                <strong>{teamName(fixture, "home", names)} – {teamName(fixture, "away", names)}</strong>
+                {" · "}{[...new Set((evaluation.kombi?.flags ?? []).map(kombiFlagLabel))].join(" · ")}
+              </span>
+            </li>)}
+          </ul>}
+        </div>}
         {sorted.length > 0 && <div className="filter-card-rule">
           <Disclosure label={rejectedCount === 1
             ? "Woran das übrige Spiel scheitert"

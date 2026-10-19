@@ -331,7 +331,7 @@ export const HZ15_PRESET: QuickpickPreset<Hz15QuickpickSettings> = {
   leerSatz: "Kein Spiel verspricht genug Tore zu diesem Preis.",
   defaults: DEFAULT_HZ15_SETTINGS,
   levels: HZ15_LEVELS,
-  defaultSort: "torerwartung",
+  defaultSort: "kickoff",
   evaluate: (fixture, settings) => evaluateHz15(fixture, settings),
   noteOf: hz15Note
 };

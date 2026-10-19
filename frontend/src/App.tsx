@@ -1,5 +1,5 @@
 import {
-  Binoculars, CaretLeft, CaretRight, Crosshair, Info, RocketLaunch, Shield, ShieldCheck, WarningCircle, X
+  Binoculars, CaretLeft, CaretRight, Crosshair, Info, MagnifyingGlass, RocketLaunch, Shield, ShieldCheck, WarningCircle, X
 } from "@phosphor-icons/react";
 import { Fragment, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { BetSlipWindow, CartAddMenu, CartButton, type CartPutFeedback } from "./BetCartUI";
@@ -36,7 +36,7 @@ import { BrandMark, NavRail, type NavKey } from "./NavRail";
 import { QuickpickButton, QuickpickChip, QuickpickDialog, type QuickpickCartFeedback } from "./QuickpickUI";
 import { applyQuickpick, loadQuickpickStore, saveQuickpickStore, settingsOf, withSettings, QUICKPICK_PRESETS, REJECTION_LABELS, presetOf, type QuickpickFilterReport, type QuickpickPresetId, type QuickpickRejection, type QuickpickStore } from "./quickpick";
 import { TeamCrest } from "./TeamCrest";
-import { competitionCountry, competitionLeague, competitionMatches, competitionVariants, countryName, displayTeam, leagueName, loadNameSource, NamesContext, saveNameSource, selectionText, teamName, useNames, type NameSource } from "./names";
+import { competitionCountry, competitionLeague, competitionMatches, competitionVariants, countryName, displayTeam, fixtureMatches, leagueName, loadNameSource, NamesContext, saveNameSource, selectionText, teamName, useNames, type NameSource } from "./names";
 import { SettingsButton, SettingsWindow } from "./SettingsUI";
 import { useMarketProfile } from "./marketProfile";
 import { eloSystemLabel } from "../../src/elo-config.ts";
@@ -1277,6 +1277,9 @@ function Dashboard({ document }: { document: DashboardDocument }) {
   // Neuladen unbemerkt fast alle Zeilen ausblendet, wäre dieselbe Falle wie der geerbte
   // Einsatzrahmen der Kelly-Automatik, der wochenlang unentdeckt auf 100 % stand.
   const [quickpickActive, setQuickpickActive] = useState(false);
+  // Die Suche über der Tabelle. Bewusst nicht gemerkt: Eine vergessene Suche, die nach dem Neuladen
+  // fast alle Spiele ausblendet, wäre dieselbe Falle wie ein gemerkter Quickpick-Filter.
+  const [search, setSearch] = useState("");
   // Beide Voreinstellungen behalten ihre eigenen Regler; gewechselt wird nur, welche aktiv ist.
   const [quickpickStore, setQuickpickStore] = useState<QuickpickStore>(loadQuickpickStore);
   const quickpickSettings = settingsOf(quickpickStore);
@@ -1550,7 +1553,10 @@ function Dashboard({ document }: { document: DashboardDocument }) {
     ? selectKelly(scopedFixtures, marketFilter, kellySettings, kellyAuto, marketProfile.profile, { now })
     : null;
   const quickpickLabel = presetOf(quickpickSettings).label;
+  // Die Suche grenzt wie Quickpick und Stufe nur die Tabelle ein, nicht den Umfang - Kelly und die
+  // Zähler im Filtermenü bleiben unberührt.
   const filtered = scopedFixtures.filter((fixture) => {
+    if (!fixtureMatches(fixture, search)) return false;
     if (quickpickActive && !quickpick.passing.has(fixture.fixtureId)) return false;
     if (classGapFilter === "only" && !fixture.classGap) return false;
     if (classGapFilter === "hide" && fixture.classGap) return false;
@@ -1697,7 +1703,11 @@ function Dashboard({ document }: { document: DashboardDocument }) {
     .map((key) => [key, sortLabels[key]]);
   const heatmapColumns = heatmapMarkets(marketFilter).map((key) =>
     ({ key, label: MARKET_OPTIONS.find((option) => option.key === key)?.label ?? key }));
-  const emptyState = quickpickActive
+  const emptyState = search.trim() !== ""
+    ? <EmptyState title={`Kein Spiel passt zu „${search.trim()}“`}
+        text="Gesucht wird in Mannschaften, Wettbewerb und Land – unter den Spielen, die die übrigen Filter zeigen."
+        action={<button className="empty-state-action" onClick={() => setSearch("")}>Suche leeren</button>} />
+    : quickpickActive
     ? <EmptyState title={`${quickpickLabel} lässt kein Spiel übrig`}
         text={quickpickReason(quickpick.report)}
         action={<button className="empty-state-action" onClick={() => setQuickpickActive(false)}>
@@ -1772,6 +1782,7 @@ function Dashboard({ document }: { document: DashboardDocument }) {
     setClassGapFilter("all");
     setShowPast(false);
     setQuickpickActive(false);
+    setSearch("");
   };
 
   const filterMenuValues: FilterMenuValues = {
@@ -1956,7 +1967,7 @@ function Dashboard({ document }: { document: DashboardDocument }) {
 
   const marketControl = <label className="toolbar-field">
     <span>Markt</span>
-    <select value={marketFilter} onChange={(event) => selectMarket(event.target.value as MarketFilter)}>
+    <select title="Markt" value={marketFilter} onChange={(event) => selectMarket(event.target.value as MarketFilter)}>
       {marketOptionGroups.map(({ group, options }) => {
         const items = options.map((option) => <option value={option.key} key={option.key}>{option.label}</option>);
         return group ? <optgroup label={group} key={group}>{items}</optgroup> : <Fragment key="ungrouped">{items}</Fragment>;
@@ -2032,7 +2043,7 @@ function Dashboard({ document }: { document: DashboardDocument }) {
   };
   const liveQuestionControl = <label className="toolbar-field">
     <span>Markt</span>
-    <select value={liveQuestion} onChange={(event) => selectLiveQuestion(event.target.value as LiveQuestion)}>
+    <select title="Markt" value={liveQuestion} onChange={(event) => selectLiveQuestion(event.target.value as LiveQuestion)}>
       {LIVE_QUESTION_GROUPS.map(({ group, options }) => {
         const items = options.map((option) => <option value={option.key} key={option.key}>{option.label}</option>);
         return group ? <optgroup label={group} key={group}>{items}</optgroup> : <Fragment key="ungrouped">{items}</Fragment>;
@@ -2049,7 +2060,7 @@ function Dashboard({ document }: { document: DashboardDocument }) {
   ];
   const liveSortControl = <div className="toolbar-field sort-field">
     <label htmlFor="live-sort-select">Sortierung</label>
-    <select id="live-sort-select" value={effectiveLiveSort(liveSort, liveQuestion)}
+    <select id="live-sort-select" title="Sortierung" value={effectiveLiveSort(liveSort, liveQuestion)}
       onChange={(event) => setLiveSort(event.target.value as LiveSort)}>
       {liveSortOptions.map(([key, label]) => <option value={key} key={key}>{label}</option>)}
     </select>
@@ -2210,21 +2221,34 @@ function Dashboard({ document }: { document: DashboardDocument }) {
       settings={settingsControl} />
 
     <main className="content">
-      {banner && <div className="banner"><span><RocketLaunch size={20} weight="duotone" /></span><p><strong className="gold">Gold ★</strong> heißt sehr empfehlenswert, <strong>Grün ✓</strong> empfehlenswert. Sortiere über „Sortierung“ oder die Spaltenköpfe; Zeitraum, Wettbewerbe und Stufe stellst du über „Filter“ ein.</p><button onClick={() => { setBanner(false); saveBannerDismissed(); }} aria-label="Hinweis schließen"><X /></button></div>}
+      {banner && <div className="banner"><span><RocketLaunch size={20} weight="duotone" /></span><p><strong className="gold">Gold ★</strong> heißt sehr empfehlenswert, <strong>Grün ✓</strong> empfehlenswert. Sortiere über die Spaltenköpfe; Zeitraum, Wettbewerbe und Stufe stellst du über „Filter“ ein.</p><button onClick={() => { setBanner(false); saveBannerDismissed(); }} aria-label="Hinweis schließen"><X /></button></div>}
       {view === "prematch" ? <>
-      <div className="view-toolbar">
+      <div className="view-toolbar prematch-toolbar">
         <div className="toolbar-row">
           {/* Links, was Spiele ausblendet; rechts der Linie, was nur die Darstellung ändert. */}
           <div className="toolbar-group toolbar-filters">
             {filterControl}
             {quickpickControl}
           </div>
+          {/* Die Suche blendet ebenfalls aus und steht deshalb links der Linie. Das Feld zeigt
+              selbst, wonach gesucht wird - ein Schildchen darunter wäre doppelt. */}
+          <div className="toolbar-search">
+            <MagnifyingGlass size={14} weight="bold" aria-hidden />
+            <input type="search" aria-label="Spiele suchen" placeholder="Mannschaft, Liga, Land"
+              title="Sucht in Mannschaften, Wettbewerb und Land – mit Tipico- und API-Namen. Mehrere Wörter müssen alle vorkommen."
+              value={search} onChange={(event) => setSearch(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Escape" && search !== "") { event.stopPropagation(); setSearch(""); }
+              }} />
+            {search !== "" && <button type="button" className="toolbar-search-clear" aria-label="Suche leeren"
+              title="Suche leeren" onClick={() => setSearch("")}><X size={12} weight="bold" aria-hidden /></button>}
+          </div>
           <span className="toolbar-divider" aria-hidden />
           {marketControl}
           <div className="toolbar-field sort-field">
             <label htmlFor="sort-select">Sortierung</label>
             <div className="sort-control">
-              <select id="sort-select" value={heatmap && heatmapSort ? "heatmap" : effectiveSortKey} onChange={(event) => selectSort(event.target.value as SortKey)}>
+              <select id="sort-select" title="Sortierung" value={heatmap && heatmapSort ? "heatmap" : effectiveSortKey} onChange={(event) => selectSort(event.target.value as SortKey)}>
                 {heatmap && heatmapSort && <option value="heatmap" disabled>Spalte der Heatmap</option>}
                 {sortOptions.map(([key, label]) => <option value={key} key={key}>{label}</option>)}
               </select>

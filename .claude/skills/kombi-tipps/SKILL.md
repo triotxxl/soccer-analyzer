@@ -12,6 +12,25 @@ pro Spiel zulässig“.** Daraus entstand eine vorab festgelegte Regel, die das 
 `tools/kombi-tipps.ts`. Das Werkzeug kostet kein API-Budget und schreibt nichts; der Wächter des
 Prüfers lässt es zu.
 
+## Ohne Agent: der Quickpick-Filter (seit 14.10.2026)
+
+Für „die sichersten Tipps ab 1,60“ braucht David keinen Agenten mehr: Quickpicker → **„Kombi-Tipps
+ab 1,60“** (Gruppe „Tipico-Filter“, `src/quickpick-kombi.ts`). Dieselbe Regel mit Mindestquote
+1,60 ohne Vorliebe; Stufe „Weit“ entspricht `npm run kombi-tipps -- --min-quote 1.6`, nur die
+Anstoßprüfung fehlt (Snapshot ohne Tipico-Anstoß). Stufen nach Höchstquote des Tipps, Vorgabe
+„Streng“ = 1,60-1,65:
+
+| Stufe | Quote | Tipps/Tag | Treffer | fair | Ertrag je Tipp |
+|---|---|---|---|---|---|
+| Streng | 1,60-1,65 | 59,3 | 57,5 % | 56,8 % | −6,9 ± 1,8 % |
+| Ausgewogen | bis 1,70 | 86,5 | 56,4 % | 56,1 % | −7,5 ± 1,5 % |
+| Locker | bis 1,80 | 106,5 | 55,7 % | 55,4 % | −7,6 ± 1,4 % |
+| Weit | ohne | 113,5 | 54,8 % | 54,6 % | −7,9 ± 1,3 % |
+
+Der Agentenweg bleibt für alles, was der Filter nicht kann: andere Mindestquote mit Vorliebe
+(1,50 / lieber 1,60), Aufteilung in Kombis nach Anstoß mit Kopiertext, Rückblick (`--ab`),
+Messung (`--messen`), Einordnung auffälliger Spiele.
+
 ## Die Regel (nicht nach Gefühl ändern)
 
 1. **Kandidaten:** jeder Tipp der 14 Dashboard-Märkte mit Quote ≥ `--min-quote` (Vorgabe 1,50),

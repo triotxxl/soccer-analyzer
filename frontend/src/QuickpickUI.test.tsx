@@ -414,13 +414,14 @@ describe("Vier Voreinstellungen", () => {
     expect(screen.getByText(/rechnet es in die Quote ein/)).toBeInTheDocument();
   });
 
-  /** Alle sechs Filter stehen in einer Liste, unter zwei Überschriften. */
-  it("teilt die Filter auf Daves und Modell auf", () => {
+  /** Alle sieben Filter stehen in einer Liste, unter drei Überschriften. */
+  it("teilt die Filter auf Daves, Modell und Tipico auf", () => {
     render(<Harness fixtures={[fixture(1, "Alpha", "Beta", 75)]} />);
     const werte = (gruppe: string) => within(screen.getByRole("group", { name: gruppe }))
       .getAllByRole("radio").map((radio) => radio.getAttribute("value"));
     expect(werte("Daves Filter")).toEqual(["daves1x2", "dominanz", "remisScore"]);
     expect(werte("Modell-Filter")).toEqual(["modell1x2", "hz15", "remis"]);
+    expect(werte("Tipico-Filter")).toEqual(["kombi"]);
   });
 
   /** Jeder Eintrag nennt, wie viele Spiele er mit **seinen** Einstellungen findet. */
@@ -507,5 +508,103 @@ describe("Remis-Score", () => {
     expect(screen.getByText(/Das kann auch Zufall sein/)).toBeInTheDocument();
     expect(screen.getAllByText(/Rechne nicht mit Gewinn/)).toHaveLength(2);
     expect(screen.getByText(/Großchancen fehlen/)).toBeInTheDocument();
+  });
+});
+
+describe("Kombi-Tipps ab 1,60", () => {
+  type Market = DashboardFixture["markets"][number];
+  const zweiweg = (key: Market["key"], label: string, selection: string, odds: number, probability: number): Market => ({
+    key, label, selection, pick: null, selectionTone: "neutral", probability, odds, confidence: 80, score: null,
+    recommendation: { level: "none", label: "Nicht empfehlenswert" }, details: []
+  });
+
+  /** Über 2,5 ist der wahrscheinlichste Tipp ab 1,60; `over` verschiebt seine Chance laut Tipico. */
+  function spiel(id: number, home: string, away: string, over = 1.62, patch: { oddsHome?: number; kickoff?: string } = {}): DashboardFixture {
+    const base = fixture(id, home, away, 60);
+    return {
+      ...base,
+      kickoff: patch.kickoff ?? base.kickoff,
+      markets: [
+        { ...base.markets[0]!, probability: 0.5, odds: patch.oddsHome ?? 2.4, oddsHome: patch.oddsHome ?? 2.4, oddsAway: 3.2 },
+        { ...base.markets[0]!, key: "draw", label: "Remis", selection: "Unentschieden (X)", pick: null, odds: 3.3, probability: 0.27 },
+        zweiweg("over25", "Über 2,5", "Mindestens 3 Tore", over, 0.58),
+        zweiweg("under25", "Unter 2,5", "Höchstens 2 Tore", 2.25, 0.42),
+        zweiweg("btts", "BTTS", "Beide Teams treffen: Ja", 1.7, 0.55),
+        zweiweg("bttsNo", "BTTS Nein", "Beide Teams treffen: Nein", 2.05, 0.45)
+      ]
+    };
+  }
+
+  it("zeigt je Spiel den Tipp im Wortlaut des Wettscheins und die Chance laut Tipico", () => {
+    render(<Harness fixtures={[spiel(1, "Alpha", "Beta")]} preset="kombi" />);
+    expect(presetRadio("Kombi-Tipps ab 1,60")).toBeChecked();
+    expect(screen.getByText("Über 2,5 · Mindestens 3 Tore")).toBeInTheDocument();
+    expect(screen.getByText("Tipico 58 %")).toBeInTheDocument();
+  });
+
+  /** Neben der Tipico-Chance würde der Abstand als Vorteil gelesen (Davids Entscheidung vom 14.10.2026). */
+  it("zeigt die Chance des Modells erst aufgeklappt und ohne Abstand", async () => {
+    render(<Harness fixtures={[spiel(1, "Alpha", "Beta")]} preset="kombi" />);
+    expect(screen.queryByText("Modell zum Tipp")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Punkte/)).not.toBeInTheDocument();
+    await openRow("Alpha – Beta");
+    expect(screen.getByText("Modell zum Tipp").closest(".quickpick-fact")).toHaveClass("quickpick-fact-quiet");
+    expect(screen.getByText("BTTS · Beide Teams treffen: Ja")).toBeInTheDocument();
+  });
+
+  /** Modell 70 % gegen Tipico 58 % - die 70 darf erst aufgeklappt erscheinen. */
+  it("lässt eine abweichende Modellchance nicht in die Zeile", async () => {
+    const base = spiel(1, "Alpha", "Beta");
+    const abweichend = {
+      ...base,
+      markets: base.markets.map((market) => market.key === "over25" ? { ...market, probability: 0.7 } : market)
+    };
+    render(<Harness fixtures={[abweichend]} preset="kombi" />);
+    expect(screen.queryByText("70 %")).not.toBeInTheDocument();
+    await openRow("Alpha – Beta");
+    expect(screen.getByText("70 %")).toBeInTheDocument();
+  });
+
+  it("sortiert ab Werk nach der Chance laut Tipico", () => {
+    render(<Harness fixtures={[
+      spiel(1, "Früh", "Spiel", 1.64, { kickoff: "2026-09-20T16:00:00.000Z" }),
+      spiel(2, "Spät", "Spiel", 1.61, { kickoff: "2026-09-20T20:00:00.000Z" })
+    ]} preset="kombi" />);
+    expect(screen.getByRole("radio", { name: "Stärke" })).toBeChecked();
+    const partien = screen.getAllByText(/– Spiel$/).map((element) => element.textContent);
+    expect(partien).toEqual(["Spät – Spiel", "Früh – Spiel"]);
+  });
+
+  it("begrenzt die Liste auf die besten Tipps", async () => {
+    render(<Harness fixtures={[spiel(1, "Alpha", "Beta", 1.64), spiel(2, "Gamma", "Delta", 1.61)]} preset="kombi" />);
+    await userEvent.type(screen.getByRole("spinbutton", { name: "Nur die besten" }), "1");
+    expect(screen.getByText(/die besten 1 von 2/)).toBeInTheDocument();
+    expect(screen.getByText("Gamma – Delta")).toBeInTheDocument();
+    expect(screen.queryByText("Alpha – Beta")).not.toBeInTheDocument();
+  });
+
+  it("nennt auffällige Spiele mit Grund, aber ohne Tipp und Prozentzahlen", async () => {
+    render(<Harness fixtures={[spiel(1, "Alpha", "Beta"), spiel(2, "Gamma", "Delta", 1.62, { oddsHome: 1.02 })]} preset="kombi" />);
+    await openDisclosure("1 auffälliges Spiel weggelassen");
+    const zeile = screen.getByText("Gamma – Delta").closest("li")!;
+    expect(zeile).toHaveTextContent("so niedrig ist meist ein Fehler in den Daten");
+    expect(zeile).not.toHaveTextContent("%");
+    expect(zeile).not.toHaveTextContent("1,02");
+    expect(zeile).not.toHaveTextContent("Mindestens 3 Tore");
+  });
+
+  it("sagt immer, dass man nicht mit Gewinn rechnen und jeden Preis prüfen soll", () => {
+    render(<Harness fixtures={[spiel(1, "Alpha", "Beta")]} preset="kombi" />);
+    const warnung = screen.getByText(/Rechne nicht mit Gewinn, denn der Aufschlag von Tipico/);
+    expect(warnung).toHaveTextContent("prüf jeden Preis vor dem Setzen in der Tipico-App");
+  });
+
+  it("meldet eigene Werte, sobald die Mindestquote von 1,60 abweicht", async () => {
+    render(<Harness fixtures={[spiel(1, "Alpha", "Beta")]} preset="kombi" />);
+    expect(screen.queryByText("eigene Werte – die Zahlen gelten nicht")).not.toBeInTheDocument();
+    await openDisclosure("Werte anpassen");
+    const feld = screen.getByRole("spinbutton", { name: "Quote ab" });
+    fireEvent.change(feld, { target: { value: "1.5" } });
+    expect(screen.getByText("eigene Werte – die Zahlen gelten nicht")).toBeInTheDocument();
   });
 });

@@ -290,7 +290,7 @@ export const REMIS_PRESET: QuickpickPreset<RemisQuickpickSettings> = {
   leerSatz: "Kein Spiel endet wahrscheinlich genug unentschieden – jedenfalls nicht zu diesem Preis.",
   defaults: DEFAULT_REMIS_SETTINGS,
   levels: REMIS_LEVELS,
-  defaultSort: "remischance",
+  defaultSort: "kickoff",
   evaluate: (fixture, settings) => evaluateRemis(fixture, settings),
   noteOf: remisNote
 };

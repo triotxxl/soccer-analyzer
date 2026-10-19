@@ -29,6 +29,12 @@ Markt (z. B. Über 2,5)
   der App nicht, und die Quote vor dem Anpfiff ist im Spiel veraltet.
 - **Tatsache ≠ Chance.** „Erreicht“, „noch 2 Tore nötig“, „nicht mehr möglich“ kommen aus dem
   Stand und sind sicher; sie stehen ohne Prozent und ohne „vorläufig“.
+- **Chance laut Tipico ≠ Modellchance ≠ Vorteil** (seit 14.10.2026). „Chance laut Tipico“
+  („Tipico 57 %“) ist die Tipico-Quote ohne Aufschlag (fairer Preis, `src/fair-price.ts`). Der
+  Quickpick-Filter „Kombi-Tipps ab 1,60“ sortiert danach. Steht sie neben der Modellchance, liest
+  man den Abstand als Vorteil - deshalb steht die Modellchance dort nur aufgeklappt, grau und ohne
+  Abstand. Im sichtbaren Text nie „fair“, sondern „Chance laut Tipico“ bzw. „Tipico-Quote ohne
+  Aufschlag“.
 
 ## Projektfeste Regeln (aus AGENTS.md - nicht zur Disposition)
 
@@ -44,7 +50,10 @@ Markt (z. B. Über 2,5)
    1X2-Quote ohne Farbe. Die Zelle zeigt „Ligastärke unbekannt" - das bleibt sichtbar.
 3. **`classGap`** (Klassenunterschied) ist eine Kennzeichnung, keine Empfehlung; Quelle (Modell oder
    Markt) steht im Tooltip. Eine Markierung aus dem Quotenbild ändert nichts am Tipp.
-4. **Tipico-Quoten ändern keinen Tipp.** Die UI darf keinen Tipp „aus der Quote" anzeigen.
+4. **Tipico-Quoten ändern keinen Tipp.** Die UI darf keinen Tipp „aus der Quote" als Tipp des
+   Modells anzeigen. Einzige Ausnahme ist die **Gruppe „Tipico-Filter“** im Quickpicker: eine
+   nachgelagerte Auswahl über Tipico-Preise, die genau so beschriftet ist („Das Modell entscheidet
+   nicht mit“) und keinen Tipp, keine Wahrscheinlichkeit und keine Stufe des Modells ändert.
 5. **H2H-Remisserien sind Auffälligkeiten**, kein Empfehlungsgrund - nicht als Empfehlung
    inszenieren.
 6. **Keine Gewinnzusage.** Jede Stelle, die Ertrag oder Kombis zeigt, behält den Hinweis auf den

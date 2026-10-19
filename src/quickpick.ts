@@ -22,6 +22,7 @@ import { HZ15_PRESET, evaluateHz15, type Hz15QuickpickSettings } from "./quickpi
 import { REMIS_PRESET, evaluateRemis, type RemisQuickpickSettings } from "./quickpick-remis.ts";
 import { REMIS_SCORE_PRESET, evaluateRemisScore, type RemisScoreQuickpickSettings } from "./quickpick-remisscore.ts";
 import { MODELL1X2_PRESET, evaluateModell1x2, type Modell1x2QuickpickSettings } from "./quickpick-modell1x2.ts";
+import { KOMBI_PRESET, evaluateKombi, type KombiQuickpickSettings } from "./quickpick-kombi.ts";
 
 export * from "./quickpick-core.ts";
 export * from "./quickpick-daves.ts";
@@ -30,6 +31,7 @@ export * from "./quickpick-hz15.ts";
 export * from "./quickpick-remis.ts";
 export * from "./quickpick-remisscore.ts";
 export * from "./quickpick-modell1x2.ts";
+export * from "./quickpick-kombi.ts";
 
 /**
  * Die Einstellungen der **gerade gewählten** Voreinstellung. Eine diskriminierte Union über
@@ -41,7 +43,8 @@ export type QuickpickSettings =
   | Hz15QuickpickSettings
   | RemisQuickpickSettings
   | RemisScoreQuickpickSettings
-  | Modell1x2QuickpickSettings;
+  | Modell1x2QuickpickSettings
+  | KombiQuickpickSettings;
 
 /** Die Einstellungen zu einer bestimmten Voreinstellung. */
 export type SettingsOf<I extends QuickpickPresetId> = Extract<QuickpickSettings, { preset: I }>;
@@ -55,7 +58,8 @@ export const QUICKPICK_PRESETS: Record<QuickpickPresetId, AnyQuickpickPreset> = 
   hz15: HZ15_PRESET as unknown as AnyQuickpickPreset,
   remis: REMIS_PRESET as unknown as AnyQuickpickPreset,
   remisScore: REMIS_SCORE_PRESET as unknown as AnyQuickpickPreset,
-  modell1x2: MODELL1X2_PRESET as unknown as AnyQuickpickPreset
+  modell1x2: MODELL1X2_PRESET as unknown as AnyQuickpickPreset,
+  kombi: KOMBI_PRESET as unknown as AnyQuickpickPreset
 };
 
 /** Stabile Reihenfolge für die Auswahl in der Oberfläche. */
@@ -65,10 +69,11 @@ export const QUICKPICK_PRESET_LIST: AnyQuickpickPreset[] = [
   QUICKPICK_PRESETS.remisScore,
   QUICKPICK_PRESETS.modell1x2,
   QUICKPICK_PRESETS.hz15,
-  QUICKPICK_PRESETS.remis
+  QUICKPICK_PRESETS.remis,
+  QUICKPICK_PRESETS.kombi
 ];
 
-/** Die beiden Gruppen der Filterliste, in der Reihenfolge der Anzeige. */
+/** Die drei Gruppen der Filterliste, in der Reihenfolge der Anzeige. */
 export const QUICKPICK_GROUPS: Array<{ id: QuickpickGroup; label: string; title: string }> = [
   {
     id: "daves",
@@ -79,6 +84,11 @@ export const QUICKPICK_GROUPS: Array<{ id: QuickpickGroup; label: string; title:
     id: "modell",
     label: "Modell-Filter",
     title: "Filter, die nach den Wahrscheinlichkeiten und erwarteten Toren des Modells aussuchen"
+  },
+  {
+    id: "tipico",
+    label: "Tipico-Filter",
+    title: "Filter, die nach der Tipico-Quote ohne Aufschlag aussuchen – nicht nach dem Modell"
   }
 ];
 
@@ -101,6 +111,7 @@ export function evaluateFixture(
     : settings.preset === "remis" ? evaluateRemis(fixture, settings)
     : settings.preset === "remisScore" ? evaluateRemisScore(fixture, settings)
     : settings.preset === "modell1x2" ? evaluateModell1x2(fixture, settings)
+    : settings.preset === "kombi" ? evaluateKombi(fixture, settings)
     : evaluateDaves(fixture, settings);
 }
 
@@ -126,6 +137,10 @@ export function applyLevel<S extends QuickpickSettings>(settings: S, level: Quic
  * Wertet eine Liste aus und liefert die Treffer als `Set` der Fixture-IDs. Bewusst kein
  * gefiltertes Array: Der Aufrufer filtert seinen eigenen Bestand und behält dessen
  * Reihenfolge und Identität.
+ *
+ * „Nur die besten N“ der Kombi-Tipps (`limit`) wirkt hier und nicht in der Regel: Ob ein Spiel
+ * dazugehört, hängt an den anderen Spielen im Umfang. Die Rückrechnung bewertet über
+ * `evaluateFixture` jedes Spiel für sich und misst die Stufen deshalb ohne Grenze.
  */
 export function applyQuickpick(
   fixtures: DashboardFixture[],
@@ -144,10 +159,26 @@ export function applyQuickpick(
   };
 
   for (const fixture of fixtures) {
-    const evaluation = evaluateFixture(fixture, settings);
-    evaluations.set(fixture.fixtureId, evaluation);
+    evaluations.set(fixture.fixtureId, evaluateFixture(fixture, settings));
+  }
+
+  if (settings.preset === "kombi" && settings.limit !== null && settings.limit >= 1) {
+    // Die sichersten zuerst - nach der Chance laut Tipico, bei Gleichstand der frühere Anstoß.
+    const kickoffOf = new Map(fixtures.map((fixture) => [fixture.fixtureId, Date.parse(fixture.kickoff)]));
+    const ranked = [...evaluations.values()]
+      .filter((evaluation) => evaluation.passes)
+      .sort((left, right) => (right.kombi?.chosen.fair ?? 0) - (left.kombi?.chosen.fair ?? 0)
+        || kickoffOf.get(left.fixtureId)! - kickoffOf.get(right.fixtureId)!);
+    for (const evaluation of ranked.slice(settings.limit)) {
+      evaluations.set(evaluation.fixtureId, { ...evaluation, passes: false, rejectedBy: "nichtUnterDenBesten" });
+    }
+  }
+
+  // Gezählt wird je Eintrag der Liste wie bisher, nicht je Fixture-ID.
+  for (const fixture of fixtures) {
+    const evaluation = evaluations.get(fixture.fixtureId)!;
     if (evaluation.passes) {
-      passing.add(fixture.fixtureId);
+      passing.add(evaluation.fixtureId);
       report.passed += 1;
     } else if (evaluation.rejectedBy !== null) {
       report.rejected[evaluation.rejectedBy] += 1;

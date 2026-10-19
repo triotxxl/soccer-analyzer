@@ -1644,6 +1644,84 @@ describe("Klassenunterschied", () => {
     expect(screen.queryByRole("dialog", { name: "Quickpicker" })).not.toBeInTheDocument();
   });
 
+  /**
+   * „Kombi-Tipps“ wechseln je Spiel die Wettart. Der Sammelknopf muss einen 1X2-Tipp auf die
+   * Mannschaft des Tipps legen (hier gegen den Tipp der Tabelle) und jede andere Wettart über
+   * ihren eigenen Markt.
+   */
+  it("legt Kombi-Tipps verschiedener Wettarten richtig in den Wettschein", async () => {
+    const current = document();
+    const [alpha, zulu] = current.fixtures as [DashboardFixture, DashboardFixture];
+    const draw = (fixture: DashboardFixture) => fixture.markets.find((market) => market.key === "draw")!;
+    // Alpha FC: Gast FC zu 1,62 ist der wahrscheinlichste Tipp ab 1,60, obwohl die Tabelle Heim tippt.
+    alpha.markets = alpha.markets.map((market) => market.key === "1x2"
+      ? { ...market, pick: "1", probability: 0.2, odds: 5, oddsHome: 5, oddsAway: 1.62 }
+      : market.key === "draw" ? { ...market, probability: 0.25, odds: 3.8 } : market);
+    // Zulu FC: BTTS Nein zu 1,62 gegen BTTS Ja zu 2,25.
+    zulu.markets = [
+      ...zulu.markets.map((market) => market.key === "btts" ? { ...market, odds: 2.25 } : market),
+      { ...draw(zulu), key: "bttsNo", label: "BTTS Nein", selection: "Beide Teams treffen: Nein", odds: 1.62 }
+    ];
+    vi.stubGlobal("fetch", dashboardFetch(() => current));
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(<App />);
+    expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Quickpicker öffnen" }));
+    const dialog = screen.getByRole("dialog", { name: "Quickpicker" });
+    await user.click(within(dialog).getByRole("radio", { name: /^Kombi-Tipps ab 1,60/ }));
+    await user.click(within(dialog).getByRole("button", { name: "Alle 2 in den Wettschein" }));
+    await user.click(within(dialog).getByRole("button", { name: "Wettschein öffnen" }));
+
+    const slip = screen.getByRole("dialog", { name: "Wettschein" });
+    expect(within(slip).getByText("Auswärtssieg Gast FC")).toBeInTheDocument();
+    expect(within(slip).getByText("BTTS Nein · Beide Teams treffen: Nein")).toBeInTheDocument();
+  });
+
+  /** Davids Wunsch vom 14.10.2026: Freitext über Mannschaft, Wettbewerb und Land. */
+  it("sucht in der Tabelle nach Mannschaft, Wettbewerb und Land", async () => {
+    const current = document();
+    current.fixtures[1]!.country = "England";
+    current.fixtures[1]!.league = "Premier League";
+    vi.stubGlobal("fetch", dashboardFetch(() => current));
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(<App />);
+    expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
+    const suche = screen.getByRole("searchbox", { name: "Spiele suchen" });
+
+    await user.type(suche, "zulu");
+    expect(screen.queryByText("Alpha FC")).not.toBeInTheDocument();
+    expect(screen.getByText("Zulu FC")).toBeInTheDocument();
+
+    await user.clear(suche);
+    await user.type(suche, "england premier");
+    expect(screen.queryByText("Alpha FC")).not.toBeInTheDocument();
+    expect(screen.getByText("Zulu FC")).toBeInTheDocument();
+
+    await user.clear(suche);
+    await user.type(suche, "bundesliga");
+    expect(screen.getByText("Alpha FC")).toBeInTheDocument();
+    expect(screen.queryByText("Zulu FC")).not.toBeInTheDocument();
+
+    // Escape leert die Suche, das ✕ ebenso.
+    await user.keyboard("{Escape}");
+    expect(suche).toHaveValue("");
+    expect(screen.getByText("Zulu FC")).toBeInTheDocument();
+  });
+
+  it("erklärt eine leere Tabelle mit der Suche und leert sie auf Knopfdruck", async () => {
+    vi.stubGlobal("fetch", dashboardFetch(() => document()));
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(<App />);
+    expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
+
+    await user.type(screen.getByRole("searchbox", { name: "Spiele suchen" }), "xyz");
+    const leer = screen.getByText("Kein Spiel passt zu „xyz“").closest(".empty-state") as HTMLElement;
+    await user.click(within(leer).getByRole("button", { name: "Suche leeren" }));
+    expect(screen.getByText("Alpha FC")).toBeInTheDocument();
+    expect(screen.getByRole("searchbox", { name: "Spiele suchen" })).toHaveValue("");
+  });
+
   it("erklärt eine leere Tabelle mit dem Quickpicker statt mit dem Zeitraum", async () => {
     const empty = quickpickDocument();
     empty.fixtures[0]!.form = { ...empty.fixtures[0]!.form, away: ["win", "win", "win", "win", "loss"] };

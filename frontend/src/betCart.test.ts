@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  canGenerate, combinedOdds, generateCombos, isPlayable, putEntriesInto, selectionLabel, shortTipLabel, sizeRange, toCartEntry, toCounterCartEntry,
+  COMBO_WARNING, canGenerate, comboCopyText, combinedOdds, generateCombos, isPlayable, putEntriesInto, selectionLabel, shortTipLabel, sizeRange, toCartEntry, toCounterCartEntry,
   toQuickpickCartEntry,
   type CartEntry
 } from "./betCart";
@@ -301,5 +301,37 @@ describe("Tipico-Namen im Wettschein", () => {
     const { result } = putEntriesInto([fromMenu], [fromQuickpick]);
     expect(result.unchanged).toHaveLength(1);
     expect(result.added).toHaveLength(0);
+  });
+});
+
+describe("comboCopyText", () => {
+  const first = { ...entry("1", 1.6), kickoff: "2026-10-14T19:00:00.000Z" };
+  const second = {
+    ...entry("2", 1.8), kickoff: "2026-10-15T02:00:00.000Z", marketKey: "over25" as const, marketLabel: "Über/Unter 2,5",
+    selection: "Über 2,5", pick: null, tipico: { homeTeam: "T2 Heim", awayTeam: "T2 Gast", league: "T-Liga", country: "Land" }
+  };
+  const combo = { id: "k", entries: [second, first], combinedOdds: 2.88, transferred: false };
+
+  it("schreibt je Tipp Anstoß mit Datum, Spiel, Tipp und Quote, nach Anstoß sortiert, und endet mit der Warnung", () => {
+    expect(comboCopyText([{ combo, number: 1 }], "api", "Europe/Berlin")).toBe([
+      "Kombi 1 · 2 Spiele · Quote 2,88",
+      "Mi 14.10. 21:00 | Team 1A – Team 1B | Heimsieg Team 1A | 1,60",
+      "Do 15.10. 04:00 | Team 2A – Team 2B | Über/Unter 2,5 · Über 2,5 | 1,80",
+      "",
+      COMBO_WARNING
+    ].join("\n"));
+  });
+
+  it("folgt der Namens-Einstellung und trennt mehrere Kombis durch eine Leerzeile, die Warnung steht einmal", () => {
+    const text = comboCopyText([{ combo, number: 1 }, { combo: { ...combo, id: "m", combinedOdds: null }, number: 3 }], "tipico", "Europe/Berlin");
+    expect(text).toContain("| T2 Heim – T2 Gast |");
+    expect(text).toContain("\n\nKombi 3 · 2 Spiele · Quote –\n");
+    expect(text.split(COMBO_WARNING)).toHaveLength(2);
+    expect(text.endsWith(COMBO_WARNING)).toBe(true);
+  });
+
+  it("nennt weder Wahrscheinlichkeit noch Stufe oder Einsatz", () => {
+    const text = comboCopyText([{ combo, number: 1 }], "api", "Europe/Berlin").replace(COMBO_WARNING, "");
+    expect(text).not.toMatch(/%|✓|★|Einsatz|Gewinn|übertragen/);
   });
 });

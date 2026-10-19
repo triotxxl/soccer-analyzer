@@ -2,6 +2,10 @@
  * Kombi-Auswahl nach fairem Tipico-Preis: je Spiel der Tipp, den Tipico (ohne Aufschlag) am
  * wahrscheinlichsten hält, unter einer Mindestquote. Aufgerufen von `tools/kombi-tipps.ts`, dort
  * auch die Messung an alten Spielen; Arbeitsanleitung im Skill `.claude/skills/kombi-tipps/`.
+ * Zweiter Aufrufer ist die Quickpick-Voreinstellung „Kombi-Tipps ab 1,60“
+ * (`src/quickpick-kombi.ts`): dieselbe Regel mit Mindestquote 1,60 ohne Vorliebe, aber **ohne
+ * die Anstoßprüfung**, weil der Snapshot die Tipico-Anstoßzeit nicht trägt (an alten Spielen
+ * hätte sie 12 von 3.913 Spielen ausgeschlossen, alle richtig zugeordnet).
  *
  * Herkunft (Prüfer-Agent, 12.10.2026, Davids Auftrag „die 24 besten Tipps bis Mittwoch, Quote ab
  * 1,50, besser 1,60“): Die Regel wurde vor dem ersten Lauf festgelegt und an 3.868 Spielen der
@@ -61,6 +65,8 @@ export interface KombiTip {
   /** Modellchance, nur zur Anzeige. */
   model: number;
   confidence: number;
+  /** Nur beim 1X2: die Mannschaft des Tipps. Wettschein und Rückrechnung brauchen die Seite. */
+  side?: "1" | "2";
 }
 
 const usable = (odds: number | null | undefined): odds is number => typeof odds === "number" && odds > 1;
@@ -88,7 +94,8 @@ export function tipsOf(fixture: DashboardFixture): KombiTip[] {
         odds,
         fair: 1 / odds / book,
         model: oneXTwo.pick === side ? oneXTwo.probability : other,
-        confidence: oneXTwo.confidence
+        confidence: oneXTwo.confidence,
+        side
       });
     }
   }
@@ -108,9 +115,38 @@ export function tipsOf(fixture: DashboardFixture): KombiTip[] {
   return tips;
 }
 
-/** Gründe, ein Spiel auszuschließen; leer = unauffällig. `tipicoKickoff` aus `tipico_fixtures`. */
-export function flagsOf(fixture: DashboardFixture, tipicoKickoff?: string | null): string[] {
-  const flags: string[] = [];
+/**
+ * Ein Grund, ein Spiel auszuschließen, mit den Werten dahinter. Strukturiert statt als Text, weil
+ * zwei Leser verschieden formulieren: die Kommandozeile mit Zahlen (`flagText`), die App in
+ * einfacher Sprache, ohne Quote und ohne die beiden Prozentzahlen beim Modellabstand - die wären
+ * ein Vorteil in Zahlen, und den zeigt die App nur unter „Vorteil & Kelly“. Ein großer Abstand
+ * ist laut Messung meist ein Fehler des Modells, nicht des Preises.
+ */
+export type KombiFlag =
+  | { code: "quote"; odds: number }
+  | { code: "aufschlag"; book: number }
+  | { code: "gleicheQuoten" }
+  | { code: "modellAbstand"; side: "1" | "2"; model: number; fair: number }
+  | { code: "anstoss"; tipico: string; api: string };
+
+/** Der Grund als Zeile der Kommandozeile, so wie `tools/kombi-tipps.ts` ihn immer gedruckt hat. */
+export function flagText(flag: KombiFlag): string {
+  switch (flag.code) {
+    case "quote": return `1X2-Quote ${flag.odds.toFixed(2)}`;
+    case "aufschlag": return `1X2-Aufschlag ${flag.book.toFixed(3)}`;
+    case "gleicheQuoten": return "1X2 dreimal dieselbe Quote";
+    case "modellAbstand":
+      return `1X2 ${flag.side === "1" ? "Heim" : "Gast"}: Modell ${(flag.model * 100).toFixed(0)} % gegen fair ${(flag.fair * 100).toFixed(0)} %`;
+    case "anstoss": return `Anstoß Tipico ${flag.tipico} gegen API ${flag.api}`;
+  }
+}
+
+/**
+ * Gründe, ein Spiel auszuschließen; leer = unauffällig. `tipicoKickoff` aus `tipico_fixtures` -
+ * der Quickpicker kennt ihn nicht (er liest nur den Snapshot) und prüft den Anstoß deshalb nicht.
+ */
+export function flagsOf(fixture: DashboardFixture, tipicoKickoff?: string | null): KombiFlag[] {
+  const flags: KombiFlag[] = [];
   const oneXTwo = fixture.markets.find((market) => market.key === "1x2");
   const draw = fixture.markets.find((market) => market.key === "draw");
   const home = oneXTwo?.oddsHome;
@@ -118,23 +154,21 @@ export function flagsOf(fixture: DashboardFixture, tipicoKickoff?: string | null
   if (oneXTwo && usable(home) && usable(away) && usable(draw?.odds)) {
     const lowest = Math.min(home, away, draw.odds);
     const book = 1 / home + 1 / draw.odds + 1 / away;
-    if (lowest <= KOMBI_FLAGS.maxSuspiciousOdds) flags.push(`1X2-Quote ${lowest.toFixed(2)}`);
-    if (book < KOMBI_FLAGS.bookRange[0] || book > KOMBI_FLAGS.bookRange[1]) flags.push(`1X2-Aufschlag ${book.toFixed(3)}`);
-    if (home === away && away === draw.odds) flags.push("1X2 dreimal dieselbe Quote");
+    if (lowest <= KOMBI_FLAGS.maxSuspiciousOdds) flags.push({ code: "quote", odds: lowest });
+    if (book < KOMBI_FLAGS.bookRange[0] || book > KOMBI_FLAGS.bookRange[1]) flags.push({ code: "aufschlag", book });
+    if (home === away && away === draw.odds) flags.push({ code: "gleicheQuoten" });
     if (oneXTwo.pick !== null && oneXTwo.probabilityReliable !== false) {
       const other = 1 - oneXTwo.probability - draw.probability;
       for (const side of ["1", "2"] as const) {
         const fair = 1 / (side === "1" ? home : away) / book;
         const model = oneXTwo.pick === side ? oneXTwo.probability : other;
-        if (Math.abs(model - fair) >= KOMBI_FLAGS.modelGap) {
-          flags.push(`1X2 ${side === "1" ? "Heim" : "Gast"}: Modell ${(model * 100).toFixed(0)} % gegen fair ${(fair * 100).toFixed(0)} %`);
-        }
+        if (Math.abs(model - fair) >= KOMBI_FLAGS.modelGap) flags.push({ code: "modellAbstand", side, model, fair });
       }
     }
   }
   if (tipicoKickoff) {
     const gap = Math.abs(Date.parse(tipicoKickoff) - Date.parse(fixture.kickoff));
-    if (gap > KOMBI_FLAGS.kickoffGapMs) flags.push(`Anstoß Tipico ${tipicoKickoff} gegen API ${fixture.kickoff}`);
+    if (gap > KOMBI_FLAGS.kickoffGapMs) flags.push({ code: "anstoss", tipico: tipicoKickoff, api: fixture.kickoff });
   }
   return flags;
 }
