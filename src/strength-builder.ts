@@ -3,7 +3,7 @@ import { AnalyzerDatabase } from "./database.ts";
 import { completedScore } from "./draw-criteria.ts";
 import { config } from "./config.ts";
 import { isWomenPool, strengthPool } from "./league-strength.ts";
-import type { ApiFixture, ApiLeague, LeagueStrengthSnapshot } from "./types.ts";
+import type { ApiFixture, ApiLeague, LeagueStrengthSnapshot, StrengthBuildStop } from "./types.ts";
 
 const CLUB_CUP_PATTERN =
   /\b(champions league|europa league|conference league|libertadores|sudamericana|concacaf|leagues cup|afc cup|caf confederation cup|ofc champions)\b/i;
@@ -26,6 +26,8 @@ export interface StrengthBuildResult {
   snapshotsWritten: number;
   apiRequests: number;
   budgetReached: boolean;
+  /** Wo das Budget griff; null, wenn alles geladen wurde. */
+  stoppedAt: StrengthBuildStop | null;
 }
 
 class RequestBudgetReached extends Error {}
@@ -143,6 +145,7 @@ export async function buildLeagueStrength(options: {
   let fixturesCollected = 0;
   let fixturesStored = 0;
   let budgetReached = false;
+  let stoppedAt: StrengthBuildStop | null = null;
   try {
     const leagues = await client.getAllLeagues();
     const selectedCompetitionIds = options.competitionIds?.length
@@ -173,12 +176,13 @@ export async function buildLeagueStrength(options: {
         }
         if (client.requestCount - requestStart >= requestBudget) {
           budgetReached = true;
+          stoppedAt = { leagueId: competition.league.id, competition: competition.league.name, season, done: 0, total: null };
           break outer;
         }
         const seasonFixtures = await client.getSeasonFixtures(competition.league.id, season);
         const fixtures = completedFixtures(seasonFixtures);
         fixturesCollected += fixtures.length;
-        for (const fixture of fixtures) {
+        for (const [index, fixture] of fixtures.entries()) {
           try {
             const homeLeagueId = await teamLeague(
               client,
@@ -220,6 +224,13 @@ export async function buildLeagueStrength(options: {
           } catch (error) {
             if (error instanceof RequestBudgetReached) {
               budgetReached = true;
+              stoppedAt = {
+                leagueId: competition.league.id,
+                competition: competition.league.name,
+                season,
+                done: index,
+                total: fixtures.length
+              };
               break outer;
             }
             throw error;
@@ -259,7 +270,8 @@ export async function buildLeagueStrength(options: {
       fixturesStored,
       snapshotsWritten,
       apiRequests: client.requestCount - requestStart,
-      budgetReached
+      budgetReached,
+      stoppedAt
     };
   } finally {
     if (ownsDatabase) database.close();

@@ -343,6 +343,36 @@ test("Ligastärke-Builder nutzt nur das konfigurierte API-Budget und speichert F
   database.close();
 });
 
+test("Ligastärke-Builder nennt, wo das Budget mitten in einer Saison griff", async () => {
+  // Der Fall vom 19.10.2026: Das Budget endet zwischen Heim- und Gastverein eines Duells; die
+  // Ausgabe der Analyse soll zeigen, welche Saison unvollständig blieb.
+  const directory = await mkdtemp(path.join(os.tmpdir(), "football-strength-stop-"));
+  const database = new AnalyzerDatabase(path.join(directory, "test.sqlite"));
+  const cross = fixture({
+    id: 21_001, timestamp: Date.parse("2025-07-01T18:00:00.000Z") / 1000, homeId: 1, awayId: 2,
+    homeGoals: 2, awayGoals: 1, leagueId: 172, leagueName: "Cup", country: "Bulgaria", season: 2025
+  });
+  const leagues: ApiLeague[] = [{
+    league: { id: 172, name: "Cup", type: "Cup" },
+    country: { name: "Bulgaria" },
+    seasons: [{ year: 2025, start: "2025-01-01", end: "2025-12-31", current: false }]
+  }];
+  const fake = {
+    requestCount: 0,
+    requestsRemaining: 1_000,
+    getAllLeagues: async () => { fake.requestCount += 1; return leagues; },
+    getSeasonFixtures: async () => { fake.requestCount += 1; return [cross]; },
+    getTeamSeasonFixtures: async () => { fake.requestCount += 1; return []; }
+  } as unknown as ApiFootballClient;
+  const result = await buildLeagueStrength({
+    client: fake, database, seasons: 1, requestBudget: 3, competitionIds: [172],
+    now: new Date("2026-01-01T00:00:00.000Z")
+  });
+  assert.equal(result.budgetReached, true);
+  assert.deepEqual(result.stoppedAt, { leagueId: 172, competition: "Cup", season: 2025, done: 0, total: 1 });
+  database.close();
+});
+
 test("Frauenwettbewerbe bekommen einen eigenen Pool", () => {
   const women = fixture({ id: 1, timestamp: 1_700_000_000, homeId: 1, awayId: 2, leagueName: "UEFA Champions League Women", country: "World" });
   const men = fixture({ id: 2, timestamp: 1_700_000_000, homeId: 1, awayId: 2, leagueName: "UEFA Europa League", country: "World" });

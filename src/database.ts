@@ -217,7 +217,7 @@ function parseModelVersion(version: string): number[] | null {
   return match ? match.slice(1).map(Number) : null;
 }
 
-function compareModelVersions(left: string, right: string): number {
+export function compareModelVersions(left: string, right: string): number {
   const a = parseModelVersion(left);
   const b = parseModelVersion(right);
   if (!a || !b) return a ? -1 : b ? 1 : 0;
@@ -1821,9 +1821,15 @@ export class AnalyzerDatabase {
    * (`stronger*`): Der Modellfavorit ist bei Spielen zwischen Ligen oft die schwächere Liga.
    * Positiv heißt dort: Der Klassenunterschied wird unterschätzt.
    */
-  leagueStrengthReport(options: { modelVersion?: string } = {}): LeagueStrengthPerformanceRow[] {
+  /**
+   * `modelVersion`: nur genau diese Fassung. `sinceVersion`: diese und alle späteren - für
+   * Gruppen, die über mehrere Fassungen gleich rechnen (`STRENGTH_COMPARABLE_SINCE`).
+   */
+  leagueStrengthReport(options: { modelVersion?: string; sinceVersion?: string } = {}): LeagueStrengthPerformanceRow[] {
     const samples = this.leagueStrengthSamples()
-      .filter((sample) => options.modelVersion === undefined || sample.modelVersion === options.modelVersion);
+      .filter((sample) => options.modelVersion === undefined || sample.modelVersion === options.modelVersion)
+      .filter((sample) => options.sinceVersion === undefined ||
+        compareModelVersions(sample.modelVersion, options.sinceVersion) >= 0);
     const order: Array<LeagueStrengthPerformanceRow["cohort"]> =
       ["Ligapartie", "gemessen", "geschätzt", "Team-Elo", "Team-Elo U21", "gleiche Liga", "ohne Rating", "vor Ligastärke"];
     return order.flatMap((cohort) => {

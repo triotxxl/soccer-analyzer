@@ -89,8 +89,8 @@ import {
  * lagen die schwachen jüngsten Tipps: Ab 3.3.0 traf die Vorgabe 47,7 ± 7,5 % (n = 44), 21 der
  * 34 Spiele ab 3.4.0 waren Länder- und U21-Spiele mit Elo-Faktor, während Tipico-Favoriten im
  * selben Band normal trafen. Kann Zufall sein. Nur an 3.5.0 gemessen (174 Spiele): Vorgabe
- * 22 Tipps, 54,5 %. Nachmessen, sobald unter 3.5.0 rund 100 Tipps der Vorgabestufe abgerechnet
- * sind - dann auch, ob der Satz „mit dem heutigen Modell …“ im Ehrlichkeitstext fallen kann.
+ * 22 Tipps, 54,5 %. Nachmessen, sobald ab 3.5.0 rund 100 Tipps der Vorgabestufe abgerechnet
+ * sind (3.6.0 zählt mit, Davids Entscheidung vom 19.10.2026) - dann auch, ob der Satz „mit dem heutigen Modell …“ im Ehrlichkeitstext fallen kann.
  */
 
 export interface Modell1x2QuickpickSettings {

@@ -21,13 +21,15 @@ function strengthRow(
 }
 
 /**
- * `all`: über alle Fassungen; `current`: nur für Fassung 3.5.0. Jede andere Version bekommt
- * nichts - ein falscher Standardwert für die laufende Fassung fiele so auf.
+ * `all`: über alle Fassungen; `current`: nur für Fassung 3.5.0 bzw. ab 3.5.0. Jede andere
+ * Version bekommt nichts - ein falscher Standardwert für die laufende Fassung fiele so auf.
  */
 function databaseWith(all: LeagueStrengthPerformanceRow[], current: LeagueStrengthPerformanceRow[] = []) {
   return {
-    leagueStrengthReport: (options: { modelVersion?: string } = {}) =>
-      options.modelVersion === undefined ? all : options.modelVersion === "3.5.0" ? current : [],
+    leagueStrengthReport: (options: { modelVersion?: string; sinceVersion?: string } = {}) =>
+      options.modelVersion === undefined && options.sinceVersion === undefined
+        ? all
+        : options.modelVersion === "3.5.0" || options.sinceVersion === "3.5.0" ? current : [],
     outcomeProbabilityReport: () => [{
       market: "1x2" as const, total: 2906, hits: 1345, hitRate: 0.463,
       averageProbability: 0.457, brierScore: 0.631, intervalLow: 0.445, intervalHigh: 0.481
@@ -94,6 +96,30 @@ test("Eine Abweichung unter zwei Standardfehlern ist nicht auffällig", () => {
 test("Ohne auffällige Abweichung entfällt der Hinweis", () => {
   const lines = calibrationSummaryLines(databaseWith([strengthRow("Ligapartie", 2569, 0.478, 0.452)]), "3.5.0");
   assert.ok(!lines.some((line) => line.includes("Auffällig")));
+});
+
+test("Ab 3.6.0 zählt \"gemessen\" ab 3.5.0 weiter, \"geschätzt\" nur die laufende Fassung", () => {
+  const requests: Array<{ modelVersion?: string; sinceVersion?: string }> = [];
+  const database = {
+    leagueStrengthReport: (options: { modelVersion?: string; sinceVersion?: string } = {}) => {
+      requests.push(options);
+      if (options.sinceVersion === "3.5.0") {
+        return [strengthRow("gemessen", 120, 0.6, 0.55, { total: 120, winRate: 0.6, predicted: 0.55 })];
+      }
+      if (options.modelVersion === "3.6.0") {
+        return [strengthRow("geschätzt", 12, 0.6, 0.6, { total: 12, winRate: 0.5, predicted: 0.6 })];
+      }
+      return [
+        strengthRow("gemessen", 400, 0.6, 0.55, { total: 400, winRate: 0.6, predicted: 0.55 }),
+        strengthRow("geschätzt", 90, 0.6, 0.6, { total: 90, winRate: 0.6, predicted: 0.6 })
+      ];
+    },
+    outcomeProbabilityReport: () => []
+  } as unknown as AnalyzerDatabase;
+  const lines = calibrationSummaryLines(database, "3.6.0");
+  assert.ok(lines.some((line) => /seit 3.5.0: 120 Spiele, stärkere Liga/.test(line)));
+  assert.ok(lines.some((line) => /seit 3.6.0: 12 Spiele, stärkere Liga/.test(line)));
+  assert.ok(requests.some((options) => options.sinceVersion === "3.5.0"));
 });
 
 test("Ohne abgerechnete Partien bleibt die Kurzfassung leer", () => {

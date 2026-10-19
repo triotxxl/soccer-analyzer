@@ -42,7 +42,8 @@ import type {
   LeagueStats,
   LiveMatchSelection,
   ResolutionFailure,
-  ResolvedLeague
+  ResolvedLeague,
+  StrengthReloadSummary
 } from "./types.ts";
 import type { TableRow } from "./draw-criteria.ts";
 
@@ -279,6 +280,14 @@ async function mapLimit<T, R>(
   return results;
 }
 
+/**
+ * Lädt Pokalsaisons nach, solange eine Seite eines Spiels zwischen Ligen kein belastbares
+ * Rating hat. Läuft nur vor der Torlinien-Rechnung, der einzigen Stelle, die die Ligastärke
+ * liest - mit dem ganzen Budget. Bis 19.10.2026 hatte sie 100 Aufrufe, Remis- und
+ * Favoritenanalyse luden danach je weitere 100 nur für die nächste Analyse: Bei Etar - Spartak
+ * Varna fehlten so 24 von 31 Duellen der Vorsaison, die Minuten nach der Rechnung ankamen
+ * (Prüfung vom 19.10.2026; 14 von 95 Prognosen mit geschätzter Seite seit August).
+ */
 async function buildMissingLeagueStrength(
   fixtures: ApiFixture[],
   crossLeagueFixtureIds: Set<number>,
@@ -286,8 +295,8 @@ async function buildMissingLeagueStrength(
   client: ApiFootballClient,
   database: AnalyzerDatabase | undefined,
   now: Date
-): Promise<void> {
-  if (!database) return;
+): Promise<StrengthReloadSummary | undefined> {
+  if (!database) return undefined;
   const competitionIds = new Set<number>();
   for (const fixture of fixtures) {
     if (!crossLeagueFixtureIds.has(fixture.fixture.id)) continue;
@@ -315,8 +324,8 @@ async function buildMissingLeagueStrength(
       competitionIds.add(fixture.league.id);
     }
   }
-  if (competitionIds.size === 0) return;
-  await buildLeagueStrength({
+  if (competitionIds.size === 0) return undefined;
+  const result = await buildLeagueStrength({
     client,
     database,
     seasons: 3,
@@ -324,6 +333,13 @@ async function buildMissingLeagueStrength(
     now,
     competitionIds: [...competitionIds]
   });
+  return {
+    competitions: competitionIds.size,
+    fixturesStored: result.fixturesStored,
+    apiRequests: result.apiRequests,
+    budget: config.strengthOnDemandRequestBudget,
+    stoppedAt: result.stoppedAt
+  };
 }
 
 export class LeagueResolutionError extends Error {
@@ -562,8 +578,9 @@ export async function runGoalLineAnalysis(
     }
     // Vor `strengthFor`: Diese Analyse ist die einzige, die die Ligastärke liest. Bis 29.09.2026
     // luden nur Remis- und Favoritenanalyse nach, die im Dashboard danach laufen - neue
-    // Pokaldaten wirkten so immer erst eine Analyse später.
-    await buildMissingLeagueStrength(fixtures, crossLeagueFixtureIds, domesticByTeam, client, database, now);
+    // Pokaldaten wirkten so immer erst eine Analyse später; bis 19.10.2026 teilten sie sich das
+    // Budget noch mit dieser Stelle.
+    const strengthReload = await buildMissingLeagueStrength(fixtures, crossLeagueFixtureIds, domesticByTeam, client, database, now);
     const domesticKeys = [...new Map([...domesticByTeam.values()].map((reference) => [`${reference.leagueId}:${reference.season}`, reference])).values()];
     const domesticEntries = await mapLimit(domesticKeys, 2, async ({ leagueId, season }) => {
       const prior = season > 1900 ? season - 1 : null;
@@ -848,7 +865,8 @@ export async function runGoalLineAnalysis(
       dates,
       rows,
       apiRequests: client.requestCount,
-      apiRequestsRemaining: client.requestsRemaining
+      apiRequestsRemaining: client.requestsRemaining,
+      ...(strengthReload ? { strengthReload } : {})
     };
   } finally {
     if (ownsDatabase) database.close();
@@ -976,14 +994,6 @@ export async function runDrawCriteriaAnalysis(
   );
   const domesticFixtures = new Map(
     domesticEntries.map((entry) => [entry.key, entry.fixtures])
-  );
-  await buildMissingLeagueStrength(
-    fixtures,
-    crossLeagueFixtureIds,
-    domesticByTeam,
-    client,
-    dependencies?.database,
-    now
   );
   const supplemental = await mapLimit(fixtures, 2, async (fixture) => ({
     fixtureId: fixture.fixture.id,
@@ -1182,14 +1192,6 @@ export async function runFavoriteAnalysis(
   );
   const domesticFixtures = new Map(
     domesticEntries.map((entry) => [entry.key, entry.fixtures])
-  );
-  await buildMissingLeagueStrength(
-    fixtures,
-    crossLeagueFixtureIds,
-    domesticByTeam,
-    client,
-    dependencies?.database,
-    now
   );
   const supplemental = await mapLimit(fixtures, 2, async (fixture) => ({
     fixtureId: fixture.fixture.id,

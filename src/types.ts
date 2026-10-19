@@ -425,6 +425,27 @@ export interface GoalLineAnalysisResult {
   rows: GoalLineRow[];
   apiRequests: number;
   apiRequestsRemaining: number | null;
+  /** Nachladen der Ligastärke vor der Rechnung; fehlt, wenn keine Liga nachzuladen war. */
+  strengthReload?: StrengthReloadSummary;
+}
+
+/** Wo ein Nachladen der Ligastärke am Budget stehen blieb. */
+export interface StrengthBuildStop {
+  leagueId: number;
+  competition: string;
+  season: number;
+  /** Abgeschlossene Ansetzungen der Saison, die schon durchgesehen waren. */
+  done: number;
+  /** Abgeschlossene Ansetzungen der Saison; null, wenn die Saison gar nicht mehr geholt wurde. */
+  total: number | null;
+}
+
+export interface StrengthReloadSummary {
+  competitions: number;
+  fixturesStored: number;
+  apiRequests: number;
+  budget: number;
+  stoppedAt: StrengthBuildStop | null;
 }
 
 export interface Candidate {

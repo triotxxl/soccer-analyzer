@@ -15,7 +15,8 @@ import {
   formatAnalysis,
   formatDrawAnalysis,
   formatFavoriteAnalysis,
-  formatGoalLineAnalysis
+  formatGoalLineAnalysis,
+  strengthReloadLines
 } from "./output.ts";
 import { formatLiveAnalysis } from "./output.ts";
 import { runLiveAnalysis } from "./live.ts";
@@ -562,9 +563,10 @@ async function dashboard(args: ParsedArgs): Promise<void> {
         console.error(`Elo nicht aktualisiert, es gilt der gespeicherte Stand: ${error instanceof Error ? error.message : String(error)}`);
       }
     }
-    const goalsResult = client
+    const goalsResult: GoalLineAnalysisResult = client
       ? await runGoalLineAnalysis(input, { client, database })
       : emptyBase;
+    for (const line of strengthReloadLines(goalsResult)) console.log(line);
     const drawResult = client
       ? await runDrawCriteriaAnalysis(input, { client, database })
       : emptyBase;

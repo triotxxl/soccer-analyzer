@@ -1,6 +1,7 @@
 import { config } from "./config.ts";
 import type { AnalyzerDatabase } from "./database.ts";
 import type { EloSystem } from "./elo-config.ts";
+import { isWomenPool } from "./league-strength.ts";
 import { clamp } from "./util.ts";
 
 export interface LeagueRating {
@@ -23,10 +24,20 @@ export interface StrengthComparison {
 }
 
 /**
- * Ligarating für eine Seite. Ohne belastbaren Snapshot gilt das schwächste belastbare
- * Rating des Pools abzüglich eines Abschlags: eine Liga, die in der Elo-Kette aus
- * Pokalbegegnungen nie auftaucht, ist unterklassig und nicht Mittelfeld. Ohne jeden
- * belastbaren Snapshot im Pool gibt es kein Rating.
+ * Ligarating für eine Seite. Ohne jeden Snapshot gilt das schwächste belastbare Rating des
+ * Pools abzüglich eines Abschlags: eine Liga, die in der Elo-Kette aus Pokalbegegnungen nie
+ * auftaucht, ist unterklassig und nicht Mittelfeld. Ohne jeden belastbaren Snapshot im Pool
+ * gibt es kein Rating.
+ *
+ * Ein nicht belastbarer Snapshot wird seit 3.6.0 (19.10.2026) zu dieser Schätzung hin
+ * gezogen statt durch sie ersetzt, gewichtet nach Duellen und Vereinen:
+ * w = min(1, Duelle / reliableMinMatches) · min(1, Vereine / Mindestvereine des Pools).
+ * Vorher galt jede nicht belastbare Liga als unterklassig, auch mit eigenem, hohem Rating - bei
+ * Etar - Spartak Varna (19.10.2026, First League mit 13 Duellen) stand so die Second League
+ * vorn, Faktor 1,26 statt rund 1,0; mit allen Duellen 0,65. Vorab festgelegt gemessen an 1.244 nachgebauten Duellen mit einer geschätzten
+ * Seite: 1X2-Log-Loss −0,068 ± 0,011, in beiden Zeithälften (−0,069 ± 0,015 / −0,067 ± 0,015);
+ * "max(eigenes Rating, Floor − Abschlag)" bestand in der zweiten Hälfte nicht. `reliable`
+ * bleibt false, Warnung, Report-Gruppe und "beide geschätzt -> kein Faktor" bleiben gleich.
  */
 export function ratingFor(
   database: Pick<AnalyzerDatabase, "getLeagueStrength">,
@@ -41,11 +52,12 @@ export function ratingFor(
     return { leagueId, rating: snapshot.rating, reliable: true };
   }
   if (floor === null) return null;
-  return {
-    leagueId,
-    rating: floor - config.strength.unratedPenalty,
-    reliable: false
-  };
+  const estimated = floor - config.strength.unratedPenalty;
+  if (!snapshot) return { leagueId, rating: estimated, reliable: false };
+  const minClubs = isWomenPool(pool) ? config.strength.reliableMinClubsWomen : config.strength.reliableMinClubs;
+  const weight = Math.min(1, snapshot.matches / config.strength.reliableMinMatches)
+    * Math.min(1, snapshot.clubs / minClubs);
+  return { leagueId, rating: weight * snapshot.rating + (1 - weight) * estimated, reliable: false };
 }
 
 /**

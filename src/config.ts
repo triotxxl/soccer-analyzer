@@ -3,8 +3,10 @@ import type { EloSystem } from "./elo-config.ts";
 
 // Eine Pokalsaison braucht rund 100 bis 150 Aufrufe (einer je teilnehmendem Verein). Mit 25 je
 // Analyse blieben Lücken wochenlang offen (29.09.2026: Slowakei ohne Rating, Tschechien bei 2024).
+// Seit 19.10.2026 300 an einer Stelle vor der Torlinien-Rechnung statt je 100 in drei Analysen,
+// von denen nur die erste die Ligastärke liest - dieselben Höchstkosten je Dashboard-Analyse.
 const strengthOnDemandRequestBudget = Number(
-  process.env.STRENGTH_ON_DEMAND_REQUEST_BUDGET ?? 100
+  process.env.STRENGTH_ON_DEMAND_REQUEST_BUDGET ?? 300
 );
 const settleRequestBudget = Number(
   process.env.SETTLE_REQUEST_BUDGET ?? 200
@@ -87,7 +89,10 @@ export const config = {
   // 3.4.0 (29.09.2026): dasselbe für U21-Nationalteams (`teamEloSystems`), dazu eigene Pools
   // und die 3-Vereine-Grenze für Frauenwettbewerbe in der Ligastärke.
   // 3.5.0 (05.10.2026): strength.factorDivisor 1500 -> 1200 (Begründung dort).
-  goalLineModelVersion: "3.5.0",
+  // 3.6.0 (19.10.2026): Eine nicht belastbare Liga behält ihr eigenes Rating, nach Duellen und
+  // Vereinen zum Pool-Floor gezogen (`ratingFor` in src/strength-factor.ts). Ligaspiele und
+  // Spiele zwischen zwei belastbar bewerteten Ligen rechnen wie 3.5.0 (`STRENGTH_COMPARABLE_SINCE`).
+  goalLineModelVersion: "3.6.0",
   xgEnrichmentRequestBudget: 250,
   // Torschüsse und Ecken der letzten fünf Partien. Ein Aufruf deckt zwanzig Partien ab, und
   // jede geholte wird gespeichert - ein 48-Stunden-Lauf braucht damit etwa zwanzig Aufrufe,
@@ -142,7 +147,8 @@ export const config = {
   // nach der Summenkorrektur, Summe bleibt gleich. **Ab Werk 0 = aus** (Davids Entscheidung
   // vom 10.10.2026): Eingeschaltet wird nach der vorab festgelegten BTTS-Prüfung
   // (docs/btts-pruefung.md, etwa Mitte November), weil sich BTTS dabei leicht verschiebt.
-  // Dann 0.054 setzen und goalLineModelVersion auf 3.6.0 erhöhen.
+  // Dann 0.054 setzen und goalLineModelVersion auf 3.7.0 erhöhen (3.6.0 ist seit 19.10.2026
+  // die Ligastärke geschätzter Ligen).
   //
   // Gemessen (Prüfung vom 10.10.2026): δ über 74.033 nachgebaute Ligaspiele 0,0539 ± 0,0023,
   // live 0,059 ± 0,010. Zeit-Split, 1X2-Log-Loss gepaart: nachgebaut −0,0036 ± 0,0004 (Test)
@@ -177,7 +183,7 @@ export const config = {
     Number.isInteger(strengthOnDemandRequestBudget) &&
     strengthOnDemandRequestBudget > 0
       ? strengthOnDemandRequestBudget
-      : 100,
+      : 300,
   strength: {
     // Elo-Differenz zweier Ligen -> Torfaktor je Seite: 10 ** (delta / factorDivisor).
     // Seit dem neutralen Maßstab im Modell trägt dieser Faktor den Klassenunterschied allein.
@@ -208,7 +214,9 @@ export const config = {
     factorMin: 0.3,
     factorMax: 3.5,
     // Abschlag auf das schwächste belastbare Rating des Pools für Ligen ohne eigenes
-    // Rating. Wer nie in der Elo-Kette auftaucht, ist unterklassig, nicht Mittelfeld.
+    // Rating. Wer nie in der Elo-Kette auftaucht, ist unterklassig, nicht Mittelfeld. Ein
+    // nicht belastbares eigenes Rating wird seit 3.6.0 nach Duellen und Vereinen zu diesem
+    // Wert hin gezogen, nicht mehr durch ihn ersetzt (`ratingFor`).
     // Am selben Lauf kalibriert (11 der 22 Partien hatten eine geschätzte Seite). Zwischen
     // 120 und 300 ist die Abweichung praktisch flach; gewählt ist der konservative Rand,
     // damit das Modell eher unter- als überschätzt - Überschätzung schlägt unmittelbar auf

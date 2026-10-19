@@ -72,7 +72,11 @@ Benutzer auf Deutsch und führe Analyseaufträge selbstständig über die vorhan
    dort erst recht ein Modellfehler. Nachmessen nach rund 90 abgerechneten Frauen-Europapokal-
    spielen mit Quote. Schottland, Griechenland und die Ukraine führt API-Football ohne
    Frauenliga - dort bleibt 1X2 verborgen. Die Ligastärke lädt seit demselben Tag **vor** der
-   1X2-Rechnung nach (`runGoalLineAnalysis`), vorher wirkte sie erst eine Analyse später, und
+   1X2-Rechnung nach (`runGoalLineAnalysis`), vorher wirkte sie erst eine Analyse später -
+   **seit 19.10.2026 mit dem ganzen Budget von 300 Aufrufen nur dort**
+   (`strengthOnDemandRequestBudget`; Remis- und Favoritenanalyse laden nicht mehr nach), und die
+   Analyse druckt „Ligastärke vor der Rechnung: … Budget erreicht bei <Pokal> <Saison> (x von y
+   Spielen)“ sowie die Spiele mit geschätzter Seite (`strengthReloadLines`, `src/output.ts`), und
    die Tipico-Quoten gehen über `tipico_fixtures.api_fixture_id` an die Spiele statt über den
    Namensvergleich (der 6 % der Spiele ohne Quote ließ). Offen: `strengthFor` schlägt mit der
    Saison der Heimatliga nach statt der des Wettbewerbs - erst an Männer-Pokalspielen messen.
@@ -487,7 +491,7 @@ Benutzer auf Deutsch und führe Analyseaufträge selbstständig über die vorhan
   an den eigenen Prognosen bestätigt (−0,024 ± 0,005). Begründung im Kommentar in
   `src/config.ts`. Folgen: mehr Spiele mit „Klasse“-Kürzel (Schwellen 1,5/2,2 am Faktor), die
   modellgebundenen Quickpick-Messungen (`MODEL_BOUND_PRESETS`: hz15, remis, modell1x2) beginnen neu.
-  **Nachmessen nach rund 150 abgerechneten Spielen von 3.5.0** in der Tabelle „Stärkere Seite
+  **Nachmessen nach rund 150 abgerechneten Spielen ab 3.5.0** (3.6.0 zählt mit) in der Tabelle „Stärkere Seite
   je Modellversion“ bzw. der Kurzfassungszeile „seit 3.5.0“ (Gruppe „gemessen“; bei 150 Spielen
   rund ± 4 Punkte; Standardfehler unter der Prognose, √(Σ p(1−p)) / n). Je Fassung gemessen am
   05.10.2026: 3.1.0 (meist 900, dazu kurz 1200 und 1500) −1,1 ± 5,3, 3.2.0 (1500) +21,5 ± 5,0.
@@ -501,6 +505,35 @@ Benutzer auf Deutsch und führe Analyseaufträge selbstständig über die vorhan
   erzeugt ein Abgleich der Cross-League-Spiele in den Snapshots gegen `strength_matches`.
   **NM Cupen** führt API-Football als Saison 2027 (August bis Oktober 2026), die `seasonsFor` nie
   lädt - offen, braucht eine eigene Änderung.
+- **Nicht belastbare Ligen behalten ihr eigenes Rating, `goalLineModelVersion` 3.6.0** (seit
+  19.10.2026, Davids Entscheidung nach der Prüfung vom selben Tag, `ratingFor` in
+  `src/strength-factor.ts`). Bis 3.5.0 bekam jede nicht belastbare Liga Floor − `unratedPenalty`,
+  auch mit hohem eigenem Rating: Bei Etar – Spartak Varna (bulgarischer Pokal, First League mit
+  13 Duellen zur Rechenzeit) stand so die Second League vorn, Faktor 1,26; nach Regel A rund
+  1,0, mit allen Duellen 0,65. Jetzt wird das eigene Rating mit
+  w = min(1, Duelle/30) · min(1, Vereine/5 bzw. 3 bei Frauen) zur Schätzung hin gezogen; ohne
+  eigenen Stand bleibt Floor − 120. `reliable` bleibt false (Warnung „geschätzt“, Report-Gruppe,
+  „beide geschätzt → kein Faktor“ unverändert). Vorab festgelegt gemessen an 1.244 nachgebauten
+  Duellen mit einer geschätzten Seite: 1X2-Log-Loss −0,068 ± 0,011, beide Zeithälften
+  −0,069/−0,067 ± 0,015; „max(eigenes Rating, Floor − 120)“ bestand in der zweiten Hälfte nicht.
+  Die alte Regel drehte dort 139 Mal die Richtung, die Seite laut neuer Regel gewann 82, die laut
+  alter 28. An echten Prognosen erst 61 Spiele (−0,061 ± 0,059, kein Gegenbeleg). Betroffen seit
+  August 77 von rund 9.300 Prognosen. **Zählweise** (Davids Entscheidung): Ligaspiele, „gemessen“
+  und die Team-Elo-Gruppen rechnen wie 3.5.0 und zählen zusammen (`STRENGTH_COMPARABLE_SINCE` in
+  `src/calibration.ts`, Kurzfassung „seit 3.5.0“); „geschätzt“ zählt ab 3.6.0, „Erste Halbzeit“
+  und „Remis-Kandidaten“ beginnen neu, „Sieger laut Modell“ zählt weiter ab 3.2.0. Wer
+  `config.strength` oder `teamEloSystems` ändert, zieht `STRENGTH_COMPARABLE_SINCE` nach.
+  **Offen:** `classGapOf` gibt jeder geschätzten Seite mindestens „clear“ („geschätzt =
+  unterklassig“) - unter der neuen Regel kann die geschätzte Seite die stärkere sein.
+  **Nachladen kam teils zu spät** (Prüfung vom 19.10.2026, behoben am selben Tag ohne neue
+  Modellversion): Nur die Torlinien-Analyse liest die Ligastärke, ihr Nachladen hatte aber nur
+  100 Aufrufe; Remis- und Favoriten-Analyse luden danach je weitere 100 - nur für die nächste
+  Analyse. Bei Etar fehlten so 24 von 31 Duellen der Vorsaison, die Minuten nach der Rechnung
+  ankamen. Von 95 Prognosen mit geschätzter Seite seit August wären 26 mit schon gespielten
+  Duellen belastbar gewesen, 14 davon in derselben Analyse nur zu spät geladen, 12 erst in
+  späteren Analysen. Jetzt 300 Aufrufe an der einen Stelle. Am 19.10.2026 zusätzlich die älteren
+  Saisons der Pokale mit Spielen zwischen Ligen seit 01.09. nachgeladen (Davids Entscheidung,
+  Schätzung rund 2.400 Aufrufe in Etappen).
 - **„Saison fertig“ in der Ligastärke (seit 05.10.2026, `src/strength-builder.ts`):** Eine
   Pokalsaison gilt erst als fertig, wenn ihr `end` vorbei ist **und** keine Ansetzung mehr offen
   steht (PST zählt als offen, eine offene Ansetzung über 30 Tage vor heute aber als erledigt -
@@ -686,10 +719,10 @@ nachgezogen, nicht gesammelt am Ende.
   Korrektur `shiftHomeAway` (`src/model.ts`) **nach** `recalibrateGoals`, Summe fest, nur
   Ligaspiele (`!crossLeague` im Analyzer), Stärke `config.goalLineHomeShift`. **Ab Werk 0 =
   aus.** Einschalten nach der BTTS-Prüfung (`docs/btts-pruefung.md`, rund Mitte November):
-  0,054 setzen, `goalLineModelVersion` 3.6.0, dann beginnen die modellgebundenen
-  Quickpick-Messungen neu (`MODEL_BOUND_SINCE.modell1x2` auf 3.6.0 setzen) und
-  `strongerSideByVersion` darf 3.5.0 und 3.6.0 zusammenzählen (Spiele zwischen Ligen rechnen
-  identisch). Gemessen: 1X2-Log-Loss −0,0035 ± 0,0013 an 4.038 echten Ligaprognosen, an 74.033
+  0,054 setzen, `goalLineModelVersion` **3.7.0** (3.6.0 ist seit 19.10.2026 die Ligastärke
+  geschätzter Ligen), dann beginnen die modellgebundenen Quickpick-Messungen neu
+  (`MODEL_BOUND_SINCE.modell1x2` auf 3.7.0 setzen), und in `STRENGTH_COMPARABLE_SINCE` darf
+  „geschätzt“ ab 3.6.0 zählen (Spiele zwischen Ligen rechnen identisch). Gemessen: 1X2-Log-Loss −0,0035 ± 0,0013 an 4.038 echten Ligaprognosen, an 74.033
   nachgebauten Ligaspielen −0,0036 / −0,0023 ± 0,0004 im Zeit-Split; Über/Unter unverändert,
   BTTS praktisch gleich; gegen Tipico fair nur ein Zehntel näher. Die Behebung an der Wurzel
   maß etwas schlechter und bewegte Spiele zwischen Ligen und Länderspiele ungemessen mit.
@@ -1557,7 +1590,7 @@ anderen ausdrücklich nicht.
   −6,6 ± 3,9 % je Tipp, Locker 363 Tipps 62,3 %, Weit 752 Tipps 60,9 %. **Vorbehalt:**
   Länder- und U21-Spiele rechnet das Modell seit 3.3.0 anders, und dort lagen die schwachen
   jüngsten Tipps (ab 3.3.0 Vorgabe 47,7 ± 7,5 %, n = 44; nur 3.5.0 22 Tipps 54,5 %). Nachmessen,
-  sobald unter 3.5.0 rund 100 Tipps der Vorgabestufe abgerechnet sind.
+  sobald ab 3.5.0 rund 100 Tipps der Vorgabestufe abgerechnet sind (3.6.0 zählt mit).
 - Nebenbefund des Prüfers: Das 1X2-Modell schätzt Heimsiege zu niedrig (43,8 % eingetreten
   gegen 40,8 %) und Auswärtssiege zu hoch (30,8 gegen 34,5 %). Geprüft am 10.10.2026, siehe
   „Heim-/Gast-Aufteilung“ im Abschnitt Märkte.

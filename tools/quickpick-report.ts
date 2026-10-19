@@ -73,7 +73,10 @@ const MODEL_BOUND_PRESETS = new Set<QuickpickPresetId>(["hz15", "remis", "modell
  * sein muss. „Sieger laut Modell" ab 3.2.0 (Davids Entscheidung vom 10.10.2026): Für Ligaspiele
  * rechnen 3.2.0 bis 3.5.0 dasselbe 1X2 - beim Wechsel 3.4.0 → 3.5.0 blieben 652 von 659
  * identisch, die Versionen danach änderten Länderspiele, U21, Frauen-Pools und den Teiler
- * zwischen Ligen. Nur an 3.5.0 standen hinter den Knöpfen rund 20 Tipps.
+ * zwischen Ligen. Nur an 3.5.0 standen hinter den Knöpfen rund 20 Tipps. 3.6.0 (19.10.2026)
+ * ändert nur Spiele zwischen Ligen mit einer nicht belastbaren Seite; „Sieger laut Modell"
+ * zählt weiter ab 3.2.0 (Davids Entscheidung vom 19.10.2026), „Erste Halbzeit" und
+ * „Remis-Kandidaten" beginnen mit 3.6.0 neu.
  */
 const MODEL_BOUND_SINCE: Partial<Record<QuickpickPresetId, string>> = { modell1x2: "3.2.0" };
 

@@ -14,6 +14,40 @@ import type {
 } from "./types.ts";
 import { localKickoff, percent } from "./util.ts";
 
+/**
+ * Zwei Zeilen zur Ligastärke einer Torlinien-Analyse: was vor der Rechnung nachgeladen wurde
+ * und wo das Budget griff, dann welche Spiele zwischen Ligen noch eine geschätzte Seite haben.
+ * Ohne sie war am 19.10.2026 nicht zu erkennen, dass bei Etar - Spartak Varna die Vorsaison erst
+ * nach der Rechnung ankam.
+ */
+export function strengthReloadLines(result: Pick<GoalLineAnalysisResult, "rows" | "strengthReload">): string[] {
+  const lines: string[] = [];
+  const reload = result.strengthReload;
+  if (reload) {
+    const stop = reload.stoppedAt;
+    lines.push(
+      `Ligastärke vor der Rechnung: ${reload.competitions} Wettbewerbe, ${reload.fixturesStored} Duelle neu, ` +
+      `${reload.apiRequests} von ${reload.budget} Aufrufen` +
+      (stop
+        ? ` - Budget erreicht bei ${stop.competition} ${stop.season}` +
+          (stop.total === null ? " (Saison nicht mehr geholt)" : ` (${stop.done} von ${stop.total} Spielen)`)
+        : "")
+    );
+  }
+  const between = result.rows.filter((row) =>
+    row.strength && (row.strength.source ?? "league") === "league");
+  const estimated = between.filter((row) => !row.strength!.home.reliable || !row.strength!.away.reliable);
+  if (between.length > 0) {
+    lines.push(
+      `Spiele zwischen Ligen mit Ligastärke: ${between.length}, davon mit geschätzter Seite ${estimated.length}` +
+      (estimated.length > 0
+        ? ": " + estimated.map((row) => `${row.homeTeam} - ${row.awayTeam} (${row.country} · ${row.league})`).join(", ")
+        : "")
+    );
+  }
+  return lines;
+}
+
 const MARKET_NAMES: Record<Market, string> = {
   draw: "Remis",
   btts: "BTTS",

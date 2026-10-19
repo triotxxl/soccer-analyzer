@@ -404,8 +404,20 @@ test("Remis-End-to-End-Analyse schaltet Pokalspiele auf Cross-League um", async 
   }, { client: fake, database, now: target });
   assert.equal(result.rows.length, 1);
   assert.equal(result.rows[0]?.model, "cross-league");
+  // Seit 19.10.2026 lädt nur die Torlinien-Analyse die Ligastärke nach - die einzige, die sie
+  // liest. Vorher lud die Remis-Analyse nach der Rechnung nur für die nächste Analyse.
+  assert.equal(strengthCatalogCalls, 0);
+  assert.equal(selectedCompetitionCalls, 0);
+  const goals = await runGoalLineAnalysis({
+    selections: [{ country: "World", league: "UEFA Europa League" }],
+    markets: ["draw"],
+    dates: "both"
+  }, { client: fake, database, now: target });
+  // Die Torlinien-Analyse holt den Wettbewerb auch für ihre eigene Rechnung; das Nachladen
+  // zeigt der Katalogaufruf des Builders und die Zusammenfassung.
   assert.equal(strengthCatalogCalls, 1);
-  assert.equal(selectedCompetitionCalls, 1);
+  assert.equal(goals.strengthReload?.competitions, 1);
+  assert.equal(goals.strengthReload?.budget, 300);
   database.close();
 });
 
