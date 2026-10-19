@@ -239,6 +239,31 @@
     "country": "Australia",
     "league": "A-League"
   },
+  "australien|a league frauen": {
+    "leagueId": 190,
+    "country": "Australia",
+    "league": "A-League Women"
+  },
+  "australien|australian championship gruppe a": {
+    "leagueId": 1202,
+    "country": "Australia",
+    "league": "Australian Championship"
+  },
+  "australien|australian championship gruppe b": {
+    "leagueId": 1202,
+    "country": "Australia",
+    "league": "Australian Championship"
+  },
+  "australien|australian championship gruppe c": {
+    "leagueId": 1202,
+    "country": "Australia",
+    "league": "Australian Championship"
+  },
+  "australien|australian championship gruppe d": {
+    "leagueId": 1202,
+    "country": "Australia",
+    "league": "Australian Championship"
+  },
   "australien|australien pokal endrunde": {
     "leagueId": 874,
     "country": "Australia",
@@ -329,6 +354,11 @@
     "country": "Belarus",
     "league": "Premier League"
   },
+  "belgien|beker van belgie": {
+    "leagueId": 147,
+    "country": "Belgium",
+    "league": "Cup"
+  },
   "belgien|pro league": {
     "leagueId": 144,
     "country": "Belgium",
@@ -379,6 +409,11 @@
     "country": "Brazil",
     "league": "Serie C"
   },
+  "brasilien|brasileiro serie c playoffs": {
+    "leagueId": 75,
+    "country": "Brazil",
+    "league": "Serie C"
+  },
   "brasilien|copa do brasil": {
     "leagueId": 73,
     "country": "Brazil",
@@ -393,6 +428,11 @@
     "leagueId": 173,
     "country": "Bulgaria",
     "league": "Second League"
+  },
+  "bulgarien|bulgarien pokal": {
+    "leagueId": 174,
+    "country": "Bulgaria",
+    "league": "Cup"
   },
   "bulgarien|super pokal": {
     "leagueId": 656,
@@ -483,6 +523,16 @@
     "leagueId": 171,
     "country": "China",
     "league": "FA Cup"
+  },
+  "china|super league frauen abstiegsrunde": {
+    "leagueId": 169,
+    "country": "China",
+    "league": "Super League"
+  },
+  "china|super league frauen meisterschaftsrunde": {
+    "leagueId": 169,
+    "country": "China",
+    "league": "Super League"
   },
   "concacaf leagues cup|endrunde": {
     "leagueId": 772,
@@ -848,6 +898,21 @@
     "leagueId": 327,
     "country": "Georgia",
     "league": "Erovnuli Liga"
+  },
+  "georgien|erovnuli liga 2": {
+    "leagueId": 326,
+    "country": "Georgia",
+    "league": "Erovnuli Liga 2"
+  },
+  "georgien|liga 3": {
+    "leagueId": 1104,
+    "country": "Georgia",
+    "league": "Liga 3"
+  },
+  "ghana|division one": {
+    "leagueId": 1196,
+    "country": "Ghana",
+    "league": "Division One League"
   },
   "griechenland|gamma ethniki gr 10": {
     "leagueId": 694,
@@ -1264,6 +1329,11 @@
     "country": "Mexico",
     "league": "Liga Premier Serie A"
   },
+  "mexiko|liga premier b": {
+    "leagueId": 872,
+    "country": "Mexico",
+    "league": "Liga Premier Serie B"
+  },
   "mexiko|liga primera premier": {
     "leagueId": 1242,
     "country": "Mexico",
@@ -1398,6 +1468,16 @@
     "leagueId": 281,
     "country": "Peru",
     "league": "Primera División"
+  },
+  "peru|segunda division abstiegsrunde gruppe a": {
+    "leagueId": 282,
+    "country": "Peru",
+    "league": "Segunda División"
+  },
+  "peru|segunda division abstiegsrunde gruppe b": {
+    "leagueId": 282,
+    "country": "Peru",
+    "league": "Segunda División"
   },
   "peru|segunda division gruppe a": {
     "leagueId": 282,
@@ -1608,6 +1688,11 @@
     "leagueId": 208,
     "country": "Switzerland",
     "league": "Challenge League"
+  },
+  "schweiz|schweizer pokal": {
+    "leagueId": 209,
+    "country": "Switzerland",
+    "league": "Schweizer Cup"
   },
   "schweiz|super league": {
     "leagueId": 207,

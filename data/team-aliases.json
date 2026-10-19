@@ -59,6 +59,11 @@
     "apiTeamId": 786,
     "apiTeamName": "TSV 1860 München"
   },
+  "3k fc": {
+    "tipicoName": "3K FC",
+    "apiTeamId": 24667,
+    "apiTeamName": "3K"
+  },
   "68 aksaray beled": {
     "tipicoName": "68 Aksaray Beled.",
     "apiTeamId": 6507,
@@ -164,6 +169,11 @@
     "apiTeamId": 1579,
     "apiTeamName": "Monza"
   },
+  "ac petrol do lobito": {
+    "tipicoName": "Ac. Petrol. Do Lobito",
+    "apiTeamId": 4915,
+    "apiTeamName": "Académica do Lobito"
+  },
   "ac pisa 1909": {
     "tipicoName": "AC Pisa 1909",
     "apiTeamId": 801,
@@ -239,10 +249,20 @@
     "apiTeamId": 24696,
     "apiTeamName": "Ospitaletto"
   },
+  "acdr lamelas": {
+    "tipicoName": "ACDR Lamelas",
+    "apiTeamId": 20353,
+    "apiTeamName": "Recreativa de Lamelas"
+  },
   "acf zapotlanejo": {
     "tipicoName": "ACF Zapotlanejo",
     "apiTeamId": 24949,
     "apiTeamName": "Acatlan"
+  },
+  "acs cil blaj": {
+    "tipicoName": "ACS Cil Blaj",
+    "apiTeamId": 24841,
+    "apiTeamName": "CIL Blaj"
   },
   "acs fc bacau 2023": {
     "tipicoName": "Acs FC Bacau 2023",
@@ -344,6 +364,11 @@
     "apiTeamId": 823,
     "apiTeamName": "San Carlos"
   },
+  "ad sanjoanense": {
+    "tipicoName": "AD Sanjoanense",
+    "apiTeamId": 4792,
+    "apiTeamName": "Sanjoanense"
+  },
   "adama city fc": {
     "tipicoName": "Adama City FC",
     "apiTeamId": 4110,
@@ -358,6 +383,11 @@
     "tipicoName": "Adana 1954 FK",
     "apiTeamId": 22009,
     "apiTeamName": "Adana 01 FK"
+  },
+  "adelaide united f": {
+    "tipicoName": "Adelaide United (F)",
+    "apiTeamId": 1972,
+    "apiTeamName": "Adelaide United W"
   },
   "adelaide united fc": {
     "tipicoName": "Adelaide United FC",
@@ -516,8 +546,8 @@
   },
   "al ahli": {
     "tipicoName": "Al Ahli",
-    "apiTeamId": 2896,
-    "apiTeamName": "Al Ahli Doha"
+    "apiTeamId": 2929,
+    "apiTeamName": "Al-Ahli Jeddah"
   },
   "al ahly sc": {
     "tipicoName": "Al Ahly SC",
@@ -804,6 +834,11 @@
     "apiTeamId": 1751,
     "apiTeamName": "Albania W"
   },
+  "albirex niigata f": {
+    "tipicoName": "Albirex Niigata (F)",
+    "apiTeamId": 16953,
+    "apiTeamName": "Albirex Niigata W"
+  },
   "alebrijes oaxaca": {
     "tipicoName": "Alebrijes Oaxaca",
     "apiTeamId": 2300,
@@ -989,6 +1024,11 @@
     "apiTeamId": 1521,
     "apiTeamName": "Equatorial Guinea"
   },
+  "aqvital fc": {
+    "tipicoName": "Aqvital FC",
+    "apiTeamId": 2409,
+    "apiTeamName": "Csakvar"
+  },
   "arambagh ks": {
     "tipicoName": "Arambagh KS",
     "apiTeamId": 5011,
@@ -1083,6 +1123,11 @@
     "tipicoName": "ART Municipal Jalapa",
     "apiTeamId": 10160,
     "apiTeamName": "Jalapa"
+  },
+  "artis brno b": {
+    "tipicoName": "Artis Brno B",
+    "apiTeamId": 21650,
+    "apiTeamName": "Líšeň II"
   },
   "as ariana": {
     "tipicoName": "AS Ariana",
@@ -1348,6 +1393,11 @@
     "tipicoName": "Atromitos Athen",
     "apiTeamId": 12260,
     "apiTeamName": "Atromitos"
+  },
+  "attard fc": {
+    "tipicoName": "Attard FC",
+    "apiTeamId": 19912,
+    "apiTeamName": "Attard"
   },
   "auckland fc": {
     "tipicoName": "Auckland FC",
@@ -1854,6 +1904,11 @@
     "apiTeamId": 23516,
     "apiTeamName": "Brindabella"
   },
+  "brisbane roar f": {
+    "tipicoName": "Brisbane Roar (F)",
+    "apiTeamId": 1973,
+    "apiTeamName": "Brisbane Roar FC W"
+  },
   "brit jungferninseln": {
     "tipicoName": "Brit. Jungferninseln",
     "apiTeamId": 8168,
@@ -2284,6 +2339,11 @@
     "apiTeamId": 19034,
     "apiTeamName": "Leones del Norte"
   },
+  "cc mariners f": {
+    "tipicoName": "CC Mariners (F)",
+    "apiTeamId": 22292,
+    "apiTeamName": "Central Coast Mariners W"
+  },
   "cd aguila": {
     "tipicoName": "CD Aguila",
     "apiTeamId": 4310,
@@ -2298,6 +2358,11 @@
     "tipicoName": "CD Argentino M M",
     "apiTeamId": 18764,
     "apiTeamName": "Argentino Monte Maíz"
+  },
+  "cd ayense ac": {
+    "tipicoName": "CD Ayense AC",
+    "apiTeamId": 22054,
+    "apiTeamName": "Deportivo Ayense"
   },
   "cd cacahuatique": {
     "tipicoName": "CD Cacahuatique",
@@ -2341,7 +2406,7 @@
   },
   "cd estrella roja": {
     "tipicoName": "CD Estrella Roja",
-    "apiTeamId": 11370,
+    "apiTeamId": 28541,
     "apiTeamName": "Estrella Roja"
   },
   "cd estudiantil cni": {
@@ -2669,6 +2734,11 @@
     "apiTeamId": 2246,
     "apiTeamName": "CFR 1907 Cluj"
   },
+  "chabab atl khen": {
+    "tipicoName": "Chabab Atl. Khen.",
+    "apiTeamId": 970,
+    "apiTeamName": "Chabab Atl. Khenifra"
+  },
   "chador malu yazd": {
     "tipicoName": "Chador Malu Yazd",
     "apiTeamId": 20299,
@@ -2688,6 +2758,11 @@
     "tipicoName": "Chapelton Maroons",
     "apiTeamId": 20597,
     "apiTeamName": "Chapelton"
+  },
+  "chapu de oaxaca": {
+    "tipicoName": "Chapu. de Oaxaca",
+    "apiTeamId": 26525,
+    "apiTeamName": "Chapulineros"
   },
   "charlestown azzurri": {
     "tipicoName": "Charlestown Azzurri",
@@ -2983,6 +3058,11 @@
     "tipicoName": "Cong An Hanoi FC",
     "apiTeamId": 16400,
     "apiTeamName": "Công An Nhân Dân"
+  },
+  "cong an ho chi minh city fc": {
+    "tipicoName": "Cong An Ho Chi Minh City FC",
+    "apiTeamId": 3672,
+    "apiTeamName": "Ho Chi Minh"
   },
   "connahs quay": {
     "tipicoName": "Connah´s Quay",
@@ -3609,6 +3689,11 @@
     "apiTeamId": 89,
     "apiTeamName": "Dijon"
   },
+  "dinamo 2 tbilisi": {
+    "tipicoName": "Dinamo-2 Tbilisi",
+    "apiTeamId": 13865,
+    "apiTeamName": "Dinamo Tbilisi II"
+  },
   "dinamo bukarest": {
     "tipicoName": "Dinamo Bukarest",
     "apiTeamId": 635,
@@ -3964,6 +4049,11 @@
     "apiTeamId": 2739,
     "apiTeamName": "Esteghlal Khuzestan"
   },
+  "esteghlal khuzestan fc": {
+    "tipicoName": "Esteghlal Khuzestan FC",
+    "apiTeamId": 2739,
+    "apiTeamName": "Esteghlal Khuzestan"
+  },
   "estland": {
     "tipicoName": "Estland",
     "apiTeamId": 1101,
@@ -4003,6 +4093,11 @@
     "tipicoName": "Ethiopia Electricity",
     "apiTeamId": 4127,
     "apiTeamName": "Mebrat Hayl"
+  },
+  "ethiopian coffee sc": {
+    "tipicoName": "Ethiopian Coffee SC",
+    "apiTeamId": 4116,
+    "apiTeamName": "Ethiopia Bunna"
   },
   "etoile carouge fc": {
     "tipicoName": "Etoile Carouge FC",
@@ -4103,6 +4198,11 @@
     "tipicoName": "FC Annecy",
     "apiTeamId": 3012,
     "apiTeamName": "Annecy"
+  },
+  "fc aragvi dusheti": {
+    "tipicoName": "FC Aragvi Dusheti",
+    "apiTeamId": 10015,
+    "apiTeamName": "Aragvi Dusheti"
   },
   "fc ararat armenia": {
     "tipicoName": "FC Ararat-Armenia",
@@ -4243,6 +4343,11 @@
     "tipicoName": "FC Burnley",
     "apiTeamId": 44,
     "apiTeamName": "Burnley"
+  },
+  "fc cabinda": {
+    "tipicoName": "FC Cabinda",
+    "apiTeamId": 4926,
+    "apiTeamName": "Sporting de Cabinda"
   },
   "fc canberra": {
     "tipicoName": "FC Canberra",
@@ -4624,6 +4729,11 @@
     "apiTeamId": 21954,
     "apiTeamName": "Lokomotiv Kyiv"
   },
+  "fc lokomotive tbilisi": {
+    "tipicoName": "FC Lokomotive Tbilisi",
+    "apiTeamId": 3500,
+    "apiTeamName": "Lokomotivi Tbilisi"
+  },
   "fc lorient": {
     "tipicoName": "FC Lorient",
     "apiTeamId": 97,
@@ -4653,6 +4763,11 @@
     "tipicoName": "FC Mathare United",
     "apiTeamId": 2463,
     "apiTeamName": "Mathare United"
+  },
+  "fc merani tbilisi": {
+    "tipicoName": "FC Merani Tbilisi",
+    "apiTeamId": 3508,
+    "apiTeamName": "Merani Tbilisi"
   },
   "fc meshakhte tkibuli": {
     "tipicoName": "FC Meshakhte Tkibuli",
@@ -4688,6 +4803,11 @@
     "tipicoName": "FC Monaro Panthers",
     "apiTeamId": 1453,
     "apiTeamName": "Monaro Panthers"
+  },
+  "fc mumbai city": {
+    "tipicoName": "FC Mumbai City",
+    "apiTeamId": 3478,
+    "apiTeamName": "Mumbai City"
   },
   "fc naftan novo": {
     "tipicoName": "FC Naftan Novo.",
@@ -4754,10 +4874,20 @@
     "apiTeamId": 3619,
     "apiTeamName": "Oleksandria"
   },
+  "fc orbi": {
+    "tipicoName": "FC Orbi",
+    "apiTeamId": 16507,
+    "apiTeamName": "Irao"
+  },
   "fc ordabasy": {
     "tipicoName": "FC Ordabasy",
     "apiTeamId": 692,
     "apiTeamName": "Ordabasy"
+  },
+  "fc ordino": {
+    "tipicoName": "FC Ordino",
+    "apiTeamId": 3344,
+    "apiTeamName": "Ordino"
   },
   "fc orsha": {
     "tipicoName": "FC Orsha",
@@ -4839,6 +4969,11 @@
     "apiTeamId": 5348,
     "apiTeamName": "Portadown"
   },
+  "fc prykarpattia if": {
+    "tipicoName": "FC Prykarpattia IF",
+    "apiTeamId": 3631,
+    "apiTeamName": "Prykarpattia"
+  },
   "fc puntarenas": {
     "tipicoName": "FC Puntarenas",
     "apiTeamId": 2045,
@@ -4848,6 +4983,11 @@
     "tipicoName": "FC Pyunik Yerevan",
     "apiTeamId": 709,
     "apiTeamName": "Pyunik Yerevan"
+  },
+  "fc rangers": {
+    "tipicoName": "FC Rangers",
+    "apiTeamId": 3353,
+    "apiTeamName": "Ranger's"
   },
   "fc rapperswil jona": {
     "tipicoName": "FC Rapperswil-Jona",
@@ -4894,10 +5034,20 @@
     "apiTeamId": 3501,
     "apiTeamName": "Rustavi"
   },
+  "fc saint george": {
+    "tipicoName": "FC Saint George",
+    "apiTeamId": 4119,
+    "apiTeamName": "Kedus Giorgis"
+  },
   "fc salzburg": {
     "tipicoName": "FC Salzburg",
     "apiTeamId": 571,
     "apiTeamName": "Red Bull Salzburg"
+  },
+  "fc samtredia": {
+    "tipicoName": "FC Samtredia",
+    "apiTeamId": 581,
+    "apiTeamName": "Samtredia"
   },
   "fc savoia 1908": {
     "tipicoName": "FC Savoia 1908",
@@ -5074,6 +5224,11 @@
     "apiTeamId": 5145,
     "apiTeamName": "Tatabánya"
   },
+  "fc telavi": {
+    "tipicoName": "FC Telavi",
+    "apiTeamId": 3511,
+    "apiTeamName": "Telavi"
+  },
   "fc tirsense": {
     "tipicoName": "FC Tirsense",
     "apiTeamId": 15128,
@@ -5229,6 +5384,16 @@
     "apiTeamId": 38,
     "apiTeamName": "Watford"
   },
+  "fc wiltz 71": {
+    "tipicoName": "FC Wiltz 71",
+    "apiTeamId": 11906,
+    "apiTeamName": "Wiltz"
+  },
+  "fc wit georgia": {
+    "tipicoName": "FC WIT Georgia",
+    "apiTeamId": 3504,
+    "apiTeamName": "WIT Georgia"
+  },
   "fc zbrojovka brno": {
     "tipicoName": "FC Zbrojovka Brno",
     "apiTeamId": 3733,
@@ -5238,6 +5403,11 @@
     "tipicoName": "FC Zbrojovka Brno B",
     "apiTeamId": 8633,
     "apiTeamName": "Zbrojovka Brno II"
+  },
+  "fc zebbug rangers": {
+    "tipicoName": "FC Zebbug Rangers",
+    "apiTeamId": 4614,
+    "apiTeamName": "Zebbug Rangers"
   },
   "fc zenit caslav": {
     "tipicoName": "FC Zenit Caslav",
@@ -6524,6 +6694,11 @@
     "apiTeamId": 1366,
     "apiTeamName": "Hartlepool"
   },
+  "hatta": {
+    "tipicoName": "Hatta",
+    "apiTeamId": 2869,
+    "apiTeamName": "Hatta SC"
+  },
   "haugesund f": {
     "tipicoName": "Haugesund (F)",
     "apiTeamId": 25760,
@@ -6533,6 +6708,11 @@
     "tipicoName": "Haverfordwest",
     "apiTeamId": 2194,
     "apiTeamName": "Haverfordwest County AFC"
+  },
+  "hawassa kenema sc": {
+    "tipicoName": "Hawassa Kenema SC",
+    "apiTeamId": 4111,
+    "apiTeamName": "Awassa Kenema"
   },
   "heart of midloth f": {
     "tipicoName": "Heart of Midloth. (F)",
@@ -6593,6 +6773,11 @@
     "tipicoName": "Herentals FC",
     "apiTeamId": 5223,
     "apiTeamName": "Herentals"
+  },
+  "heroes de zaci fc ii": {
+    "tipicoName": "Heroes de Zaci FC II",
+    "apiTeamId": 28301,
+    "apiTeamName": "Heroes de Zaci 2"
   },
   "herrera fc": {
     "tipicoName": "Herrera FC",
@@ -7048,6 +7233,11 @@
     "tipicoName": "Jeunesse Ben Guerir",
     "apiTeamId": 3450,
     "apiTeamName": "Chabab Ben Guerir"
+  },
+  "jeunesse esch": {
+    "tipicoName": "Jeunesse Esch",
+    "apiTeamId": 2034,
+    "apiTeamName": "AS Jeunesse Esch"
   },
   "jiangxi dingnan utd": {
     "tipicoName": "Jiangxi Dingnan Utd.",
@@ -7549,6 +7739,11 @@
     "apiTeamId": 6953,
     "apiTeamName": "Ruch Chorzów"
   },
+  "ks teuta": {
+    "tipicoName": "KS Teuta",
+    "apiTeamId": 3320,
+    "apiTeamName": "Teuta Durrës"
+  },
   "ks warta posen": {
     "tipicoName": "KS Warta Posen",
     "apiTeamId": 3496,
@@ -7563,6 +7758,11 @@
     "tipicoName": "KSE Targu Secuiesc",
     "apiTeamId": 6909,
     "apiTeamName": "Târgu Secuiesc"
+  },
+  "ksk heist": {
+    "tipicoName": "KSK Heist",
+    "apiTeamId": 6217,
+    "apiTeamName": "Heist"
   },
   "ksp polonia warszawa": {
     "tipicoName": "KSP Polonia Warszawa",
@@ -7684,6 +7884,11 @@
     "apiTeamId": 111,
     "apiTeamName": "Le Havre"
   },
+  "le havre ac f": {
+    "tipicoName": "Le Havre AC (F)",
+    "apiTeamId": 14006,
+    "apiTeamName": "Le Havre W"
+  },
   "le mans fc": {
     "tipicoName": "Le Mans FC",
     "apiTeamId": 1298,
@@ -7703,6 +7908,11 @@
     "tipicoName": "Lechia Danzig",
     "apiTeamId": 343,
     "apiTeamName": "Lechia Gdansk"
+  },
+  "lee man fc": {
+    "tipicoName": "Lee Man FC",
+    "apiTeamId": 4207,
+    "apiTeamName": "Warriors"
   },
   "leeds united": {
     "tipicoName": "Leeds United",
@@ -7731,8 +7941,8 @@
   },
   "leichhardt tigers": {
     "tipicoName": "Leichhardt Tigers",
-    "apiTeamId": 3764,
-    "apiTeamName": "APIA Leichhardt Tigers"
+    "apiTeamId": 26874,
+    "apiTeamName": "Wests APIA"
   },
   "leiknir reykjavik": {
     "tipicoName": "Leiknir Reykjavik",
@@ -7788,6 +7998,11 @@
     "tipicoName": "Lierse Kempenzonen",
     "apiTeamId": 6219,
     "apiTeamName": "K. Lierse S.K."
+  },
+  "life fc": {
+    "tipicoName": "Life FC",
+    "apiTeamId": 24520,
+    "apiTeamName": "Life Sihanoukville"
   },
   "lillestrom sk": {
     "tipicoName": "Lilleström SK",
@@ -8094,6 +8309,11 @@
     "apiTeamId": 1693,
     "apiTeamName": "Mantova"
   },
+  "mara sugar fc": {
+    "tipicoName": "Mara Sugar FC",
+    "apiTeamId": 19483,
+    "apiTeamName": "Mara Sugar"
+  },
   "maranhao ma": {
     "tipicoName": "Maranhao MA",
     "apiTeamId": 7832,
@@ -8194,15 +8414,30 @@
     "apiTeamId": 1439,
     "apiTeamName": "Meizhou Kejia"
   },
+  "melaka fc": {
+    "tipicoName": "Melaka FC",
+    "apiTeamId": 21038,
+    "apiTeamName": "Melaka"
+  },
   "melbourne city fc": {
     "tipicoName": "Melbourne City FC",
     "apiTeamId": 945,
     "apiTeamName": "Melbourne City"
   },
+  "melbourne city fc f": {
+    "tipicoName": "Melbourne City FC (F)",
+    "apiTeamId": 1971,
+    "apiTeamName": "Melbourne City W"
+  },
   "melbourne city u21": {
     "tipicoName": "Melbourne City U21",
     "apiTeamId": 20783,
     "apiTeamName": "Melbourne City II"
+  },
+  "melbourne victory f": {
+    "tipicoName": "Melbourne Victory (F)",
+    "apiTeamId": 1976,
+    "apiTeamName": "Melbourne Victory W"
   },
   "melita fc": {
     "tipicoName": "Melita FC",
@@ -8314,6 +8549,11 @@
     "apiTeamId": 2373,
     "apiTeamName": "Miramar"
   },
+  "miramar rangers": {
+    "tipicoName": "Miramar Rangers",
+    "apiTeamId": 2373,
+    "apiTeamName": "Miramar"
+  },
   "mirassol sp": {
     "tipicoName": "Mirassol SP",
     "apiTeamId": 7848,
@@ -8388,6 +8628,11 @@
     "tipicoName": "Mohun Bagan Super Giant",
     "apiTeamId": 15516,
     "apiTeamName": "ATK Mohun Bagan"
+  },
+  "moi kompong dewa fa": {
+    "tipicoName": "MOI Kompong Dewa FA",
+    "apiTeamId": 26303,
+    "apiTeamName": "Kompong Dewa"
   },
   "moik baku": {
     "tipicoName": "Moik Baku",
@@ -8549,6 +8794,11 @@
     "apiTeamId": 2360,
     "apiTeamName": "Wanderers"
   },
+  "muang loei united fc": {
+    "tipicoName": "Muang Loei United FC",
+    "apiTeamId": 6573,
+    "apiTeamName": "Muang Loei United"
+  },
   "muang thong utd": {
     "tipicoName": "Muang Thong Utd",
     "apiTeamId": 2786,
@@ -8619,6 +8869,16 @@
     "apiTeamId": 4323,
     "apiTeamName": "Parceiro Nagano"
   },
+  "nagano parceiro f": {
+    "tipicoName": "Nagano Parceiro (F)",
+    "apiTeamId": 16954,
+    "apiTeamName": "Parceiro Nagano W"
+  },
+  "nagaworld fc": {
+    "tipicoName": "Nagaworld FC",
+    "apiTeamId": 5566,
+    "apiTeamName": "NagaWorld"
+  },
   "nagykanizsai fc": {
     "tipicoName": "Nagykanizsai FC",
     "apiTeamId": 5123,
@@ -8669,6 +8929,11 @@
     "apiTeamId": 755,
     "apiTeamName": "Nautico Recife"
   },
+  "naxxar lions fc": {
+    "tipicoName": "Naxxar Lions FC",
+    "apiTeamId": 4605,
+    "apiTeamName": "Naxxar Lions"
+  },
   "nd beltinci": {
     "tipicoName": "ND Beltinci",
     "apiTeamId": 4366,
@@ -8704,6 +8969,11 @@
     "apiTeamId": 22699,
     "apiTeamName": "NEC"
   },
+  "negeri sembilan fa": {
+    "tipicoName": "Negeri Sembilan FA",
+    "apiTeamId": 2502,
+    "apiTeamName": "Negeri Sembilan"
+  },
   "neom sc": {
     "tipicoName": "Neom SC",
     "apiTeamId": 10513,
@@ -8723,6 +8993,11 @@
     "tipicoName": "New York Cosmos",
     "apiTeamId": 9033,
     "apiTeamName": "NY Cosmos"
+  },
+  "newcastle jets f": {
+    "tipicoName": "Newcastle Jets (F)",
+    "apiTeamId": 1975,
+    "apiTeamName": "Newcastle Jets FC W"
   },
   "newcastle olympic": {
     "tipicoName": "Newcastle Olympic",
@@ -9049,6 +9324,11 @@
     "apiTeamId": 4197,
     "apiTeamName": "Mura"
   },
+  "nsuopun fidelity fc": {
+    "tipicoName": "Nsuopun Fidelity FC",
+    "apiTeamId": 25396,
+    "apiTeamName": "Nsuopun Fidelity"
+  },
   "ntungasaze fc": {
     "tipicoName": "Ntungasaze FC",
     "apiTeamId": 28318,
@@ -9359,6 +9639,11 @@
     "apiTeamId": 85,
     "apiTeamName": "Paris Saint Germain"
   },
+  "paris sg f": {
+    "tipicoName": "Paris SG (F)",
+    "apiTeamId": 1667,
+    "apiTeamName": "Paris Saint Germain W"
+  },
   "parma calcio": {
     "tipicoName": "Parma Calcio",
     "apiTeamId": 523,
@@ -9483,6 +9768,11 @@
     "tipicoName": "Persita Tangerang",
     "apiTeamId": 4244,
     "apiTeamName": "Persita"
+  },
+  "perth glory f": {
+    "tipicoName": "Perth Glory (F)",
+    "apiTeamId": 1969,
+    "apiTeamName": "Perth Glory FC W"
   },
   "perth glory u21": {
     "tipicoName": "Perth Glory U21",
@@ -9924,6 +10214,11 @@
     "apiTeamId": 7740,
     "apiTeamName": "Radcliffe"
   },
+  "raec mons": {
+    "tipicoName": "RAEC Mons",
+    "apiTeamId": 5740,
+    "apiTeamName": "Albert Quévy-Mons"
+  },
   "raith rovers fc": {
     "tipicoName": "Raith Rovers FC",
     "apiTeamId": 1385,
@@ -9999,6 +10294,11 @@
     "apiTeamId": 20501,
     "apiTeamName": "RB Leipzig W"
   },
+  "rc arbaa": {
+    "tipicoName": "RC Arbaa",
+    "apiTeamId": 937,
+    "apiTeamName": "RC Arba"
+  },
   "rc celta de vigo": {
     "tipicoName": "RC Celta de Vigo",
     "apiTeamId": 538,
@@ -10023,6 +10323,11 @@
     "tipicoName": "RC Lens",
     "apiTeamId": 116,
     "apiTeamName": "Lens"
+  },
+  "rc lens f": {
+    "tipicoName": "RC Lens (F)",
+    "apiTeamId": 26234,
+    "apiTeamName": "Lens W"
   },
   "rc strasbourg f": {
     "tipicoName": "RC Strasbourg (F)",
@@ -10194,6 +10499,11 @@
     "apiTeamId": 1301,
     "apiTeamName": "Rodez"
   },
+  "roea f": {
+    "tipicoName": "Roea (F)",
+    "apiTeamId": 18379,
+    "apiTeamName": "Røa W"
+  },
   "rosenborg bk f": {
     "tipicoName": "Rosenborg BK (F)",
     "apiTeamId": 15956,
@@ -10243,6 +10553,11 @@
     "tipicoName": "RSC Anderlecht Fut.",
     "apiTeamId": 19046,
     "apiTeamName": "RSC Anderlecht II"
+  },
+  "rsc habay": {
+    "tipicoName": "RSC Habay",
+    "apiTeamId": 5814,
+    "apiTeamName": "Habay-la-Neuve"
   },
   "rts widzew lodz": {
     "tipicoName": "RTS Widzew Lodz",
@@ -10438,6 +10753,11 @@
     "tipicoName": "Santa Cruz PFA",
     "apiTeamId": 26550,
     "apiTeamName": "Santa Cruz FC"
+  },
+  "santiago fc": {
+    "tipicoName": "Santiago FC",
+    "apiTeamId": 22055,
+    "apiTeamName": "FC Santiago"
   },
   "santos fc": {
     "tipicoName": "Santos FC",
@@ -10799,6 +11119,11 @@
     "apiTeamId": 2874,
     "apiTeamName": "Sharjah FC"
   },
+  "shb da nang": {
+    "tipicoName": "SHB Da Nang",
+    "apiTeamId": 3669,
+    "apiTeamName": "Da Nang"
+  },
   "shelbourne fc": {
     "tipicoName": "Shelbourne FC",
     "apiTeamId": 3854,
@@ -10959,6 +11284,11 @@
     "apiTeamId": 8622,
     "apiTeamName": "Sigma Olomouc II"
   },
+  "sk slavia prague c": {
+    "tipicoName": "SK Slavia Prague C",
+    "apiTeamId": 26232,
+    "apiTeamName": "Slavia III"
+  },
   "sk slavia praha": {
     "tipicoName": "SK Slavia Praha",
     "apiTeamId": 560,
@@ -11028,6 +11358,11 @@
     "tipicoName": "SKN St. Pölten (F)",
     "apiTeamId": 10227,
     "apiTeamName": "St. Pölten W"
+  },
+  "skyy fc": {
+    "tipicoName": "Skyy FC",
+    "apiTeamId": 21090,
+    "apiTeamName": "Skyy"
   },
   "sl benfica": {
     "tipicoName": "SL Benfica",
@@ -11544,6 +11879,11 @@
     "apiTeamId": 943,
     "apiTeamName": "Sydney"
   },
+  "sydney fc f": {
+    "tipicoName": "Sydney FC (F)",
+    "apiTeamId": 1968,
+    "apiTeamName": "Sydney FC W"
+  },
   "sydney fc u21": {
     "tipicoName": "Sydney FC U21",
     "apiTeamId": 3773,
@@ -11568,6 +11908,11 @@
     "tipicoName": "Tacuary Asuncion",
     "apiTeamId": 10491,
     "apiTeamName": "Tacuary"
+  },
+  "tafic fc": {
+    "tipicoName": "Tafic FC",
+    "apiTeamId": 5597,
+    "apiTeamName": "TAFIC"
   },
   "tai po fc": {
     "tipicoName": "Tai Po FC",
@@ -11618,6 +11963,11 @@
     "tipicoName": "Tapachula FC",
     "apiTeamId": 24954,
     "apiTeamName": "Tapachula"
+  },
+  "tarxien rainbows fc": {
+    "tipicoName": "Tarxien Rainbows FC",
+    "apiTeamId": 4629,
+    "apiTeamName": "Tarxien Rainbows"
   },
   "tatr oravske vesele": {
     "tipicoName": "Tatr. Oravske Vesele",
@@ -11864,6 +12214,11 @@
     "apiTeamId": 8188,
     "apiTeamName": "Czech Republic U21"
   },
+  "tsg 1899 hoffen f": {
+    "tipicoName": "TSG 1899 Hoffen. (F)",
+    "apiTeamId": 1858,
+    "apiTeamName": "1899 Hoffenheim W"
+  },
   "tsg hoffenheim": {
     "tipicoName": "TSG Hoffenheim",
     "apiTeamId": 167,
@@ -12089,6 +12444,11 @@
     "apiTeamId": 441,
     "apiTeamName": "Union Santa Fe"
   },
+  "union ksour essef": {
+    "tipicoName": "Union Ksour Essef",
+    "apiTeamId": 10649,
+    "apiTeamName": "Ksour Essef"
+  },
   "union minas": {
     "tipicoName": "Union Minas",
     "apiTeamId": 26867,
@@ -12098,6 +12458,11 @@
     "tipicoName": "Union Omaha SC",
     "apiTeamId": 10283,
     "apiTeamName": "Union Omaha"
+  },
+  "union rochefortoise": {
+    "tipicoName": "Union Rochefortoise",
+    "apiTeamId": 5914,
+    "apiTeamName": "Rochefort"
   },
   "union saint gilloise": {
     "tipicoName": "Union Saint-Gilloise",
@@ -12569,6 +12934,11 @@
     "apiTeamId": 8663,
     "apiTeamName": "Wealdstone"
   },
+  "welling phoenix f": {
+    "tipicoName": "Welling. Phoenix (F)",
+    "apiTeamId": 17905,
+    "apiTeamName": "Wellington Phoenix W"
+  },
   "welwalu adigrat": {
     "tipicoName": "Welwalu Adigrat",
     "apiTeamId": 4125,
@@ -12669,6 +13039,11 @@
     "apiTeamId": 1837,
     "apiTeamName": "Wrexham"
   },
+  "ws wanderers fc f": {
+    "tipicoName": "WS Wanderers FC (F)",
+    "apiTeamId": 1974,
+    "apiTeamName": "Western Sydney Wanderers W"
+  },
   "wsg tirol": {
     "tipicoName": "WSG Tirol",
     "apiTeamId": 1398,
@@ -12738,6 +13113,11 @@
     "tipicoName": "Young Apostles FC",
     "apiTeamId": 22783,
     "apiTeamName": "Young Apostles"
+  },
+  "yuksa tarasivka": {
+    "tipicoName": "Yuksa Tarasivka",
+    "apiTeamId": 21957,
+    "apiTeamName": "UCSA"
   },
   "yverdon sport fc": {
     "tipicoName": "Yverdon Sport FC",
