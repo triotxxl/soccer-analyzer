@@ -1,6 +1,6 @@
 ---
 name: betting-ux
-description: Fachwissen für UI/UX-Arbeit an der React-App dieses Fußball-Analyzers - welche Ansicht welche Aufgabe hat, wie Quote, Wahrscheinlichkeit, Vorteil (Value/Edge), Kelly und Einsatz zusammenhängen und wo die App sie bewusst versteckt, welche Information Vorrang hat, welches Bedienelement wofür passt und wie ein UX-Review aufgebaut ist. Laden, bevor eine Ansicht, Komponente, Beschriftung oder ein Ablauf in `frontend/src/` geprüft, entworfen oder umgebaut wird. Ergänzt `ui-ux-pro-max` (allgemeine UX-Regeln) um die Wett-Domäne und die Entscheidungen dieses Projekts.
+description: Fachwissen für UI/UX-Arbeit an der React-App dieses Fußball-Analyzers - welche Ansicht welche Aufgabe hat, wie Quote, Wahrscheinlichkeit, Vorteil (Value/Edge), Kelly und Einsatz zusammenhängen und wo die App sie bewusst versteckt, welche Information Vorrang hat, welches Bedienelement wofür passt und wie ein UX-Review aufgebaut ist. Laden, bevor eine Ansicht, Komponente, Beschriftung oder ein Ablauf in `apps/analyzer/src/` geprüft, entworfen oder umgebaut wird. Ergänzt `ui-ux-pro-max` (allgemeine UX-Regeln) um die Wett-Domäne und die Entscheidungen dieses Projekts.
 ---
 
 # Betting UX für den Fußball-Analyzer
@@ -28,7 +28,7 @@ verfolgen.
 ## Feste Regeln (Kurzfassung - Details in den Referenzen)
 
 1. **Das Design-System hat Vorrang.** Farben, Abstände, Schrift und Bausteine kommen aus
-   `frontend/src/styles.css` und den vorhandenen Komponenten. Keine neuen Paletten, Schriften oder
+   `apps/analyzer/src/styles.css` (Farben in `apps/shared/styles/base.css`) und den vorhandenen Komponenten. Keine neuen Paletten, Schriften oder
    Icon-Sätze; wer einen Baustein für ungeeignet hält, begründet das.
 2. **Sichtbare Texte in einfacher Sprache** nach dem Wörterbuch in `AGENTS.md` („Sprache der
    sichtbaren Texte"). Kelly, Value, Edge, xG/xGA, BTTS, H2H bleiben als Namen, brauchen je Ansicht
@@ -42,7 +42,7 @@ verfolgen.
 5. **Kein Vorschlag verändert Tipp, Wahrscheinlichkeit oder Empfehlungsstufe.** Die UI zeigt, was das
    Modell rechnet; sie rechnet nichts um.
 6. **Textänderungen ziehen Tests nach.** Rund 1.000 Text-, Rollen- und Attributabfragen in
-   `frontend/src/*.test.tsx` (Stand 11.10.2026); jede geänderte Beschriftung nennt die betroffenen
+   `apps/analyzer/src/*.test.tsx` (Stand 11.10.2026); jede geänderte Beschriftung nennt die betroffenen
    Tests, Negativabfragen (`not.toBeInTheDocument`) eingeschlossen - sie laufen nach einer
    Umbenennung sonst still ins Leere.
 7. **Kein Umbau aus Prinzip.** Was funktioniert, wird als solches benannt und bleibt.

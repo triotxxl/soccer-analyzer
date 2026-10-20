@@ -5,6 +5,10 @@ Endpunkte. Nutzer ist David allein, am Desktop, dunkles Layout. Die App ist **ta
 es gibt keine „Match Cards" im üblichen Sinn; die kleinste Einheit ist die **Tabellenzeile** mit
 ihren Marktzellen (`MarketCard`).
 
+Dateien liegen in `apps/analyzer/src/`; Datentypen, Datenladen (`data.ts`, `liveData.ts`), Namen
+(`names.ts`), Wappen (`TeamCrest.tsx`) und Flaggen (`countryFlags.ts`) in `apps/shared/src/`, weil
+auch das Neo Dashboard (`apps/neo/`, `npm run neo`) sie nutzt.
+
 So lesen: Die Übersicht genügt, um die Ansicht zu finden. Danach nur den Abschnitt der geprüften
 Ansicht unter „Einzelheiten je Ansicht“ lesen, dazu immer „Was schon bewusst versteckt oder zurückgenommen ist“ und
 „Design-System“.
@@ -182,6 +186,21 @@ Ansicht unter „Einzelheiten je Ansicht“ lesen, dazu immer „Was schon bewus
   Filters; leer: Leersatz plus die drei häufigsten Gründe; Aufklapper „Woran die übrigen n Spiele
   scheitern“). Die Sortierung beginnt mit `preset.defaultSort` (nur „Kombi-Tipps“ startet mit
   Stärke, alle anderen mit Anstoß).
+- **Wettschein-Knopf je Zeile** (seit 19.10.2026, Davids Entscheidung nach dem Review des
+  UX-Agenten): links **neben** der Zeile (kein Knopf im Knopf), gebaut wie „+“ der Tabelle (24 px);
+  liegt genau dieser Tipp im Wettschein (`hasTip`), zeigt er „−“ mit grünem Balken unten und nimmt
+  ihn heraus. Gesperrt bei angepfiffen, ≈-Quote oder ohne Tipp. Name „Zum Wettschein hinzufügen: …“
+  / „Aus dem Wettschein nehmen: …“ - **bewusst ohne „in den Wettschein“**, damit der Sammelknopf
+  eindeutig bleibt. Einzel- und Sammelknopf legen über `quickpickCartEntry` (`betCart.ts`)
+  denselben Tipp. Aufgeklappt zusätzlich „In der Tabelle zeigen ›“ (schließt, Filter an, Spiel
+  aufgeklappt, hingescrollt und fokussiert; das Aufklappen lädt wie ein Klick auf die Zeile beim
+  ersten Mal die Detailkennzahlen, rund 4 Aufrufe). Steht das Spiel wegen Suche oder Filtermenü
+  nicht in der Tabelle, steht dort grau „In der Tabelle ausgeblendet (Suche oder Filter)“.
+- **In der Tabelle** steht bei aktivem Quickpick unter den Teams grau „Quickpick 1,90 · Auswärtssieg
+  Maccabi Tel Aviv“ (`QuickpickTableTip`, Tipp im Wortlaut des Wettscheins über
+  `selectionLabel`; Quote vorn, weil die Spalte hinten abschneidet; ohne
+  Modellchance, ohne Vorteil, ≈ bleibt). Die Zeile wächst dadurch von 62 auf 77 px, nur solange der
+  Filter wirkt (gemessen bei 1463 px).
 - **„Kombi-Tipps ab 1,60“** (seit 14.10.2026, Gruppe „Tipico-Filter“): je Spiel ein Tipp aus allen
   Wettarten nach der Chance laut Tipico. Zeile: Tipp im Wortlaut des Wettscheins („Über 2,5 ·
   Mindestens 3 Tore“, „Auswärtssieg Gast FC“), Stärke „Tipico 57 %“, Quote (kein Hinweis
@@ -192,13 +211,18 @@ Ansicht unter „Einzelheiten je Ansicht“ lesen, dazu immer „Was schon bewus
   Kopf sagt dann „· die besten n von m“. Unter der Liste leise „n auffällige Spiele weggelassen ›“ (nur Spiele im Quotenbereich der Stufe),
   aufgeklappt Anstoß · Spiel · Grund ohne Tipp, Quote und Prozentzahlen (`kombiFlagLabel`; ein großer
   Abstand Modell/Tipico heißt dort „meist ein Fehler des Modells oder der Daten“).
-- Fuß: **Warnzeile `warnung` immer sichtbar**, „n ohne echte Quote“, „n schon angepfiffen“ (beide
-  nicht in den Wettschein), einziger gefüllter Knopf „Alle n in den Wettschein“ (hell auf dunkel).
-  Danach **bleibt der Quickpicker offen** (seit 11.10.2026) und zeigt darüber eine Statuszeile
-  „**n** neu im Wettschein · **r** ersetzt · **u** schon drin · Rückgängig · Wettschein öffnen ›“
-  (Teile mit 0 fallen weg, Tooltip auf „ersetzt“ nennt Spiel und alten Tipp; weg bei
-  Filterwechsel und Schließen; „Rückgängig“ nur, solange nichts anderes am Wettschein geändert
-  wurde).
+- Fuß: oben **immer** der Stand „Wettschein: **n** Tipps aus **s** Spielen · deine Kombis brauchen
+  **p** Plätze · Wettschein ansehen ›“ (ohne Größen ohne Plätze, leer „Wettschein: noch leer“; seit
+  19.10.2026 - so bleibt beim Einsammeln aus mehreren Filtern der Überblick). Darunter nach einem
+  Klick „Zuletzt: **n** neu im Wettschein · **r** ersetzt · **u** schon drin · Rückgängig“ (Teile
+  mit 0 fallen weg, Tooltip auf „ersetzt“ nennt Spiel und alten Tipp; **bleibt beim
+  Filterwechsel**, weg beim Schließen und beim Herausnehmen einzeln; „Rückgängig“ nur, solange
+  nichts anderes am Wettschein geändert wurde). Dann **Warnzeile `warnung` immer sichtbar**, „n
+  ohne echte Quote“, „n schon angepfiffen“, Nebenknopf „Tabelle zeigen“ (schließt, Filter an) und
+  der einzige gefüllte Knopf: „Alle n in den Wettschein“, teils drin „k weitere in den
+  Wettschein“ (zählt nur Neues), alles drin gesperrt „Alle n schon im Wettschein“. Der Quickpicker
+  **bleibt offen** (seit 11.10.2026). Die Plätze stehen bei „Nur die besten“ nur im Tooltip - eine
+  eigene Angabe im Kopf schob die Sortierung aus dem Fenster.
 - **Jede Wahl** (Filter, auch der schon gewählte, Stufe, Regler, Schalter, Zurücksetzen) schaltet
   „Tabelle filtern“ ein; Sortieren und Aufklappen nicht. Kein Blau außer Fokus, kein Grün in
   Datenzellen.
@@ -226,7 +250,9 @@ Ansicht unter „Einzelheiten je Ansicht“ lesen, dazu immer „Was schon bewus
 - Darunter zwei Spalten 2 : 3, jede scrollt für sich.
 - Links Karte **Tipps**: je Spiel nach Anstoß zwei Zeilen - Anstoß, Spiel, Liga rechts (nur die
   Liga gekürzt, voller Name im Tooltip), darunter je Tipp Auswahl (1X2 mit Mannschaft: „Heimsieg
-  Bayern“), ✓/★, Quote, ✕; angepfiffen bzw. ohne Quote grau („kommt in keine Kombi“), „k
+  Bayern“), darunter grau die Herkunft „aus Daves 1x2-Filter“ (`CartEntry.source`, seit
+  19.10.2026, nur bei Tipps aus dem Quickpicker; gemischt wird trotzdem über alle Filter
+  zusammen), ✓/★, Quote, ✕; angepfiffen bzw. ohne Quote grau („kommt in keine Kombi“), „k
   angepfiffen … · Entfernen“ (mit Rückgängig), „2 Tipps aus einem Spiel – in eine Kombi kommt nur
   einer“.
 - Rechts Karte **Kombis (k)** mit „Alle kopieren“; ohne Kombis „Noch keine Kombis. Wähle oben die
@@ -244,7 +270,8 @@ Ansicht unter „Einzelheiten je Ansicht“ lesen, dazu immer „Was schon bewus
   „Kopiert“ (kein Häkchen) plus Live-Region. Ohne Zwischenablage: markiertes Textfeld mit
   „Kopieren ging nicht. … Strg+C.“ und ✕. Kopieren markiert **nicht** als übertragen.
 - Fuß: **Warnung immer sichtbar** („Eine Kombi geht nur durch, wenn jeder Tipp stimmt … Rechne
-  nicht mit Gewinn.“), einziger gefüllter Knopf „Kombis mischen“.
+  nicht mit Gewinn.“), einziger gefüllter Knopf „k Kombis mischen“ (die Zahl nur, wenn das Mischen
+  geht; gesperrt „Kombis mischen“).
 - Regeln: **je Kombi höchstens ein Tipp pro Spiel**, **Gegensätze ersetzen einander** beim
   Hineinlegen (Remis ↔ Sieger, Über ↔ Unter; über `marketsExcludeEachOther`), angepfiffene Tipps
   und Tipps ohne Quote sind nicht mischbar, übertragene Kombis bleiben beim Neumischen stehen (bei
@@ -307,7 +334,7 @@ machen, ohne den Grund zu kennen:
 - Elo klein und grau, Details im Tooltip; es ist ausdrücklich unverbindlich.
 - Klassenunterschied als Kürzel mit Pfeil, Quelle im Tooltip.
 - Die Reihenfolge der Panels in der Detailansicht ist festgelegt und getestet
-  (`frontend/src/.struktur.test.tsx`): Torphasen, Direkte Begegnungen, Match-Statistiken, Trends.
+  (`apps/analyzer/src/.struktur.test.tsx`): Torphasen, Direkte Begegnungen, Match-Statistiken, Trends.
 - Einsteiger-Banner ist wegklickbar und bleibt weg.
 - Filter liegen im Filtermenü, das meist zu ist (27.09.2026, ersetzt die Filterspalte). Damit dabei
   kein Filter unbemerkt Spiele versteckt, steht jeder als Schildchen unter der Werkzeugleiste, und
@@ -331,7 +358,7 @@ machen, ohne den Grund zu kennen:
 
 ## Design-System
 
-Tokens in `frontend/src/styles.css` (`:root`): `--bg`, `--shell`, `--surface`, `--surface-2`,
+Tokens in `apps/shared/styles/base.css` (`:root`): `--bg`, `--shell`, `--surface`, `--surface-2`,
 `--line`, `--line-soft`, `--text`, `--muted`, `--dim`, `--accent`, `--accent-soft`, `--green`,
 `--gold`, `--red`, `--home`, `--away`, `--mono`. Schrift durchgehend JetBrains Mono. Icons:
 Phosphor (`@phosphor-icons/react`, z. B. `ListBullets`, `Star`, `CheckCircle`, `Crosshair`).
@@ -358,7 +385,7 @@ Vorschlag nutzt die Tokens und kann das als Befund nennen, erfindet aber keine n
 
 ## Tests, die Oberfläche festhalten
 
-`frontend/src/App.test.tsx`, `FixtureInsights.test.tsx`, `QuickpickUI.test.tsx`,
+`apps/analyzer/src/App.test.tsx`, `FixtureInsights.test.tsx`, `QuickpickUI.test.tsx`,
 `KellyUI.test.tsx`, `LiveView.test.tsx`, `MarketProfileUI.test.tsx`, `BetCartUI.test.tsx`,
 `TeamCrest.test.tsx`, `.struktur.test.tsx`. Sie fragen konkrete Texte, Rollen und `aria-label` ab.
 Wer einen Text, eine Rolle oder eine Reihenfolge ändert, nennt die Stellen dort.

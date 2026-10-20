@@ -51,7 +51,10 @@ export const BLOCKED_SCRIPTS: Readonly<Record<string, string>> = {
   "add-tipico-names": "schreibt in die Dashboard-Snapshots unter output/",
   app: "startet den Server der App",
   "app:build": "schreibt den Build der App",
-  "app:preview": "startet einen Server"
+  "app:preview": "startet einen Server",
+  neo: "startet den Server des Neo Dashboards",
+  "neo:build": "schreibt den Build des Neo Dashboards",
+  "neo:preview": "startet einen Server"
 };
 
 /**

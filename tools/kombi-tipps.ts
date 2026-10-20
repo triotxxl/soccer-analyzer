@@ -18,7 +18,7 @@
  * frühere Liste getroffen hat. Eine einzelne Liste beweist nichts; maßgeblich ist `--messen`.
  *
  * Liest nur den Snapshot und die Datenbank (`readOnly`), kostet kein API-Budget und schreibt
- * nichts. Regel und Messstand: `src/kombi-tipps.ts`; Arbeitsanleitung: Skill `kombi-tipps`.
+ * nichts. Regel und Messstand: `src/kombi-tipps.ts`; Hintergrund: AGENTS.md, „Kombi-Auswahl nach fairem Preis“.
  */
 import fs from "node:fs";
 import path from "node:path";

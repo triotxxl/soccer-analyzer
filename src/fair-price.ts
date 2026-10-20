@@ -11,7 +11,7 @@
  * Entfernt wird der Aufschlag proportional (Zweiweg normiert, Dreiweg aus Heim/Remis/Gast). Mit
  * additiver Entfernung kam in der Prüfung dasselbe heraus.
  *
- * Reine Funktion, damit App (`frontend/src/kelly.ts`) und Nachspielung (`tools/edge-report.ts`)
+ * Reine Funktion, damit App (`apps/analyzer/src/kelly.ts`) und Nachspielung (`tools/edge-report.ts`)
  * dieselbe Rechnung benutzen.
  */
 import type { DashboardFixture, DashboardMarket } from "./dashboard.ts";

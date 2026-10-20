@@ -1,7 +1,7 @@
 /**
  * Kombi-Auswahl nach fairem Tipico-Preis: je Spiel der Tipp, den Tipico (ohne Aufschlag) am
  * wahrscheinlichsten hält, unter einer Mindestquote. Aufgerufen von `tools/kombi-tipps.ts`, dort
- * auch die Messung an alten Spielen; Arbeitsanleitung im Skill `.claude/skills/kombi-tipps/`.
+ * auch die Messung an alten Spielen; Hintergrund in AGENTS.md, „Kombi-Auswahl nach fairem Preis“.
  * Zweiter Aufrufer ist die Quickpick-Voreinstellung „Kombi-Tipps ab 1,60“
  * (`src/quickpick-kombi.ts`): dieselbe Regel mit Mindestquote 1,60 ohne Vorliebe, aber **ohne
  * die Anstoßprüfung**, weil der Snapshot die Tipico-Anstoßzeit nicht trägt (an alten Spielen

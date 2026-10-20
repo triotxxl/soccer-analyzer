@@ -1,0 +1,43 @@
+/* Gemeinsame Grundlage aller Apps: Farben, Schrift, Reset. App-eigene Stile stehen in der
+   styles.css der jeweiligen App und bauen auf diesen Tokens auf. */
+:root {
+  color-scheme: dark;
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  background: #181818;
+  color: #d4d4d4;
+  font-synthesis: none;
+  --bg: #181818;
+  --shell: #1e1e1e;
+  --surface: #252526;
+  --surface-2: #2d2d30;
+  --line: #3c3c3c;
+  --line-soft: #2b2b2b;
+  --text: #d4d4d4;
+  --muted: #a0a0a0;
+  --dim: #868686;
+  --accent: #3794ff;
+  --accent-soft: #1f3a4d;
+  --green: #89d185;
+  --gold: #cca700;
+  --red: #f14c4c;
+  --home: #75beff;
+  --away: #ce9178;
+  --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+* { box-sizing: border-box; }
+html, body, #root { min-height: 100%; margin: 0; }
+body { min-width: 320px; background: radial-gradient(900px 520px at 6% -6%, rgba(255,255,255,.035), transparent 60%), var(--bg); }
+button, input, select { font: inherit; }
+button { color: inherit; cursor: pointer; }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: #424242; border-radius: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+
+.visually-hidden { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+
+/* Wappen (shared/src/TeamCrest.tsx); im Analyzer halten Übersicht und Torphasen-Zeilen dafür
+   eine 16px-Spalte. Größen je Ort stehen in der App. */
+.team-crest { width: 16px; height: 16px; flex: 0 0 auto; object-fit: contain; }
+.team-crest.fallback { display: grid; place-items: center; border-radius: 4px; background: rgba(255,255,255,.07); color: #8a8a8a; font-size: 7px; font-weight: 700; }

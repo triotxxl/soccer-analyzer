@@ -212,7 +212,7 @@ function printCellLedger(profile: MarketProfile): void {
  *
  * - Profil nur aus Spielen, die vor dem Snapshot abgerechnet waren (`settledAt`),
  * - Umfang „nächste 48 Std.“ ab dem Snapshot,
- * - `selectKelly` aus `frontend/src/kelly.ts` mit Automatik und `now` = Snapshot,
+ * - `selectKelly` aus `apps/analyzer/src/kelly.ts` mit Automatik und `now` = Snapshot,
  * - je Spiel die erste Sichtung, abgerechnet mit `decideMarket`,
  * - gemessen gegen den fairen Tipico-Preis (`src/fair-price.ts`).
  *
@@ -292,7 +292,7 @@ function printReplayLine(label: string, bets: ReplayBet[]): void {
 }
 
 async function simulate(): Promise<void> {
-  const kellyUrl = pathToFileURL(path.join(ROOT_DIR, "frontend", "src", "kelly.ts")).href;
+  const kellyUrl = pathToFileURL(path.join(ROOT_DIR, "apps", "analyzer", "src", "kelly.ts")).href;
   const kelly = await import(kellyUrl) as KellyModule;
   const outcomes = readOutcomes();
   const withOneXTwo = process.argv.includes("--mit-1x2");

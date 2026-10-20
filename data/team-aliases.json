@@ -1139,6 +1139,11 @@
     "apiTeamId": 528,
     "apiTeamName": "Avellino"
   },
+  "as elfen saitama f": {
+    "tipicoName": "AS Elfen Saitama (F)",
+    "apiTeamId": 16946,
+    "apiTeamName": "Elfen Saitama W"
+  },
   "as giana erminio": {
     "tipicoName": "AS Giana Erminio",
     "apiTeamId": 865,
@@ -4178,6 +4183,11 @@
     "tipicoName": "Farul Constanta (F)",
     "apiTeamId": 22192,
     "apiTeamName": "Farul Constanţa W"
+  },
+  "fasil kenema": {
+    "tipicoName": "Fasil Kenema",
+    "apiTeamId": 4117,
+    "apiTeamName": "Fasil Ketema"
   },
   "fc ajka": {
     "tipicoName": "FC Ajka",
@@ -7494,6 +7504,11 @@
     "apiTeamId": 1004,
     "apiTeamName": "Kasımpaşa"
   },
+  "kataka fc": {
+    "tipicoName": "Kataka FC",
+    "apiTeamId": 28319,
+    "apiTeamName": "Kataka"
+  },
   "katar u23": {
     "tipicoName": "Katar U23",
     "apiTeamId": 10954,
@@ -7538,6 +7553,11 @@
     "tipicoName": "Kenia",
     "apiTeamId": 1511,
     "apiTeamName": "Kenya"
+  },
+  "kenya police fc": {
+    "tipicoName": "Kenya Police FC",
+    "apiTeamId": 2485,
+    "apiTeamName": "Kenya Police"
   },
   "kerala blasters fc": {
     "tipicoName": "Kerala Blasters FC",
@@ -8824,6 +8844,11 @@
     "apiTeamId": 412,
     "apiTeamName": "MVV"
   },
+  "mynavi sendai f": {
+    "tipicoName": "MyNavi Sendai (F)",
+    "apiTeamId": 16956,
+    "apiTeamName": "Vegalta Sendai W"
+  },
   "mzks arka gdynia": {
     "tipicoName": "MZKS Arka Gdynia",
     "apiTeamId": 344,
@@ -9243,6 +9268,11 @@
     "tipicoName": "NK Zagora",
     "apiTeamId": 5731,
     "apiTeamName": "Zagora"
+  },
+  "nojima sks f": {
+    "tipicoName": "Nojima SKS (F)",
+    "apiTeamId": 16949,
+    "apiTeamName": "Nojima Stella W"
   },
   "nordirland": {
     "tipicoName": "Nordirland",

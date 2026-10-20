@@ -21,6 +21,10 @@ Die Darstellung läuft als lokale React-/Vite-App. Starte sie in einem zweiten T
 npm run app
 ```
 
+Ein zweites Dashboard (Neo) startet mit `npm run neo` auf http://localhost:5174 und liest
+dieselben Daten. Beide Apps liegen unter `apps/` (`analyzer`, `neo`, gemeinsame Bausteine in
+`shared`).
+
 Die App liest ausschließlich den neuesten JSON-Lauf und aktualisiert sich automatisch,
 wenn eine neue Analyse im Chat abgeschlossen wurde.
 

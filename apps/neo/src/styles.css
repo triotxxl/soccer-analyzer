@@ -1,0 +1,10 @@
+/* Eigene Stile des Neo Dashboards. Farben und Schrift kommen aus apps/shared/styles/base.css. */
+.neo-shell { max-width: 1100px; margin: 0 auto; padding: 24px 16px; }
+.neo-header { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; margin-bottom: 16px; }
+.neo-header h1 { margin: 0; font-size: 20px; color: var(--text); }
+.neo-muted { color: var(--muted); font-size: 13px; }
+.neo-list { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.neo-row { display: grid; grid-template-columns: 150px minmax(0, 1fr) minmax(0, 1fr); align-items: center; gap: 16px; padding: 10px 14px; border: 1px solid var(--line-soft); border-radius: 10px; background: var(--surface); }
+.neo-row time { color: var(--dim); font-size: 13px; }
+.neo-teams { display: grid; gap: 4px; }
+.neo-teams > span { display: flex; align-items: center; gap: 8px; }
