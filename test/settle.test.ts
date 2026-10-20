@@ -5,7 +5,7 @@ import path from "node:path";
 import test from "node:test";
 import type { ApiFootballClient } from "../src/api.ts";
 import { AnalyzerDatabase } from "../src/database.ts";
-import { settleFixtures } from "../src/settle.ts";
+import { settleFixtures, settlementDeferral } from "../src/settle.ts";
 import type { GoalLineRow } from "../src/types.ts";
 import { event, fixture, teamStatistics } from "./helpers.ts";
 
@@ -167,5 +167,40 @@ test("die Abrechnung speichert die Ergebnisdaten, ohne mehr Aufrufe zu brauchen"
   assert.equal(row.home_possession_ht2, 50);
   assert.equal(row.half_stats_status, "available");
   assert.equal(row.source, "api");
+  database.close();
+});
+
+test("Wiedervorlage: verlegt bis nach dem neuen Termin, verschoben drei Tage, gewertet nie wieder", () => {
+  const now = new Date("2026-10-20T12:00:00.000Z");
+  const at = (iso: string, status: string) => fixture({ id: 1, timestamp: Date.parse(iso) / 1000, homeId: 1, awayId: 2, status });
+  // Levante - Athletic: vom 16.09. auf den 21.10. verlegt, steht wieder auf NS.
+  assert.deepEqual(settlementDeferral(at("2026-10-21T18:00:00.000Z", "NS"), now), { status: "NS", nextCheck: "2026-10-21T19:50:00.000Z" });
+  assert.deepEqual(settlementDeferral(at("2026-10-15T18:00:00.000Z", "PST"), now), { status: "PST", nextCheck: "2026-10-23T12:00:00.000Z" });
+  assert.deepEqual(settlementDeferral(at("2026-10-10T10:00:00.000Z", "ABD"), now), { status: "ABD", nextCheck: "2026-10-23T12:00:00.000Z" });
+  // Persiku - PSIS am grünen Tisch gewertet: Es gibt kein gespieltes Ergebnis.
+  assert.deepEqual(settlementDeferral(at("2026-09-27T08:30:00.000Z", "AWD"), now), { status: "AWD", nextCheck: null });
+  assert.deepEqual(settlementDeferral(undefined, now), { status: "MISSING", nextCheck: "2026-10-27T12:00:00.000Z" });
+  // NS mit vorbeigegangenem Termin: Der Status der API hängt nur hinterher - beim nächsten Mal wieder.
+  assert.equal(settlementDeferral(at("2026-10-19T18:00:00.000Z", "NS"), now), null);
+  assert.equal(settlementDeferral(at("2026-10-20T10:30:00.000Z", "2H"), now), null);
+});
+
+test("Zurückgestellte Spiele fragt die Abrechnung erst zur Wiedervorlage wieder ab", async () => {
+  const database = await databaseWithDueFixtures([[1101, "2026-01-01T12:00:00.000Z"], [1102, "2026-01-01T15:00:00.000Z"]]);
+  const seen: number[] = [];
+  const client = {
+    requestCount: 0,
+    getFixture: async function (this: { requestCount: number }, id: number) {
+      this.requestCount += 1;
+      seen.push(id);
+      return [fixture({ id, timestamp: Date.parse(id === 1101 ? "2026-01-20T18:00:00.000Z" : "2026-01-01T15:00:00.000Z") / 1000, homeId: 1, awayId: 2, status: id === 1101 ? "NS" : "AWD" })];
+    },
+    getFixtureStatistics: async () => []
+  } as unknown as ApiFootballClient;
+  const first = await settleFixtures({ client, database, now: new Date("2026-01-02T00:00:00.000Z") });
+  assert.equal(first.deferred, 2);
+  assert.deepEqual(database.unsettledFixtures(new Date("2026-01-10T00:00:00.000Z")), []);
+  // Nach dem neuen Termin ist das verlegte Spiel wieder fällig, das gewertete nie.
+  assert.deepEqual(database.unsettledFixtures(new Date("2026-01-21T00:00:00.000Z")), [1101]);
   database.close();
 });

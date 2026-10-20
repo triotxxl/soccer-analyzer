@@ -514,3 +514,16 @@ test("Zusammenführung trennt auch: eine fremde Mannschaft unter geteilter ID be
   // Ohne Namen bleibt der Name aus dem Spiel.
   assert.equal(mergeTeams(match("Suriname", 3), [{ from: 687, to: 1, note: "Test" }]).homeName, "Flora Tallinn");
 });
+
+test("Trennung nach Liga und Zeitraum: zweite Mannschaft nur in ihrer Liga und Zeit", () => {
+  const match = (leagueId: number, iso: string): EloMatch => ({
+    fixtureId: leagueId, kickoff: Date.parse(iso), leagueId, leagueName: "Liga", leagueType: "League", country: "Spain",
+    season: 2025, homeId: 9410, homeName: "Recreativo Huelva", awayId: 9, awayName: "Gegner", homeGoals: 1, awayGoals: 0
+  });
+  const split = [{ from: 9410, to: -9410, leagues: [448], since: "2025-07-01T00:00:00Z", until: "2027-01-01T00:00:00Z", name: "Recreativo Huelva II", note: "Test" }];
+  assert.equal(mergeTeams(match(448, "2025-10-05T12:00:00Z"), split).homeId, -9410);
+  // Dieselbe Liga 2021/22 war die erste Mannschaft selbst, eine andere Liga bleibt ohnehin.
+  assert.equal(mergeTeams(match(448, "2021-10-03T12:00:00Z"), split).homeId, 9410);
+  assert.equal(mergeTeams(match(878, "2025-10-05T12:00:00Z"), split).homeId, 9410);
+  assert.equal(mergeTeams(match(448, "2027-02-01T12:00:00Z"), split).homeId, 9410);
+});

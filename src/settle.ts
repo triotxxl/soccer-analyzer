@@ -2,6 +2,7 @@ import { ApiFootballClient } from "./api.ts";
 import { config } from "./config.ts";
 import { AnalyzerDatabase } from "./database.ts";
 import { toFixtureResult } from "./fixture-result.ts";
+import type { ApiFixture } from "./types.ts";
 import { parseExpectedGoals } from "./xg.ts";
 
 export interface SettleResult {
@@ -9,6 +10,8 @@ export interface SettleResult {
   due: number;
   /** Tatsächlich abgefragte Partien. */
   checked: number;
+  /** Davon zurückgestellt: verlegt, verschoben, abgebrochen, gewertet oder unbekannt. */
+  deferred: number;
   /** Abgerechnete Prognosezeilen. */
   settled: number;
   /** Partien, deren Ergebnisdaten gespeichert wurden. */
@@ -17,6 +20,39 @@ export interface SettleResult {
   halfStatistics: number;
   apiRequests: number;
   budgetReached: boolean;
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+/** Erst so lange nach dem neuen Anpfiff ist ein verlegtes Spiel beendet (wie `unsettledFixtures`). */
+const AFTER_KICKOFF_MS = 110 * 60 * 1000;
+/** Gewertet oder abgesagt: Es gibt nie ein gespieltes Ergebnis. */
+const VOID_STATUSES = new Set(["AWD", "WO", "CANC"]);
+/** Verschoben, unterbrochen, abgebrochen: Ein neuer Termin oder eine Wertung kommt später. */
+const PENDING_STATUSES = new Set(["PST", "SUSP", "INT", "ABD"]);
+const PENDING_RECHECK_MS = 3 * DAY_MS;
+const MISSING_RECHECK_MS = 7 * DAY_MS;
+
+/**
+ * Wann ein nicht beendetes Spiel wieder abgefragt wird - oder `null`, wenn es beim nächsten Mal
+ * wieder dran ist. Bis 20.10.2026 fragte jede Abrechnung alle offenen Spiele erneut ab, ein Aufruf
+ * je Spiel und Analyse; am 20.10. waren es 24 seit bis zu zwei Monaten (12 verlegt, 8 verschoben,
+ * 2 abgebrochen, 3 unterbrochen, 1 gewertet, 1 bei API-Football gelöscht). Ein Spiel auf „NS“ mit
+ * vorbeigegangenem Termin bleibt offen: Dort hängt meist nur der Status der API hinterher.
+ * Ein verlegtes Spiel wird nach dem neuen Termin abgerechnet; die Prognose stammt dann von vor dem
+ * ursprünglichen Termin und bleibt eine echte Vorhersage.
+ */
+export function settlementDeferral(fixture: ApiFixture | undefined, now: Date): { status: string; nextCheck: string | null } | null {
+  const at = (ms: number) => new Date(ms).toISOString();
+  if (!fixture) return { status: "MISSING", nextCheck: at(now.getTime() + MISSING_RECHECK_MS) };
+  const status = fixture.fixture.status.short.toUpperCase();
+  if (VOID_STATUSES.has(status)) return { status, nextCheck: null };
+  const kickoff = Date.parse(fixture.fixture.date);
+  const rescheduled = Number.isFinite(kickoff) && kickoff > now.getTime();
+  if (rescheduled && (PENDING_STATUSES.has(status) || status === "NS" || status === "TBD")) {
+    return { status, nextCheck: at(kickoff + AFTER_KICKOFF_MS) };
+  }
+  if (PENDING_STATUSES.has(status)) return { status, nextCheck: at(now.getTime() + PENDING_RECHECK_MS) };
+  return null;
 }
 
 /**
@@ -54,8 +90,10 @@ export async function settleFixtures(options: {
   const requestBudget = options.requestBudget ?? null;
   const concurrency = Math.max(1, options.concurrency ?? config.settleConcurrency);
   const requestStart = client.requestCount;
-  const fixtureIds = database.unsettledFixtures(options.now ?? new Date());
+  const now = options.now ?? new Date();
+  const fixtureIds = database.unsettledFixtures(now);
   let checked = 0;
+  let deferred = 0;
   let settled = 0;
   let results = 0;
   let halfStatistics = 0;
@@ -64,6 +102,12 @@ export async function settleFixtures(options: {
   async function settleOne(fixtureId: number): Promise<void> {
     const fixture = (await client.getFixture(fixtureId, true))[0];
     checked += 1;
+    const deferral = settlementDeferral(fixture, now);
+    if (deferral) {
+      database.deferSettlement(fixtureId, deferral.status, deferral.nextCheck, now.toISOString());
+      deferred += 1;
+      return;
+    }
     if (!fixture || !["FT", "AET", "PEN"].includes(fixture.fixture.status.short)) return;
     // `half` kostet keinen zusätzlichen Aufruf: Es ist dieselbe Anfrage, die zusätzlich
     // `statistics_1h` und `statistics_2h` mitbringt. Nur `/fixtures/statistics` kennt den
@@ -129,6 +173,7 @@ export async function settleFixtures(options: {
   return {
     due: fixtureIds.length,
     checked,
+    deferred,
     settled,
     results,
     halfStatistics,

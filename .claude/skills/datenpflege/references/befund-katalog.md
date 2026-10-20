@@ -57,8 +57,19 @@ Guerdane gehörten nicht dazu).
   Ansetzungen heute, `countries` beschränkt auf die zugehörigen Länder (+ `"World"`, wenn die
   internationalen Spiele dazugehören), `exceptFixtures` für einzelne fremde Spiele, `name`.
 - Trennung (fremder Verein unter der eigenen ID): `from` = geteilte ID, `to` = **negative** eigene
-  ID, `countries` = Land des fremden Vereins, `name` Pflicht („Flora (Suriname)“).
+  ID, `countries` = Land des fremden Vereins, `name` Pflicht („Flora (Suriname)“). Ein zweites
+  fremdes Land derselben ID bekommt `-(ID·10+1)`.
+- Selbes Land, zweite Mannschaft oder gleichnamiger Klub: `leagues` mit der Liga der anderen
+  Mannschaft. **Vorher die Saisons je Liga ansehen** (`GROUP BY league_id, season`): Spielt die
+  erste Mannschaft nach Auf- oder Abstieg selbst in dieser Liga, braucht es `since`/`until` -
+  Recreativo Huelva spielte 2021/22 selbst in der Tercera (Reserve erst ab 2025/26), Talavera nur
+  2022/23 parallel, die SC Wanderers 2026 nach dem Abstieg selbst in der Queensland Premier League.
+- Welche Wettbewerbe kollidieren, zeigt eine Auflistung der Doppel-Spieltage je Paar
+  („Liga A + Liga B ×n [erster..letzter Tag]“) - abgetrennt wird die Liga, die im Paar wechselt.
 - Kommentar mit Beleg und Datum, dann `npm run elo -- build`.
+- **Nicht trennbar** (beide Mannschaften im selben Wettbewerb, doppelt geführte Pokalspiele):
+  mit Grund in `KNOWN_SHARED_IDS` (`src/data-check.ts`) - Wichita, Kaw Valley (USL League Two),
+  BX Brussels, Aserri FC.
 
 **Gegenprobe:** Elo-Vergleich vorher/nachher (unten); `npm run data-check` meldet die ID nicht mehr;
 `npm run elo -- team <ID>` zeigt eine durchgehende Geschichte.
@@ -110,10 +121,17 @@ Die Analyse lädt vor der Rechnung selbst nach (300 Aufrufe, `strengthOnDemandRe
 ## 6. Abrechnung (`data-check` Abschnitt 6)
 
 - **„Torminuten lückenlos“, aber Halbzeittore passen nicht zum Stand:** `goals_complete = 1` ist
-  falsch gesetzt; bei AET/PEN gehen die Abschnitte 1-2 gegen `score.fulltime`. Ableitung in
-  `src/fixture-result.ts` an den gemeldeten Spielen prüfen, Torphasen zählen sie sonst falsch mit.
-- **Prognosen über einen Tag nach Anpfiff offen:** `npm run settle`; bleiben sie offen, sind es meist
-  verschobene oder abgesagte Spiele.
+  falsch gesetzt. Zuerst prüfen, ob die heutige Ableitung (`toFixtureResult` in
+  `src/fixture-result.ts`) dasselbe Spiel richtig einstuft - die 4 Fälle vom 20.10.2026 waren
+  Zeilen aus der Fassung vor dem 29.09. (alle Tore gegen den 90-Minuten-Stand). Dann nur das
+  Kennzeichen dieser Zeilen gezielt auf 0 setzen, nicht den ganzen Bestand neu schreiben. Stuft
+  auch die heutige Ableitung falsch ein, ist es ein Fehler im Code.
+- **Prognosen über einen Tag nach Anpfiff offen:** `npm run settle`. Die Abrechnung stellt seit
+  20.10.2026 selbst zurück (`settlementDeferral` in `src/settle.ts`, Tabelle `settle_deferrals`):
+  verlegt (neuer Termin in der Zukunft) bis 110 Minuten nach dem neuen Anpfiff, PST/SUSP/INT/ABD
+  ohne Termin alle 3 Tage, bei API-Football gelöscht alle 7 Tage, AWD/WO/CANC nie wieder (kein
+  gespieltes Ergebnis - nicht als Spielausgang abrechnen). „NS“ mit vorbeigegangenem Termin bleibt
+  offen, dort hängt meist nur der Status nach. `data-check` meldet nur nicht zurückgestellte.
 - **Heim und Gast gedreht:** `settleFixture` spiegelt das selbst (AGENTS.md); nur melden, wenn
   Ergebnisse und Prognose nicht zusammenpassen.
 

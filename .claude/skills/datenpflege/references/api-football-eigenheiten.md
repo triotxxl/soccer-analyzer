@@ -55,7 +55,16 @@ Fällen belegt; die Fundstelle steht dabei.
 - **Verein gegen Nationalteam** unter „Friendlies“ (10) und Nationalteam-IDs in „Friendlies Clubs“
   (667) - das Elo verwirft solche Spiele.
 - **Nachspielzeit-Tore** mal als „90“, mal als „90+x“, mit Drift über die Zeit.
-- **`score.extratime`** mal Gesamtstand, mal Zuwachs - dafür nicht verwenden.
+- **`score.extratime`** mal Gesamtstand, mal Zuwachs - dafür nicht verwenden. Auch
+  `score.fulltime` steht bei AET mitunter auf dem Endstand nach Verlängerung statt nach 90
+  Minuten (Neratovice - Čáslav 2:2 bei 1:1 nach 90); die Torereignisse sind dann die Wahrheit.
+- **Spiele verschwinden oder werden gewertet:** Eine Fixture-ID kann später leer zurückkommen
+  (Aragua - Dinamo), ein Spiel „AWD“ (am grünen Tisch) oder „ABD“ (abgebrochen) werden. Verlegte
+  Spiele behalten ihre ID und bekommen ein neues Datum, oft mit „NS“ statt „PST“.
+- **Umbenennungen unterklassiger Vereine** führt API-Football oft gar nicht nach: „ACS Inter
+  Ilfov“ heißt dort weiter „LPS HD Clinceni“ (umbenannt 2024). Tipico kürzt dafür stark („ACS Prog.
+  Mogo.“, „CDC Nican. Otamen.“, „FADEP“ = Fundación Amigos del Deporte). Beleg ist die Paarung
+  zum selben Termin, ein Name allein nicht.
 - **Halbzeitwerte** nur über `/fixtures/statistics?fixture=<id>&half=true`, nicht bündelbar, und
   sie ergeben nicht immer den Gesamtwert (Schüsse aufs Tor in 4,5 % der Spiele ±1).
 - **Statuscodes in wechselnder Schreibweise** („Canc“) - ohne Rücksicht auf Groß/Klein vergleichen.

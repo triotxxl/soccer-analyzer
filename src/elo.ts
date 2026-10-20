@@ -248,6 +248,9 @@ export function mergeTeams(match: EloMatch, merges: EloTeamMerge[]): EloMatch {
   for (const merge of merges) {
     if (merge.exceptFixtures?.includes(match.fixtureId)) continue;
     if (merge.countries && !merge.countries.includes(match.country)) continue;
+    if (merge.leagues && !merge.leagues.includes(match.leagueId)) continue;
+    if (merge.since && match.kickoff < Date.parse(merge.since)) continue;
+    if (merge.until && match.kickoff >= Date.parse(merge.until)) continue;
     if (homeId === merge.from) { homeId = merge.to; homeName = merge.name ?? homeName; }
     if (awayId === merge.from) { awayId = merge.to; awayName = merge.name ?? awayName; }
   }

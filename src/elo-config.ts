@@ -359,6 +359,15 @@ export interface EloTeamMerge {
   name?: string;
   /** Nur Spiele in Wettbewerben dieser Länder; „World" sind Testspiele und internationale Wettbewerbe. */
   countries?: string[];
+  /**
+   * Nur Spiele dieser Wettbewerbe (Liga-IDs) - für zwei Mannschaften eines Landes unter einer ID,
+   * etwa erste und zweite Mannschaft (seit 20.10.2026).
+   */
+  leagues?: number[];
+  /** Nur Spiele ab diesem Zeitpunkt (ISO) - etwa wenn die erste Mannschaft aus der Liga aufstieg. */
+  since?: string;
+  /** Nur Spiele vor diesem Zeitpunkt (ISO) - etwa wenn die erste Mannschaft später dorthin abstieg. */
+  until?: string;
   /** Einzelne Spiele, die trotzdem bei `from` bleiben. */
   exceptFixtures?: number[];
   note: string;
@@ -390,6 +399,77 @@ export const ELO_TEAM_MERGES: EloTeamMerge[] = [
     // zeitgleich mit Spielen in Estland (`npm run data-check`, 20.10.2026).
     from: 687, to: -687, countries: ["Suriname"], name: "Flora (Suriname)",
     note: "Eerste Divisie Suriname 2023 unter der ID von Flora Tallinn (20.10.2026)"
+  },
+  // Trennungen vom 20.10.2026 (`npm run data-check`): Jede ID hatte an mindestens zwei Tagen zwei
+  // Pflichtspiele gegen verschiedene Gegner. Abgetrennt wird der Teil, der nicht zum Verein der
+  // heutigen Ansetzungen gehört - fremdes Land über `countries`, zweite Mannschaft oder
+  // gleichnamiger Klub im selben Land über `leagues`. Namen in Klammern, wo der Verein unbekannt ist.
+  // Fremdes Land (Doppel-Spieltage zwischen der Heimatliga und der fremden Liga):
+  ...([
+    [5242, "Sudan", "Al Shorta (Sudan)", "Sudani Premier League 2022-2026, 14 Doppel-Spieltage mit der Iraqi League"],
+    [1057, "El-Salvador", "Platense (El Salvador)", "Primera División 2021/22, 11 Tage mit der Liga Nacional Honduras"],
+    [8114, "Australia", "Vipers (Australien)", "South Australia State League 1 2023-2025, 11 Tage mit Uganda und CAF"],
+    [8086, "Benin", "Etoile Filante (Benin)", "Championnat National 2023-2025, 10 Tage mit der Ligue 1 Burkina Faso"],
+    [8379, "Spain", "San Miguel (Spanien)", "Tercera RFEF Gruppe 12 2024/25, 9 Tage mit der Primera Nacional"],
+    [9855, "Guatemala", "San Juan (Guatemala)", "Primera División 2022/23, 7 Tage mit der Segunda RFEF"],
+    [12452, "Norway", "Express (Norwegen)", "3. Division und NM Cupen 2021-2024, 6 Tage mit der Premier League Uganda"],
+    [3702, "Venezuela", "Bolívar (Venezuela)", "Segunda División 2021/22, 5 Tage mit der Primera División Bolivien"],
+    [1051, "Peru", "Olimpia (Peru)", "Copa Perú 2023, 5 Tage mit der Liga Nacional Honduras"],
+    [13134, "USA", "Capital (USA)", "USL League Two 2022-2024, 4 Tage mit der Serie D"],
+    [2056, "Northern-Ireland", "Aserri (Nordirland)", "Irish Cup 2022-2024 unter der ID eines Klubs aus Costa Rica"],
+    [2373, "New-Zealand", "Miramar (Neuseeland)", "National League und Chatham Cup 2025/26, 4 Tage mit Uruguay"],
+    [10217, "Mongolia", "Lions (Mongolei)", "Premier League 2021/22, 3 Tage mit der Queensland NPL"],
+    [437, "Brazil", "Rosario Central (Brasilien)", "Sergipano 2 2024, 3 Tage mit der Liga Profesional"],
+    [22782, "Rwanda", "Vision (Ruanda)", "National Soccer League 2024/25, 3 Tage mit der Premier League Ghana"],
+    [9678, "Dominican-Republic", "San Cristóbal (Dominikanische Republik)", "Liga Mayor 2022, 2 Tage mit der Tercera RFEF"],
+    [12601, "Uzbekistan", "Olympic (Usbekistan)", "Cup und Super League 2021-2023, 2 Tage mit der Ettan Södra"],
+    [1140, "Brazil", "Patriotas (Brasilien)", "Paranaense 2 2025, 2 Tage mit der Primera B Kolumbien"],
+    [135, "El-Salvador", "Cruzeiro (El Salvador)", "Copa Presidente 2026, 2 Tage mit der Serie A"],
+    [4310, "Costa-Rica", "Águila (Costa Rica)", "Copa Costa Rica 2024, 2 Tage mit El Salvador und CONCACAF"],
+    [12457, "Lesotho", "SC Villa (Lesotho)", "Premier League Lesotho 2026, 2 Tage mit der Premier League Uganda"]
+  ] as const).map(([id, country, name, note]): EloTeamMerge => ({ from: id, to: -id, countries: [country], name, note })),
+  // Zweites fremdes Land derselben ID (je ein Spiel, ohne Doppel-Spieltag, aber eindeutig fremd).
+  { from: 8379, to: -83791, countries: ["Paraguay"], name: "San Miguel (Paraguay)", note: "Copa Paraguay 2024" },
+  { from: 1140, to: -11401, countries: ["Paraguay"], name: "Patriotas (Paraguay)", note: "Copa Paraguay 2024" },
+  // Selbes Land, eine Liga gehört einer zweiten Mannschaft oder einem gleichnamigen Klub:
+  ...([
+    [4459, 381, "Rangers (HKFA 1st Division)", "1st Division 2021-2023, 14 Tage mit der Premier League"],
+    [10566, 289, "Royal AM (1st Division)", "1st Division 2021/22, 8 Tage mit der Premier Soccer League"],
+    [4496, 496, "Hapoel Iksal (Liga Alef)", "Liga Alef 2021/22, 7 Tage mit der Liga Leumit"],
+    [3475, 325, "Goa (Santosh Trophy)", "Landesauswahl der Santosh Trophy, 7 Tage mit ISL und AFC"],
+    [7177, 325, "Odisha (Santosh Trophy)", "Landesauswahl der Santosh Trophy, 4 Tage mit der ISL"],
+    [1031, 889, "Al Masry (Second League)", "Second League Gruppe C 2021/22, 5 Tage mit Premier League und League Cup"],
+    [4040, 256, "Chicago Fire (USL League Two)", "USL League Two 2022, 5 Tage mit der MLS Next Pro"],
+    [1599, 1118, "Philadelphia Union (NPSL)", "NPSL 2024/25, 5 Tage mit MLS und US Open Cup"],
+    [3672, 637, "Ho Chi Minh (V.League 2)", "V.League 2 2025/26, 5 Tage mit der V.League 1"],
+    [13192, 1118, "Virginia Beach City (NPSL)", "NPSL 2025, 4 Tage mit der USL League Two"],
+    [9037, 256, "West Chester United (USL League Two)", "USL League Two 2025/26, 4 Tage mit der NPSL"],
+    [10013, 503, "Cusco (Copa Perú)", "Copa Perú 2022, 2 Tage mit der Segunda División"],
+    [132, 1036, "Chapecoense (Copa Santa Catarina)", "Copa Santa Catarina 2023-2025, 2 Tage mit der Serie B"]
+  ] as const).map(([id, league, name, note]): EloTeamMerge => ({ from: id, to: -id, leagues: [league], name, note })),
+  {
+    // Die erste Mannschaft stieg zur Saison 2024/25 in die Regionalliga Mitte auf; die Landesliga
+    // danach ist die zweite Mannschaft (7 Doppel-Spieltage ab August 2025).
+    from: 4979, to: -4979, leagues: [227], since: "2024-07-01T00:00:00Z", name: "Oedt II",
+    note: "Landesliga Oberösterreich ab 2024/25"
+  },
+  {
+    // Die erste Mannschaft spielte 2021/22 selbst in der Tercera Gruppe 10 (Abstieg 2021); die
+    // zweite Mannschaft erst ab 2025/26 (24 Doppel-Spieltage mit der Segunda RFEF).
+    from: 9410, to: -9410, leagues: [448], since: "2025-07-01T00:00:00Z", name: "Recreativo Huelva II",
+    note: "Tercera RFEF Gruppe 10 ab 2025/26"
+  },
+  {
+    // Nur 2022/23 liefen Primera RFEF Gruppe 1 und Segunda RFEF Gruppe 5 nebeneinander (21 Tage);
+    // 2023-2025 und 2026/27 spielt die erste Mannschaft selbst in der Segunda RFEF Gruppe 5.
+    from: 5253, to: -5253, leagues: [879], since: "2022-07-01T00:00:00Z", until: "2023-07-01T00:00:00Z",
+    name: "Talavera (Segunda RFEF 2022/23)", note: "Segunda RFEF Gruppe 5 2022/23"
+  },
+  {
+    // Die Queensland Premier League gehörte 2021-2023 einer zweiten Mannschaft (15 Tage mit der NPL);
+    // 2026 spielt die erste Mannschaft nach dem Abstieg selbst dort.
+    from: 10223, to: -10223, leagues: [833], until: "2024-01-01T00:00:00Z",
+    name: "SC Wanderers (Queensland Premier League)", note: "Queensland Premier League 2021-2023"
   }
 ];
 

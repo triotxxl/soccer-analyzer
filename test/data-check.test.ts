@@ -120,3 +120,10 @@ test("Ligastärke: nennt nur die geschätzte Seite und den Abstand zur Belastbar
   }], (leagueId) => (leagueId === 211 ? { matches: 16, clubs: 9, women: false } : null));
   assert.deepEqual(gaps, [{ fixture: "Karlovac 1919 – HNK Rijeka", team: "Karlovac 1919", leagueId: 211, matches: 16, clubs: 9, minClubs: 5 }]);
 });
+
+test("geteilte ID: bekannte, nicht trennbare Fälle meldet die Prüfung nicht", () => {
+  const usl = (homeId: number, awayId: number, day: string) =>
+    match({ homeId, homeName: "Wichita", awayId, kickoff: at(day), leagueId: 256, leagueName: "USL League Two", country: "USA" });
+  const matches = [usl(9064, 1, "2022-05-22"), usl(9064, 2, "2022-05-22"), usl(9064, 3, "2022-06-19"), usl(9064, 4, "2022-06-19")];
+  assert.deepEqual(sharedTeamIds(matches, [], new Set()), []);
+});

@@ -34,6 +34,17 @@ const MAPPING_MIN_EVENTS = 3;
 const MAPPING_MAX_SHARE = 0.5;
 /** Ein Doppel-Spieltag kann ein Datenfehler der API sein, zwei sind ein Muster. */
 const SHARED_MIN_DAYS = 2;
+
+/**
+ * Geteilte IDs, die sich mit `ELO_TEAM_MERGES` nicht trennen lassen: Beide Mannschaften spielen im
+ * selben Wettbewerb, oder es sind doppelt geführte Spiele der API. Nachgeprüft am 20.10.2026.
+ */
+export const KNOWN_SHARED_IDS: Array<{ teamId: number; note: string }> = [
+  { teamId: 9064, note: "Wichita: zwei Teams in der USL League Two 2022/23" },
+  { teamId: 4057, note: "Kaw Valley: zwei Teams in der USL League Two 2022" },
+  { teamId: 8431, note: "BX Brussels: zwei Pokalspiele je Tag 2023, doppelt geführt" },
+  { teamId: 2056, note: "Aserri FC: Liga de Ascenso 2026 mit zwei Spielen je Tag, Copa Costa Rica 2025 ebenso" }
+];
 /** So lange darf das letzte Spiel eines Teams der Analyse zurückliegen, ohne aufzufallen. */
 const STALE_AFTER_MS = 365 * DAY_MS;
 /** Kandidaten für die zweite ID: aktiv in diesem Zeitraum, Name mindestens so ähnlich. */
@@ -172,7 +183,7 @@ export function sharedTeamIds(
     teams.set(id, entry);
   }
   return [...teams.values()]
-    .filter((team) => team.days >= SHARED_MIN_DAYS)
+    .filter((team) => team.days >= SHARED_MIN_DAYS && !KNOWN_SHARED_IDS.some((known) => known.teamId === team.teamId))
     .sort((left, right) => Number(right.inAnalysis) - Number(left.inAnalysis) || right.days - left.days);
 }
 

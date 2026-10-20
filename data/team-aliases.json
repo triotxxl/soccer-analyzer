@@ -259,6 +259,11 @@
     "apiTeamId": 24949,
     "apiTeamName": "Acatlan"
   },
+  "acs axi adu copac": {
+    "tipicoName": "ACS Axi Adu. Copac.",
+    "apiTeamId": 24361,
+    "apiTeamName": "Axi Adunații-Copăceni"
+  },
   "acs cil blaj": {
     "tipicoName": "ACS Cil Blaj",
     "apiTeamId": 24841,
@@ -273,6 +278,11 @@
     "tipicoName": "ACS Inainte Modelu",
     "apiTeamId": 6932,
     "apiTeamName": "Înainte Modelu"
+  },
+  "acs inter ilfov": {
+    "tipicoName": "ACS Inter Ilfov",
+    "apiTeamId": 23382,
+    "apiTeamName": "LPS HD Clinceni"
   },
   "acs kids tampa": {
     "tipicoName": "ACS Kids Tampa",
@@ -2109,6 +2119,11 @@
     "apiTeamId": 2357,
     "apiTeamName": "Fenix"
   },
+  "ca germinal": {
+    "tipicoName": "CA Germinal",
+    "apiTeamId": 3972,
+    "apiTeamName": "Germinal de Rawson"
+  },
   "ca guemes": {
     "tipicoName": "CA Guemes",
     "apiTeamId": 3969,
@@ -2603,6 +2618,11 @@
     "tipicoName": "CDA Aguilas FC",
     "apiTeamId": 9823,
     "apiTeamName": "Águilas"
+  },
+  "cdc nican otamen": {
+    "tipicoName": "CDC Nican. Otamen.",
+    "apiTeamId": 8399,
+    "apiTeamName": "Circulo Deportivo"
   },
   "cdt real oruro": {
     "tipicoName": "Cdt Real Oruro",
@@ -4153,6 +4173,11 @@
     "tipicoName": "FAC Wien",
     "apiTeamId": 1395,
     "apiTeamName": "Floridsdorfer AC"
+  },
+  "fadep": {
+    "tipicoName": "FADEP",
+    "apiTeamId": 27574,
+    "apiTeamName": "Fundacion Amigos"
   },
   "fajr sepasi fc": {
     "tipicoName": "Fajr Sepasi FC",
@@ -7834,6 +7859,11 @@
     "apiTeamId": 734,
     "apiTeamName": "Kortrijk"
   },
+  "kyanous astir varis": {
+    "tipicoName": "Kyanous Astir Varis",
+    "apiTeamId": 15229,
+    "apiTeamName": "Asteras Varis"
+  },
   "kyoto sanga fc": {
     "tipicoName": "Kyoto Sanga FC",
     "apiTeamId": 302,
@@ -8999,6 +9029,11 @@
     "apiTeamId": 14432,
     "apiTeamName": "Napoli W"
   },
+  "neas ionias": {
+    "tipicoName": "Neas Ionias",
+    "apiTeamId": 24879,
+    "apiTeamName": "Nea Ionia"
+  },
   "nec fc": {
     "tipicoName": "NEC FC",
     "apiTeamId": 22699,
@@ -9374,6 +9409,11 @@
     "apiTeamId": 28318,
     "apiTeamName": "Ntugasaze"
   },
+  "ntv beleza f": {
+    "tipicoName": "NTV Beleza (F)",
+    "apiTeamId": 16951,
+    "apiTeamName": "Tokyo Verdy Beleza W"
+  },
   "nyiregyhaza spartacus fc": {
     "tipicoName": "Nyiregyhaza Spartacus FC",
     "apiTeamId": 2403,
@@ -9538,6 +9578,11 @@
     "tipicoName": "Oman FC",
     "apiTeamId": 5334,
     "apiTeamName": "Oman Club"
+  },
+  "omiya ardija v f": {
+    "tipicoName": "Omiya Ardija V. (F)",
+    "apiTeamId": 16950,
+    "apiTeamName": "Omiya Ardija Ventus W"
   },
   "one knoxville sc": {
     "tipicoName": "One Knoxville SC",
@@ -10779,6 +10824,11 @@
     "apiTeamId": 6697,
     "apiTeamName": "Sandviken"
   },
+  "sanfrecce h f": {
+    "tipicoName": "Sanfrecce H. (F)",
+    "apiTeamId": 16955,
+    "apiTeamName": "Sanfrecce Hiroshima W"
+  },
   "sanliurfaspor": {
     "tipicoName": "Sanliurfaspor",
     "apiTeamId": 3613,
@@ -10873,6 +10923,11 @@
     "tipicoName": "SC Escaldes",
     "apiTeamId": 3354,
     "apiTeamName": "Sporting Escaldes"
+  },
+  "sc fc voluntari ii": {
+    "tipicoName": "SC FC Voluntari II",
+    "apiTeamId": 16289,
+    "apiTeamName": "Voluntari II"
   },
   "sc freiburg f": {
     "tipicoName": "SC Freiburg (F)",
@@ -12053,6 +12108,11 @@
     "tipicoName": "Thespa Gunma",
     "apiTeamId": 756,
     "apiTeamName": "Thespakusatsu Gunma"
+  },
+  "thiella rafinas": {
+    "tipicoName": "Thiella Rafinas",
+    "apiTeamId": 5064,
+    "apiTeamName": "Thyella Diastavroseos"
   },
   "throttur rey": {
     "tipicoName": "Throttur Rey.",

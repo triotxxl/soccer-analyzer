@@ -223,8 +223,13 @@ Benutzer auf Deutsch und führe Analyseaufträge selbstständig über die vorhan
     war: Ein übersprungener Wettbewerb behielt seine letzte Zuordnung. Seitdem löscht
     `--skip-unresolved` sie (`clearTipicoCompetitionMapping`).
   - Flora Tallinn (687) trug 2023 auch 24 Spiele eines Vereins aus Suriname - abgetrennt über
-    `ELO_TEAM_MERGES` mit negativer Ziel-ID und `name` (Trennung statt Zusammenführung). Die
-    übrigen 40 geteilten IDs sind offen.
+    `ELO_TEAM_MERGES` mit negativer Ziel-ID und `name` (Trennung statt Zusammenführung).
+  - Die übrigen 40 geteilten IDs am selben Tag getrennt: 21 fremde Länder über `countries`, 17
+    zweite Mannschaften oder gleichnamige Klubs über `leagues` (seit 20.10.2026, mit `since`/`until`,
+    wo die erste Mannschaft nach Auf- oder Abstieg selbst dort spielte), 4 nicht trennbar in
+    `KNOWN_SHARED_IDS`. Nationalteams unverändert, Vereine Median 0,01 Punkte.
+  - 4 Zeilen mit `goals_complete = 1` aus der Fassung vor dem 29.09. korrigiert; die Abrechnung
+    stellt verlegte, verschobene und gewertete Spiele zurück (siehe „Nach beendeten Spielen“).
   Nach jeder Analyse gehört dazu:
   1. **Zuordnung:** fehlende Liga- und Team-Aliase setzen (`npm run aliases`,
      `npm run team-aliases`), unklare Namen recherchieren (Umbenennung, Umzug, Lizenzübernahme).
@@ -480,6 +485,14 @@ Benutzer auf Deutsch und führe Analyseaufträge selbstständig über die vorhan
   Aufrufe, 0 schaltet es ab), neueste Partien zuerst. Für einen Rückstand `npm run settle --
   --budget <n>` mit größerem Budget in Etappen laufen lassen; ohne `--budget` arbeitet der
   Befehl den gesamten Rückstand ab und kann das Tagesbudget überschreiten.
+  **Wiedervorlage seit 20.10.2026** (`settlementDeferral` in `src/settle.ts`, Tabelle
+  `settle_deferrals`): Vorher fragte jede Abrechnung jedes nicht beendete Spiel erneut ab, ein
+  Aufruf je Spiel und Analyse, am 20.10. 24 Spiele seit bis zu zwei Monaten. Jetzt: verlegt bis
+  110 Minuten nach dem neuen Anpfiff, PST/SUSP/INT/ABD ohne Termin alle 3 Tage, bei API-Football
+  gelöscht alle 7 Tage, AWD/WO/CANC nie wieder - es gibt kein gespieltes Ergebnis, die Prognose
+  bleibt unabgerechnet. „NS“ mit vorbeigegangenem Termin bleibt fällig (Status hängt nach). Ein
+  verlegtes Spiel wird nach dem neuen Termin abgerechnet; die Prognose stammt von vor dem
+  ursprünglichen Termin und bleibt eine echte Vorhersage.
 - **API-Football dreht gelegentlich nachträglich Heim und Gast** (Senegal - Mozambique am
   26.09.2026, dazu PSG - Rennes). Die Prognosetabellen speichern nur Teamnamen; `settleFixture`
   (`src/database.ts`) vergleicht sie deshalb seit 28.09.2026 mit der Antwort und spiegelt Tore,

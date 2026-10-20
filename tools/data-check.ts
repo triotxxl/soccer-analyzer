@@ -112,13 +112,19 @@ try {
     FROM fixture_results WHERE goals_complete = 1 AND (
       goals_ht1_home + goals_ht2_home <> COALESCE(ft_home_goals, final_home_goals)
       OR goals_ht1_away + goals_ht2_away <> COALESCE(ft_away_goals, final_away_goals))`).all() as Array<{ fixtureId: number; status: string; home: string; away: string }>;
-  const overdue = db.prepare(`SELECT COUNT(DISTINCT fixture_id) AS n, MIN(kickoff) AS oldest FROM goal_line_predictions
-    WHERE settled_at IS NULL AND julianday(kickoff) < julianday(?)`).get(new Date(now - OVERDUE_MS).toISOString()) as { n: number; oldest: string | null };
+  // Zurückgestellte Spiele (`settle_deferrals`) sind erklärt und zählen getrennt.
+  const overdue = db.prepare(`SELECT COUNT(DISTINCT fixture_id) AS n, MIN(kickoff) AS oldest FROM goal_line_predictions p
+    WHERE settled_at IS NULL AND julianday(kickoff) < julianday(?)
+      AND NOT EXISTS (SELECT 1 FROM settle_deferrals d WHERE d.fixture_id = p.fixture_id)`)
+    .get(new Date(now - OVERDUE_MS).toISOString()) as { n: number; oldest: string | null };
+  const deferredRows = db.prepare(`SELECT status, COUNT(*) AS n FROM settle_deferrals d
+    WHERE EXISTS (SELECT 1 FROM goal_line_predictions p WHERE p.fixture_id = d.fixture_id AND p.settled_at IS NULL)
+    GROUP BY status ORDER BY n DESC`).all() as Array<{ status: string; n: number }>;
 
   const report = {
     createdAt: document.meta.createdAt, fixtures: document.fixtures.length,
     mapping, shared, stale, seasonGaps, strength,
-    results: { goalsCompleteMismatch: goalsMismatch, overdueUnsettled: overdue.n, oldestUnsettled: overdue.oldest }
+    results: { goalsCompleteMismatch: goalsMismatch, overdueUnsettled: overdue.n, oldestUnsettled: overdue.oldest, deferred: deferredRows }
   };
   if (asJson) {
     console.log(JSON.stringify(report, null, 2));
@@ -133,7 +139,10 @@ function print(report: {
   createdAt: string; fixtures: number;
   mapping: ReturnType<typeof mappingIssues>; shared: ReturnType<typeof sharedTeamIds>; stale: ReturnType<typeof staleTeams>;
   seasonGaps: ReturnType<typeof eloSeasonGaps>; strength: ReturnType<typeof strengthGaps>;
-  results: { goalsCompleteMismatch: Array<{ fixtureId: number; status: string; home: string; away: string }>; overdueUnsettled: number; oldestUnsettled: string | null };
+  results: {
+    goalsCompleteMismatch: Array<{ fixtureId: number; status: string; home: string; away: string }>;
+    overdueUnsettled: number; oldestUnsettled: string | null; deferred: Array<{ status: string; n: number }>;
+  };
 }): void {
   const limit = <T>(list: T[]) => (showAll ? list : list.slice(0, 10));
   const more = (list: unknown[]) => (!showAll && list.length > 10 ? `  … und ${list.length - 10} weitere (--all)` : null);
@@ -207,8 +216,12 @@ function print(report: {
       console.log("    Maßnahme: Ableitung in src/fixture-result.ts für diese Fälle prüfen; bis dahin zählen sie in Torphasen falsch mit");
     }
     if (overdueUnsettled > 0) {
-      console.log(`- ${overdueUnsettled} Spiele über einen Tag nach Anpfiff nicht abgerechnet (ältestes ${oldestUnsettled?.slice(0, 10)})`);
-      console.log("    Maßnahme: npm run settle; bleiben sie offen, sind sie meist verschoben oder abgesagt");
+      console.log(`- ${overdueUnsettled} Spiele über einen Tag nach Anpfiff nicht abgerechnet und nicht zurückgestellt (ältestes ${oldestUnsettled?.slice(0, 10)})`);
+      console.log("    Maßnahme: npm run settle - die Abrechnung stellt verlegte, verschobene und gewertete Spiele selbst zurück");
     }
+  }
+  if (report.results.deferred.length > 0) {
+    console.log(`\nZurückgestellt (erklärt, kein Handlungsbedarf): ${report.results.deferred.map((row) => `${row.n} ${row.status}`).join(", ")}`
+      + " - NS = verlegt, PST/SUSP/INT/ABD = ohne neuen Termin, AWD/WO/CANC = ohne gespieltes Ergebnis, MISSING = bei API-Football gelöscht");
   }
 }

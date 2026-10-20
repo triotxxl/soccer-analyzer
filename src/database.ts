@@ -431,6 +431,14 @@ export class AnalyzerDatabase {
       );
       CREATE INDEX IF NOT EXISTS idx_goal_line_scopes_prediction
         ON goal_line_prediction_scopes(prediction_id);
+      -- Wiedervorlage der Abrechnung (seit 20.10.2026): verlegte, verschobene, abgebrochene und
+      -- gewertete Spiele. next_check NULL = erledigt ohne Ergebnis (gewertet, abgesagt).
+      CREATE TABLE IF NOT EXISTS settle_deferrals (
+        fixture_id INTEGER PRIMARY KEY,
+        status TEXT NOT NULL,
+        next_check TEXT,
+        checked_at TEXT NOT NULL
+      );
       CREATE TABLE IF NOT EXISTS fixture_expected_goals (
         fixture_id INTEGER PRIMARY KEY,
         kickoff TEXT NOT NULL,
@@ -1370,6 +1378,7 @@ export class AnalyzerDatabase {
     // Textvergleich mit "…+02:00" das zufällig um 2 Stunden; ohne ihn kostete es im Schnitt
     // rund 7 Aufrufe je Analyse, an vollen Spieltagen bis 55 (Prüfung vom 05.10.2026).
     const cutoff = new Date(now.getTime() - UNSETTLED_MIN_AGE_MS).toISOString();
+    // Zurückgestellte Spiele erst zu ihrer Wiedervorlage, erledigte nie mehr (`deferSettlement`).
     const rows = this.db.prepare(`
       SELECT fixture_id, MAX(kickoff) AS kickoff FROM (
         SELECT fixture_id, kickoff
@@ -1383,11 +1392,22 @@ export class AnalyzerDatabase {
         SELECT fixture_id, kickoff
         FROM goal_line_predictions
         WHERE settled_at IS NULL AND julianday(kickoff) < julianday(?)
+      ) AS due
+      WHERE NOT EXISTS (
+        SELECT 1 FROM settle_deferrals d WHERE d.fixture_id = due.fixture_id
+          AND (d.next_check IS NULL OR julianday(d.next_check) > julianday(?))
       )
       GROUP BY fixture_id
       ORDER BY kickoff DESC, fixture_id DESC
-    `).all(cutoff, cutoff, cutoff) as Array<{ fixture_id: number }>;
+    `).all(cutoff, cutoff, cutoff, now.toISOString()) as Array<{ fixture_id: number }>;
     return rows.map((row) => row.fixture_id);
+  }
+
+  /** Abrechnung zurückstellen; `nextCheck` null = erledigt ohne Ergebnis. */
+  deferSettlement(fixtureId: number, status: string, nextCheck: string | null, checkedAt: string): void {
+    this.db.prepare(`INSERT INTO settle_deferrals(fixture_id, status, next_check, checked_at) VALUES (?, ?, ?, ?)
+      ON CONFLICT(fixture_id) DO UPDATE SET status = excluded.status, next_check = excluded.next_check,
+        checked_at = excluded.checked_at`).run(fixtureId, status, nextCheck, checkedAt);
   }
 
   settleFixture(fixture: ApiFixture, actualXg?: { home: number | null; away: number | null }): number {
