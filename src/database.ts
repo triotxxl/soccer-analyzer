@@ -2414,6 +2414,15 @@ export class AnalyzerDatabase {
     `).run(value.leagueId, value.country, value.league, value.source, tipicoCompetitionId);
   }
 
+  /** Für einen übersprungenen Wettbewerb: Eine alte Zuordnung darf nicht stehen bleiben. */
+  clearTipicoCompetitionMapping(tipicoCompetitionId: number): void {
+    this.db.prepare(`
+      UPDATE tipico_competitions SET
+        api_league_id = NULL, api_country_name = NULL, api_league_name = NULL, mapping_source = NULL
+      WHERE tipico_competition_id = ?
+    `).run(tipicoCompetitionId);
+  }
+
   /** Die API-Liga-ID zu einem Wettbewerb, wie ihn die Analyse nennt (Land und Liga von API-Football). */
   apiLeagueIdByName(country: string, league: string): number | null {
     const row = this.db.prepare(`SELECT api_league_id FROM tipico_competitions

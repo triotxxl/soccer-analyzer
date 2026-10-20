@@ -349,8 +349,14 @@ export function nationalCategoryOf(homeName: string, awayName: string): National
 export interface EloTeamMerge {
   /** Die alte oder zusätzlich benutzte ID. */
   from: number;
-  /** Die ID, unter der API-Football den Verein heute führt. */
+  /**
+   * Die ID, unter der API-Football den Verein heute führt. Negativ: eine eigene ID für einen
+   * abgetrennten Verein, den API-Football unter der ID eines anderen führt (Trennung statt
+   * Zusammenführung, seit 20.10.2026) - dann gehört `name` dazu.
+   */
   to: number;
+  /** Anzeigename nach dem Umhängen; sonst bliebe der Name des Vereins, dessen ID geteilt ist. */
+  name?: string;
   /** Nur Spiele in Wettbewerben dieser Länder; „World" sind Testspiele und internationale Wettbewerbe. */
   countries?: string[];
   /** Einzelne Spiele, die trotzdem bei `from` bleiben. */
@@ -369,6 +375,21 @@ export const ELO_TEAM_MERGES: EloTeamMerge[] = [
     // Testspiel gegen Club Africain). Nur die schwedischen Spiele und Testspiele gehören zu Malmö.
     from: 10598, to: 27669, countries: ["Sweden", "World"], exceptFixtures: [1501344],
     note: "Ariana FC Malmö 2022 (Division 2) und Vorbereitungsspiele bis März 2026"
+  },
+  {
+    // 8560 „Police" trägt auch Police aus Burkina Faso (Ligue 1) sowie 2021 einen AFC- und einen
+    // CAF-Teilnehmer. Kenya Police lief in der FKF Premier League bis Juni 2022 unter 2485, ab
+    // Dezember 2021 nahtlos und ohne gemeinsamen Spieltag unter 8560, die Ansetzungen ab
+    // 20.10.2026 wieder unter 2485. Dazu CAF Confederation Cup 2024, CECAFA Club Cup 2025.
+    from: 8560, to: 2485, countries: ["Kenya", "World"], exceptFixtures: [663747, 773191, 773192], name: "Kenya Police",
+    note: "Kenya Police: FKF Premier League und Shield Cup 2021-2026, CAF/CECAFA 2024-2025 (20.10.2026)"
+  },
+  {
+    // Trennung: 687 ist Flora Tallinn (Meistriliiga, Europapokal, Testspiele). API-Football legte
+    // 2023 die 24 Spiele eines Vereins der zweiten Liga Surinams unter dieselbe ID, an vier Tagen
+    // zeitgleich mit Spielen in Estland (`npm run data-check`, 20.10.2026).
+    from: 687, to: -687, countries: ["Suriname"], name: "Flora (Suriname)",
+    note: "Eerste Divisie Suriname 2023 unter der ID von Flora Tallinn (20.10.2026)"
   }
 ];
 

@@ -62,12 +62,13 @@ export const BLOCKED_SCRIPTS: Readonly<Record<string, string>> = {
  * `btts-check` und `live-model-report` sind die vorab festgelegten Nachmessungen, die der Prüfer
  * ungefragt laufen lässt; beide lesen nur Snapshots und die Datenbank (`readOnly`). `coverage`
  * öffnet die Datenbank wie `report` über `AnalyzerDatabase`, schreibt aber nichts. `kombi-tipps`
- * liest den Snapshot und die Datenbank (`readOnly`) und druckt nur.
+ * liest den Snapshot und die Datenbank (`readOnly`) und druckt nur. `data-check` ebenso (Snapshot,
+ * Datenbank `readOnly`, kein API-Client).
  */
 export const ALLOWED_SCRIPTS = new Set([
   "test", "typecheck", "app:test", "report", "edge-report", "edge-report:simulate",
   "quickpick-report", "draw-signals-report", "elo-backtest", "elo", "snapshot-history",
-  "btts-check", "live-model-report", "coverage", "kombi-tipps"
+  "btts-check", "live-model-report", "coverage", "kombi-tipps", "data-check"
 ]);
 
 /** `npm run elo -- <befehl>`: nur diese beiden lesen bloß. */

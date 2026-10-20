@@ -491,13 +491,17 @@ async function venueForm(args: ParsedArgs): Promise<void> {
  */
 async function withoutUnresolvedLeagues(
   input: AnalysisInput,
-  client: ApiFootballClient
+  client: ApiFootballClient,
+  database: AnalyzerDatabase
 ): Promise<AnalysisInput> {
   const { failures } = await resolveLeagues(input.selections, await client.getLeagues());
   if (failures.length === 0) return input;
   const skipped = new Set(failures.map((failure) =>
     aliasKey(failure.requested.country, failure.requested.league)));
   for (const failure of failures) {
+    // Eine früher gespeicherte Zuordnung gilt nicht mehr: „Panama | Liga Prom“ behielt nach dem
+    // Löschen des falschen Alias am 26.09.2026 bis zum 20.10. die 304 in der Datenbank.
+    if (failure.requested.tipicoCompetitionId) database.clearTipicoCompetitionMapping(failure.requested.tipicoCompetitionId);
     // Der Resolver liefert auch bei 0 % Ähnlichkeit Kandidaten, deshalb sagt die Meldung
     // die beste erreichte Übereinstimmung statt eines pauschalen "mehrdeutig".
     const best = failure.candidates[0];
@@ -534,7 +538,7 @@ async function dashboard(args: ParsedArgs): Promise<void> {
     });
     const client = imported.selectedEvents > 0 ? new ApiFootballClient() : null;
     const input = client && args.options.has("skip-unresolved")
-      ? await withoutUnresolvedLeagues(imported.input, client)
+      ? await withoutUnresolvedLeagues(imported.input, client, database)
       : imported.input;
     const emptyBase = {
       createdAt: new Date().toISOString(),

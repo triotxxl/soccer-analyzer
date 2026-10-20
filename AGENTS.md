@@ -193,7 +193,39 @@ Benutzer auf Deutsch und führe Analyseaufträge selbstständig über die vorhan
   jedes Team ohne Elo, jedes Elo unter 30 % Vertrauen und jedes 1X2 ohne Ligastärke, jeweils mit
   Ursache und Maßnahme, und trennt Offenes von bewusst Gewolltem (verschiedene Verbände, nicht
   freigegebene Elo-Skala). Der Snapshot trägt dafür `homeTeamId`/`awayTeamId`; ältere lesen die
-  ID aus dem Wappen-Link. Nach jeder Analyse gehört dazu:
+  ID aus dem Wappen-Link. **Wie Befunde belegt und behoben werden, steht im Skill
+  `.claude/skills/datenpflege/`** (Ablauf je Analyse, Beweisregeln für Zusammenführungen,
+  Befund-Katalog, Eigenheiten von API-Football; seit 20.10.2026 statt eines eigenen Agenten -
+  Davids Entscheidung; ein Agent erst für große Stapel, der dann denselben Skill lädt).
+  **Daneben `npm run data-check`** (seit 20.10.2026, `src/data-check.ts`,
+  `tools/data-check.ts`, kein API-Budget, Datenbank `readOnly`, rund 20 s): Fehler, bei denen die
+  Analyse durchläuft, aber mit falschen Daten rechnet - (1) Tipico-Wettbewerbe der letzten 60
+  Tage, bei denen unter der Hälfte ankam, getrennt nach „API-Liga spielte im selben Zeitraum“
+  (falscher Alias oder Team-Aliase) und „API-Liga ohne Spiele“; (2) **geteilte Team-IDs**: zwei
+  Pflichtspiele gegen verschiedene Gegner am selben Tag, an mindestens zwei Tagen, nach
+  `ELO_TEAM_MERGES` (Testspiele, Jugend- und Frauenteams ausgenommen - dort sind es falsche Daten
+  der API); (3) Teams der Analyse, deren letztes Spiel über ein Jahr alt ist, mit Kandidaten für
+  die zweite ID; (4) **Elo-Saisonlücken**: als vollständig markierte Ligasaisons unter 60 % des
+  Medians (bekannt kurze in `KNOWN_SHORT_SEASONS`); (5) geschätzte Ligastärke mit Abstand zu
+  30 Duellen; (6) Torminuten „lückenlos“, die nicht zum Stand passen, und lange offene Prognosen.
+  Jede Regel stammt aus einem echten Fund (Kopf von `src/data-check.ts`). Erster Lauf 20.10.2026:
+  - **170 Elo-Saisons mit rund 27.000 fehlenden Spielen**, Ursache die 80-%-Abkürzung in
+    `tools/elo.ts`, die am 24.09.2026 um 19:30 vor dem ersten Nachladen gegen die vollste Saison
+    **im Cache** verglich (dort lagen je Saison nur die rund 30 Spiele der eigenen Analysen).
+    Abkürzung entfernt, Markierungen gelöscht, nachgeladen (237 Saisons, 25.414 Spiele, 156
+    Aufrufe). Zudem markiert das Nachladen eine Saison seit demselben Tag nur ohne offene Ansetzung
+    (`seasonHasOpenFixtures` aus `src/strength-builder.ts`, dieselbe Regel wie die Ligastärke) -
+    vorher hakte ein vorbeigegangenes `end` laufende Saisons 2026 ab (Botola Pro 30 von 240).
+    Die Prüfung meldet nur Markierungen vor `ELO_FULL_LOAD_SINCE`; was danach kurz ist, ist bei
+    API-Football kurz. A-Nationalteams und Jugendskalen blieben unverändert (U17: vier Teams bis
+    6,6 Punkte durch die regulär offene U17-EM 2026), Vereine Median 0,2 Punkte.
+  - Panama „Liga Prom“ stand in der Datenbank noch auf 304, obwohl der Alias am 26.09. gelöscht
+    war: Ein übersprungener Wettbewerb behielt seine letzte Zuordnung. Seitdem löscht
+    `--skip-unresolved` sie (`clearTipicoCompetitionMapping`).
+  - Flora Tallinn (687) trug 2023 auch 24 Spiele eines Vereins aus Suriname - abgetrennt über
+    `ELO_TEAM_MERGES` mit negativer Ziel-ID und `name` (Trennung statt Zusammenführung). Die
+    übrigen 40 geteilten IDs sind offen.
+  Nach jeder Analyse gehört dazu:
   1. **Zuordnung:** fehlende Liga- und Team-Aliase setzen (`npm run aliases`,
      `npm run team-aliases`), unklare Namen recherchieren (Umbenennung, Umzug, Lizenzübernahme).
   2. **Gleiche Mannschaft, neue ID:** Führt API-Football einen Verein nach einer Umbenennung unter
@@ -998,9 +1030,10 @@ nachgezogen, nicht gesammelt am Ende.
   Frauen-Vereine bleiben ausgeschlossen. Nachgeladen mit `npm run elo -- backfill
   --national-categories --from 2019` (83 Wettbewerbs-Saisons, 5.806 Spiele, 82 Aufrufe); die
   Wochenrunde nimmt die laufenden Saisons dieser Wettbewerbe mit. A-Nationalteams und Vereine
-  blieben dabei nachgewiesen unverändert. Für diese Wettbewerbe gilt die 80-%-Abkürzung des
-  Nachladens nicht mehr (sie hatte drei U21-Saisons mit rund 15 % Lücke als vollständig
-  markiert); bei den übrigen Wettbewerben ist dieselbe Schwäche möglich, aber ungeprüft.
+  blieben dabei nachgewiesen unverändert. Die 80-%-Abkürzung des Nachladens (sie hatte drei
+  U21-Saisons mit rund 15 % Lücke als vollständig markiert) galt hier ab 29.09.2026 nicht mehr und
+  ist seit 20.10.2026 ganz entfernt - bei den übrigen Wettbewerben hatte sie 170 Ligasaisons mit
+  rund 27.000 fehlenden Spielen abgehakt (Abschnitt „Pflege“, `npm run data-check`).
   **Die U21 trägt seit 29.09.2026 den Klassenfaktor** (Davids Entscheidung nach der Prüfung vom
   selben Tag): `config.strength.teamEloSystems` = `national`, `national-u21`, derselbe Teiler
   1400, dazu die Torkorrektur der Länderspiele; die Skala bestimmt der Analyzer aus den

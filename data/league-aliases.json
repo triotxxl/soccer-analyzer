@@ -879,6 +879,11 @@
     "country": "Finland",
     "league": "Veikkausliiga"
   },
+  "finnland|veikkausliiga promotion relegation playoff": {
+    "leagueId": 244,
+    "country": "Finland",
+    "league": "Veikkausliiga"
+  },
   "finnland|veikkausliiga relegation round": {
     "leagueId": 244,
     "country": "Finland",

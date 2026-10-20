@@ -40,6 +40,19 @@ const CLOSED_STATUSES = new Set(["FT", "AET", "PEN", "CANC", "ABD", "AWD", "WO"]
 /** Offene Ansetzungen, die so lange zurückliegen, werden nicht mehr nachgeholt. */
 const STALE_OPEN_FIXTURE_MS = 30 * 24 * 60 * 60 * 1000;
 
+/**
+ * Steht in der Saison noch eine Ansetzung offen, die nachgeholt werden kann? Gilt auch für das
+ * Elo-Nachladen (`tools/elo.ts`, seit 20.10.2026): Dort markierte ein vorbeigegangenes `end` 13
+ * laufende Ligasaisons 2026 als vollständig (Botola Pro 30 von 240 Spielen).
+ */
+export function seasonHasOpenFixtures(fixtures: ApiFixture[], now: number): boolean {
+  const staleBefore = now - STALE_OPEN_FIXTURE_MS;
+  return fixtures.some((fixture) =>
+    !CLOSED_STATUSES.has(fixture.fixture.status.short.toUpperCase()) &&
+    fixture.fixture.timestamp * 1000 >= staleBefore
+  );
+}
+
 export function relevantCompetitions(leagues: ApiLeague[]): ApiLeague[] {
   return leagues
     .filter((league) => league.league.type.toLocaleLowerCase() !== "league")
@@ -243,14 +256,10 @@ export async function buildLeagueStrength(options: {
         // Eine Ansetzung, deren Termin über 30 Tage zurückliegt, gilt als erledigt: API-Football
         // lässt verschobene Altspiele teils für immer offen stehen (Copa do Brasil 2025, PST vom
         // 19.02.2025), die Saison würde sonst bei jedem Nachladen erneut geholt.
-        const staleBefore = now.getTime() - STALE_OPEN_FIXTURE_MS;
         const seasonEnded =
           seasonDetails !== undefined &&
           Date.parse(seasonDetails.end) < now.getTime() &&
-          !seasonFixtures.some((fixture) =>
-            !CLOSED_STATUSES.has(fixture.fixture.status.short.toUpperCase()) &&
-            fixture.fixture.timestamp * 1000 >= staleBefore
-          );
+          !seasonHasOpenFixtures(seasonFixtures, now.getTime());
         if (seasonEnded) {
           database.markStrengthSeasonComplete(
             competition.league.id,

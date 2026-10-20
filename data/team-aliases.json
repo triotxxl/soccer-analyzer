@@ -6984,6 +6984,11 @@
     "apiTeamId": 10430,
     "apiTeamName": "Imigresen"
   },
+  "inac kobe f": {
+    "tipicoName": "INAC Kobe (F)",
+    "apiTeamId": 16947,
+    "apiTeamName": "INAC Kobe Leonessa W"
+  },
   "incheon united fc": {
     "tipicoName": "Incheon United FC",
     "apiTeamId": 2763,
@@ -7228,6 +7233,11 @@
     "tipicoName": "Jamaika",
     "apiTeamId": 2385,
     "apiTeamName": "Jamaica"
+  },
+  "jef united chiba f": {
+    "tipicoName": "JEF United Chiba (F)",
+    "apiTeamId": 16948,
+    "apiTeamName": "JEF United W"
   },
   "jeonbuk fc ii": {
     "tipicoName": "Jeonbuk FC II",

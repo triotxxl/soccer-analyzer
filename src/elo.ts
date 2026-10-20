@@ -244,14 +244,14 @@ function prepare(matches: EloMatch[], state: EloState, merges: EloTeamMerge[]): 
 
 /** Hängt ein Spiel auf die heutige Team-ID um, wenn eine Zusammenführung darauf passt. */
 export function mergeTeams(match: EloMatch, merges: EloTeamMerge[]): EloMatch {
-  let { homeId, awayId } = match;
+  let { homeId, awayId, homeName, awayName } = match;
   for (const merge of merges) {
     if (merge.exceptFixtures?.includes(match.fixtureId)) continue;
     if (merge.countries && !merge.countries.includes(match.country)) continue;
-    if (homeId === merge.from) homeId = merge.to;
-    if (awayId === merge.from) awayId = merge.to;
+    if (homeId === merge.from) { homeId = merge.to; homeName = merge.name ?? homeName; }
+    if (awayId === merge.from) { awayId = merge.to; awayName = merge.name ?? awayName; }
   }
-  return homeId === match.homeId && awayId === match.awayId ? match : { ...match, homeId, awayId };
+  return homeId === match.homeId && awayId === match.awayId ? match : { ...match, homeId, awayId, homeName, awayName };
 }
 
 /**

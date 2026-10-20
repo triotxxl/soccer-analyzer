@@ -3,7 +3,7 @@ import test from "node:test";
 import { backtestElo, backtestMetrics } from "../src/elo-backtest.ts";
 import { classifyMatch, type EloMatch } from "../src/elo-competitions.ts";
 import { ELO_CONFIG, type EloConfig } from "../src/elo-config.ts";
-import { calculateHistoricalElo, decayFactor, expectedHome, movFactor, summarizeElo, teamKey } from "../src/elo.ts";
+import { calculateHistoricalElo, decayFactor, expectedHome, mergeTeams, movFactor, summarizeElo, teamKey } from "../src/elo.ts";
 
 const DAY = 24 * 60 * 60 * 1000;
 const NOW = Date.parse("2026-09-24T00:00:00Z");
@@ -498,4 +498,19 @@ test("Frauen-Vereine bekommen eine eigene Skala, getrennt von Männer-Vereinen u
   assert.ok(!state.teams.has(teamKey("club", 90)));
   // Frauen-Jugend bleibt draußen.
   assert.equal(classifyMatch({ leagueId: 1, leagueName: "U19 Frauen-Bundesliga", leagueType: "League", country: "Germany", homeName: "Bayern U19 W", awayName: "Wolfsburg U19 W" }).excluded, true);
+});
+
+test("Zusammenführung trennt auch: eine fremde Mannschaft unter geteilter ID bekommt eigene ID und Namen", () => {
+  const match = (country: string, fixtureId: number): EloMatch => ({
+    fixtureId, kickoff: Date.parse("2023-04-16T15:00:00Z"), leagueId: 1, leagueName: "Liga", leagueType: "League", country,
+    season: 2023, homeId: 687, homeName: "Flora Tallinn", awayId: 9, awayName: "Gegner", homeGoals: 1, awayGoals: 0
+  });
+  const split = [{ from: 687, to: -687, countries: ["Suriname"], name: "Flora (Suriname)", note: "Test" }];
+  const suriname = mergeTeams(match("Suriname", 1), split);
+  assert.deepEqual([suriname.homeId, suriname.homeName, suriname.awayId, suriname.awayName], [-687, "Flora (Suriname)", 9, "Gegner"]);
+  // Die estnischen Spiele bleiben unverändert dasselbe Objekt.
+  const estonia = match("Estonia", 2);
+  assert.equal(mergeTeams(estonia, split), estonia);
+  // Ohne Namen bleibt der Name aus dem Spiel.
+  assert.equal(mergeTeams(match("Suriname", 3), [{ from: 687, to: 1, note: "Test" }]).homeName, "Flora Tallinn");
 });

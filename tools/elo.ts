@@ -22,6 +22,7 @@ import { classifyMatch, type EloMatch } from "../src/elo-competitions.ts";
 import { ELO_COMPETITIONS, ELO_CONFIG, ELO_EXCLUDE_PATTERN, ELO_NATIONAL_CATEGORY_COMPETITIONS, ELO_SYSTEMS, eloSystemLabel, type EloSystem } from "../src/elo-config.ts";
 import { getEloHistory, getEloRanking, getTeamElo } from "../src/elo-store.ts";
 import { autoUpdateElo, importFromCache, leagueTypeMap, rebuildElo, toEloMatch } from "../src/elo-update.ts";
+import { seasonHasOpenFixtures } from "../src/strength-builder.ts";
 import type { ApiLeague } from "../src/types.ts";
 
 const args = process.argv.slice(2);
@@ -98,21 +99,17 @@ async function backfill(database: AnalyzerDatabase): Promise<void> {
       if (ELO_EXCLUDE_PATTERN.test(league.league.name)) continue;
       if (classifyMatch({ leagueId: league.league.id, leagueName: league.league.name, leagueType: league.league.type, country: league.country.name }).excluded) continue;
     }
-    const maxSeason = Math.max(0, ...league.seasons.map((season) => counts.get(`${league.league.id}|${season.year}`) ?? 0));
     for (const season of league.seasons) {
       // Laufende Saisons kommen über die normalen Analysen; hier nur beendete.
       if (season.year < from || Date.parse(season.end) >= now) continue;
-      if (database.isEloSeasonComplete(league.league.id, season.year)) continue;
-      const have = counts.get(`${league.league.id}|${season.year}`) ?? 0;
-      // Die Abkürzung vergleicht mit der vollsten Saison im Bestand - auch wenn keine je ganz
-      // geladen wurde. Bei den Jugend- und Frauenwettbewerben markierte sie so am 29.09.2026 drei
-      // U21-Saisons mit rund 15 % Lücke als vollständig. Dort gilt sie nicht; eine Saison ist ein
-      // Aufruf. Bei den übrigen Wettbewerben ist dieselbe Schwäche möglich, aber ungeprüft.
-      if (!category && maxSeason > 0 && have >= 0.8 * maxSeason) {
-        if (!dryRun) database.markEloSeasonComplete(league.league.id, season.year, have);
+      if (database.isEloSeasonComplete(league.league.id, season.year)) {
         alreadyFull += 1;
         continue;
       }
+      // Keine Abkürzung mehr über „80 % der vollsten Saison im Bestand“ (bis 20.10.2026): Sie
+      // verglich am 24.09.2026 vor dem ersten Nachladen mit dem Cache, in dem je Saison nur die
+      // rund 30 Spiele der eigenen Analysen lagen, und markierte so 170 Ligasaisons mit rund
+      // 27.000 fehlenden Spielen als vollständig (`npm run data-check`). Eine Saison ist ein Aufruf.
       todo.push({ league, season: season.year });
     }
   }
@@ -128,15 +125,20 @@ async function backfill(database: AnalyzerDatabase): Promise<void> {
   const start = client.requestCount;
   let loaded = 0;
   let added = 0;
+  let stillOpen = 0;
   for (const item of todo) {
     if (client.requestCount - start >= budget) break;
     const fixtures = await client.getSeasonFixtures(item.league.league.id, item.season, true);
     const matches = fixtures.map((fixture) => toEloMatch(fixture, types)).filter((match): match is EloMatch => match !== null);
     added += database.saveEloMatches(matches, "backfill");
-    database.markEloSeasonComplete(item.league.league.id, item.season, matches.length);
+    // `end` führt API-Football als letzte bisher angesetzte Partie; mit offener Ansetzung läuft die
+    // Saison noch und wird beim nächsten Nachladen erneut geholt (dieselbe Regel wie die Ligastärke).
+    if (seasonHasOpenFixtures(fixtures, now)) stillOpen += 1;
+    else database.markEloSeasonComplete(item.league.league.id, item.season, matches.length);
     loaded += 1;
   }
-  console.log(`Geladen: ${loaded} Liga-Saisons, ${added} neue Spiele, ${client.requestCount - start} API-Aufrufe.`);
+  console.log(`Geladen: ${loaded} Liga-Saisons, ${added} neue Spiele, ${client.requestCount - start} API-Aufrufe`
+    + (stillOpen ? ` · ${stillOpen} laufen noch (offene Ansetzung), nicht als vollständig markiert` : "") + ".");
   console.log(`Noch offen: ${todo.length - loaded}. Danach: npm run elo -- build`);
 }
 
