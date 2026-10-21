@@ -42,8 +42,8 @@ export const DB_FILE = path.join(DATA_DIR, "analyzer.sqlite");
 export const LIVE_SNAPSHOT_DIR = path.join(DATA_DIR, "live-snapshots");
 export const LIVE_USAGE_FILE = path.join(DATA_DIR, "live-usage.json");
 
-const backupKeep = Number(process.env.BACKUP_KEEP ?? 7);
-const megaKeep = Number(process.env.MEGA_KEEP ?? 14);
+const backupKeep = Number(process.env.BACKUP_KEEP ?? 6);
+const megaKeep = Number(process.env.MEGA_KEEP ?? 6);
 
 export const config = {
   apiKey: process.env.API_FOOTBALL_KEY ?? "",
@@ -183,15 +183,15 @@ export const config = {
   // sinnvoll auf einer anderen Platte; BACKUP_AFTER_ANALYSIS=0 schaltet sie ab.
   backupAfterAnalysis: process.env.BACKUP_AFTER_ANALYSIS !== "0",
   backupDir: process.env.BACKUP_DIR ? path.resolve(process.env.BACKUP_DIR) : path.join(DATA_DIR, "backups"),
-  backupKeep: Number.isInteger(backupKeep) && backupKeep > 0 ? backupKeep : 7,
+  backupKeep: Number.isInteger(backupKeep) && backupKeep > 0 ? backupKeep : 6,
   // Dieselbe Sicherung zusätzlich bei MEGA (src/mega-store.ts), wenn MEGA_EMAIL und
-  // MEGA_PASSWORD gesetzt sind; dort bleiben die neuesten MEGA_KEEP (14, rund 2,7 GB).
+  // MEGA_PASSWORD gesetzt sind; dort bleiben die neuesten MEGA_KEEP (6, rund 1,2 GB; Davids Wahl).
   mega: process.env.MEGA_EMAIL && process.env.MEGA_PASSWORD
     ? {
         email: process.env.MEGA_EMAIL,
         password: process.env.MEGA_PASSWORD,
         folder: process.env.MEGA_FOLDER ?? "api-football-analyzer",
-        keep: Number.isInteger(megaKeep) && megaKeep > 0 ? megaKeep : 14
+        keep: Number.isInteger(megaKeep) && megaKeep > 0 ? megaKeep : 6
       }
     : null,
   eloTopUpRequestBudget:

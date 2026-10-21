@@ -624,7 +624,7 @@ nur auf Davids ausdrücklichen Wunsch mit `ANALYZER_NEW_DATABASE=1`.
   Dashboard-Analyse schreibt am Ende, nach Abrechnung und Kalibrier-Kurzfassung,
   `analyzer-JJJJ-MM-TT.sqlite.gz` nach `data/backups/` (oder `BACKUP_DIR`, besser eine andere
   Platte), eine Datei je Berliner Tag, eine spätere Analyse am selben Tag ersetzt sie; die
-  neuesten `BACKUP_KEEP` (7) Dateien bleiben, gezählt nach Dateien, nicht nach Tagen. Kopiert
+  neuesten `BACKUP_KEEP` (6) Dateien bleiben, gezählt nach Dateien, nicht nach Tagen. Kopiert
   über die Online-Sicherung von SQLite (eine Dateikopie verlöre, was noch im WAL steht), geprüft
   mit `quick_check`, erst dann gepackt und umbenannt - scheitert etwas, bleibt die bisherige
   Sicherung. Rund 190 MB und 15 s je Analyse, kein API-Budget. Von Hand `npm run backup`,
@@ -632,7 +632,7 @@ nur auf Davids ausdrücklichen Wunsch mit `ANALYZER_NEW_DATABASE=1`.
   **Seit 21.10.2026 zusätzlich bei MEGA** (Davids Wahl, 20 GB kostenlos), wenn `MEGA_EMAIL` und
   `MEGA_PASSWORD` in `.env` stehen: `src/mega-store.ts` über das Paket `megajs` (nicht von MEGA
   selbst), Regeln in `src/remote-backup.ts` - erst hochladen, dann die ältere Fassung des Tages
-  und alles über `MEGA_KEEP` (14) **endgültig** löschen (der Papierkorb zählte sonst gegen den
+  und alles über `MEGA_KEEP` (6, Davids Wahl vom 21.10.2026) **endgültig** löschen (der Papierkorb zählte sonst gegen den
   Speicher), Ordner `MEGA_FOLDER`. Scheitert das Hochladen, bleibt die lokale Sicherung, und die
   Analyse läuft weiter. Empfohlen ist ein eigenes MEGA-Konto nur dafür: Das Passwort steht im
   Klartext in `.env`, und eine Zwei-Faktor-Anmeldung kann das Skript nicht bedienen.

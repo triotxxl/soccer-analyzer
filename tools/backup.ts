@@ -3,7 +3,7 @@
  *
  *   npm run backup
  *
- * Ziel `data/backups/` oder `BACKUP_DIR`, eine Datei je Tag, die neuesten `BACKUP_KEEP` (7)
+ * Ziel `data/backups/` oder `BACKUP_DIR`, eine Datei je Tag, die neuesten `BACKUP_KEEP` (6)
  * bleiben; mit MEGA-Zugang in `.env` zusätzlich dort. Kostet kein API-Budget. Zurückspielen:
  * `npm run restore` (`tools/restore.ts`).
  */
