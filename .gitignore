@@ -8,6 +8,7 @@ node_modules/
 data/cache/
 data/analysis-cache/
 data/analyzer.sqlite*
+data/backups/
 data/tmp/
 data/live-snapshots/
 data/live-usage.json

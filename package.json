@@ -43,7 +43,8 @@
     "data-check": "node tools/data-check.ts",
     "add-tipico-names": "node tools/add-tipico-names.ts",
     "prepare-analysis": "node --env-file-if-exists=.env tools/prepare-analysis.ts",
-    "kombi-tipps": "node tools/kombi-tipps.ts"
+    "kombi-tipps": "node tools/kombi-tipps.ts",
+    "backup": "node --env-file-if-exists=.env tools/backup.ts"
   },
   "engines": {
     "node": ">=24.0.0"

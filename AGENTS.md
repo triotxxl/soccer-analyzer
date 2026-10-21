@@ -592,6 +592,17 @@ Benutzer auf Deutsch und führe Analyseaufträge selbstständig über die vorhan
   An dem Tag ist die Analyse entsprechend teurer.
 - Historische xG-Werte und bestätigte Nichtverfügbarkeit werden in SQLite gehalten; der
   xG-Erstaufbau darf pro Dashboard-Lauf höchstens 250 zusätzliche API-Anfragen auslösen.
+- **Sicherung der Datenbank** (seit 21.10.2026, `src/backup.ts`, Davids Wunsch): Jede
+  Dashboard-Analyse schreibt am Ende, nach Abrechnung und Kalibrier-Kurzfassung,
+  `analyzer-JJJJ-MM-TT.sqlite.gz` nach `data/backups/` (oder `BACKUP_DIR`, besser eine andere
+  Platte), eine Datei je Berliner Tag, eine spätere Analyse am selben Tag ersetzt sie; die
+  neuesten `BACKUP_KEEP` (7) Dateien bleiben, gezählt nach Dateien, nicht nach Tagen. Kopiert
+  über die Online-Sicherung von SQLite (eine Dateikopie verlöre, was noch im WAL steht), geprüft
+  mit `quick_check`, erst dann gepackt und umbenannt - scheitert etwas, bleibt die bisherige
+  Sicherung. Rund 190 MB und 15 s je Analyse, kein API-Budget. Von Hand `npm run backup`,
+  abschalten mit `BACKUP_AFTER_ANALYSIS=0`. Cache und Snapshots sind nicht dabei.
+  **Zurückspielen:** App und Analysen beenden, `data/analyzer.sqlite-wal` und `-shm` löschen,
+  die gewählte Datei entpacken und als `data/analyzer.sqlite` ablegen.
 ## Apps
 
 Seit 19.10.2026 liegen die Oberflächen unter `apps/` (vorher `frontend/`):

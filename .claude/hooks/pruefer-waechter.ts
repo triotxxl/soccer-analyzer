@@ -49,6 +49,7 @@ export const BLOCKED_SCRIPTS: Readonly<Record<string, string>> = {
   "kelly-tracker": "schreibt docs/kelly-tracker.json",
   "prepare-analysis": "kann API-Football aufrufen (Ligaliste, Ansetzungen) und schreibt in den Cache",
   "add-tipico-names": "schreibt in die Dashboard-Snapshots unter output/",
+  backup: "schreibt eine Sicherung der Datenbank und löscht ältere",
   app: "startet den Server der App",
   "app:build": "schreibt den Build der App",
   "app:preview": "startet einen Server",

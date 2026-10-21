@@ -1,8 +1,9 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { ApiFootballClient } from "./api.ts";
-import { config, ROOT_DIR } from "./config.ts";
+import { config, DB_FILE, ROOT_DIR } from "./config.ts";
 import { AnalysisSnapshotCache } from "./analysis-cache.ts";
+import { backupDatabase, backupLine } from "./backup.ts";
 import {
   runAnalysis,
   runDrawCriteriaAnalysis,
@@ -660,6 +661,21 @@ async function dashboard(args: ParsedArgs): Promise<void> {
         console.error(`Abrechnung übersprungen: ${error instanceof Error ? error.message : String(error)}`);
       }
       for (const line of calibrationSummaryLines(database)) console.log(line);
+    }
+    // Zuletzt, damit Abrechnung und Elo des Laufs mit drin sind. Scheitert sie, bleibt die
+    // Analyse gültig und die bisherige Sicherung des Tages stehen.
+    if (config.backupAfterAnalysis) {
+      try {
+        const saved = await backupDatabase({
+          source: DB_FILE,
+          directory: config.backupDir,
+          keep: config.backupKeep,
+          timezone: config.timezone
+        });
+        console.log(backupLine(saved));
+      } catch (error) {
+        console.error(`Sicherung fehlgeschlagen, die bisherige bleibt: ${error instanceof Error ? error.message : String(error)}`);
+      }
     }
     console.log(`Dashboard-Daten erstellt: ${files.latest}`);
     console.log(`JSON-Snapshot gespeichert: ${files.snapshot}`);
