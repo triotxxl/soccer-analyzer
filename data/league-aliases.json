@@ -1219,6 +1219,11 @@
     "country": "Cambodia",
     "league": "C-League"
   },
+  "kamerun|elite one": {
+    "leagueId": 411,
+    "country": "Cameroon",
+    "league": "Elite One"
+  },
   "kanada|canadian premier league": {
     "leagueId": 479,
     "country": "Canada",

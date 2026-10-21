@@ -1504,6 +1504,11 @@
     "apiTeamId": 6009,
     "apiTeamName": "B 93"
   },
+  "bahir dar kenema fc": {
+    "tipicoName": "Bahir Dar Kenema FC",
+    "apiTeamId": 4112,
+    "apiTeamName": "Bahardar"
+  },
   "baku sc": {
     "tipicoName": "Baku SC",
     "apiTeamId": 22788,
@@ -2273,6 +2278,11 @@
     "tipicoName": "Cancun FC",
     "apiTeamId": 14276,
     "apiTeamName": "Cancún"
+  },
+  "canon s de yaounde": {
+    "tipicoName": "Canon S. de Yaounde",
+    "apiTeamId": 5560,
+    "apiTeamName": "Canon"
   },
   "cape town city fc": {
     "tipicoName": "Cape Town City FC",
@@ -5664,6 +5674,11 @@
     "apiTeamId": 10696,
     "apiTeamName": "Ekranas"
   },
+  "fk energetik": {
+    "tipicoName": "FK Energetik",
+    "apiTeamId": 5573,
+    "apiTeamName": "Mingəçevir"
+  },
   "fk gabala": {
     "tipicoName": "FK Gabala",
     "apiTeamId": 627,
@@ -6269,6 +6284,11 @@
     "apiTeamId": 1823,
     "apiTeamName": "Gateshead"
   },
+  "gazelle fa de garoua": {
+    "tipicoName": "Gazelle FA de Garoua",
+    "apiTeamId": 28568,
+    "apiTeamName": "Gazelle"
+  },
   "gd chaves": {
     "tipicoName": "GD Chaves",
     "apiTeamId": 223,
@@ -6583,6 +6603,11 @@
     "tipicoName": "Guerreros de Autlan",
     "apiTeamId": 26426,
     "apiTeamName": "Guerreros"
+  },
+  "guerreros del pacifico fc": {
+    "tipicoName": "Guerreros Del Pacífico FC",
+    "apiTeamId": 28304,
+    "apiTeamName": "Guerreros del Pacifico"
   },
   "guidonia montecelio": {
     "tipicoName": "Guidonia Montecelio",
@@ -8084,6 +8109,11 @@
     "apiTeamId": 21041,
     "apiTeamName": "El Linqueño"
   },
+  "lion city sailors fc": {
+    "tipicoName": "Lion City Sailors FC",
+    "apiTeamId": 4204,
+    "apiTeamName": "Home United"
+  },
   "lions fc": {
     "tipicoName": "Lions FC",
     "apiTeamId": 10217,
@@ -8203,6 +8233,11 @@
     "tipicoName": "Ludogorets Razgrad II",
     "apiTeamId": 1409,
     "apiTeamName": "Ludogorets II"
+  },
+  "lugazi municipal fc": {
+    "tipicoName": "Lugazi Municipal FC",
+    "apiTeamId": 24776,
+    "apiTeamName": "Lugazi"
   },
   "lunds bk": {
     "tipicoName": "Lunds BK",
@@ -10771,7 +10806,7 @@
   },
   "san antonio fc": {
     "tipicoName": "San Antonio FC",
-    "apiTeamId": 4017,
+    "apiTeamId": 23310,
     "apiTeamName": "San Antonio"
   },
   "san diego fc": {
@@ -11173,6 +11208,11 @@
     "tipicoName": "Shabana FC",
     "apiTeamId": 19489,
     "apiTeamName": "Shabana"
+  },
+  "shahdagh qusar": {
+    "tipicoName": "Shahdagh Qusar",
+    "apiTeamId": 5576,
+    "apiTeamName": "Şahdağ"
   },
   "shamakhi fk": {
     "tipicoName": "Shamakhi FK",
@@ -12609,6 +12649,11 @@
     "apiTeamId": 2540,
     "apiTeamName": "Universitario"
   },
+  "updf fc": {
+    "tipicoName": "UPDF FC",
+    "apiTeamId": 12466,
+    "apiTeamName": "UPDF"
+  },
   "ura fc": {
     "tipicoName": "URA FC",
     "apiTeamId": 12459,
@@ -12788,6 +12833,11 @@
     "tipicoName": "Vancouver Langley",
     "apiTeamId": 20881,
     "apiTeamName": "Vancouver FC"
+  },
+  "vanlose if": {
+    "tipicoName": "Vanlose IF",
+    "apiTeamId": 6065,
+    "apiTeamName": "Vanløse"
   },
   "vaqueros reynosa fc": {
     "tipicoName": "Vaqueros Reynosa FC",
@@ -13033,6 +13083,11 @@
     "tipicoName": "Wealdstone FC",
     "apiTeamId": 8663,
     "apiTeamName": "Wealdstone"
+  },
+  "welayta dicha fc": {
+    "tipicoName": "Welayta Dicha FC",
+    "apiTeamId": 4124,
+    "apiTeamName": "Welayta Dicha"
   },
   "welling phoenix f": {
     "tipicoName": "Welling. Phoenix (F)",
