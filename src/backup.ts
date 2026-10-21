@@ -19,7 +19,7 @@ import { pipeline } from "node:stream/promises";
 import { createGzip } from "node:zlib";
 import { zonedDate } from "./util.ts";
 
-const BACKUP_FILE = /^analyzer-(\d{4}-\d{2}-\d{2})\.sqlite\.gz$/;
+export const BACKUP_FILE = /^analyzer-(\d{4}-\d{2}-\d{2})\.sqlite\.gz$/;
 const TEMP_SUFFIX = ".tmp";
 
 export interface BackupOptions {

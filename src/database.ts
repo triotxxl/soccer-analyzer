@@ -1,4 +1,4 @@
-import { mkdirSync } from "node:fs";
+import { existsSync, mkdirSync } from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 import path from "node:path";
 import { config, DB_FILE } from "./config.ts";
@@ -271,10 +271,22 @@ export interface StoredProfileSnapshot {
   }>;
 }
 
+export const MISSING_DATABASE_MESSAGE = [
+  `Keine Datenbank unter ${DB_FILE}.`,
+  "Neuer PC: MEGA-Zugang (MEGA_EMAIL, MEGA_PASSWORD, MEGA_FOLDER) in .env eintragen und `npm run restore` -",
+  "das holt die neueste Sicherung. Eine Datei liegt schon vor: `npm run restore -- --file <pfad>`.",
+  "Ganz neu anfangen (ohne Prognosen, Abrechnungen und Elo): ANALYZER_NEW_DATABASE=1 in .env."
+].join("\n");
+
 export class AnalyzerDatabase {
   private readonly db: DatabaseSync;
 
   constructor(filename = DB_FILE) {
+    // Auf einem neuen PC legte jeder Befehl sonst still eine leere Datenbank an - ohne Prognosen,
+    // Abrechnungen und Elo, das neu aufzubauen Tausende Aufrufe kostet.
+    if (filename === DB_FILE && !existsSync(filename) && process.env.ANALYZER_NEW_DATABASE !== "1") {
+      throw new Error(MISSING_DATABASE_MESSAGE);
+    }
     mkdirSync(path.dirname(filename), { recursive: true });
     this.db = new DatabaseSync(filename);
     this.db.exec("PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;");

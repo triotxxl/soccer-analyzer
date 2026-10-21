@@ -4,15 +4,12 @@
  *   npm run backup
  *
  * Ziel `data/backups/` oder `BACKUP_DIR`, eine Datei je Tag, die neuesten `BACKUP_KEEP` (7)
- * bleiben. Kostet kein API-Budget. Zurückspielen steht in AGENTS.md („Pflege“, Sicherung).
+ * bleiben; mit MEGA-Zugang in `.env` zusätzlich dort. Kostet kein API-Budget. Zurückspielen:
+ * `npm run restore` (`tools/restore.ts`).
  */
-import { backupDatabase, backupLine } from "../src/backup.ts";
-import { config, DB_FILE } from "../src/config.ts";
+import { runBackup } from "../src/backup-run.ts";
 
-const result = await backupDatabase({
-  source: DB_FILE,
-  directory: config.backupDir,
-  keep: config.backupKeep,
-  timezone: config.timezone
-});
-console.log(backupLine(result));
+const report = await runBackup();
+for (const line of report.lines) console.log(line);
+for (const line of report.errors) console.error(line);
+if (report.errors.length > 0) process.exitCode = 1;

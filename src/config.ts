@@ -43,6 +43,7 @@ export const LIVE_SNAPSHOT_DIR = path.join(DATA_DIR, "live-snapshots");
 export const LIVE_USAGE_FILE = path.join(DATA_DIR, "live-usage.json");
 
 const backupKeep = Number(process.env.BACKUP_KEEP ?? 7);
+const megaKeep = Number(process.env.MEGA_KEEP ?? 14);
 
 export const config = {
   apiKey: process.env.API_FOOTBALL_KEY ?? "",
@@ -183,6 +184,16 @@ export const config = {
   backupAfterAnalysis: process.env.BACKUP_AFTER_ANALYSIS !== "0",
   backupDir: process.env.BACKUP_DIR ? path.resolve(process.env.BACKUP_DIR) : path.join(DATA_DIR, "backups"),
   backupKeep: Number.isInteger(backupKeep) && backupKeep > 0 ? backupKeep : 7,
+  // Dieselbe Sicherung zusätzlich bei MEGA (src/mega-store.ts), wenn MEGA_EMAIL und
+  // MEGA_PASSWORD gesetzt sind; dort bleiben die neuesten MEGA_KEEP (14, rund 2,7 GB).
+  mega: process.env.MEGA_EMAIL && process.env.MEGA_PASSWORD
+    ? {
+        email: process.env.MEGA_EMAIL,
+        password: process.env.MEGA_PASSWORD,
+        folder: process.env.MEGA_FOLDER ?? "api-football-analyzer",
+        keep: Number.isInteger(megaKeep) && megaKeep > 0 ? megaKeep : 14
+      }
+    : null,
   eloTopUpRequestBudget:
     Number.isInteger(eloTopUpRequestBudget) && eloTopUpRequestBudget >= 0
       ? eloTopUpRequestBudget

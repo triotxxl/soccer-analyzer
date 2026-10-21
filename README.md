@@ -397,6 +397,14 @@ API_REQUESTS_PER_MINUTE=300
 ```
 
 `.env`, API-Cache und die lokale SQLite-Datenbank werden nicht mit Git versioniert.
+
+Die Datenbank kommt auf einem weiteren PC aus der Sicherung: MEGA-Zugang (`MEGA_EMAIL`,
+`MEGA_PASSWORD`, `MEGA_FOLDER`) in `.env` eintragen und `npm run restore` ausführen - das lädt
+die neueste Sicherung und spielt sie als `data/analyzer.sqlite` ein. Eine schon vorhandene Datei:
+`npm run restore -- --file <pfad>`. Ohne Datenbank verweigern Analyse und App den Start, statt
+still eine leere anzulegen; wer wirklich neu beginnen will, setzt `ANALYZER_NEW_DATABASE=1`.
+Jede Dashboard-Analyse schreibt am Ende eine neue Sicherung (`npm run backup` von Hand).
+
 Mit `npm run smoke` lässt sich der API-Zugang mit einer einzigen, gecachten Abfrage prüfen.
 Der API-Client begrenzt echte Netzwerkaufrufe auf 300 Requests pro Minute. Meldet
 API-Football ein Rate Limit (HTTP 429 oder `too many requests`), wartet der laufende

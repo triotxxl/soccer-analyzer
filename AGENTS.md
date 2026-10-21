@@ -4,6 +4,34 @@ Dieses Repository ist ein chatgesteuerter Fußball-Analyzer mit einer rein darst
 lokalen React-App. Antworte dem
 Benutzer auf Deutsch und führe Analyseaufträge selbstständig über die vorhandene CLI aus.
 
+## Neuer PC
+
+Davids Anweisung vom 21.10.2026: Wird das Projekt auf einem anderen PC eingerichtet (frischer
+Klon, `npm install`, `.env` neu) oder fehlt `data/analyzer.sqlite`, **weise David vor jeder Analyse
+darauf hin, wie die Datenbank eingebunden wird** - nicht still weiterarbeiten. Die Datenbank
+liegt nicht im Repository; ohne sie fehlen alle Prognosen, Abrechnungen, Zuordnungen und das Elo,
+und ihr Neuaufbau kostet Tausende API-Aufrufe. Schritte für David:
+
+1. `npm install`, `.env.example` nach `.env` kopieren, `API_FOOTBALL_KEY` eintragen.
+2. MEGA-Zugang des Sicherungskontos in `.env`: `MEGA_EMAIL`, `MEGA_PASSWORD`, `MEGA_FOLDER`
+   (derselbe Ordner wie auf dem ersten PC, Vorgabe `api-football-analyzer`).
+3. `npm run restore` - lädt die neueste Sicherung von MEGA, prüft sie und legt sie als
+   `data/analyzer.sqlite` ab. Ohne MEGA: `npm run restore -- --file <pfad zur .sqlite.gz>`.
+   Eine vorhandene Datenbank ersetzt erst `--force`, und sie wird dabei beiseitegelegt.
+4. Nicht in der Sicherung: der API-Cache (`data/cache/`, füllt sich mit den Analysen, die erste
+   ist teurer), die Snapshots in `output/` (Marktprofil und Kelly-Automatik beginnen mit dem
+   übertragenen Stand der Datenbank, aber ohne alte Snapshots), `data.json` und Claudes Notizen
+   (`C:\Users\<Name>\.claude\projects\…\memory\` - von Hand kopieren, sonst fehlen die
+   Daueraufträge).
+
+**Immer nur ein PC zur Zeit:** Jede Analyse sichert am Ende. Wer danach am anderen PC weitermacht,
+spielt dort vorher mit `npm run restore -- --force` den neuesten Stand ein - sonst laufen zwei
+Datenbanken auseinander, und SQLite-Dateien lassen sich nicht zusammenführen.
+
+Ohne Datenbank verweigert `AnalyzerDatabase` den Start mit genau diesem Hinweis
+(`MISSING_DATABASE_MESSAGE` in `src/database.ts`), statt still eine leere anzulegen. Neu beginnen
+nur auf Davids ausdrücklichen Wunsch mit `ANALYZER_NEW_DATABASE=1`.
+
 ## Primärer data.json-Workflow
 
 1. Die vom Benutzer aktualisierte `data.json` im Repository ist die alleinige Quelle für
@@ -601,8 +629,14 @@ Benutzer auf Deutsch und führe Analyseaufträge selbstständig über die vorhan
   mit `quick_check`, erst dann gepackt und umbenannt - scheitert etwas, bleibt die bisherige
   Sicherung. Rund 190 MB und 15 s je Analyse, kein API-Budget. Von Hand `npm run backup`,
   abschalten mit `BACKUP_AFTER_ANALYSIS=0`. Cache und Snapshots sind nicht dabei.
-  **Zurückspielen:** App und Analysen beenden, `data/analyzer.sqlite-wal` und `-shm` löschen,
-  die gewählte Datei entpacken und als `data/analyzer.sqlite` ablegen.
+  **Seit 21.10.2026 zusätzlich bei MEGA** (Davids Wahl, 20 GB kostenlos), wenn `MEGA_EMAIL` und
+  `MEGA_PASSWORD` in `.env` stehen: `src/mega-store.ts` über das Paket `megajs` (nicht von MEGA
+  selbst), Regeln in `src/remote-backup.ts` - erst hochladen, dann die ältere Fassung des Tages
+  und alles über `MEGA_KEEP` (14) **endgültig** löschen (der Papierkorb zählte sonst gegen den
+  Speicher), Ordner `MEGA_FOLDER`. Scheitert das Hochladen, bleibt die lokale Sicherung, und die
+  Analyse läuft weiter. Empfohlen ist ein eigenes MEGA-Konto nur dafür: Das Passwort steht im
+  Klartext in `.env`, und eine Zwei-Faktor-Anmeldung kann das Skript nicht bedienen.
+  **Zurückspielen:** `npm run restore` (`tools/restore.ts`, Abschnitt „Neuer PC“).
 ## Apps
 
 Seit 19.10.2026 liegen die Oberflächen unter `apps/` (vorher `frontend/`):
