@@ -60,7 +60,14 @@ Aus dem Auftrag ableiten; im Zweifel **Review**.
 - **Vorabmessung** - für einen neuen Filter oder ein neues Modellelement vor dem Bau: Basisrate,
   Lift je Kandidat, Abstand zum fairen Tipico-Preis. Schwellen nicht an denselben Daten suchen,
   gegen die später gemessen wird, oder das ausdrücklich als Schwäche nennen.
-- **Kombi-Auswahl** - „die besten Tipps bis …“, „vielversprechendste Spiele für eine Kombi“, eine
+- **Qualitative Tipps** - „die besten Tipps bis …“, „Sieg-Tipps“, „wen siehst du vorn“, „qualitativ“,
+  Gegnerstärke, Ausfälle: Lade zuerst den Skill `.claude/skills/qualitative-tipps/` (SKILL.md, dann
+  `references/methode.md`) und arbeite genau danach - Rechnung mit
+  `node .claude/skills/qualitative-tipps/scripts/gegnerstaerke.ts`, feste Regel mit Stufen statt
+  fester Anzahl, Meldungen per WebSearch stufen nur herab. Das ist seit 22.10.2026 die Vorgabe für
+  Tipplisten (Davids Wunsch); die Kombi-Auswahl unten nur, wenn er ausdrücklich Kombi-Tipps nach
+  fairem Preis will.
+- **Kombi-Auswahl** - „vielversprechendste Spiele für eine Kombi“, eine
   Tippliste mit Mindestquote: Lies zuerst `AGENTS.md`, Abschnitt „Kombi-Auswahl nach fairem Preis“,
   und arbeite mit `npm run kombi-tipps` (je Spiel ein Tipp nach fairem Tipico-Preis, Rückblick mit
   `--ab`, Messung mit `--messen`). Die Regel dort ist vorab festgelegt; eigene Skripte nur für Fragen, die
@@ -219,8 +226,9 @@ Vom Billigen zum Teuren:
 - Erlaubt: `npm test`, `npm run typecheck`, `npm run report`, `npm run edge-report -- --simulate`,
   `npm run quickpick-report` (ohne `--write`), `npm run draw-signals-report`, `npm run btts-check`,
   `npm run live-model-report -- …`, `npm run coverage`, `npm run kombi-tipps -- …`, `npm run elo-backtest -- …`,
-  `npm run elo -- ranking`, `npm run elo -- team <ID>`. Gesperrt bleibt `prepare-analysis` (kann
-  die API fragen).
+  `npm run elo -- ranking`, `npm run elo -- team <ID>`,
+  `node .claude/skills/qualitative-tipps/scripts/gegnerstaerke.ts …` (`--json` nur ins
+  Temp-Verzeichnis). Gesperrt bleibt `prepare-analysis` (kann die API fragen).
 - Lange Rechnungen im Hintergrund starten, die Ausgabe in eine Temp-Datei schreiben und in der
   Zwischenzeit weiterprüfen; vor dem Bericht auf das Ergebnis warten. Eine Elo-Rückrechnung braucht
   je Jahr und Einstellung 3 bis 6 Minuten und rund 2,5 GB Arbeitsspeicher: höchstens zwei zugleich,

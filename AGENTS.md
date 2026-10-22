@@ -1295,6 +1295,31 @@ nachgezogen, nicht gesammelt am Ende.
   `npm run kombi-tipps -- --min-quote 1.6`; nur die Anstoßprüfung fehlt dort. `flagsOf` liefert
   seitdem Codes (`KombiFlag`), `flagText` die bisherigen Zeilen der Kommandozeile.
 
+## Qualitative Tipps (Gegnerstärke)
+
+- Davids Auftrag vom 22.10.2026: Tipplisten („die besten Tipps bis heute Abend“, „Sieg-Tipps bis
+  morgen früh“) **qualitativ** statt über die Kombi-Auswahl. Saisonzahlen werden nach der Stärke der
+  letzten 5/10 Gegner gewichtet (Elo der Gegner, deren Bilanz, Tore gegen starke und schwache
+  Gegner). Dazu kommen Ausfälle, Rotation, Trainerwechsel und Motivation per Recherche, erst dann der
+  Abgleich mit Modell und Tipico. Ausgeführt vom Prüfer-Agenten (Modus „Qualitative Tipps“) nach dem
+  Skill `.claude/skills/qualitative-tipps/`. Die Rechnung steht in `scripts/gegnerstaerke.ts` dort
+  (fünf Sichten E/A/B/X/M, 0 Aufrufe, Datenbank `readOnly`), mit fester Regel und Stufen
+  klar/eher/knapp statt fester Anzahl (Davids Frage, warum es genau 5 Tipps waren).
+- **Messstand 22.10.2026:**
+  - Beim 1X2 schlägt die Gegnerbereinigung das Elo allein nicht (+0,0126 ± 0,0013 bzw.
+    +0,0105 ± 0,0010 Log-Loss).
+  - Bei Über 2,5 ist sie besser als das Elo allein, aber schlechter als das App-Modell.
+  - Wo sie oder das Elo mehr als 10 Punkte vom fairen Tipico-Preis abwichen, trat der faire Preis
+    ein (Ertrag −9,0 ± 2,7 % über 2.744 Ligaspiele).
+  - Jede Tippliste trägt deshalb „realistisch = fair + ¼ Abstand“ und kennzeichnet, wo sie nur den
+    Tipico-Favoriten bestätigt.
+  - Die Bereinigung bevorzugt Teams aus der schwächeren Liga. Das Skript stuft sie herab
+    (Ligastärke-Faktor < 0,97 bzw. < 0,80).
+- **Offen:**
+  - Nebenbefund, dass eine reine Elo-Poisson-Rechnung das 1X2 der App schlug (−0,026 ± 0,004,
+    nicht vorab festgelegt). Eine saubere Messung ist David vorgeschlagen.
+  - `/injuries` und `/fixtures/lineups` von API-Football fragt der Analyzer bisher nicht ab.
+
 ## Quickpicker
 
 Der **Quickpicker** neben dem Filter-Knopf filtert die Tabelle nach einer **Voreinstellung**.
