@@ -394,6 +394,14 @@ export const ELO_TEAM_MERGES: EloTeamMerge[] = [
     note: "Kenya Police: FKF Premier League und Shield Cup 2021-2026, CAF/CECAFA 2024-2025 (20.10.2026)"
   },
   {
+    // API-Football hat Al Shorta (Bagdad) zwischen 05.10. und 21.10.2026 rückwirkend umnummeriert:
+    // dieselben Fixtures (Al Zawra'a - Al Shorta 1628014, Al Shorta - Al Karkh 18.10., AFC Champions
+    // League Two) tragen im Cache vom 05.10. die 5242, ab 21.10. die 28571. Den sudanesischen Teil
+    // von 5242 trennt der Eintrag weiter unten ab; „World" sind bei 5242 nur AFC-Wettbewerbe.
+    from: 5242, to: 28571, countries: ["Iraq", "World"],
+    note: "Al Shorta (Irak): Iraqi League und AFC 2020-2026, seit Oktober 2026 unter 28571 (22.10.2026)"
+  },
+  {
     // Trennung: 687 ist Flora Tallinn (Meistriliiga, Europapokal, Testspiele). API-Football legte
     // 2023 die 24 Spiele eines Vereins der zweiten Liga Surinams unter dieselbe ID, an vier Tagen
     // zeitgleich mit Spielen in Estland (`npm run data-check`, 20.10.2026).
