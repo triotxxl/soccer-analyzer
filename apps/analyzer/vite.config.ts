@@ -17,6 +17,8 @@ export default defineConfig({
     name: "analyzer",
     environment: "jsdom",
     setupFiles: "../shared/vitest.setup.ts",
-    css: true
+    css: true,
+    // Node ab 25: eigenes localStorage überdeckt das von jsdom (Begründung in apps/shared/vitest.config.ts).
+    execArgv: ["--no-experimental-webstorage"]
   }
 });
