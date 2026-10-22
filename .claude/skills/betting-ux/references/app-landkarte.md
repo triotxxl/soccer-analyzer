@@ -262,9 +262,13 @@ Ansicht unter „Einzelheiten je Ansicht“ lesen, dazu immer „Was schon bewus
   nichts gekürzt** (Anstoß, Spiel, Auswahl hell wie das Spiel, Quote), „Spiel angepfiffen – neu
   mischen“, „x von k übertragen“, „Der Wettschein hat sich geändert …“.
 - **Kopieren** (seit 14.10.2026, Davids Entscheidungen): je Kombi und „Alle kopieren“, beide
-  neutral. Text aus `comboCopyText` (`betCart.ts`): Kopf „Kombi 1 · 4 Spiele · Quote 6,12“, je Tipp
-  „Mi 14.10. 21:00 | Heim – Gast | Tipp | 1,60“ (mit Datum, ohne Liga, Namen nach Einstellung),
-  Kombis durch eine Leerzeile getrennt, **die Warnung einmal als letzte Zeile**. Nie ✓/★, Einsatz,
+  neutral. Markdown aus `comboCopyText` (`betCart.ts`, seit 22.10.2026): Überschrift
+  „## Kombi 1 · 4 Spiele · Quote 6,12“, darunter eine Tabelle Anstoß | Spiel | Tipp | Quote, je Tipp
+  „Mi 14.10. 21:00 | Heim – Gast | Tipp | 1,60“ (mit Datum, ohne Liga, Namen nach Einstellung), das
+  Spiel seit 21.10.2026 als Link zur Tipico-Spielseite (nur bei Einträgen mit `tipico.eventId`),
+  Kombis durch eine Leerzeile getrennt, **die Warnung einmal als letzte Zeile** (als Zitat „> …“).
+  Jede Kopie landet zusätzlich in `data/tmp/kombis.md` (ersetzt die Datei); Tooltip und Rückmeldung
+  nennen den Pfad. Nie ✓/★, Einsatz,
   Gewinn, Modellchance, Vorteil, „übertragen“. Kombis mit angepfiffenem Spiel: „Kopieren“
   gesperrt, bei „Alle kopieren“ ausgelassen (Rückmeldung nennt die Zahl). Rückmeldung: Knopf 2 s
   „Kopiert“ (kein Häkchen) plus Live-Region. Ohne Zwischenablage: markiertes Textfeld mit

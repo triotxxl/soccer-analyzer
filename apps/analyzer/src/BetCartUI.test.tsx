@@ -91,15 +91,34 @@ describe("BetSlipWindow", () => {
       const region = screen.getByRole("region", { name: "Kombi 1" });
       await user.click(within(region).getByRole("button", { name: "Kombi 1 kopieren" }));
       expect(await navigator.clipboard.readText()).toBe([
-        "Kombi 1 · 2 Spiele · Quote 3,60",
-        "So 16.08. 20:00 | Heim 1 – Gast 1 | Heimsieg Heim 1 | 1,80",
-        "So 16.08. 21:30 | Heim 2 – Gast 2 | Heimsieg Heim 2 | 2,00",
+        "## Kombi 1 · 2 Spiele · Quote 3,60",
         "",
-        COMBO_WARNING
+        "| Anstoß | Spiel | Tipp | Quote |",
+        "|---|---|---|--:|",
+        "| So 16.08. 20:00 | Heim 1 – Gast 1 | Heimsieg Heim 1 | 1,80 |",
+        "| So 16.08. 21:30 | Heim 2 – Gast 2 | Heimsieg Heim 2 | 2,00 |",
+        "",
+        `> ${COMBO_WARNING}`
       ].join("\n"));
       expect(within(region).getByRole("button", { name: "Kombi 1 kopieren" })).toHaveTextContent("Kopiert");
       expect(screen.getByText("Kombi 1 kopiert (2 Tipps)")).toBeInTheDocument();
       expect(onCombosChange).not.toHaveBeenCalled();
+    });
+
+    it("schreibt die Kopie zusätzlich in die Markdown-Datei und nennt sie", async () => {
+      const user = userEvent.setup();
+      const save = vi.fn().mockResolvedValue(new Response(JSON.stringify({ file: "data/tmp/kombis.md" }), { status: 200 }));
+      vi.stubGlobal("fetch", save);
+      try {
+        slip([tip(1), tip(2)], undefined, [ready]);
+        await user.click(screen.getByRole("button", { name: "Kombi 1 kopieren" }));
+        expect(save).toHaveBeenCalledWith("/api/combos/markdown", expect.objectContaining({
+          method: "POST", body: await navigator.clipboard.readText()
+        }));
+        expect(await screen.findByText("Kombi 1 kopiert (2 Tipps) · auch in data/tmp/kombis.md")).toBeInTheDocument();
+      } finally {
+        vi.unstubAllGlobals();
+      }
     });
 
     it("sperrt eine Kombi mit angepfiffenem Spiel und lässt sie bei „Alle kopieren“ aus", async () => {
@@ -108,7 +127,7 @@ describe("BetSlipWindow", () => {
       expect(within(screen.getByRole("region", { name: "Kombi 2" })).getByRole("button", { name: "Kombi 2 kopieren" })).toBeDisabled();
       await user.click(screen.getByRole("button", { name: "Alle Kombis kopieren" }));
       const text = await navigator.clipboard.readText();
-      expect(text).toMatch(/^Kombi 1 · /);
+      expect(text).toMatch(/^## Kombi 1 · /);
       expect(text).not.toContain("Kombi 2");
       expect(screen.getByText("1 Kombi kopiert · 1 mit angepfiffenem Spiel ausgelassen")).toBeInTheDocument();
     });

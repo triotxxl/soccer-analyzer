@@ -120,6 +120,11 @@ export interface TipicoNames {
   awayTeam: string;
   country: string;
   league: string;
+  /**
+   * Die Tipico-Ereignis-ID aus der data.json (seit 21.10.2026). Nur für den Link zur Spielseite in
+   * der Kopie des Wettscheins (`tipicoEventUrl`); kein Zugriff auf Tipico. Fehlt in älteren Läufen.
+   */
+  eventId?: string;
 }
 
 export interface DashboardFixture {

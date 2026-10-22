@@ -1294,6 +1294,10 @@ function Dashboard({ document }: { document: DashboardDocument }) {
   const [quickpickStore, setQuickpickStore] = useState<QuickpickStore>(loadQuickpickStore);
   const quickpickSettings = settingsOf(quickpickStore);
   const { cart, lastChange, putEntry, putEntries, removeEntry, removeStarted, clear: clearCart, undo: undoCart } = useBetCart();
+  // Die Links in der Kopie des Wettscheins kommen aus der geladenen Analyse, nicht aus dem
+  // gespeicherten Tipp - Tipps von vor dem 21.10.2026 tragen keine Tipico-Ereignis-ID.
+  const tipicoEventIds = useMemo(() => new Map(document.fixtures.flatMap((fixture) =>
+    fixture.tipico?.eventId ? [[fixture.fixtureId, fixture.tipico.eventId] as const] : [])), [document]);
   // Was „Alle n in den Wettschein“ getan hat - der Quickpicker meldet es im Fuß, statt den
   // Wettschein zu öffnen. `changeId` sagt, ob „Rückgängig“ noch genau diesen Schritt zurücknimmt.
   const [cartFeedback, setCartFeedback] = useState<QuickpickCartFeedback | null>(null);
@@ -1966,6 +1970,7 @@ function Dashboard({ document }: { document: DashboardDocument }) {
       setup={comboSetup}
       combos={combos}
       combosStale={combos.length > 0 && cartKey(cart) !== mixedKey}
+      tipicoEventIds={tipicoEventIds}
       onRemove={removeEntry}
       onRemoveStarted={() => removeStarted(Date.now())}
       onClear={clearCart}

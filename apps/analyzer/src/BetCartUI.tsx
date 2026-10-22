@@ -13,6 +13,24 @@ import { QUICKPICK_PRESETS } from "./quickpick";
 import { leagueName, selectionText, teamName, useNames, type NameSource } from "../../shared/src/names";
 import type { DashboardFixture, DashboardMarket } from "../../shared/src/types";
 
+/**
+ * Schreibt die kopierten Kombis zusätzlich nach `data/tmp/kombis.md` (Endpunkt in
+ * `apps/shared/server/endpoints.ts`) und liefert den Dateipfad. Scheitert das - etwa ohne
+ * App-Server -, bleibt es still bei der Zwischenablage.
+ */
+async function saveComboMarkdown(text: string): Promise<string | null> {
+  try {
+    const response = await fetch("/api/combos/markdown", {
+      method: "POST", headers: { "Content-Type": "text/markdown; charset=utf-8" }, body: text
+    });
+    if (!response.ok) return null;
+    const body = await response.json() as { file?: unknown };
+    return typeof body.file === "string" ? body.file : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Abstand der Liste zum Knopf und zum Fensterrand. */
 const MENU_GAP = 6;
 const MENU_MARGIN = 8;
@@ -360,7 +378,7 @@ function byGame(cart: CartEntry[]): CartEntry[][] {
  * Fokus regelt das Dashboard; die Kombis liegen dort, damit sie das Schließen überstehen.
  */
 export function BetSlipWindow({
-  cart, now, timezone, lastChange, setup, combos, combosStale,
+  cart, now, timezone, lastChange, setup, combos, combosStale, tipicoEventIds,
   onRemove, onRemoveStarted, onClear, onUndo, onSetupChange, onMix, onCombosChange, onClose
 }: {
   cart: CartEntry[];
@@ -371,6 +389,8 @@ export function BetSlipWindow({
   combos: Combo[];
   /** Der Wettschein hat sich seit dem Mischen geändert. */
   combosStale: boolean;
+  /** Tipico-Ereignis-IDs der geladenen Analyse je Fixture-ID, für die Links in der Kopie. */
+  tipicoEventIds?: ReadonlyMap<number, string>;
   onRemove(id: string): void;
   onRemoveStarted(): void;
   onClear(): void;
@@ -501,7 +521,8 @@ export function BetSlipWindow({
   const numbered = combos.map((combo, index) => ({ combo, number: index + 1 }));
   const copyable = numbered.filter(({ combo }) => !combo.entries.some(isStarted));
   const copy = async (key: string, label: string, items: typeof numbered, done: string) => {
-    const text = comboCopyText(items, names, timezone);
+    const text = comboCopyText(items, names, timezone, tipicoEventIds);
+    const saved = saveComboMarkdown(text);
     try {
       if (!navigator.clipboard?.writeText) throw new Error("Keine Zwischenablage");
       await navigator.clipboard.writeText(text);
@@ -510,6 +531,8 @@ export function BetSlipWindow({
       window.clearTimeout(copiedTimer.current);
       copiedTimer.current = window.setTimeout(() => setCopied(null), COPIED_MS);
       setAnnouncement(done);
+      const file = await saved;
+      if (file) setAnnouncement(`${done} · auch in ${file}`);
     } catch {
       setCopied(null);
       setCopyFallback({ key, label, text });
@@ -669,7 +692,7 @@ export function BetSlipWindow({
             <h4>Kombis{combos.length > 0 ? ` (${combos.length})` : ""}</h4>
             {combos.length > 0 && <button type="button" className="filter-reset cart-copy" aria-label="Alle Kombis kopieren"
               disabled={copyable.length === 0}
-              title={copyable.length < combos.length ? "Kombis mit angepfiffenem Spiel werden ausgelassen." : "Alle Kombis in die Zwischenablage"}
+              title={copyable.length < combos.length ? "Kombis mit angepfiffenem Spiel werden ausgelassen." : "Alle Kombis als Markdown in die Zwischenablage und nach data/tmp/kombis.md"}
               onClick={() => void copyAll()}>
               <Copy size={13} weight="bold" aria-hidden />{copied === "all" ? "Kopiert" : "Alle kopieren"}
             </button>}
@@ -687,7 +710,7 @@ export function BetSlipWindow({
                 <strong>Kombi {number} · {entries.length} Spiele · ab {time(entries[0]!.kickoff)}</strong>
                 <span className="cart-combo-odds">Quote {formatOdd(combo.combinedOdds)}</span>
                 <button type="button" className="filter-reset cart-copy" aria-label={`Kombi ${number} kopieren`} disabled={started}
-                  title={started ? "Ein Spiel läuft schon – die Quote gilt nicht mehr. Neu mischen." : "In die Zwischenablage"}
+                  title={started ? "Ein Spiel läuft schon – die Quote gilt nicht mehr. Neu mischen." : "Als Markdown in die Zwischenablage und nach data/tmp/kombis.md"}
                   onClick={() => void copyOne(combo, number)}>
                   <Copy size={13} weight="bold" aria-hidden />{copied === combo.id ? "Kopiert" : "Kopieren"}
                 </button>

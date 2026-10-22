@@ -478,6 +478,20 @@ function copyOdd(value: number | null): string {
   return value === null ? "–" : value.toFixed(2).replace(".", ",");
 }
 
+/**
+ * Die Tipico-Spielseite des Tipps, gebaut aus der Ereignis-ID der data.json. Nur Ziffern: Ereignisse
+ * wie „690170410_1“ sind Saisonwetten, keine Spiele. Die ID kommt bevorzugt aus der geladenen
+ * Analyse (`eventIds` je Fixture-ID), weil gespeicherte Tipps aus der Zeit davor sie nicht tragen
+ * und ein erneutes Hineinlegen sie als „schon drin“ nicht ersetzt. Ohne ID gibt es keinen Link.
+ */
+export function tipicoEventUrl(
+  entry: Pick<CartEntry, "fixtureId" | "tipico">,
+  eventIds?: ReadonlyMap<number, string>
+): string | null {
+  const id = eventIds?.get(entry.fixtureId) ?? entry.tipico?.eventId;
+  return id && /^\d+$/.test(id) ? `https://sports.tipico.de/de/event/${id}` : null;
+}
+
 /** „Mi 14.10. 21:00“ - mit Datum, weil die Kopie später und außerhalb der App gelesen wird. */
 function copyKickoff(value: string, timezone: string): string {
   const date = new Date(value);
@@ -487,26 +501,44 @@ function copyKickoff(value: string, timezone: string): string {
   return `${weekday} ${day} ${clock}`;
 }
 
+/** Ein Tabellenfeld in Markdown: `|` trennte sonst die Spalte, ein Zeilenumbruch die Zeile. */
+function markdownCell(value: string): string {
+  return value.replace(/\\/g, "\\\\").replace(/\|/g, "\\|").replace(/\s*\n\s*/g, " ");
+}
+
 /**
- * Kombis als Text für die Zwischenablage (seit 14.10.2026, Davids Entscheidungen nach dem Entwurf
- * des UX-Agenten): je Kombi eine Kopfzeile mit Kombi-Quote, je Tipp Anstoß mit Datum, Spiel, Tipp
- * und Quote, am Ende einmal die Warnung. Wie im Wettschein selbst nie Einsatz, Gewinn,
- * Modellwahrscheinlichkeit, Vorteil oder ✓/★. Namen folgen der Einstellung - mit Tipico-Namen
- * findet man das Spiel dort schneller.
+ * Kombis als Markdown für die Zwischenablage (seit 14.10.2026, Davids Entscheidungen nach dem
+ * Entwurf des UX-Agenten; Markdown seit 22.10.2026, Davids Wunsch - er sammelt die Kombis in einer
+ * .md-Datei): je Kombi eine Überschrift mit Kombi-Quote und eine Tabelle mit Anstoß samt Datum,
+ * Spiel, Tipp und Quote, am Ende einmal die Warnung als Zitat. Wie im Wettschein selbst nie Einsatz,
+ * Gewinn, Modellwahrscheinlichkeit, Vorteil oder ✓/★. Namen folgen der Einstellung - mit
+ * Tipico-Namen findet man das Spiel dort schneller. Seit 21.10.2026 (Davids Wunsch) führt das Spiel
+ * zur Tipico-Spielseite, sofern der Eintrag die Ereignis-ID trägt; den Tipp klickt David dort selbst
+ * an - die App greift nicht auf Tipico zu.
  */
-export function comboCopyText(items: Array<{ combo: Combo; number: number }>, names: NameSource, timezone: string): string {
+export function comboCopyText(
+  items: Array<{ combo: Combo; number: number }>,
+  names: NameSource,
+  timezone: string,
+  eventIds?: ReadonlyMap<number, string>
+): string {
   const blocks = items.map(({ combo, number }) => {
     const entries = [...combo.entries].sort((left, right) => Date.parse(left.kickoff) - Date.parse(right.kickoff));
-    const head = `Kombi ${number} · ${entries.length} Spiele · Quote ${copyOdd(combo.combinedOdds)}`;
-    const lines = entries.map((entry) => [
-      copyKickoff(entry.kickoff, timezone),
-      `${teamName(entry, "home", names)} – ${teamName(entry, "away", names)}`,
-      selectionLabel(entry, names),
-      copyOdd(entry.odds)
-    ].join(" | "));
-    return [head, ...lines].join("\n");
+    const head = `## Kombi ${number} · ${entries.length} Spiele · Quote ${copyOdd(combo.combinedOdds)}`;
+    const rows = entries.map((entry) => {
+      const game = markdownCell(`${teamName(entry, "home", names)} – ${teamName(entry, "away", names)}`);
+      const url = tipicoEventUrl(entry, eventIds);
+      const cells = [
+        copyKickoff(entry.kickoff, timezone),
+        url ? `[${game.replace(/([[\]])/g, "\\$1")}](${url})` : game,
+        markdownCell(selectionLabel(entry, names)),
+        copyOdd(entry.odds)
+      ];
+      return `| ${cells.join(" | ")} |`;
+    });
+    return [head, "", "| Anstoß | Spiel | Tipp | Quote |", "|---|---|---|--:|", ...rows].join("\n");
   });
-  return [...blocks, COMBO_WARNING].join("\n\n");
+  return [...blocks, `> ${COMBO_WARNING}`].join("\n\n");
 }
 
 function comboId(size: number, index: number): string {

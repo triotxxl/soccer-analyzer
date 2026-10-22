@@ -626,7 +626,8 @@ async function dashboard(args: ParsedArgs): Promise<void> {
         homeTeam: event.homeTeam,
         awayTeam: event.awayTeam,
         country: event.competition.country,
-        league: event.competition.league
+        league: event.competition.league,
+        eventId: event.tipicoEventId
       });
     }
     const files = await writeDashboard({

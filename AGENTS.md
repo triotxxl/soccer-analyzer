@@ -429,9 +429,22 @@ nur auf Davids ausdrücklichen Wunsch mit `ANALYZER_NEW_DATABASE=1`.
   **Seit 14.10.2026 so breit wie die Werkzeugleiste** (Davids Wunsch, Entwurf des UX-Agenten):
   oben fester Streifen „Kombis bauen“, darunter Tipps links und Kombis rechts (2 : 3), Kombi-Zeilen
   ungekürzt. **Kopieren** je Kombi und „Alle kopieren“ (`comboCopyText` in `betCart.ts`): Anstoß
-  mit Datum, Spiel, Tipp, Quote, Kombi-Quote und **immer die Warnung als letzte Zeile**; was der
+  mit Datum, Spiel, Tipp, Quote, Kombi-Quote und **immer die Warnung als letzte Zeile**, **seit
+  22.10.2026 als Markdown** (Davids Wunsch: je Kombi `## Kombi n · … · Quote x`, eine Tabelle
+  Anstoß | Spiel | Tipp | Quote, die Warnung als Zitat) und **zusätzlich in `data/tmp/kombis.md`**
+  (jede Kopie ersetzt die Datei; Endpunkt `POST /api/combos/markdown` in
+  `apps/shared/server/endpoints.ts`, schreibt nur diese Datei; ohne Server bleibt es still bei der
+  Zwischenablage, sonst nennt die Rückmeldung den Pfad); was der
   Wettschein nicht zeigt, steht auch nicht in der Kopie. Kombis mit angepfiffenem Spiel werden nicht
   kopiert, Kopieren markiert nicht als übertragen, ohne Zwischenablage erscheint der Text markiert.
+  **Seit 21.10.2026 führt in der Kopie jeder Tipp zur Tipico-Spielseite** (seit 22.10. als Link
+  auf dem Spielnamen in der Tabelle)
+  (`https://sports.tipico.de/de/event/<id>`, `tipicoEventUrl`; Davids Wunsch statt eines
+  „Konnektors“ zum Tipico-Wettschein, den es nicht gibt und der gegen „Grenzen“ verstieße) - die
+  einzige Ausnahme von „was der Wettschein nicht zeigt“. Die ID steht als `tipico.eventId` im
+  Snapshot; die Kopie schlägt sie je Fixture-ID in der **geladenen** Analyse nach
+  (`tipicoEventIds` in `App.tsx`), weil gespeicherte Tipps von davor sie nicht tragen und ein
+  erneutes Hineinlegen sie als „schon drin“ nicht ersetzt. Ohne ID im Lauf kein Link. Den Tipp klickt David selbst an.
 - **Der Kelly-Dialog heißt „Kelly-Auswahl“ und führt die Liste der Wetten** (seit 29.09.2026
   wieder, Davids Entscheidung): Modus, Kennzahlen, Hinweise, Einstellungen, dann die sortierbare
   Liste (Spiel, Markt, Quote, Modell, Korrigiert nur in der Automatik, Vorteil grau mit „nach

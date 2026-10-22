@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Plugin } from "vite";
@@ -172,6 +172,51 @@ function marketProfileEndpoint(): Plugin {
   };
 }
 
+/** Wohin die kopierten Kombis zusätzlich geschrieben werden; `data/tmp/` steht in .gitignore. */
+export const COMBO_MARKDOWN_FILE = "data/tmp/kombis.md";
+const comboMarkdownLimit = 1_000_000;
+
+/**
+ * Jede Kopie aus dem Wettschein landet zusätzlich als Markdown in `data/tmp/kombis.md` (seit
+ * 22.10.2026, Davids Wunsch) und ersetzt die vorige. Nur POST, nur Text bis 1 MB - der Endpunkt
+ * schreibt genau diese eine Datei, keinen Pfad aus der Anfrage.
+ */
+function comboMarkdownEndpoint(): Plugin {
+  const target = path.resolve(repositoryRoot, COMBO_MARKDOWN_FILE);
+  const handler = async (request: AsyncIterable<Buffer> & { method?: string }, response: ServerResponse) => {
+    if (request.method !== "POST") {
+      sendJson(response, 405, { error: "method_not_allowed" });
+      return;
+    }
+    const chunks: Buffer[] = [];
+    let size = 0;
+    for await (const chunk of request) {
+      size += chunk.length;
+      if (size > comboMarkdownLimit) {
+        sendJson(response, 413, { error: "too_large" });
+        return;
+      }
+      chunks.push(chunk);
+    }
+    try {
+      await mkdir(path.dirname(target), { recursive: true });
+      await writeFile(target, Buffer.concat(chunks).toString("utf8"), "utf8");
+      sendJson(response, 200, { file: COMBO_MARKDOWN_FILE });
+    } catch (error) {
+      sendJson(response, 500, { error: "write_failed", message: error instanceof Error ? error.message : String(error) });
+    }
+  };
+  return {
+    name: "combo-markdown-endpoint",
+    configureServer(server) {
+      server.middlewares.use("/api/combos/markdown", handler);
+    },
+    configurePreviewServer(server) {
+      server.middlewares.use("/api/combos/markdown", handler);
+    }
+  };
+}
+
 export function dataEndpoints(): Plugin[] {
-  return [dashboardEndpoint(), liveEndpoint(), insightsEndpoint(), marketProfileEndpoint()];
+  return [dashboardEndpoint(), liveEndpoint(), insightsEndpoint(), marketProfileEndpoint(), comboMarkdownEndpoint()];
 }

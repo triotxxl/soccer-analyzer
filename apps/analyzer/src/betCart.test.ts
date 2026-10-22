@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  COMBO_WARNING, canGenerate, comboCopyText, combinedOdds, generateCombos, isPlayable, putEntriesInto, selectionLabel, shortTipLabel, sizeRange, toCartEntry, toCounterCartEntry,
+  COMBO_WARNING, canGenerate, comboCopyText, combinedOdds, generateCombos, isPlayable, putEntriesInto, selectionLabel, shortTipLabel, sizeRange, tipicoEventUrl, toCartEntry, toCounterCartEntry,
   toQuickpickCartEntry, quickpickCartEntry, hasTip,
   type CartEntry
 } from "./betCart";
@@ -350,22 +350,57 @@ describe("comboCopyText", () => {
   };
   const combo = { id: "k", entries: [second, first], combinedOdds: 2.88, transferred: false };
 
-  it("schreibt je Tipp Anstoß mit Datum, Spiel, Tipp und Quote, nach Anstoß sortiert, und endet mit der Warnung", () => {
+  it("schreibt je Kombi eine Markdown-Tabelle mit Anstoß, Spiel, Tipp und Quote, nach Anstoß sortiert, und endet mit der Warnung", () => {
     expect(comboCopyText([{ combo, number: 1 }], "api", "Europe/Berlin")).toBe([
-      "Kombi 1 · 2 Spiele · Quote 2,88",
-      "Mi 14.10. 21:00 | Team 1A – Team 1B | Heimsieg Team 1A | 1,60",
-      "Do 15.10. 04:00 | Team 2A – Team 2B | Über/Unter 2,5 · Über 2,5 | 1,80",
+      "## Kombi 1 · 2 Spiele · Quote 2,88",
       "",
-      COMBO_WARNING
+      "| Anstoß | Spiel | Tipp | Quote |",
+      "|---|---|---|--:|",
+      "| Mi 14.10. 21:00 | Team 1A – Team 1B | Heimsieg Team 1A | 1,60 |",
+      "| Do 15.10. 04:00 | Team 2A – Team 2B | Über/Unter 2,5 · Über 2,5 | 1,80 |",
+      "",
+      `> ${COMBO_WARNING}`
     ].join("\n"));
   });
 
   it("folgt der Namens-Einstellung und trennt mehrere Kombis durch eine Leerzeile, die Warnung steht einmal", () => {
     const text = comboCopyText([{ combo, number: 1 }, { combo: { ...combo, id: "m", combinedOdds: null }, number: 3 }], "tipico", "Europe/Berlin");
     expect(text).toContain("| T2 Heim – T2 Gast |");
-    expect(text).toContain("\n\nKombi 3 · 2 Spiele · Quote –\n");
+    expect(text).toContain("\n\n## Kombi 3 · 2 Spiele · Quote –\n");
     expect(text.split(COMBO_WARNING)).toHaveLength(2);
     expect(text.endsWith(COMBO_WARNING)).toBe(true);
+  });
+
+  it("verlinkt das Spiel jedes Tipps mit Tipico-Ereignis-ID auf die Spielseite", () => {
+    const linked = { ...second, tipico: { ...second.tipico, eventId: "728501010" } };
+    const withLink = { ...combo, entries: [linked, first] };
+    expect(comboCopyText([{ combo: withLink, number: 1 }], "api", "Europe/Berlin")).toBe([
+      "## Kombi 1 · 2 Spiele · Quote 2,88",
+      "",
+      "| Anstoß | Spiel | Tipp | Quote |",
+      "|---|---|---|--:|",
+      "| Mi 14.10. 21:00 | Team 1A – Team 1B | Heimsieg Team 1A | 1,60 |",
+      "| Do 15.10. 04:00 | [Team 2A – Team 2B](https://sports.tipico.de/de/event/728501010) | Über/Unter 2,5 · Über 2,5 | 1,80 |",
+      "",
+      `> ${COMBO_WARNING}`
+    ].join("\n"));
+  });
+
+  it("holt die Ereignis-ID gespeicherter Tipps aus der geladenen Analyse", () => {
+    // `second` stammt aus der Zeit vor den Links und trägt keine `eventId`.
+    const text = comboCopyText([{ combo, number: 1 }], "api", "Europe/Berlin", new Map([[second.fixtureId, "727466110"]]));
+    expect(text).toContain("| [Team 2A – Team 2B](https://sports.tipico.de/de/event/727466110) |");
+  });
+
+  it("maskiert senkrechte Striche und eckige Klammern in Namen, damit die Tabelle hält", () => {
+    const odd = { ...first, homeTeam: "A|B", awayTeam: "C [D]", tipico: { homeTeam: "A|B", awayTeam: "C [D]", league: "L", country: "X", eventId: "1" } };
+    const text = comboCopyText([{ combo: { ...combo, entries: [odd] }, number: 1 }], "api", "Europe/Berlin");
+    expect(text).toContain("| [A\\|B – C \\[D\\]](https://sports.tipico.de/de/event/1) |");
+  });
+
+  it("baut keinen Link aus einer Saisonwetten-ID", () => {
+    expect(tipicoEventUrl({ fixtureId: 1, tipico: { ...second.tipico, eventId: "690170410_1" } })).toBeNull();
+    expect(tipicoEventUrl({ fixtureId: 1 })).toBeNull();
   });
 
   it("nennt weder Wahrscheinlichkeit noch Stufe oder Einsatz", () => {
