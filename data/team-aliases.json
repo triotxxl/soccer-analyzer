@@ -1514,6 +1514,11 @@
     "apiTeamId": 22788,
     "apiTeamName": "Baku Sportinq"
   },
+  "baku sporting fc": {
+    "tipicoName": "Baku Sporting FC",
+    "apiTeamId": 22788,
+    "apiTeamName": "Baku Sportinq"
+  },
   "baladiyat el mahalla": {
     "tipicoName": "Baladiyat El Mahalla",
     "apiTeamId": 18036,
@@ -4018,6 +4023,11 @@
     "tipicoName": "Enppi Club",
     "apiTeamId": 1037,
     "apiTeamName": "Enppi"
+  },
+  "entebbe uppc fc": {
+    "tipicoName": "Entebbe UPPC FC",
+    "apiTeamId": 26700,
+    "apiTeamName": "Entebbe UPPC"
   },
   "envigado fc": {
     "tipicoName": "Envigado FC",
