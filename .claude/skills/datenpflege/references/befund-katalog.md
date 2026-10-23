@@ -28,6 +28,14 @@ lassen. Ein falscher Alias, der aus der Datei gelöscht wurde, kann in `tipico_c
 bleiben - seit 20.10.2026 löscht `--skip-unresolved` die Zuordnung übersprungener Wettbewerbe;
 ältere Reste mit `aliasKey` gegen die Datei abgleichen.
 
+**Ein Team-Alias springt zwischen zwei IDs** (im Diff von `data/team-aliases.json` steht eine
+geänderte `apiTeamId`, die niemand gesetzt hat): Tipico führt den Namen für zwei Vereine. Beleg:
+beide IDs in verschiedenen Ländern bzw. Ligen, kein gemeinsamer Gegner (San Antonio FC: 4017 nur
+USA, 23310 nur Ecuador, 23.10.2026). Behebung: der allgemeine Alias bleibt beim einen Verein, der
+andere bekommt je API-Wettbewerb `npm run team-aliases -- ... --league <id>` (Schlüssel
+`name@ligaId`). Neue Fälle legt die Analyse seitdem selbst so an (`learnTeamAlias`); ein solcher
+Eintrag kann also auch einen falschen allgemeinen Alias verdecken - dann den allgemeinen prüfen.
+
 **Gegenprobe:** `npm run prepare-analysis` für denselben Umfang; der Wettbewerb ist zugeordnet und
 seine Spiele haben Ansetzungen.
 

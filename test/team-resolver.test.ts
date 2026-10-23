@@ -5,8 +5,11 @@ import path from "node:path";
 import test from "node:test";
 import {
   fixtureMatchesTeamAliases,
+  learnTeamAlias,
   readTeamAliases,
   saveTeamAlias,
+  teamAliasFor,
+  teamAliasesFor,
   teamAliasKey,
   teamNameSimilarity,
   teamNameMatches
@@ -50,4 +53,51 @@ test("ordnet gespeicherte Aliase anhand stabiler API-Team-IDs zu", async () => {
     true
   );
   assert.equal(teamNameMatches("Falsches Team", upcoming.teams.home, aliases), false);
+});
+
+test("ein Alias je Wettbewerb geht dem allgemeinen vor (San Antonio FC: USL und Ecuador)", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "football-team-alias-league-"));
+  const file = path.join(directory, "team-aliases.json");
+  await saveTeamAlias("San Antonio FC", { id: 4017, name: "San Antonio" }, file);
+  await saveTeamAlias("San Antonio FC", { id: 23310, name: "San Antonio" }, file, 243);
+  const aliases = await readTeamAliases(file);
+
+  assert.equal(aliases[teamAliasKey("San Antonio FC")]?.apiTeamId, 4017);
+  assert.deepEqual(aliases[teamAliasKey("San Antonio FC", 243)], {
+    tipicoName: "San Antonio FC",
+    apiTeamId: 23310,
+    apiTeamName: "San Antonio",
+    leagueId: 243
+  });
+  const usl = fixture({ id: 1, timestamp: 1_786_000_000, homeId: 4017, awayId: 7, leagueId: 255 });
+  const ecuador = fixture({ id: 2, timestamp: 1_786_000_000, homeId: 23310, awayId: 8, leagueId: 243 });
+  usl.teams.home.name = "San Antonio USL";
+  ecuador.teams.home.name = "San Antonio ECU";
+  assert.equal(teamNameMatches("San Antonio FC", usl.teams.home, aliases, 255), true);
+  assert.equal(teamNameMatches("San Antonio FC", ecuador.teams.home, aliases, 243), true);
+  assert.equal(teamNameMatches("San Antonio FC", ecuador.teams.home, aliases, 255), false);
+  assert.equal(teamNameMatches("San Antonio FC", usl.teams.home, aliases, 243), false);
+  assert.equal(teamAliasFor(aliases, "San Antonio FC", 917)?.apiTeamId, 4017);
+  assert.equal(teamAliasesFor(aliases, "San Antonio FC").length, 2);
+});
+
+test("eine gelernte Zuordnung überschreibt einen Alias auf ein anderes Team nicht", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "football-team-alias-learn-"));
+  const file = path.join(directory, "team-aliases.json");
+  await saveTeamAlias("San Antonio FC", { id: 4017, name: "San Antonio" }, file);
+  const aliases = await readTeamAliases(file);
+
+  await learnTeamAlias(aliases, "San Antonio FC", { id: 23310, name: "San Antonio" }, 243, file);
+  await learnTeamAlias(aliases, "San Antonio FC", { id: 4017, name: "San Antonio Renamed" }, 255, file);
+  await learnTeamAlias(aliases, "Neues Team", { id: 99, name: "New Team" }, 255, file);
+  await learnTeamAlias(aliases, "Same Name", { id: 100, name: "Same Name" }, 255, file);
+  const stored = await readTeamAliases(file);
+
+  assert.deepEqual(stored, aliases);
+  assert.equal(stored[teamAliasKey("San Antonio FC")]?.apiTeamId, 4017);
+  assert.equal(stored[teamAliasKey("San Antonio FC")]?.apiTeamName, "San Antonio Renamed");
+  assert.equal(stored[teamAliasKey("San Antonio FC", 243)]?.apiTeamId, 23310);
+  assert.equal(stored[teamAliasKey("San Antonio FC", 255)], undefined);
+  assert.equal(stored[teamAliasKey("Neues Team")]?.leagueId, undefined);
+  assert.equal(stored[teamAliasKey("Same Name")], undefined);
 });

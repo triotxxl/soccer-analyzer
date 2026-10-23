@@ -261,6 +261,12 @@ nur auf Davids ausdrücklichen Wunsch mit `ANALYZER_NEW_DATABASE=1`.
   Nach jeder Analyse gehört dazu:
   1. **Zuordnung:** fehlende Liga- und Team-Aliase setzen (`npm run aliases`,
      `npm run team-aliases`), unklare Namen recherchieren (Umbenennung, Umzug, Lizenzübernahme).
+     **Führt Tipico einen Namen für zwei Vereine** (San Antonio FC: USL 4017, Ecuador 23310), gilt
+     ein Team-Alias mit `--league <API-Liga-ID>` nur in diesem Wettbewerb (Schlüssel
+     `name@ligaId`, seit 23.10.2026, `teamAliasFor` in `src/team-resolver.ts`) und geht dem
+     allgemeinen vor. Lernt die Analyse über die Namensähnlichkeit ein anderes Team für einen
+     schon belegten Namen, legt `learnTeamAlias` einen solchen Alias an, statt den bestehenden zu
+     überschreiben - vorher sprang der Alias mit jeder Analyse zwischen beiden Vereinen hin und her.
   2. **Gleiche Mannschaft, neue ID:** Führt API-Football einen Verein nach einer Umbenennung unter
      einer neuen Team-ID, gehört er in `ELO_TEAM_MERGES` (`src/elo-config.ts`), damit seine
      Geschichte zusammengeführt wird - nur mit Beleg (gleiche Liga, gleiche Gegner, nahtlos

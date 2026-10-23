@@ -7,14 +7,39 @@ export interface TeamAliasValue {
   tipicoName: string;
   apiTeamId: number;
   apiTeamName: string;
+  /** Nur in diesem API-Wettbewerb gültig; Schlüssel dann „<name>@<leagueId>“. */
+  leagueId?: number;
 }
 
 export type TeamAliasMap = Record<string, TeamAliasValue>;
 
 const writeQueues = new Map<string, Promise<void>>();
 
-export function teamAliasKey(name: string): string {
-  return normalizeText(name);
+/**
+ * Tipico führt manche Namen für zwei Vereine (San Antonio FC: USL 4017 und Ecuador 23310). Ein
+ * Alias je Name sprang deshalb mit jeder Analyse zwischen beiden hin und her (21. und
+ * 23.10.2026). Ein Alias mit `leagueId` gilt nur in diesem Wettbewerb und geht dem allgemeinen vor.
+ */
+export function teamAliasKey(name: string, leagueId?: number): string {
+  const key = normalizeText(name);
+  return leagueId === undefined ? key : `${key}@${leagueId}`;
+}
+
+export function teamAliasFor(
+  aliases: TeamAliasMap,
+  name: string,
+  leagueId?: number
+): TeamAliasValue | undefined {
+  return (leagueId === undefined ? undefined : aliases[teamAliasKey(name, leagueId)]) ??
+    aliases[teamAliasKey(name)];
+}
+
+/** Alle Aliase eines Namens, der allgemeine und die je Wettbewerb. */
+export function teamAliasesFor(aliases: TeamAliasMap, name: string): TeamAliasValue[] {
+  const key = teamAliasKey(name);
+  return Object.entries(aliases)
+    .filter(([entryKey]) => entryKey === key || entryKey.startsWith(`${key}@`))
+    .map(([, alias]) => alias);
 }
 
 function compactTeamName(value: string): string {
@@ -56,28 +81,33 @@ export async function readTeamAliases(file = TEAM_ALIASES_FILE): Promise<TeamAli
 export async function saveTeamAlias(
   tipicoName: string,
   apiTeam: { id: number; name: string },
-  file = TEAM_ALIASES_FILE
+  file = TEAM_ALIASES_FILE,
+  leagueId?: number
 ): Promise<void> {
-  await saveTeamAliases([{ tipicoName, apiTeam }], file);
+  await saveTeamAliases([{ tipicoName, apiTeam, ...(leagueId === undefined ? {} : { leagueId }) }], file);
 }
 
 export async function saveTeamAliases(
-  entries: Array<{ tipicoName: string; apiTeam: { id: number; name: string } }>,
+  entries: Array<{ tipicoName: string; apiTeam: { id: number; name: string }; leagueId?: number }>,
   file = TEAM_ALIASES_FILE
 ): Promise<void> {
-  for (const { tipicoName, apiTeam } of entries) {
+  for (const { tipicoName, apiTeam, leagueId } of entries) {
     if (!teamAliasKey(tipicoName)) throw new Error("Der Tipico-Teamname darf nicht leer sein.");
     if (!Number.isInteger(apiTeam.id) || apiTeam.id <= 0 || !apiTeam.name.trim()) {
       throw new Error("API-Team-ID und API-Teamname sind erforderlich.");
     }
+    if (leagueId !== undefined && (!Number.isInteger(leagueId) || leagueId <= 0)) {
+      throw new Error("Die API-Liga-ID muss eine positive ganze Zahl sein.");
+    }
   }
   const queued = (writeQueues.get(file) ?? Promise.resolve()).then(async () => {
     const aliases = await readTeamAliases(file);
-    for (const { tipicoName, apiTeam } of entries) {
-      aliases[teamAliasKey(tipicoName)] = {
+    for (const { tipicoName, apiTeam, leagueId } of entries) {
+      aliases[teamAliasKey(tipicoName, leagueId)] = {
         tipicoName: tipicoName.trim(),
         apiTeamId: apiTeam.id,
-        apiTeamName: apiTeam.name.trim()
+        apiTeamName: apiTeam.name.trim(),
+        ...(leagueId === undefined ? {} : { leagueId })
       };
     }
     const sorted = Object.fromEntries(
@@ -89,13 +119,38 @@ export async function saveTeamAliases(
   await queued;
 }
 
+/**
+ * Merkt sich eine Zuordnung, die über die Namensähnlichkeit gefunden wurde. Zeigt der Name schon
+ * auf ein anderes Team, gilt die neue Zuordnung nur in diesem Wettbewerb - der bestehende Alias
+ * bleibt, statt bei jeder Analyse umzuspringen.
+ */
+export async function learnTeamAlias(
+  aliases: TeamAliasMap,
+  tipicoName: string,
+  apiTeam: { id: number; name: string },
+  leagueId: number,
+  file = TEAM_ALIASES_FILE
+): Promise<void> {
+  if (normalizeText(tipicoName) === normalizeText(apiTeam.name)) return;
+  const current = teamAliasFor(aliases, tipicoName, leagueId);
+  const scope = current && current.apiTeamId !== apiTeam.id ? leagueId : current?.leagueId;
+  await saveTeamAlias(tipicoName, apiTeam, file, scope);
+  aliases[teamAliasKey(tipicoName, scope)] = {
+    tipicoName,
+    apiTeamId: apiTeam.id,
+    apiTeamName: apiTeam.name,
+    ...(scope === undefined ? {} : { leagueId: scope })
+  };
+}
+
 export function teamNameMatches(
   requestedName: string,
   apiTeam: { id: number; name: string },
-  aliases: TeamAliasMap
+  aliases: TeamAliasMap,
+  leagueId?: number
 ): boolean {
   if (normalizeText(requestedName) === normalizeText(apiTeam.name)) return true;
-  return aliases[teamAliasKey(requestedName)]?.apiTeamId === apiTeam.id;
+  return teamAliasFor(aliases, requestedName, leagueId)?.apiTeamId === apiTeam.id;
 }
 
 export function fixtureMatchesTeamAliases(
@@ -104,6 +159,6 @@ export function fixtureMatchesTeamAliases(
   fixture: ApiFixture,
   aliases: TeamAliasMap
 ): boolean {
-  return teamNameMatches(homeTeam, fixture.teams.home, aliases) &&
-    teamNameMatches(awayTeam, fixture.teams.away, aliases);
+  return teamNameMatches(homeTeam, fixture.teams.home, aliases, fixture.league.id) &&
+    teamNameMatches(awayTeam, fixture.teams.away, aliases, fixture.league.id);
 }

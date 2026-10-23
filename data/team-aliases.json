@@ -10834,6 +10834,18 @@
     "apiTeamId": 4017,
     "apiTeamName": "San Antonio"
   },
+  "san antonio fc@243": {
+    "tipicoName": "San Antonio FC",
+    "apiTeamId": 23310,
+    "apiTeamName": "San Antonio",
+    "leagueId": 243
+  },
+  "san antonio fc@917": {
+    "tipicoName": "San Antonio FC",
+    "apiTeamId": 23310,
+    "apiTeamName": "San Antonio",
+    "leagueId": 917
+  },
   "san diego fc": {
     "tipicoName": "San Diego FC",
     "apiTeamId": 25484,

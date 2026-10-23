@@ -11,12 +11,10 @@ import type {
 } from "./types.ts";
 import {
   fixtureMatchesTeamAliases,
+  learnTeamAlias,
   readTeamAliases,
-  saveTeamAlias,
-  teamAliasKey,
   teamNameSimilarity
 } from "./team-resolver.ts";
-import { normalizeText } from "./util.ts";
 
 function fixtureMatchScore(selection: LiveMatchSelection, fixture: ApiFixture): number {
   return (
@@ -109,13 +107,7 @@ export async function runLiveAnalysis(
         [selection.homeTeam, best.fixture.teams.home],
         [selection.awayTeam, best.fixture.teams.away]
       ] as const) {
-        if (normalizeText(tipicoName) === normalizeText(apiTeam.name)) continue;
-        await saveTeamAlias(tipicoName, apiTeam, teamAliasFile);
-        aliases[teamAliasKey(tipicoName)] = {
-          tipicoName,
-          apiTeamId: apiTeam.id,
-          apiTeamName: apiTeam.name
-        };
+        await learnTeamAlias(aliases, tipicoName, apiTeam, best.fixture.league.id, teamAliasFile);
       }
     }
     if (!selected.some((fixture) => fixture.fixture.id === best.fixture.fixture.id)) {

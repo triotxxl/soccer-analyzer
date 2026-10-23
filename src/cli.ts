@@ -418,13 +418,20 @@ async function teamAliases(args: ParsedArgs): Promise<void> {
   const tipicoName = option(args, "tipico");
   const teamId = Number(option(args, "id"));
   const apiTeamName = option(args, "api-team");
+  // `--league <API-Liga-ID>`: nur in diesem Wettbewerb, für Namen, die Tipico für zwei Vereine führt.
+  const leagueOption = option(args, "league");
+  const leagueId = leagueOption === undefined ? undefined : Number(leagueOption);
   if (!tipicoName || !Number.isInteger(teamId) || teamId <= 0 || !apiTeamName) {
     throw new Error(
-      'Erforderlich: --tipico "Tipico-Teamname" --id 123 --api-team "API-Teamname"'
+      'Erforderlich: --tipico "Tipico-Teamname" --id 123 --api-team "API-Teamname" [--league 123]'
     );
   }
-  await saveTeamAlias(tipicoName, { id: teamId, name: apiTeamName });
-  console.log(`Team-Alias gespeichert: ${tipicoName} → ${apiTeamName} (${teamId})`);
+  if (leagueId !== undefined && (!Number.isInteger(leagueId) || leagueId <= 0)) {
+    throw new Error(`--league muss eine API-Liga-ID sein, nicht "${leagueOption}".`);
+  }
+  await saveTeamAlias(tipicoName, { id: teamId, name: apiTeamName }, undefined, leagueId);
+  console.log(`Team-Alias gespeichert: ${tipicoName} → ${apiTeamName} (${teamId})`
+    + (leagueId === undefined ? "" : ` · nur in Liga ${leagueId}`));
 }
 
 async function smoke(): Promise<void> {

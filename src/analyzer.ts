@@ -25,9 +25,9 @@ import { buildLeagueStrength } from "./strength-builder.ts";
 import { resolveLeagues, saveAlias } from "./resolver.ts";
 import {
   fixtureMatchesTeamAliases,
+  learnTeamAlias,
   readTeamAliases,
-  saveTeamAlias,
-  teamAliasKey,
+  teamAliasesFor,
   teamNameSimilarity,
   type TeamAliasMap
 } from "./team-resolver.ts";
@@ -73,8 +73,8 @@ export interface RequestedFixtureScope {
 
 function aliasMatchesApiName(requestedName: string, apiName: string, aliases: TeamAliasMap): boolean {
   if (normalizeText(requestedName) === normalizeText(apiName)) return true;
-  const alias = aliases[teamAliasKey(requestedName)];
-  return alias !== undefined && normalizeText(alias.apiTeamName) === normalizeText(apiName);
+  return teamAliasesFor(aliases, requestedName)
+    .some((alias) => normalizeText(alias.apiTeamName) === normalizeText(apiName));
 }
 
 function tipicoOddsForTeams(
@@ -122,13 +122,7 @@ export async function requestedFixtureScope(
       [match.homeTeam, best.fixture.teams.home],
       [match.awayTeam, best.fixture.teams.away]
     ] as const) {
-      if (normalizeText(tipicoName) === normalizeText(apiTeam.name)) continue;
-      await saveTeamAlias(tipicoName, apiTeam, teamAliasFile);
-      aliases[teamAliasKey(tipicoName)] = {
-        tipicoName,
-        apiTeamId: apiTeam.id,
-        apiTeamName: apiTeam.name
-      };
+      await learnTeamAlias(aliases, tipicoName, apiTeam, best.fixture.league.id, teamAliasFile);
     }
     return best.fixture;
   };
