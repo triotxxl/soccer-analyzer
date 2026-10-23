@@ -1129,6 +1129,11 @@
     "country": "Ireland",
     "league": "Premier Division"
   },
+  "irland|premier division relegation promotion": {
+    "leagueId": 358,
+    "country": "Ireland",
+    "league": "First Division"
+  },
   "island|1 deild": {
     "leagueId": 165,
     "country": "Iceland",

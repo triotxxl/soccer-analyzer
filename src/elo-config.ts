@@ -402,6 +402,14 @@ export const ELO_TEAM_MERGES: EloTeamMerge[] = [
     note: "Al Shorta (Irak): Iraqi League und AFC 2020-2026, seit Oktober 2026 unter 28571 (22.10.2026)"
   },
   {
+    // Dasselbe bei Kerry FC (Irland): Die Fixtures der First Division 2025 (1324339, 1324343,
+    // 1324473 ...) stehen in elo_matches unter 11328, im Cache vom 23.10.2026 unter 28562; Kerry -
+    // Cork City vom 16.10.2026 liegt im Cache unter beiden IDs. 11328 trägt nur Kerry FC (First
+    // Division, FAI Cup, Vereins-Testspiele 2023-2026).
+    from: 11328, to: 28562, countries: ["Ireland", "World"],
+    note: "Kerry FC (Irland): First Division und FAI Cup 2023-2026, seit Oktober 2026 unter 28562 (23.10.2026)"
+  },
+  {
     // Trennung: 687 ist Flora Tallinn (Meistriliiga, Europapokal, Testspiele). API-Football legte
     // 2023 die 24 Spiele eines Vereins der zweiten Liga Surinams unter dieselbe ID, an vier Tagen
     // zeitgleich mit Spielen in Estland (`npm run data-check`, 20.10.2026).

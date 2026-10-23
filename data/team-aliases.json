@@ -2274,6 +2274,11 @@
     "apiTeamId": 2202,
     "apiTeamName": "Cambrian & Clydach"
   },
+  "canberra united f": {
+    "tipicoName": "Canberra United (F)",
+    "apiTeamId": 1970,
+    "apiTeamName": "Canberra United W"
+  },
   "canberra w e fc": {
     "tipicoName": "Canberra W.E. FC",
     "apiTeamId": 23518,
@@ -3828,6 +3833,11 @@
     "tipicoName": "Drogheda Utd",
     "apiTeamId": 3850,
     "apiTeamName": "Drogheda United"
+  },
+  "dublin university fc": {
+    "tipicoName": "Dublin University FC",
+    "apiTeamId": 3844,
+    "apiTeamName": "UCD"
   },
   "dukla prag": {
     "tipicoName": "Dukla Prag",
@@ -10821,7 +10831,7 @@
   },
   "san antonio fc": {
     "tipicoName": "San Antonio FC",
-    "apiTeamId": 23310,
+    "apiTeamId": 4017,
     "apiTeamName": "San Antonio"
   },
   "san diego fc": {

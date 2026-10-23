@@ -577,9 +577,14 @@ nur auf Davids ausdrücklichen Wunsch mit `ANALYZER_NEW_DATABASE=1`.
   an den eigenen Prognosen bestätigt (−0,024 ± 0,005). Begründung im Kommentar in
   `src/config.ts`. Folgen: mehr Spiele mit „Klasse“-Kürzel (Schwellen 1,5/2,2 am Faktor), die
   modellgebundenen Quickpick-Messungen (`MODEL_BOUND_PRESETS`: hz15, remis, modell1x2) beginnen neu.
-  **Nachmessen nach rund 150 abgerechneten Spielen ab 3.5.0** (3.6.0 zählt mit) in der Tabelle „Stärkere Seite
-  je Modellversion“ bzw. der Kurzfassungszeile „seit 3.5.0“ (Gruppe „gemessen“; bei 150 Spielen
-  rund ± 4 Punkte; Standardfehler unter der Prognose, √(Σ p(1−p)) / n). Je Fassung gemessen am
+  **Nachgemessen am 23.10.2026 bei 154 Spielen ab 3.5.0: 1200 bestätigt** (stärkere Liga +3,9 ± 3,8,
+  Zeithälften +11,7 / −3,9; gepaarter Log-Loss 1000 +0,0024 ± 0,0058, 1500 +0,0029 ± 0,0057 gegen
+  1200, ohne Faktor +0,070 ± 0,028; Tipico weiter besser, unabhängig vom Teiler). **Nächste
+  Nachmessung bei rund 750 Spielen ab 3.5.0** (Davids Entscheidung; erst dann sind 1000/1200/1500 mit
+  2 Standardfehlern trennbar) in der Kurzfassungszeile „seit 3.5.0“ (Gruppe „gemessen“, 3.6.0 zählt
+  mit; Standardfehler unter der Prognose, √(Σ p(1−p)) / n). Nebenbefund: Bei Spielen zwischen Ligen
+  ist der Heimsieg zu niedrig geschätzt (47,4 % statt 40,5 ± 3,7) - Heimvorteil, nicht Teiler; wird
+  mit der Heim-/Gast-Aufteilung (Abschnitt „Märkte“) vorab festgelegt eigens geprüft. Je Fassung gemessen am
   05.10.2026: 3.1.0 (meist 900, dazu kurz 1200 und 1500) −1,1 ± 5,3, 3.2.0 (1500) +21,5 ± 5,0.
   Tipico lag dort vorher klar besser (+0,095 ± 0,028 Log-Loss).
   Die Ligastärke selbst ist teils veraltet: Laufende Pokalsaisons lädt die Analyse nur nach, wenn
