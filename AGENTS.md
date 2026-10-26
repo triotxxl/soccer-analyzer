@@ -587,6 +587,34 @@ alte App `apps/analyzer/` (Abschnitt „Pflege“):
   veröffentlichen** - Artifact-Werkzeug mit `url` oben und `file_path: docs/stack-karte.html`; in
   einer neuen Sitzung vorher `action: "read"` auf die URL. Ohne `url` entstünde ein zweiter Link.
 
+## UI/UX: Skills und Design-Agent
+
+- **Seit 26.10.2026 (Davids Entscheidung) gestaltet der Agent `ui-ux-designer`** (`.claude/agents/`, Opus):
+  Ansichten entwerfen, bauen, umbauen und prüfen in `apps/neo/` und `apps/shared/`. **Bei jedem UI/UX-Auftrag
+  automatisch einsetzen**, ohne dass David ihn nennt. Die Hauptsitzung gibt Davids Wortlaut und einen Bildpfad
+  mit, reicht seine offenen Entscheidungen (höchstens drei, Empfehlung zuerst) unverändert als Auswahlfrage an
+  David weiter, sieht nach der Umsetzung am Bildschirm nach (er selbst kann die App nicht ansehen) und
+  veröffentlicht die Stack-Karte. Kleine, klar beschriebene UI-Änderungen darf die Hauptsitzung selbst machen
+  und lädt dafür dieselben Skills.
+- **Skills im Projekt** (installiert mit `npx skills add … --copy`, Versionen in `skills-lock.json`,
+  aktualisieren mit `npx skills update -p`):
+  - `interface-design` **baut**. Das Design-System steht in `.interface-design/system.md` - die einzige Quelle
+    für Richtung, Tokens und Muster.
+  - `impeccable` **prüft und schleift nach** (critique, audit, clarify, distill, harden, polish, layout,
+    typeset), Neo gilt dort als Modus *Operate*. `init`, `document` und `extract` (PRODUCT.md, DESIGN.md) nur
+    auf Davids Wunsch, sonst gäbe es zwei Design-Systeme.
+  - Taste Skill (tasteskill.dev) wurde geprüft und nicht übernommen: sein Kern ist Art Direction für
+    Landingpages, sein Dashboard-Kapitel überschneidet sich mit `interface-design`.
+- **Die Engine von `impeccable`** (`scripts/impeccable`) lädt sich beim ersten Aufruf von den GitHub-Releases des
+  Autors nach `~/.impeccable/bin/<version>/` (geprüft gegen `engine-checksums.txt`) und liefert den Design-Detektor
+  (`detect`), Kontext, Berichte und den Live-Modus. **Von David am 26.10.2026 freigegeben**, Version 0.1.17 liegt.
+  Den Detektor-Hook (`/impeccable hooks on`, schreibt `.impeccable/` und `.claude/settings.local.json`) gibt es
+  nur auf Davids Wunsch; der Live-Modus startet einen Server und bleibt der Hauptsitzung vorbehalten.
+- **Wächter `.claude/hooks/design-waechter.ts`** (Test `test/design-waechter.test.ts`): erlaubt Tests,
+  Typprüfung, `neo:build` und `stack-karte` (`ALLOWED_SCRIPTS`), sperrt jedes andere npm-Skript, die
+  Analyse-Kommandozeile, Werkzeuge unter `tools/`, Netzzugriffe aus der Shell, neue Pakete, Git-Schreibbefehle
+  und `.env`; die Engine von `impeccable` ist erlaubt. `npm run neo` bleibt gesperrt, weil der Server bei Live und Detailkennzahlen die API fragt.
+
 ## Sprache der sichtbaren Texte
 
 David ist kein Statistiker und hat am 18.09.2026 ausdrücklich um einfache Sprache gebeten -
