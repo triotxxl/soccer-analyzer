@@ -13,26 +13,18 @@
  * Selbstüberschätzung senkt. Deshalb weist der Report jede Kennzahl zusätzlich getrennt nach
  * erster und zweiter Zeithälfte aus - was nur in einer Hälfte funktioniert, ist gefittet.
  *
- * Mit `--simulate` folgt die Nachspielung der Kelly-Automatik: für jeden Snapshot genau die
- * Regel der App (`selectKelly`), gemessen gegen den fairen Tipico-Preis. `--mit-1x2` lässt
- * dabei 1X2 zu, das ab Werk abgewählt ist. Kein API-Aufruf.
+ * Am Ende steht das Ablehnungsregister je Zelle aus Markt und Band. Kein API-Aufruf.
  *
- * Aufruf: node --env-file-if-exists=.env tools/edge-report.ts [--json <datei>] [--simulate [--mit-1x2]]
+ * Aufruf: node --env-file-if-exists=.env tools/edge-report.ts [--json <datei>]
  */
 import fs from "node:fs";
 import path from "node:path";
-import { pathToFileURL } from "node:url";
-import { ROOT_DIR } from "../src/config.ts";
-import type { DashboardFixture } from "../src/dashboard.ts";
-import { decideMarket } from "../src/market-outcome.ts";
-import { buildObservations, readOutcomes, type EdgeObservation as Observation } from "../src/market-profile-service.ts";
+import { buildObservations, type EdgeObservation as Observation } from "../src/market-profile-service.ts";
 import {
   MINIMUM_MARKET_SAMPLE,
   buildMarketProfile,
   type MarketProfile
 } from "../src/market-profile.ts";
-
-const OUTPUT_DIR = path.join(ROOT_DIR, "output");
 
 interface Metrics {
   n: number;
@@ -202,203 +194,4 @@ function printCellLedger(profile: MarketProfile): void {
     + (avoidedMarkets.size === 0 ? "" : ` (${[...avoidedMarkets].join(", ")})`));
 }
 
-/**
- * Nachspielung der App-Regel (seit 06.10.2026, Befund der drei Prüfer-Agenten).
- *
- * Bis dahin bildete `--simulate` ein festes Profil aus der ersten Zeithälfte und zählte jede
- * angenommene Marktzeile - mehrere je Spiel, ohne Einsatzrahmen, mit flachen Einsätzen. Das
- * war nicht die Regel der App, und die drei Trennstellen hatten verschachtelte Prüfmengen. Jetzt
- * läuft für jeden datierten Snapshot genau das, was die App zu diesem Zeitpunkt getan hätte:
- *
- * - Profil nur aus Spielen, die vor dem Snapshot abgerechnet waren (`settledAt`),
- * - Umfang „nächste 48 Std.“ ab dem Snapshot,
- * - `selectKelly` aus `apps/analyzer/src/kelly.ts` mit Automatik und `now` = Snapshot,
- * - je Spiel die erste Sichtung, abgerechnet mit `decideMarket`,
- * - gemessen gegen den fairen Tipico-Preis (`src/fair-price.ts`).
- *
- * Die Kernfrage ist die Spalte „Treffer − fair“: Liegt sie bei null, weiß das Modell nichts,
- * was nicht schon in der Quote steht, und auf Dauer kostet jede Wette den Aufschlag.
- */
-interface ReplayBet {
-  fixtureId: number;
-  kickoff: string;
-  marketKey: string;
-  marketLabel: string;
-  odds: number;
-  probability: number;
-  calibrated: number;
-  fair: number;
-  fairSource: "quote" | "geschätzt";
-  stake: number;
-  won: boolean;
-}
-
-interface KellyModule {
-  DEFAULT_KELLY_SETTINGS: Record<string, unknown>;
-  TEST_RUN_SETTINGS: Record<string, unknown>;
-  selectKelly(
-    fixtures: DashboardFixture[],
-    marketFilter: "all",
-    settings: Record<string, unknown>,
-    auto: boolean,
-    profile: MarketProfile | null,
-    options: { now?: number }
-  ): {
-    automatic: boolean;
-    candidates: Array<{
-      fixtureId: number; kickoff: string; marketKey: string; marketLabel: string; selection: string;
-      odds: number; probability: number; calibratedProbability: number | null;
-      fairProbability: number; fairSource: "quote" | "geschätzt"; stake: number;
-    }>;
-  };
-}
-
-const berlinDay = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Berlin" });
-const dayOf = (iso: string): string => berlinDay.format(new Date(iso));
-const fixed = (value: number, digits = 1) => value.toFixed(digits).replace(".", ",");
-const pp = (value: number) => `${value >= 0 ? "+" : "−"}${fixed(Math.abs(value) * 100)}`;
-
-/** Flacher ROI mit Standardfehler, einmal unabhängig, einmal je Berliner Anstoßtag gebündelt. */
-function replayRoi(bets: ReplayBet[]): { roi: number; se: number; seDay: number } {
-  const n = bets.length;
-  const profits = bets.map((bet) => (bet.won ? bet.odds - 1 : -1));
-  const roi = profits.reduce((sum, value) => sum + value, 0) / n;
-  const variance = profits.reduce((sum, value) => sum + (value - roi) ** 2, 0) / Math.max(1, n - 1);
-  const byDay = new Map<string, number>();
-  bets.forEach((bet, index) => byDay.set(dayOf(bet.kickoff), (byDay.get(dayOf(bet.kickoff)) ?? 0) + profits[index]! - roi));
-  const days = byDay.size;
-  const clustered = days > 1
-    ? Math.sqrt([...byDay.values()].reduce((sum, value) => sum + value * value, 0) * days / (days - 1)) / n
-    : Number.POSITIVE_INFINITY;
-  return { roi, se: Math.sqrt(variance / n), seDay: clustered };
-}
-
-function printReplayLine(label: string, bets: ReplayBet[]): void {
-  const n = bets.length;
-  if (n < 2) { console.log(`  ${label.padEnd(26)}${String(n).padStart(6)}  zu wenige Wetten`); return; }
-  const mean = (value: (bet: ReplayBet) => number) => bets.reduce((sum, bet) => sum + value(bet), 0) / n;
-  const hit = mean((bet) => (bet.won ? 1 : 0));
-  const fair = mean((bet) => bet.fair);
-  const seFair = Math.sqrt(bets.reduce((sum, bet) => sum + bet.fair * (1 - bet.fair), 0)) / n;
-  const { roi, se, seDay } = replayRoi(bets);
-  const staked = bets.reduce((sum, bet) => sum + bet.stake, 0);
-  const kellyRoi = staked > 0 ? bets.reduce((sum, bet) => sum + bet.stake * (bet.won ? bet.odds - 1 : -1), 0) / staked : 0;
-  console.log(`  ${label.padEnd(26)}${String(n).padStart(6)}`
-    + `${`${fixed(hit * 100)} %`.padStart(9)}${`${fixed(mean((bet) => bet.probability) * 100)} %`.padStart(9)}`
-    + `${`${fixed(mean((bet) => bet.calibrated) * 100)} %`.padStart(9)}${`${fixed(fair * 100)} %`.padStart(9)}`
-    + `${`${pp(hit - fair)} ± ${fixed(seFair * 100)}`.padStart(15)}`
-    + `${`${pp(roi)} ± ${fixed(se * 100)} %`.padStart(17)}${`(Tag ± ${Number.isFinite(seDay) ? fixed(seDay * 100) : "∞"})`.padStart(14)}`
-    + `${`${pp(kellyRoi)} %`.padStart(10)}`);
-}
-
-async function simulate(): Promise<void> {
-  const kellyUrl = pathToFileURL(path.join(ROOT_DIR, "apps", "analyzer", "src", "kelly.ts")).href;
-  const kelly = await import(kellyUrl) as KellyModule;
-  const outcomes = readOutcomes();
-  const withOneXTwo = process.argv.includes("--mit-1x2");
-
-  const snapshots = fs.readdirSync(OUTPUT_DIR)
-    .filter((file) => /^dashboard-\d{4}-\d{2}-\d{2}.*\.json$/.test(file))
-    .map((file) => {
-      try {
-        const parsed = JSON.parse(fs.readFileSync(path.join(OUTPUT_DIR, file), "utf8")) as
-          { meta?: { createdAt?: string }; fixtures?: DashboardFixture[] };
-        return { t: Date.parse(parsed.meta?.createdAt ?? ""), fixtures: parsed.fixtures ?? [] };
-      } catch {
-        return { t: Number.NaN, fixtures: [] };
-      }
-    })
-    .filter((snapshot) => Number.isFinite(snapshot.t))
-    .sort((left, right) => left.t - right.t);
-
-  // Die Einstellungen der App: ab Werk, Testbetrieb, und ein Rahmen, der nichts abschneidet.
-  // Die Marktabwahl ab Werk (1X2 aus) gilt seit 06.10.2026 auch in der Automatik.
-  const defaults = { ...kelly.DEFAULT_KELLY_SETTINGS, ...(withOneXTwo ? { disabledMarkets: [] } : {}) };
-  const frames: Array<[string, Record<string, unknown>]> = [
-    ["ohne Rahmen", { ...defaults, maxStakePercent: 1, maxExposurePercent: 1e9, minStake: 0, enableGameRiskLimit: false }],
-    ["Testbetrieb", { ...defaults, ...kelly.TEST_RUN_SETTINGS }],
-    ["Vorgabe", defaults]
-  ];
-  const firstSeen = frames.map(() => new Map<number, ReplayBet & { runAt: number }>());
-  const perRun = frames.map(() => [] as number[]);
-
-  let runs = 0;
-  for (const snapshot of snapshots) {
-    const known = observations.filter((entry) => Date.parse(entry.settledAt) < snapshot.t);
-    if (known.length < 100) continue;
-    runs += 1;
-    const profile = buildMarketProfile(known, new Date(snapshot.t));
-    const scope = snapshot.fixtures.filter((fixture) => {
-      const kickoff = Date.parse(fixture.kickoff);
-      return kickoff > snapshot.t && kickoff <= snapshot.t + 48 * 3_600_000;
-    });
-    frames.forEach(([, settings], index) => {
-      const selection = kelly.selectKelly(scope, "all", settings, true, profile, { now: snapshot.t });
-      if (!selection.automatic) return;
-      perRun[index]!.push(selection.candidates.length);
-      for (const candidate of selection.candidates) {
-        if (firstSeen[index]!.has(candidate.fixtureId)) continue;
-        const outcome = outcomes.get(candidate.fixtureId);
-        const won = outcome === undefined ? null : decideMarket(candidate.marketKey, candidate.selection, outcome);
-        if (won === null) continue;
-        firstSeen[index]!.set(candidate.fixtureId, {
-          runAt: snapshot.t,
-          fixtureId: candidate.fixtureId,
-          kickoff: candidate.kickoff,
-          marketKey: candidate.marketKey,
-          marketLabel: candidate.marketLabel,
-          odds: candidate.odds,
-          probability: candidate.probability,
-          calibrated: candidate.calibratedProbability ?? candidate.probability,
-          fair: candidate.fairProbability,
-          fairSource: candidate.fairSource,
-          stake: candidate.stake,
-          won
-        });
-      }
-    });
-  }
-
-  console.log("\n\nNachspielung der Kelly-Automatik (App-Regel je Snapshot, erste Sichtung je Spiel)");
-  console.log(`  ${runs} Snapshots mit Profil, Abrechnung nach echtem settled_at`
-    + (withOneXTwo ? ", 1X2 zugelassen (--mit-1x2)" : ", Marktabwahl ab Werk (1X2 aus)"));
-  const header = `  ${"".padEnd(26)}${"Wetten".padStart(6)}${"Treffer".padStart(9)}${"Modell".padStart(9)}`
-    + `${"korr.".padStart(9)}${"fair".padStart(9)}${"Treffer−fair".padStart(15)}${"flacher ROI".padStart(17)}`
-    + `${"".padStart(14)}${"Kelly-ROI".padStart(10)}`;
-
-  frames.forEach(([name], index) => {
-    const bets = [...firstSeen[index]!.values()].sort((left, right) => Date.parse(left.kickoff) - Date.parse(right.kickoff));
-    if (bets.length === 0) { console.log(`\n  ${name}: keine Wetten`); return; }
-    const kickoffs = bets.map((bet) => Date.parse(bet.kickoff));
-    const middle = kickoffs[Math.floor(kickoffs.length / 2)]!;
-    console.log(`\n  Rahmen „${name}“`);
-    console.log(header);
-    printReplayLine("alle", bets);
-    printReplayLine("ohne Remis", bets.filter((bet) => bet.marketKey !== "draw"));
-    printReplayLine(`Anstoß vor ${new Date(middle).toISOString().slice(0, 10)}`, bets.filter((bet) => Date.parse(bet.kickoff) < middle));
-    printReplayLine("Anstoß danach", bets.filter((bet) => Date.parse(bet.kickoff) >= middle));
-    printReplayLine("fair aus echter Gegenquote", bets.filter((bet) => bet.fairSource === "quote"));
-    const byMarket = new Map<string, ReplayBet[]>();
-    for (const bet of bets) byMarket.set(bet.marketLabel, [...(byMarket.get(bet.marketLabel) ?? []), bet]);
-    for (const [label, group] of [...byMarket].sort((left, right) => right[1].length - left[1].length)) {
-      printReplayLine(`  ${label}`, group);
-    }
-    const perDay = new Map<string, number>();
-    for (const bet of bets) perDay.set(dayOf(bet.kickoff), (perDay.get(dayOf(bet.kickoff)) ?? 0) + 1);
-    const days = [...perDay.values()].sort((left, right) => left - right);
-    const runsSorted = [...perRun[index]!].sort((left, right) => left - right);
-    console.log(`  Wetten je Anstoßtag: Median ${days[Math.floor(days.length / 2)]}, Mittel`
-      + ` ${fixed(days.reduce((sum, value) => sum + value, 0) / days.length)}, höchstens ${days.at(-1)} (${days.length} Tage)`
-      + ` · je Analyse: Median ${runsSorted[Math.floor(runsSorted.length / 2)]}, höchstens ${runsSorted.at(-1)}`);
-  });
-
-  console.log("\n  Lesehinweis: Maßgeblich ist „Treffer − fair“. Liegt es bei null, trifft die Auswahl nur so");
-  console.log("  oft, wie die Tipico-Quote ohne Aufschlag sagt, und auf Dauer kostet jede Wette den Aufschlag");
-  console.log("  (rund 8 bis 11 %). Ein ROI ist nur mit seinem ± lesbar; „Tag ±“ bündelt Wetten desselben");
-  console.log("  Anstoßtags. Teilmengen nach Markt sind nachträglich herausgegriffen - kann auch Zufall sein.");
-}
-
-if (process.argv.includes("--simulate")) {
-  printCellLedger(buildMarketProfile(observations));
-  await simulate();
-}
+printCellLedger(buildMarketProfile(observations));

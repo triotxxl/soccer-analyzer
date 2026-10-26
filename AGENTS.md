@@ -64,8 +64,8 @@ nur auf Davids ausdrücklichen Wunsch mit `ANALYZER_NEW_DATABASE=1`.
 
 3. Der Lauf importiert Tipico-IDs und Quoten in SQLite, verwendet gespeicherte Liga- und
    Teamzuordnungen, analysiert Liga- und Pokal-/Cross-League-Spiele getrennt und erzeugt
-   `output/dashboard-latest.json` sowie einen datierten JSON-Snapshot. Die lokale
-   React-App wird bei Bedarf mit `npm run app` gestartet und liest nur diesen neuesten Lauf.
+   `output/dashboard-latest.json` sowie einen datierten JSON-Snapshot. Das Neo
+   Dashboard (`npm run neo`) liest nur diesen neuesten Lauf.
 4. Eine Tipico-Auswahl ändert niemals den sportlichen 1X2-Tipp des Modells. Das Dashboard
    zeigt Tipico-Quoten deutlich, verwendet aber weder Quoten noch einen relativen
    Modellvorteil für die Empfehlungsstufe. Diese beruht ausschließlich auf absoluter
@@ -314,8 +314,9 @@ nur auf Davids ausdrücklichen Wunsch mit `ANALYZER_NEW_DATABASE=1`.
   eindeutig ist und keine andere Tipico-Partie sie belegt. Der Anstoß kommt dann von Tipico,
   alles andere von der API. Lauf vom 05.10.2026 (Mo-So): 687 → 725 von 751 Spielen. Die
   Ansetzung muss an einem Tag des Umfangs liegen, sonst wird sie gar nicht geladen.
-- Die Live-Ansicht der App fragt ausschließlich Fixtures aus `output/dashboard-latest.json`
-  ab, die laut Anstoßzeit gerade laufen können und von der Ansicht auch beobachtet werden.
+- Der Live-Dienst (`src/live-service.ts`, Endpunkt `/api/live/board`) fragt ausschließlich Fixtures
+  aus `output/dashboard-latest.json` ab, die laut Anstoßzeit gerade laufen können und von einer App
+  beobachtet werden.
   Bis `LIVE_ALL_THRESHOLD` (25) Partien werden sie über `/fixtures?ids=` zu je 20 IDs
   gebündelt, was 4 Anfragen pro Minute inklusive Statistiken ergibt. Darüber wechselt der
   Dienst auf `/fixtures?live=all` im 15-Sekunden-Takt und zieht die Statistiken nur noch
@@ -324,149 +325,28 @@ nur auf Davids ausdrücklichen Wunsch mit `ANALYZER_NEW_DATABASE=1`.
   `data/live-snapshots/` mitgeschrieben, seit 29.09.2026 samt Karten und den gezeigten
   Live-Chancen. Einen eigenen Statistik-Abruf gibt es nicht für Spiele, deren Liga laut
   `liveCoverage.statistics` keine Live-Statistik führt (vorher erst nach der ersten leeren
-  Antwort). Was die Ansicht zeigt, steht im Abschnitt „Live-Ansicht und Live-Chancen“.
-- Die Übersicht stellt jedem Teamnamen sein Wappen voran. Die URL kommt aus der ohnehin
+  Antwort). Das Live-Modell steht im Abschnitt „Live-Ansicht und Live-Chancen“.
+- Jedes Spiel trägt die Wappen beider Teams. Die URL kommt aus der ohnehin
   geladenen Fixture-Antwort von API-Football und steht als `homeCrest`/`awayCrest` im
   Dashboard-Snapshot; das kostet keinen zusätzlichen Aufruf. Führt die Antwort kein Wappen
-  oder lädt das Bild nicht, zeigt die App die beiden Anfangsbuchstaben des Teams. Snapshots
+  oder lädt das Bild nicht, zeigt `TeamCrest` (`apps/shared/src/`) die beiden Anfangsbuchstaben. Snapshots
   aus Läufen vor dieser Ergänzung tragen die Felder nicht und bleiben bei den Initialen.
-- Die linke Navigationsleiste (`apps/analyzer/src/NavRail.tsx`, seit 27.09.2026) wechselt zwischen
-  **Tabelle**, **Heatmap**, **Live** und **Marktprofil**. Tabelle und Heatmap sind intern dieselbe
-  Ansicht `prematch` mit anderer Darstellung (Wahl in `localStorage`, Vorgabe Tabelle).
-- Alle Filter stehen im **Filtermenü** (`apps/analyzer/src/FilterMenu.tsx`, seit 27.09.2026 statt der
-  Filterspalte): ein nicht-modales Fenster unter dem Filter-Knopf links in der Werkzeugleiste, das
-  über der Tabelle liegt und nichts verdrängt. **Seit 10.10.2026 dunkelt ein weichgezeichneter
-  Hintergrund (`.menu-backdrop`) den Rest ab, solange Filtermenü oder Quickpicker offen sind**
-  (Davids Wunsch); nur die Gruppe mit Filter und Quickpick (`.toolbar-filters`) bleibt darüber, ein
-  Klick auf den Hintergrund schließt, ein Fokus-Gefängnis gibt es nicht. Seit 11.10.2026 gilt
-  dasselbe für den **Wettschein** (Knopf rechts in der Leiste, `.cart-anchor` ebenfalls über dem
-  Hintergrund); Kelly-Dialog und Wettbewerbe-Dialog (`.overlay-backdrop`) sind dabei ebenfalls
-  weichgezeichnet. Markt und Sortierung bleiben sichtbar in der Leiste,
-  weil sie nichts ausblenden. **Werkzeugleiste seit 28.09.2026 im Leistenstil** (Entwurf des
-  UX-Agenten, Davids Entscheidung): links Filter und Quickpick (beide blenden aus), eine Trennlinie,
-  dann Markt, Sortierung, Anzeige und direkt daneben „Kelly-Auswahl“ (nur im Kelly-Modus).
-  **Seit 14.10.2026 steht links der Linie ein Suchfeld** (Davids Wunsch): Freitext über
-  Mannschaften, Wettbewerb und Land unter Tipico- und API-Namen (`fixtureMatches` in
-  `apps/shared/src/names.ts`, ohne Akzente, jedes Wort muss vorkommen). Es grenzt wie der Quickpick
-  nur `filtered` ein, nicht `scopedFixtures` (Kelly und Zähler bleiben), wird nicht gemerkt
-  (dieselbe Falle wie ein gemerkter Quickpick) und braucht kein Schildchen, weil das Feld sich
-  selbst zeigt; „Filter zurücksetzen“ leert es.
-  Markt und Sortierung bleiben **eingebaute `<select>`** und werden in Chromium über
-  `appearance: base-select` gestaltet (Wahl mit grünem Balken links, kein Häkchen, Marktliste mit
-  `optgroup`-Gruppen) - bewusst kein eigener Listbox-Baustein: Tastatur, Screenreader und die rund
-  35 `selectOptions`-Tests bleiben so unverändert. Jeder Filter, der Spiele ausblendet oder den Umfang ändert, steht bei
-  geschlossenem Menü als Schildchen mit ✕ darunter, und der Knopf zählt sie - dieselbe Begründung
-  wie beim unpersistierten Quickpick-Zustand. Im Marktprofil gibt es keinen Filter-Knopf, weil dort
-  kein Filter wirkt; Live hat eine eigene, kleinere Fassung (Wettbewerbe, „Nur Spiele mit
-  Empfehlung“). Die Elemente darin sind Segmentschalter und Schalter statt Auswahllisten und
-  Checkboxen; „an“ heißt überall „Filter aktiv“, deshalb heißt der Pokal-Schalter **„Nur
-  Ligaspiele“** (ab Werk aus, `showCrossLeague` negiert). Der Zeitraum ist „Nächste 48 Std.“ plus
-  ein **richtiger Kalender** (seit 30.09.2026, Davids Wunsch - das Raster aus Tageskacheln ließ
-  sich über drei Wochen nicht als Zeitraum bedienen): Felder „Von“/„Bis“ (`<input type="date">`,
-  begrenzt auf die Tage der Analyse, ein Bis vor dem Von macht beide zu diesem Tag) und eine
-  Monatsansicht Mo-So mit Blättern, Tage außerhalb der Analyse sichtbar, aber nicht wählbar. Klick,
-  zweiter Klick = Zeitraum, während der Wahl zeigt das Überfahren den künftigen Zeitraum. Alles
-  wirkt ohne Übernehmen sofort; `next48` bleibt dabei strikt. Form und H2H teilen sich einen Umschalter (beide Zustände bleiben, weil die Sortierung
-  je Spalte liest). Das Menü hat zwei Spalten aus Karten: links der Umfang (`scopedFixtures`, gilt
-  auch für Kelly und Quickpick), rechts, was nur die Tabelle eingrenzt, und die Striche in Form und H2H (Gruppe „Form und H2H“). Der Kopf
-  zählt die angezeigten Spiele aus `filtered`, weil das Menü die Statuszeile verdeckt. Grün markiert im Menü die
-  Wahl nur als Linie und Schalterbahn, nie als Fläche oder Häkchen (Grün ✓ heißt in der Tabelle
-  „Empfehlenswert“); Blau ist dort nur Tastaturfokus. Seit 28.09.2026 im Leistenstil: Die Wahl
-  trägt wie der aktive Leisteneintrag eine hellere Fläche, fette Schrift und einen grünen Balken,
-  alles nicht Gewählte liegt tiefer als die Karte, und die Karten haben einen Rand. Die Heatmap (`apps/analyzer/src/HeatmapTable.tsx`, Rechnung in
-  `apps/analyzer/src/heatmap.ts`) zeigt je Spiel eine Zeile mit Δ Elo, Δ Form, Δ xG, Δ Schüsse aufs
-  Tor und Δ Ecken als Heim minus Auswärts, die Remis-Punkte und die Quoten für 1X2, Remis und
-  BTTS (ein anderer gewählter Markt kommt als vierte Spalte dazu). Sie liest nur den Snapshot,
-  kostet keinen Aufruf und ändert weder Tipp noch Wahrscheinlichkeit. **Δ xG ist die
-  Torerwartung des Modells** (`expectedGoals`), nicht das xG von API-Football. Eine fehlende
-  Seite ergibt „–“, nie 0. Die **Value-Färbung der Quoten erscheint nur in der Anzeige „Vorteil &
-  Kelly“** (Davids Entscheidung vom 25.09.2026): Ein großer Value ist laut Messung meist ein
-  Ausrutscher des Modells, eine immer sichtbare Färbung höbe gerade die schwächsten Wetten
-  hervor. Bei `probabilityReliable: false` bleibt die 1X2-Quote ohne Farbe.
-- **Anzeige „Kennzahlen | Vorteil & Kelly“** (seit 28.09.2026, Davids Entscheidung nach einem
-  Entwurf des UX-Agenten): ein Segmentschalter in der Werkzeugleiste von Tabelle und Heatmap, der
-  den früheren Schalter „Vorteil & Kelly-Einsatz anzeigen“ im Filtermenü ersetzt - er blendet
-  kein Spiel aus und gehört deshalb wie Markt und Sortierung in die Leiste. Ab Werk
-  „Kennzahlen“, gemerkt unter `football-analyzer:kelly-visible-v2` (Zustand `showKelly` in
-  `App.tsx`). Im Modus „Vorteil & Kelly“ stehen unter der Leiste die Kelly-Zeile (Markt, Zahl
-  der Wetten, Einsatz von Budget, Automatik/Manuell, **Einsatzrahmen mit Plätzen**) und immer
-  die Warnung „Ein großer Vorteil ist meist ein Fehler des Modells. Auch die Kelly-Auswahl lag,
-  an alten Spielen geprüft, im Minus – rechne nicht mit Gewinn.“ **Die Spalten der Tabelle
-  ändern sich dabei nicht** (Davids Entscheidung vom 29.09.2026, nach einem Tag mit eigenen
-  Kelly-Spalten: „das Verhalten wie vorher war besser“): Die Marktzelle zeigt zusätzlich den
-  Vorteil, die Wetten selbst stehen im Kelly-Dialog. Die Auswahl rechnet `selectKelly`
-  (`apps/analyzer/src/kelly.ts`) **einmal** im Dashboard auf `scopedFixtures`; Kelly-Zeile und
-  Dialog lesen dasselbe Ergebnis, ein Tabellenfilter ändert es nicht. Solange das Marktprofil
-  lädt, steht „Automatik wird geladen …“ statt eines Betrags, der gleich umspringt. Der Vorteil
-  ist in der Marktzelle grau, nicht grün - Grün heißt dort „Empfehlenswert“. **Live zeigt nie einen Vorteil** und hat keinen Umschalter: Er stammt aus
-  Quote und Wahrscheinlichkeit vor dem Anpfiff und ist im laufenden Spiel veraltet.
-- **Spalten der Tabelle** (`apps/analyzer/src/tableColumns.ts`, seit 28.09.2026): eine Liste erzeugt
-  Raster und Mindestbreite, vorher standen beide getrennt in `styles.css` und `App.tsx`. Fest
-  sind Spiel, Anstoß (eigene Spalte mit Land, Liga, „Klasse“) und **Daten** (Datenvertrauen des
-  gezeigten Marktes, darunter „⚠ n Hinweise“ mit dem Wortlaut im Tooltip). In beiden Anzeigen
-  je Markt nur, was passt: Punkte bei 1X2/Remis/Alle, Schüsse aufs Tor bei Tor- und BTTS-Märkten,
-  bei Torlinien die Torerwartung als Summe, bei allen vier 1.-HZ-Märkten die der Halbzeit mit
-  „Spiel Σ“ darunter. **Ecken stehen nicht mehr in der Zeile**, sondern im Kopf der
-  Detailansicht (aus dem Snapshot, sofort da) und in der Heatmap. Bei „Alle Märkte“ statt
-  vierzehn Kästchen die 1X2-Zelle und „Empfohlene Märkte“ (höchstens drei mit ✓/★, ★ zuerst,
-  1X2 und Märkte ohne belastbare Wahrscheinlichkeit nie). Eine H2H-Remisserie steht grau als
-  „Remis-Serie“ unter den H2H-Strichen. **Form und H2H sind seit 11.10.2026 schmale Striche**
-  statt Kreisen (Aufbau in `references/app-landkarte.md`); die Zahl rechts neben der Form ist
-  neutral, weil Grün in der Tabelle „Empfehlenswert“ heißt. Kelly-Spalten (Tipp, Modell, Korrigiert, Kelly-Einsatz)
-  gab es vom 28. bis 29.09.2026 und gibt es nicht mehr - nicht wieder einbauen, ohne David zu
-  fragen. Sortierbar ist nur, was zu
-  sehen ist; eine gemerkte Sortierung auf eine ausgeblendete Spalte fällt auf den Anstoß zurück,
-  ohne gelöscht zu werden. Bei Sortierung nach Anstoß trennt eine leise Zeile die Tage (Berliner
-  Zeit), das Datum fällt dann aus der Zeile.
-- **Wettschein** (seit 11.10.2026, `apps/analyzer/src/BetCartUI.tsx`, Logik `apps/analyzer/src/betCart.ts`;
-  Davids Entscheidungen nach zwei Runden des UX-Agenten, vorher „Warenkorb“/„Wett-Baukasten“ als
-  Seitenleiste): Knopf „Wettschein“ rechts in der Leiste, Fenster im Leistenstil wie Filter und
-  Quickpicker, offen ist höchstens eins. Regeln, die nicht zurückgebaut werden sollen:
-  **Gegensätze desselben Spiels ersetzen einander** beim Hineinlegen (`putEntriesInto` über
-  `marketsExcludeEachOther`; vorher landeten Remis und Heimsieg zugleich in einer Kombi, die sicher
-  verliert), **je Kombi höchstens ein Tipp pro Spiel** (Quoten zweier Tipps eines Spiels zu
-  multiplizieren gäbe einen falschen Kombi-Preis), **angepfiffene Tipps und Tipps ohne Quote sind
-  nicht mischbar** (`isPlayable`), der „+“-Knopf ist nach dem Anpfiff gesperrt. Leeren und
-  „Angepfiffene entfernen“ wirken sofort und lassen sich einmal zurücknehmen (`lastChange`), statt
-  vorher zu fragen. Größen und Modus der Kombis werden gemerkt (`football-analyzer:combo-setup`),
-  die Kombis nur bis zum Neuladen; „Als übertragen markieren“ hält eine Kombi beim Neumischen fest.
-  Die Kombi-Quote ist neutral, nie grün; Einsatz, Gewinn, Modellwahrscheinlichkeit und Vorteil
-  zeigt der Wettschein bewusst nicht. Die Warnung im Fuß steht immer da.
-  **Seit 14.10.2026 so breit wie die Werkzeugleiste** (Davids Wunsch, Entwurf des UX-Agenten):
-  oben fester Streifen „Kombis bauen“, darunter Tipps links und Kombis rechts (2 : 3), Kombi-Zeilen
-  ungekürzt. **Kopieren** je Kombi und „Alle kopieren“ (`comboCopyText` in `betCart.ts`): Anstoß
-  mit Datum, Spiel, Tipp, Quote, Kombi-Quote und **immer die Warnung als letzte Zeile**, **seit
-  22.10.2026 als Markdown** (Davids Wunsch: je Kombi `## Kombi n · … · Quote x`, eine Tabelle
-  Anstoß | Spiel | Tipp | Quote, die Warnung als Zitat) und **zusätzlich in `data/tmp/kombis.md`**
-  (jede Kopie ersetzt die Datei; Endpunkt `POST /api/combos/markdown` in
-  `apps/shared/server/endpoints.ts`, schreibt nur diese Datei; ohne Server bleibt es still bei der
-  Zwischenablage, sonst nennt die Rückmeldung den Pfad); was der
-  Wettschein nicht zeigt, steht auch nicht in der Kopie. Kombis mit angepfiffenem Spiel werden nicht
-  kopiert, Kopieren markiert nicht als übertragen, ohne Zwischenablage erscheint der Text markiert.
-  **Seit 21.10.2026 führt in der Kopie jeder Tipp zur Tipico-Spielseite** (seit 22.10. als Link
-  auf dem Spielnamen in der Tabelle)
-  (`https://sports.tipico.de/de/event/<id>`, `tipicoEventUrl`; Davids Wunsch statt eines
-  „Konnektors“ zum Tipico-Wettschein, den es nicht gibt und der gegen „Grenzen“ verstieße) - die
-  einzige Ausnahme von „was der Wettschein nicht zeigt“. Die ID steht als `tipico.eventId` im
-  Snapshot; die Kopie schlägt sie je Fixture-ID in der **geladenen** Analyse nach
-  (`tipicoEventIds` in `App.tsx`), weil gespeicherte Tipps von davor sie nicht tragen und ein
-  erneutes Hineinlegen sie als „schon drin“ nicht ersetzt. Ohne ID im Lauf kein Link. Den Tipp klickt David selbst an.
-- **Der Kelly-Dialog heißt „Kelly-Auswahl“ und führt die Liste der Wetten** (seit 29.09.2026
-  wieder, Davids Entscheidung): Modus, Kennzahlen, Hinweise, Einstellungen, dann die sortierbare
-  Liste (Spiel, Markt, Quote, Modell, Korrigiert nur in der Automatik, Vorteil grau mit „nach
-  Korr.“, Kelly-Anteil mit dem Wert ohne Grenzen, Einsatz), Erklärungen und Export. Solange die
-  Automatik lädt, zeigt die Liste keine Beträge. Der Export nimmt die ganze Auswahl über den
-  Umfang in der Reihenfolge des Dashboards, nicht die Sortierung der Liste. Die Kennzahl **„Auf Dauer“** (seit
-  06.10.2026 statt „Erwarteter Ertrag“) rechnet zum fairen Tipico-Preis ohne Aufschlag, ist
-  neutral gefärbt und sagt „Das Modell trifft geprüft nicht öfter als die Quote.“ - eine
-  Rechnung, keine Messung; Begründung im Abschnitt „Kelly-Automatik und Marktprofil“.
-- Klappt die App eine Partie auf, lädt sie deren Detailkennzahlen über
-  `/api/fixture/insights`: Torphasen je Viertelstunde, direkte Duelle mit Liga und
+- **Die alte App `apps/analyzer/` ist seit 26.10.2026 entfernt** (Davids Entscheidung): Tabelle,
+  Heatmap, Filtermenü, Quickpicker-Fenster, Wettschein, Kelly-Dialog, Marktprofil- und Live-Ansicht.
+  Mit ihr entfielen die Kelly-Auswahl (`selectKelly`), `npm run edge-report -- --simulate`, der
+  Endpunkt `/api/combos/markdown`, der UX-Agent `betting-ux-architect` und der Skill `betting-ux`.
+  Der letzte Stand liegt im Commit `3c7c35f` (Code und die Beschreibung der Ansichten in dieser
+  Datei). **Entscheidungen der alten App gelten für Neo nicht von selbst** - etwa Value nur hinter
+  einem Schalter, kein Vorteil in Live, Grün heißt „Empfehlenswert“, Gegensätze eines Spiels nie in
+  einer Kombi. Sie werden je Ansicht mit David neu entschieden; dort nachlesen, bevor etwas neu
+  gebaut wird, das es schon einmal gab.
+- Die Detailkennzahlen einer Partie liefert `/api/fixture/insights`
+  (`apps/shared/server/endpoints.ts`): Torphasen je Viertelstunde, direkte Duelle mit Liga und
   Halbzeitstand sowie Trends über die letzten zehn Partien inklusive Ballbesitz und
   Schüssen. Team- und H2H-Historien liegen aus dem Dashboard-Lauf im Cache; neu sind nur
   die Bündel aus `/fixtures?ids=` zu je 20 Partien, die Ereignisse und Statistiken in
   einem Aufruf tragen. Das kostet einmalig rund vier Anfragen je Partie und danach nichts
-  mehr, weil beendete Partien 30 Tage gespeichert bleiben. Zugeklappt entsteht kein
+  mehr, weil beendete Partien 30 Tage gespeichert bleiben. Ohne Abfrage entsteht kein
   Aufruf. Grenzen: `INSIGHTS_HISTORY_LIMIT` (20 Partien je Team) und
   `INSIGHTS_H2H_LIMIT` (10 direkte Duelle). Einzelne Partie prüfen:
   `npm run insights-probe -- <fixtureId>`.
@@ -663,24 +543,49 @@ nur auf Davids ausdrücklichen Wunsch mit `ANALYZER_NEW_DATABASE=1`.
   **Zurückspielen:** `npm run restore` (`tools/restore.ts`, Abschnitt „Neuer PC“).
 ## Apps
 
-Seit 19.10.2026 liegen die Oberflächen unter `apps/` (vorher `frontend/`):
+Seit 19.10.2026 liegen die Oberflächen unter `apps/` (vorher `frontend/`), seit 26.10.2026 ohne die
+alte App `apps/analyzer/` (Abschnitt „Pflege“):
 
-- `apps/analyzer/` - die bisherige App (`npm run app`, Port 5173). Alle Angaben `apps/analyzer/src/…`
-  in dieser Datei meinen sie.
-- `apps/neo/` - das **Neo Dashboard** (`npm run neo`, Port 5174, `neo:build`, `neo:preview`),
-  bisher ein Gerüst, das die Spiele des Snapshots listet.
-- `apps/shared/` - was beide nutzen: `server/endpoints.ts` (`dataEndpoints()`: Dashboard, Live,
-  Detailkennzahlen, Marktprofil - vorher in der Vite-Konfiguration), `src/` (`types.ts`, `data.ts`,
-  `liveData.ts`, `names.ts`, `TeamCrest.tsx`, `countryFlags.ts`), `styles/base.css` (Farb-Tokens,
-  Schrift, Reset, Wappen) und `vitest.setup.ts`.
-- `npm run app:test` läuft über `vitest.config.ts` in der Wurzel für alle drei Ordner, `npm run
-  typecheck` prüft beide Apps (`apps/tsconfig.base.json`). Ein neues npm-Script gehört in
-  `.claude/hooks/pruefer-waechter.ts` eingeordnet, sonst schlägt `test/pruefer-waechter.test.ts` fehl.
-- Jede App startet ihren eigenen Server mit denselben Endpunkten. **Zeigen beide gleichzeitig Live,
-  fragen zwei Server API-Football ab** - Neo hat deshalb vorerst keine Live-Ansicht.
-- Was nur eine App braucht, bleibt in ihrem Ordner; erst wenn die zweite es nutzt, wandert es nach
-  `apps/shared/`. `tools/edge-report.ts` lädt `apps/analyzer/src/kelly.ts` direkt mit Node - dort nur
-  `import type` aus `apps/shared/src/types.ts`.
+- `apps/neo/` - das **Neo Dashboard** (`npm run neo`, Port 5174, `neo:build`, `neo:preview`), die
+  einzige App. Sie liest den Snapshot, den `npm run dashboard` schreibt.
+- `apps/shared/` - Bausteine für Apps: `server/endpoints.ts` (`dataEndpoints()`: Dashboard, Live,
+  Detailkennzahlen, Marktprofil), `src/` (`types.ts`, `data.ts`, `liveData.ts`, `names.ts`,
+  `TeamCrest.tsx`, `countryFlags.ts`), `styles/base.css` (Farb-Tokens, Schrift, Reset, Wappen) und
+  `vitest.setup.ts`.
+- `npm run app:test` läuft über `vitest.config.ts` in der Wurzel: Neo, `apps/shared` und die
+  Quickpick-Regeln (`test/rules/*.spec.ts`). `npm run typecheck` prüft Wurzel und Neo
+  (`apps/tsconfig.base.json`). Ein neues npm-Script gehört in `.claude/hooks/pruefer-waechter.ts`
+  eingeordnet, sonst schlägt `test/pruefer-waechter.test.ts` fehl.
+- Neo hat vorerst keine Live-Ansicht. Kommt eine zweite App dazu, startet jede ihren eigenen Server mit
+  denselben Endpunkten - **zeigen beide gleichzeitig Live, fragen zwei Server API-Football ab**.
+
+## Stack-Karte
+
+- **`docs/stack-karte.html`**, veröffentlicht als Artifact
+  https://claude.ai/artifact/9J2Abc4DKRZTt2W7TK9Vu3 (seit 26.10.2026, Davids Wunsch: **immer aktuell
+  halten**). Zeigt Quellen, Befehle, Speicher, Server und Neo, die Claude-Ebene (AGENTS.md, Notizen,
+  Agenten, Hooks, Skills), den Ablauf einer Analyse, alle npm-Befehle und die Bibliotheken.
+- **`test/stack-karte.test.ts`** schlägt fehl, wenn ein npm-Script, ein Paket, eine Tabelle
+  (`CREATE TABLE` in `src/`), ein Projekt-Skill, ein Agent, ein Hook oder eine App fehlt, wenn die
+  Karte einen Befehl oder Pfad nennt, den es nicht mehr gibt, oder wenn `schemaVersion` bzw.
+  `goalLineModelVersion` abweichen. Bewusst als entfernt genannte Pfade stehen in `REMOVED_PATHS`.
+- **Quickpick-Filter auf der Karte** (seit 26.10.2026, Davids Wunsch): Bedingungen, Stufen, Messwerte und
+  Warnungen jedes Filters stehen als JSON-Block in der Karte und kommen aus `src/quickpick.ts`
+  (`tools/stack-karte-data.ts`). **`npm run stack-karte`** schreibt sie neu (0 Aufrufe); der Test
+  vergleicht sie mit dem Code, prüft die Beschriftungen (`FILTER_INFO`, `PARAM_LABELS`) und dass jede
+  Datei, die `src/quickpick.ts` einbindet, unter „Wo sie greifen“ steht - bindet Neo die Filter ein,
+  gehört das dort nachgetragen.
+- **Automatisch seit 26.10.2026** (Davids Wunsch): Der PostToolUse-Hook
+  `.claude/hooks/stack-karte-sync.ts` (eingerichtet in `.claude/settings.json`, nach Edit|Write) führt nach
+  jeder Änderung an `src/quickpick*.ts` oder `src/kombi-tipps.ts` `tools/stack-karte.ts` aus. Ändern sich die
+  Regeln, schreibt er sie in die Karte und gibt Claude die Erinnerung, im selben Schritt neu zu
+  veröffentlichen - das Veröffentlichen selbst kann nur Claude. Änderungen über die Shell (sed, Skripte)
+  sieht er nicht; die fängt der Test.
+- **Nach jeder Änderung, die die Karte betrifft** - auch ohne Testfehler, etwa ein neuer Ablauf, ein
+  anderes Budget, eine neue Verbindung, globale Skills oder MCP-Verbindungen, die der Test nicht
+  sieht: Karte nachziehen, „Stand“ im Kopf auf das Datum setzen und **im selben Schritt neu
+  veröffentlichen** - Artifact-Werkzeug mit `url` oben und `file_path: docs/stack-karte.html`; in
+  einer neuen Sitzung vorher `action: "read"` auf die URL. Ohne `url` entstünde ein zweiter Link.
 
 ## Sprache der sichtbaren Texte
 
@@ -732,32 +637,9 @@ Spiele." Eine gekürzte Warnung, die nicht mehr warnt, ist schlimmer als der Fac
 
 ### Wenn ein Text geändert wird
 
-Es gibt keine zentrale Textdatei; die Strings stehen am Fundort. Rund 140 Zusicherungen in
-`apps/analyzer/src/*.test.tsx` prüfen konkrete Formulierungen - sie gehören im selben Schritt
+Es gibt keine zentrale Textdatei; die Strings stehen am Fundort. Tests, die konkrete Formulierungen
+prüfen (`apps/neo/src/*.test.tsx`, `test/rules/quickpick.spec.ts`), gehören im selben Schritt
 nachgezogen, nicht gesammelt am Ende.
-
-## UX-Agent
-
-- Seit 27.09.2026 prüft der Subagent `betting-ux-architect` (`.claude/agents/`) Ansichten,
-  Beschriftungen, Filter und Abläufe der App und schlägt begründete Änderungen vor; Davids Wunsch:
-  bei UI/UX-Aufträgen automatisch einsetzen. Er arbeitet **nur lesend** (Read, Grep, Glob, kein
-  Bash, deshalb kein Wächter); umgesetzt wird von der Hauptsitzung nach Davids Entscheidung.
-- **Was die Hauptsitzung ihm mitgibt:** den Bildpfad eines Screenshots (nicht nur eine Beschreibung -
-  er kann Bilder lesen), Davids Wortlaut und bei einer Planprüfung den Planpfad samt Davids
-  Entscheidungen. Seine „Offenen Entscheidungen“ (höchstens drei, empfohlene Wahl zuerst) gehen
-  unverändert als Auswahlfrage an David. Pixelmaße, die er schätzt, misst die Hauptsitzung nach der
-  Umsetzung in der laufenden App nach. Modus **Planprüfung** (seit 11.10.2026): Plan oder fertige
-  Änderung als „muss / sollte / kann“ - am 11.10.2026 fand er so zwei sichtbare Fehler im Plan der
-  Form-Striche.
-- Sein Fachwissen steht im Skill `.claude/skills/betting-ux/` (Landkarte der App, Wett-Begriffe und
-  Projektregeln, Prioritäten und Bedienelemente, Review-Format). Der Skill ist auch für die
-  Hauptsitzung gedacht, wenn sie UI-Vorschläge umsetzt. Allgemeine UX-Regeln kommen aus
-  `ui-ux-pro-max` und werden dort nicht wiederholt.
-- **Wer eine Ansicht, eine Entscheidung zur Sichtbarkeit (etwa Value hinter dem Schalter) oder das
-  Wörterbuch ändert, zieht `references/app-landkarte.md` bzw. `wett-begriffe.md` nach** - sonst
-  prüft der Agent gegen einen veralteten Stand.
-- Handy-Breite ist dort nur Randnotiz (Davids Entscheidung vom 27.09.2026): Die App läuft lokal am
-  Desktop.
 
 ## Live-Ansicht und Live-Chancen
 
@@ -815,30 +697,6 @@ nachgezogen, nicht gesammelt am Ende.
   Ligaliste, 0 Aufrufe) und `cardData` (`AnalyzerDatabase.cardDataByLeague`: unter einer Gelben
   je Spiel über mindestens 20 Spiele = keine Kartendaten; am 29.09.2026 31 von 211 Ligen).
   Ältere Snapshots tragen beides nicht; die App sagt dann nichts Falsches, nur weniger.
-- **App:** Live hat eine **eigene Frage** statt des Marktes der Tabelle (`liveQuestion`, gemerkt
-  unter `football-analyzer:live-question`, Liste in `apps/analyzer/src/liveQuestions.ts`): Überblick,
-  Noch ein Tor, Über/Unter 1,5/2,5/3,5, BTTS Ja/Nein (**nur Stand**, keine gemessene
-  Live-Chance), Nächstes Tor, Sieger nach 90 Min., Karten. **Keine 1.-HZ-Märkte in Live.** Die
-  Liste ist **eine Tabelle mit Kopfzeile** (Davids Wunsch vom 29.09.2026: „übersichtlich als
-  Tabelle“): Min., Spiel (Teams mit Rot, Land · Liga), Stand, die Frage (Chance mit „vorläufig“
-  oder Tatsache, darunter der zweite Wert), dann **Aufs Tor, Karten, Ballbesitz, Pässe** je Heim
-  oben und Gast unten, auf Höhe der Teamnamen. Karten stehen nur beim Team, das welche hat (keine
-  gelbe „0“); „–“ heißt keine Kartendaten bzw. keine Live-Statistik (Grund im Tooltip). Pässe
-  als „412 · 84 %“: API-Football liefert live „Total passes“ und „Passes accurate“, „Passes %“
-  fast nie (16 von 292) - die Quote rechnet `teamSnapshot` daraus. Die Frage steht einmal in der
-  Kopfzeile statt in jeder Zeile. **Keine Quote, kein ✓/★** -
-  der Wert vor dem Anpfiff steht nur grau als „vor Anpfiff x %“. Das Fenster mit den Kennzahlen
-  öffnet **per Klick auf die Zeile, an der Stelle der Maus** (Davids Wunsch vom 29.09.2026;
-  vorher beim Überfahren, das deckte beim Weg über die Liste die Zeilen zu). Zu geht es mit
-  einem zweiten Klick, einem Klick daneben, Escape oder Scrollen der Liste; mit der Tastatur
-  öffnet Enter es neben der Zeile. Es zeigt Chancen live, Karten, Tore und Karten, drei Hauptstatistiken plus eine Kontextzeile und
-  „Vor dem Anpfiff“ (gewählter Markt und ✓/★-Märkte mit Quote). Das Aktivitätsbild ist aus der
-  App entfernt (die CLI behält es). Die App rechnet keine Wahrscheinlichkeit selbst.
-- **Filter:** „Beobachtete Spiele“ bestimmt die Aufrufe (Wettbewerbe, „Nur Spiele mit Empfehlung
-  vor Anpfiff“); „Nur Anzeige“ kostet nichts: Chance ab 50/65/80 % (folgt der Frage, bei
-  BTTS/Karten abgeschaltet), Rote Karte im Spiel, Phase (1. HZ, 2. HZ, ab 75.). Nicht
-  gespeichert, als Schildchen sichtbar. Sortierung: Anstoß (Vorgabe - nach Chance springen die
-  Zeilen bei jedem Abruf), Spielminute, Chance, Karten; sortierbar nur, was zu sehen ist.
 - **Bewusst nicht gebaut:** Momentum, `/odds/live` (Live-Preis neben Live-Chance wäre genau der
   Vorteil, den Live nie zeigt), „Karten ab N“ (die Sortierung erledigt das), „Nur mit
   Live-Statistik“ (die Statistik trägt keine belastbare Aussage; der Filter versteckte Spiele,
@@ -877,14 +735,20 @@ nachgezogen, nicht gesammelt am Ende.
   dem Basismarkt gespiegelt: Unter 1,5 tritt selten ein, eine übernommene Schwelle von 0,75 wäre
   dort nie erreichbar.
 - Ein neuer Markt braucht Einträge in `DashboardMarketKey`, `thresholds`, der Marktliste,
-  `decideMarket` (`src/market-outcome.ts`), `MARKET_OPTIONS`, `MARKET_TOGGLES` und
-  `MARKET_GROUP_OF` (`apps/analyzer/src/App.tsx`, Gruppe in der Marktliste der Werkzeugleiste und in
-  der Marktauswahl am „+“-Knopf). `MARKET_GROUP_OF` und `thresholds` sind als vollständige
-  Records notiert, der Compiler erzwingt sie also. `RADIAL_LABELS` gibt es seit 30.09.2026 nicht
-  mehr: Das Radialmenü wurde durch eine Liste ersetzt, die die vollen Marktnamen zeigt.
+  `decideMarket` (`src/market-outcome.ts`) und in jeder App, die Märkte auflistet. `thresholds` ist
+  als vollständiger Record notiert, der Compiler erzwingt ihn also.
 
 ## Kelly-Automatik und Marktprofil
 
+- **Seit 26.10.2026 gibt es keine Kelly-Auswahl mehr** (Davids Entscheidung, mit der alten App
+  entfernt): `selectKelly`, `recommendedSettings`, `marketCandidates`, `applyStakeFloor`, der
+  Kelly-Dialog und `npm run edge-report -- --simulate` standen in `apps/analyzer/src/kelly.ts`
+  (Commit `3c7c35f`). Geblieben sind `autoDecide`, `AUTO_RULE` und `buildMarketProfile`
+  (`src/market-profile.ts`), das Marktprofil über `/api/market-profile`, `npm run edge-report` mit
+  Ablehnungsregister und die Messungen unten. Sie gelten als Befund weiter: Wer Kelly in Neo neu
+  baut, liest sie vorher und fragt David. Ebenfalls am 26.10.2026 entfernt: `npm run kelly-tracker`, die
+  Kelly-Listen und -Protokolle in `docs/` (`kelly-testbetrieb.md`, `kelly-verlauf.md`, `kelly-tracker.json`) -
+  die Zahlen unten bleiben als Befund, die Dateien stehen in der git-Geschichte.
 - **Stand 06.10.2026 (drei Prüfer-Agenten nacheinander, Endstand der Drittprüfung) - gehört vor
   jede Aussage über Kelly gelesen:** Die Kelly-Rechnung ist richtig (Formel, Viertel-Kelly,
   Deckel, auch bei rund zwei Dutzend gleichzeitigen Wetten). **Value findet sie nicht.**
@@ -912,7 +776,7 @@ nachgezogen, nicht gesammelt am Ende.
 - Der Kelly-Picker hat zwei Modi. In der **Automatik** (Vorgabe) entscheidet `autoDecide` in
   `src/market-profile.ts` anhand der eigenen abgerechneten Ergebnisse, welche Märkte und
   Partien gewählt werden. **Manuell** verhält sich unverändert wie zuvor.
-- `recommendedSettings` (`apps/analyzer/src/kelly.ts`) sagt, was die Automatik übernimmt: die
+- `recommendedSettings` (bis 26.10.2026 in `apps/analyzer/src/kelly.ts`) sagte, was die Automatik übernimmt: die
   Auswahlregler (`minOdds`, `minEdge`, `maxEdge`, `minConfidence`, `excludeCrossLeague`)
   **und** `allowMultipleMarketsPerGame` - ob mehrere Märkte derselben
   Partie zugleich gespielt werden, ist eine Frage der Auswahl, und die Korrelation kann eine
@@ -970,7 +834,7 @@ nachgezogen, nicht gesammelt am Ende.
   meldete 1 €. Tritt ab Werk nur unter rund 40 € Budget auf.
 - **Angepfiffene Spiele** sind nie in der Kelly-Auswahl (`selectKelly(…, { now })`), auch wenn
   „Laufende / beendete Partien“ sie in der Tabelle zeigt: Ihre Quote stammt von vor dem Anpfiff.
-- Die Ansicht **Marktprofil** in der App zeigt je Markt Prognose, tatsächliche Trefferquote,
+- Das **Marktprofil** (`/api/market-profile`, bis 26.10.2026 als Ansicht der alten App) zeigt je Markt Prognose, tatsächliche Trefferquote,
   Abweichung und Ertrag, aufklappbar nach Vorteilsband. Das Verdikt der Marktzeile gilt für
   alle Zeilen mit Vorteil zusammen und wird von der Automatik **nicht** gelesen - sonst wäre
   Remis gesperrt, das über alle Zeilen bei −18,2 % lag, im Band ab 7 PP aber bei +18,4 %
@@ -984,7 +848,8 @@ nachgezogen, nicht gesammelt am Ende.
   uneinheitlichen Quoten innerhalb einer Zelle - konstruierbar, aber über 2462 Prüfzeilen
   **null Mal** aufgetreten. Nicht erneut einbauen, ohne vorher im Ablehnungsregister des
   Edge-Reports nachzusehen, ob der Fall inzwischen vorkommt.
-- Belastbarkeit prüfen: `npm run edge-report -- --simulate` (seit 06.10.2026 neu gebaut). Für
+- Belastbarkeit prüfte bis 26.10.2026 `npm run edge-report -- --simulate` (seit 06.10.2026 neu gebaut,
+  mit der alten App entfernt). Für
   jeden datierten Snapshot läuft genau die Regel der App: Profil nur aus Spielen, die vorher
   abgerechnet waren (`settledAt`), Umfang „nächste 48 Std.“, `selectKelly` aus
   `apps/analyzer/src/kelly.ts` mit Automatik und `now`, erste Sichtung je Spiel, gemessen gegen den
@@ -1136,9 +1001,8 @@ nachgezogen, nicht gesammelt am Ende.
   `teamEloSystems` nachgezogen** (Davids Anweisung vom 29.09.2026). U20, U23 und
   Frauen-Nationalteams: nein (zu wenige Spiele bzw. Favorit weiter unterschätzt) - dort vorher
   neu messen.
-- **In der App steht es seit 24.09.2026 unverbindlich neben dem Teamnamen** (Davids Wunsch):
-  klein und grau, Vertrauen und Stand im Tooltip, unter 50 % Vertrauen blasser (`EloTag` in
-  `apps/analyzer/src/App.tsx`). Der Dashboard-Lauf hängt es über die Team-ID an
+- **Im Snapshot steht es unverbindlich je Team** (seit 24.09.2026, Davids Wunsch; die alte App zeigte
+  es klein und grau neben dem Teamnamen). Der Dashboard-Lauf hängt es über die Team-ID an
   (`homeTeamId`/`awayTeamId` in `GoalLineRow`, `homeElo`/`awayElo` im Snapshot) und liest
   dafür nur `elo_ratings` - kein Aufruf. Ein Test hält fest, dass die Märkte mit und ohne Elo
   identisch bleiben.
@@ -1346,15 +1210,16 @@ nachgezogen, nicht gesammelt am Ende.
 
 ## Quickpicker
 
-Der **Quickpicker** neben dem Filter-Knopf filtert die Tabelle nach einer **Voreinstellung**.
+Der **Quickpicker** wählt Spiele des Snapshots nach einer **Voreinstellung** aus. Die Regeln stehen in
+`src/quickpick*.ts`, ihre Tests in `test/rules/quickpick.spec.ts`. Fenster, gemerkte Regler und
+Wettschein gehörten zur alten App und sind seit 26.10.2026 entfernt.
 Es gibt sieben, und sie haben **verschiedene Maßstäbe** - was für die eine gilt, gilt für die
 anderen ausdrücklich nicht.
 
 ### Gemeinsames Gerüst
 
 - Er liest ausschließlich den geladenen Snapshot und kostet **kein API-Budget**;
-  `src/quickpick-*.ts`, `apps/analyzer/src/quickpick.ts` und `apps/analyzer/src/quickpickColumns.tsx`
-  enthalten weder `fetch` noch `useEffect`.
+  `src/quickpick-*.ts` enthalten weder `fetch` noch `useEffect`.
 - Die Regeln stehen in `src/quickpick-daves.ts`, `src/quickpick-dominanz.ts` und
   `src/quickpick-hz15.ts`, das
   gemeinsame Gerüst in `src/quickpick-core.ts`, zusammengeführt in `src/quickpick.ts`. Dort
@@ -1365,58 +1230,18 @@ anderen ausdrücklich nicht.
   Wettschein-Modus. Wer eine neue hinzufügt, ergänzt: `QuickpickPresetId`, den Deskriptor in
   `src/quickpick-<id>.ts`, `QUICKPICK_PRESETS`/`QUICKPICK_PRESET_LIST`, die Weiche in
   `evaluateFixture`, `QuickpickSettings`, Abweisungsgründe in `REJECTION_LABELS` und
-  `emptyRejections` (`src/quickpick-core.ts`), im Frontend `QuickpickStore` samt
-  `loadQuickpickStore`/`settingsOf`/`withSettings` und der Altbestandsprüfung
-  (`apps/analyzer/src/quickpick.ts`), `QUICKPICK_PARAMS`/`QUICKPICK_TOGGLES`,
-  `QUICKPICK_COLUMNS` und einen **eigenen Zweig in `strengthOf`** - ohne ihn fällt sie still in
-  den Remis-Zweig, und der Compiler merkt es nicht.
-- **Der Quickpicker ist seit 10.10.2026 ein nicht-modales Fenster im Leistenstil** (Davids
-  Entscheidungen nach zwei Entwürfen des UX-Agenten; Aufbau in
-  `.claude/skills/betting-ux/references/app-landkarte.md`). Er geht unter der Knopfgruppe an
-  derselben Stelle auf wie das Filtermenü - offen ist höchstens eins -, schließt bei Klick
-  daneben, Wegtabben, Escape, ✕ und Ansichtswechsel und **lässt den Filter dabei an**.
-  Festgelegt sind außerdem:
-  - **Alle sieben Filter stehen als eine Radio-Liste** unter drei Gruppenüberschriften, je mit
-    der Zahl ihrer Treffer (vorher Umschalter plus Dropdown, zwei Klicks und versteckte Zahlen).
-    Das Feld `group` im Deskriptor ordnet jede Voreinstellung einer Gruppe zu
-    (`QUICKPICK_GROUPS` in `src/quickpick.ts`): **Daves Filter** (`daves1x2`, `dominanz`,
-    `remisScore`) wählen über Tabelle, H2H und Form, **Modell-Filter** (`modell1x2`, `hz15`,
-    `remis`) über Wahrscheinlichkeiten und Torerwartung des Modells, **Tipico-Filter**
-    (`kombi`, seit 14.10.2026) über die Tipico-Quote ohne Aufschlag. Die Gruppe ist reine
-    Anzeige, keine Regel liest sie.
-  - **Jede Wahl schaltet „Tabelle filtern“ ein** - Filter (auch ein Klick auf den schon
-    gewählten, deshalb `onClick` statt `onChange`), Stufe, Regler, Zusatzschalter,
-    Zurücksetzen. Sortieren und Aufklappen schalten nichts.
-  - **Der Haken steht immer sichtbar** im Fuß: `QuickpickPreset.warnung`, ein Satz, gekürzt
-    aus `honesty` (der volle Absatz steht unter „Worauf dieser Filter achtet“). Sie nennt keine
-    Zahl, die nur für eine Stufe gilt, und gehört bei jeder Nachkalibrierung mit `honesty`
-    geprüft. Bei „Erste Halbzeit“ steht trotz +6,8 % bei Streng „Rechne nicht mit Gewinn“
-    (Schwellen an denselben Daten gesucht, zweite Zeithälfte überall schwächer, Vorgabe −2,2 %).
-  - **„eigene Werte – die Zahlen gelten nicht“** erscheint auch, wenn ein Kernwert abweicht,
-    den keine Stufe setzt (Mindestquote, Quotengrenze, Torerwartung): Verglichen wird mit dem
-    Wert der Stufe, sonst mit `preset.defaults`. Nur Anzeige - `levelOf` bleibt unverändert;
-    „Auf Stufe zurücksetzen“ setzt auch diese Kernwerte zurück, die Zusatzschalter nicht.
-  - **Angepfiffene Spiele kommen nicht in den Wettschein** (wie bei Kelly: ihre Quote stammt
-    von vor dem Anpfiff), ebenso wenig Zeilen mit geschätzter Quote (≈). Beide stehen gezählt
-    neben dem Knopf. Die Prüfung sitzt in `QuickpickUI.tsx`, nicht in der Regel.
-  - **„Alle n in den Wettschein“ öffnet den Wettschein nicht mehr** (seit 11.10.2026, Davids
-    Entscheidung): Der Quickpicker bleibt offen und meldet im Fuß „Zuletzt: n neu im Wettschein · r
-    ersetzt · u schon drin · Rückgängig“ - so lassen sich mehrere Filter nacheinander einsammeln.
-    Remis-Filter ersetzen dabei einen Sieger-Tipp desselben Spiels (Hinweistext in
-    `src/quickpick-remis.ts` und `src/quickpick-remisscore.ts`).
-  - **Quickpicker und Wettschein greifen ineinander** (seit 19.10.2026, Davids Entscheidungen nach
-    dem Review des UX-Agenten): Knopf je Trefferzeile zum Hineinlegen und Herausnehmen (zeigt, was
-    schon drin ist), Sammelknopf zählt nur Neues („k weitere …“, alles drin gesperrt), im Fuß
-    **immer** der Stand „Wettschein: n Tipps aus s Spielen · deine Kombis brauchen p Plätze“, die
-    Meldung bleibt beim Filterwechsel. Einzel- und Sammelknopf legen über **`quickpickCartEntry`**
-    (`apps/analyzer/src/betCart.ts`) denselben Tipp - nicht zurück in zwei Fassungen aufteilen.
-    `CartEntry.source` trägt den Filter, der Wettschein zeigt ihn grau („aus …“); **gemischt wird
-    über alle Filter zusammen** (Davids Wahl, „je Filter getrennt“ abgelehnt). Bei aktivem Quickpick
-    zeigt die Tabelle unter den Teams „Quickpick <Quote> · <Tipp>“ (`QuickpickTableTip`, ohne
-    Modellchance und Vorteil). „In der Tabelle zeigen ›“ und „Tabelle zeigen“ schließen den
-    Quickpicker und lassen den Filter an; „In der Tabelle zeigen“ klappt das Spiel auf und lädt
-    damit wie ein Klick auf die Zeile einmalig die Detailkennzahlen (rund 4 Aufrufe). Aufbau in
-    `references/app-landkarte.md`.
+  `emptyRejections` (`src/quickpick-core.ts`) und Tests in `test/rules/quickpick.spec.ts`. Sortiert eine
+  App Treffer nach Stärke, braucht sie einen eigenen Zweig je Voreinstellung - die alte App fiel ohne
+  ihn still in den Remis-Zweig, und der Compiler merkte es nicht.
+- Das Feld `group` im Deskriptor (`QUICKPICK_GROUPS` in `src/quickpick.ts`) ordnet jede
+  Voreinstellung einer Gruppe zu: **Daves Filter** (`daves1x2`, `dominanz`, `remisScore`) wählen über
+  Tabelle, H2H und Form, **Modell-Filter** (`modell1x2`, `hz15`, `remis`) über Wahrscheinlichkeiten
+  und Torerwartung des Modells, **Tipico-Filter** (`kombi`) über die Tipico-Quote ohne Aufschlag. Die
+  Gruppe ist reine Anzeige, keine Regel liest sie.
+- `QuickpickPreset.warnung` ist der Haken in einem Satz, gekürzt aus `honesty`, und gehört immer
+  sichtbar neben die Treffer. Sie nennt keine Zahl, die nur für eine Stufe gilt, und wird bei jeder
+  Nachkalibrierung mit `honesty` geprüft. Bei „Erste Halbzeit“ steht trotz +6,8 % bei Streng „Rechne
+  nicht mit Gewinn“ (Schwellen an denselben Daten gesucht, zweite Zeithälfte überall schwächer).
 - **Die Messwerte der Stufen sind Zahlen, keine Strings.** `QuickpickLevel.measured` trägt
   `{ n, proTag, trefferquote, roi }`; den Knopftext formatiert `preset.noteOf`. Früher stand
   dort ein Text, den die Rückrechnung wieder zerlegen musste.
@@ -1427,11 +1252,6 @@ anderen ausdrücklich nicht.
   `onAddAll` in `App.tsx` und `strongPercent`/`teamOf` in den Spalten. Abgerechnet wird bei
   1X2 weiter über den Sieger und sonst über `decideMarket`; ein fehlender Pausenstand ergibt
   dort `null` und fällt heraus, statt als Niederlage zu zählen.
-- Jede Voreinstellung hat **eigene gespeicherte Regler** (`QuickpickStore` in
-  `apps/analyzer/src/quickpick.ts`). Ein Wechsel darf die Schwellen der anderen nie überschreiben;
-  ein Altbestand aus der Zeit mit nur einer Voreinstellung wandert beim Laden in den
-  Daves-Zweig. Gespeichert wird zusätzlich, **welche** Voreinstellung gewählt ist - der
-  **aktive Filter** bleibt weiterhin unpersistiert.
 - **Ein Quotenband als Tor ist erlaubt und widerspricht Punkt „Grenzen" nicht.** Die Auswahl
   einer Voreinstellung steht fest, die Quote entscheidet nur, *welche* Partien in der Liste
   landen - sie ändert weder Tipp noch Wahrscheinlichkeit. Alle drei Voreinstellungen nutzen
@@ -1440,8 +1260,8 @@ anderen ausdrücklich nicht.
   Das kostet keinen Aufruf - die Preise liegen in `src/dashboard.ts` ohnehin in der Hand. Für
   ältere Läufe rechnet `counterOddsOf` die fehlende Quote über den Buchmacherschnitt
   (`TIPICO_BOOK = 1,1068`, Median über 6.135 Ereignisse): Die **Seite** stimmt dann zu 97,6 %,
-  der **Preis** liegt im Median 7,1 % daneben (p90 18,4 %). Solche Zeilen tragen in der App ein
-  `≈` und dürfen **nicht** in den Wettschein.
+  der **Preis** liegt im Median 7,1 % daneben (p90 18,4 %). Solche Zeilen erkennt
+  `oddsEstimated`; ihr Preis taugt nicht für eine Kombi.
 - **Die Rückrechnung rechnet die Tabellen der Läufe bis 03.09.2026 neu** (`tools/snapshot-history.ts`,
   seit 28.09.2026). Diese Läufe summierten mehrere Saisons - alle 7.669 nachrechenbaren Tabellen
   waren gemischt. Der Leser rechnet sie beim Einlesen mit `buildTable` und `tableScopeOf` aus den
@@ -1520,8 +1340,7 @@ anderen ausdrücklich nicht.
   bei 29,5 % Treffern. Die Voreinstellung „Dominanz" lässt sie zu, markiert sie aber - dort
   bestimmen die Kriterien die Seite, nicht der Modelltipp.
 - Die Regel steht in `src/quickpick.ts`, nicht im Frontend - dort, wo auch der Backtest sie
-  aufruft. `apps/analyzer/src/quickpick.ts` reicht sie durch und hält nur das Laden und Speichern
-  der Einstellungen. Dieselbe Begründung wie bei `autoDecide`: Eine zweite Fassung im Frontend
+  aufruft. Dieselbe Begründung wie bei `autoDecide`: Eine zweite Fassung im Frontend
   würde die Rückrechnung wertlos machen.
 - **Vier Strengestufen** in `QUICKPICK_LEVELS` (streng, ausgewogen, locker, weit) verschieben
   Formschwellen, Tabellenschwellen und Favoritenpunkte gemeinsam. Auf jedem Knopf stehen die
@@ -1567,7 +1386,7 @@ anderen ausdrücklich nicht.
   auswärts spielende Seite dort strukturell schlechter dasteht. Was David „Form" nennt, ist die
   **Saisonbilanz aus der Tabelle**: `(Siege + Remis) / Spiele`, in `superiorityOf` als
   `nonLossGap` in Prozentpunkten. Wer das Formtor wieder einbaut, entfernt genau die Partien,
-  um die es geht - der Regressionstest in `apps/analyzer/src/quickpick.test.ts` hält das fest.
+  um die es geht - der Regressionstest in `test/rules/quickpick.spec.ts` hält das fest.
 - **Die Kerntore staffeln nie**: `minPointsPerGame` 0,3, `minPositionGap` 3, `minNonLossGap` 10
   sind die Identität der Voreinstellung. Gestaffelt werden nur Quotenband, Serienlänge und die
   Modellseite.
@@ -1706,7 +1525,7 @@ anderen ausdrücklich nicht.
 - **Jedes Tor obendrauf macht es schlechter.** Auf `p(Remis) >= 0,30` gemessen:
   `scores.draw >= 40` 34,7 %, `>= 50` **30,8 %**, Datenvertrauen >= 80 32,2 %, ohne
   Cross-League 35,4 % - gegen 35,7 % ohne jedes Zusatztor. Ein Regressionstest in
-  `apps/analyzer/src/quickpick.test.ts` hält fest, dass magere Remis-Punkte, fehlende H2H-Remis,
+  `test/rules/quickpick.spec.ts` hält fest, dass magere Remis-Punkte, fehlende H2H-Remis,
   schwaches Datenvertrauen und ein torreiches Spiel die Partie **nicht** kosten dürfen.
 - **Das hauseigene 100-Punkte-System ist hier Spalte, nicht Tor.** Es ordnet monoton, feuert
   aber kaum: 28 von 835 Partien erreichen 60 Punkte, drei erreichen 70. Eine eigene
@@ -1865,13 +1684,5 @@ anderen ausdrücklich nicht.
   in den letzten Spielen* (+5,7 ±2,0 bei 0,25-0,30); *Form am Ort* trennt gar nicht
   (+0,9 ±1,1). Das sind Hinweise für die nächste Runde, keine Freigabe zum Umgewichten - es
   wurden 15 Kriterien in drei Bändern geprüft, einzelne Zwei-Sigma-Treffer sind da zu erwarten.
-
-### Verdrahtung
-
-- Das Prädikat sitzt in `filtered` (`apps/analyzer/src/App.tsx`), **nicht** in
-  `scopedFixtures`: Dort hingen auch die KPI-Zähler und die Kelly-Auswahl daran. Gespeichert
-  werden die Regler, **nicht** der aktive Zustand - ein Filter, der nach dem Neuladen unbemerkt
-  fast alle Zeilen ausblendet, wäre dieselbe Falle wie der geerbte Einsatzrahmen der
-  Kelly-Automatik.
 
 - Vor Codeänderungen und danach: `npm test` und `npm run typecheck`

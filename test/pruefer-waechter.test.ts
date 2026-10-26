@@ -21,7 +21,7 @@ test("Befehle aus echten Prüfungen bleiben erlaubt", () => {
   allowed("npm run elo -- ranking --top 25");
   allowed("npm run elo-backtest -- --test-start 2025-01-01 --test-end 2025-12-31");
   allowed("npm run quickpick-report -- --preset hz15");
-  allowed("npm run edge-report -- --simulate");
+  allowed("npm run edge-report");
   allowed("npm run report");
   allowed("git status --short && git diff --stat && git log -1 --oneline");
   allowed("git -C \"C:/repo\" --no-pager log --oneline -5");
@@ -75,7 +75,7 @@ node /tmp/x.ts`, /API-Football/);
 test("Schreiben in Datenbank, Repository und Git wird gesperrt", () => {
   blocked("npm run elo -- build", /ranking/);
   blocked("npm run quickpick-report -- --write", /Kalibrierpunkt/);
-  blocked("npm run edge-report -- --simulate --json docs/edge.json", /Temp/);
+  blocked("npm run edge-report -- --json docs/edge.json", /Temp/);
   blocked("npm run backfill-results -- --scan", /Datenbank/);
   blocked("echo x > src/foo.ts", /src\/foo\.ts/);
   blocked("node skript.ts >> AGENTS.md", /AGENTS\.md/);
@@ -114,7 +114,7 @@ node /tmp/z.ts`, /SQL/);
 
 test("Schreiben ins Temp-Verzeichnis bleibt erlaubt", () => {
   allowed("echo x > /tmp/notiz.txt");
-  allowed("npm run edge-report -- --simulate --json /tmp/edge.json");
+  allowed("npm run edge-report -- --json /tmp/edge.json");
   allowed(`Out-File -FilePath $env:TEMP\\x.txt -InputObject 1`);
   allowed("New-Item -ItemType Directory -Force -Path $env:TEMP\\pruefer");
   allowed(`node -e "require('fs').writeFileSync(require('path').join(require('os').tmpdir(), 'x.json'), '{}')"`);

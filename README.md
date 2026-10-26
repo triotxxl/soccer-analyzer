@@ -1,5 +1,13 @@
 # API-Football-Analyzer
 
+Lokaler, chatgesteuerter Fußball-Analyzer. Der Chat-Agent in VS Code startet die Analysen über
+die Kommandozeile und folgt dabei `AGENTS.md`. Wie Datenbank, Befehle, App, Filterregeln und die
+Claude-Werkzeuge zusammenhängen, zeigt die Stack-Karte `docs/stack-karte.html`.
+
+Das Programm verwendet **keine API-Football-Predictions**. Wahrscheinlichkeiten entstehen
+deterministisch aus abgeschlossenen Ligaspielen, getrennten Heim-/Auswärtswerten, jüngerer
+Form, Liga-Basiswerten und einer Poisson-Tormatrix.
+
 ## Empfohlener Komplettlauf
 
 Lege die aktuelle Tipico-Datei als `data.json` im Projektstamm ab und starte:
@@ -15,21 +23,18 @@ fehlende historische Daten nur einmal und erzeugt:
 - `output/dashboard-latest.json`
 - einen zusätzlichen datierten JSON-Snapshot
 
-Die Darstellung läuft als lokale React-/Vite-App. Starte sie in einem zweiten Terminal:
+Die Darstellung übernimmt das **Neo Dashboard**, eine lokale React-/Vite-App unter `apps/neo`
+(gemeinsame Bausteine in `apps/shared`). Starte es in einem zweiten Terminal:
 
 ```powershell
-npm run app
+npm run neo
 ```
 
-Ein zweites Dashboard (Neo) startet mit `npm run neo` auf http://localhost:5174 und liest
-dieselben Daten. Beide Apps liegen unter `apps/` (`analyzer`, `neo`, gemeinsame Bausteine in
-`shared`).
+Neo läuft auf http://localhost:5174, liest ausschließlich den neuesten Lauf und löst selbst
+keine Analyse aus.
 
-Die App liest ausschließlich den neuesten JSON-Lauf und aktualisiert sich automatisch,
-wenn eine neue Analyse im Chat abgeschlossen wurde.
-
-Das Dashboard zeigt 1X2, Remis, BTTS, Über 1,5 und Über 2,5 mit eindeutigen Symbolen:
-⛔ nicht empfehlenswert, ✅ empfehlenswert und ⭐ sehr empfehlenswert. Pokal- und
+Der Snapshot führt je Spiel 14 Märkte mit Modellwahrscheinlichkeit, Tipico-Quote und einer
+Empfehlungsstufe (nicht empfehlenswert, empfehlenswert, sehr empfehlenswert). Pokal- und
 Cross-League-Spiele werden mit einem getrennten Modell gekennzeichnet. Remis-Serien aus
 direkten Duellen erscheinen als eigener Auffälligkeitshinweis.
 
@@ -41,344 +46,35 @@ wirklich noch läuft, entscheidet der Status von API-Football und nicht der Stat
 `data.json`, der beim Export eingefroren wurde. Beendete und abgesagte Partien fallen
 heraus.
 
-In der 48-Stunden-Ansicht bleibt die obere Grenze unangetastet. Angepfiffene Partien
-erscheinen dort erst, wenn die Option **Laufende / beendete Partien** gesetzt ist; sie
-sind in der Tabelle mit `angepfiffen` gekennzeichnet. In der Live-Ansicht erscheinen sie
-unabhängig davon.
+`next48` ist das Standardfenster und umfasst exakt den Zeitpunkt des Starts bis 48 Stunden
+später. Dafür werden nötigenfalls drei Kalendertage geladen; Spiele außerhalb der exakten
+Zeitgrenzen werden verworfen.
 
-### Detailansicht einer Partie
+### Quickpick-Filter
 
-Klappt die Übersicht eine Partie auf, öffnet sich ein Seitenpanel mit Torphasen je
-Viertelstunde, den direkten Duellen, **Match-Statistiken** und den Trends der letzten
-Spiele. Die Match-Statistiken stellen die Durchschnittswerte beider Teams je Kennzahl als
-zwei Balken untereinander gegenüber — Ballbesitz, Schüsse und ihre Aufschlüsselung, Ecken,
-Fouls, Abseits, Karten, Paraden, Pässe und die daraus gerechnete Passquote. Im Panelkopf
-wird zwischen **Letzte Spiele** und **Direkte Duelle** umgeschaltet und die Anzahl der
-betrachteten Partien zwischen 1 und 5 gewählt.
+Sieben Filter wählen aus den Spielen einer Analyse Tipps für Kombis aus (`src/quickpick*.ts`).
+Bedingungen, Stufen und gemessene Trefferquoten jedes Filters zeigt die Stack-Karte im Abschnitt
+„Quickpick-Filter“; nachgerechnet werden sie mit `npm run quickpick-report`. Neo zeigt sie noch
+nicht an. Für keinen Filter ist ein Gewinn belegt: Die Trefferquote folgt fast ganz der Quote.
 
-Die Werte reichen nur so weit, wie API-Football zu den historischen Partien überhaupt
-Statistiken führt: Die Abdeckung schwankt stark je Liga, eine fehlende Kennzahl erscheint
-als `–` und geht nie als `0` in einen Mittelwert ein. Die Datenbasis-Zeile nennt deshalb
-je Team, über wie viele Partien tatsächlich gemittelt wurde. Ballbesitz summiert sich nur
-im Modus **Direkte Duelle** auf 100 %, weil dort beide Seiten über dieselben Partien
-gemittelt werden; bei **Letzte Spiele** stammen die Werte aus verschiedenen Begegnungen
-und werden bewusst nicht auf 100 % normiert.
+### Live-Dienst
 
-Alle Umschalter im Panel rechnen auf dem bereits geladenen Bestand und lösen keinen
-weiteren API-Aufruf aus.
-
-### Quickpicker
-
-Der Knopf **Quickpick** rechts in der Toolbar kürzt die Tabelle auf **klar überlegene
-Mannschaften**. Gedacht ist er für Kombis: Ein Knopf legt alle Treffer als 1X2-Tipp in den
-Wettschein, wo der Baukasten daraus Kombis baut. Bisher gibt es eine Voreinstellung,
-**Daves 1x2-Filter**, und sie verlangt der Reihe nach:
-
-- **Tabelle:** Vorsprung bei Platz, Punkten je Spiel und Tordifferenz.
-- **Form:** die getippte Seite deutlich stärker als die andere, gerechnet als Sieg 3, Remis 1,
-  Niederlage 0 über die letzten fünf Spiele — Remis zählen also als kein Verlust.
-- **Direkte Duelle:** kein Rückstand und keine zwei Niederlagen in Folge gegen die getippte
-  Seite.
-- **Favoritenpunkte** des Modells über der Schwelle und **Quote** ab 1,30.
-- Getippt wird immer die Seite des Modells; für die Gegenseite führt der Lauf keine Quote.
-
-Wie hoch die Schwellen liegen, bestimmt die Strengestufe (siehe unten).
-
-Ohne Ligatabelle ist Überlegenheit nicht prüfbar — Pokal- und Cross-League-Partien fallen
-deshalb weg, nicht als Werturteil, sondern mangels Grundlage.
-
-In den Einstellungen stehen vier **Strengestufen**. Auf jedem Knopf steht, was er kostet:
-
-| Stufe | Tipps je Tag | Treffer je Tipp | 4er-Kombi |
-|---|---|---|---|
-| Streng | 2,4 | 71,0 % | 25,4 % |
-| **Ausgewogen** (Vorgabe) | 4,9 | 69,1 % | 22,8 % |
-| Locker | 6,6 | 63,8 % | 16,6 % |
-| Weit | 9,4 | 59,1 % | 12,2 % |
-
-Die Zahlen sind über die archivierten Läufe an alten Spielen geprüft. Wer einen einzelnen Regler
-verstellt, steht auf „Eigene Werte“. Die Mindestpunkte sind dabei die empfindlichste
-Schraube — unterhalb von 70 fällt die Trefferquote deutlich schneller als bei allen anderen.
-
-Nachgerechnet wird mit `npm run quickpick-report`: Der Report misst jede Stufe neu, vergleicht
-sie mit den Zahlen auf den Knöpfen und meldet, wenn sie auseinanderlaufen. Fällig ist das alle
-2.000 neu abgerechneten Partien; er sagt selbst, wie viele seither dazugekommen sind.
-
-> **Wiedervorlage – wann nachjustiert wird** (Stand 28.09.2026, 6.578 abgerechnete Partien)
->
-> 1. **Remis-Kandidaten: Vorgabe und 30-%-Schwelle prüfen, sobald „Ausgewogen“ auf dem
->    laufenden Modell mindestens 200 Tipps hat** – bei 2,6 Tipps am Tag etwa um den
->    **20.11.2026**. Am 28.09. waren es 61 Tipps mit 27,9 % Treffern, kaum mehr als ohne Filter
->    (25 %). Nachsehen mit `npm run quickpick-report -- --preset remis`, Spalte `n`. Vorher nicht
->    an der Schwelle drehen: Auf 61 Tipps würde man sie an den Zufall anpassen.
-> 2. **Neue Modellversion** (`goalLineModelVersion` in `src/config.ts`): „Erste Halbzeit“ und
->    „Remis-Kandidaten“ werden nur am laufenden Modell gemessen und starten danach bei null.
->    Die Knopfzahlen erst ersetzen, wenn „Ausgewogen“ je Filter wieder mindestens 100 Tipps hat;
->    bis dahin gelten die alten mit dem Zusatz, dass sie zum Vorgänger gehören.
-> 3. **Alle Filter alle 2.000 neu abgerechneten Partien** – als Nächstes Daves 1x2 bei 7.628,
->    alle übrigen bei 8.578. Der Report meldet „FÄLLIG“ von selbst.
-> 4. **Daves 1x2: nur noch Analysen ab 04.09. werten, sobald die Vorgabe dort mindestens 300
->    Tipps hat** (am 28.09. waren es 162). Die Favoritenpunkte der Analysen bis 03.09. standen auf
->    der gemischten Tabelle und lassen sich nicht nachrechnen; die Tabellen selbst werden beim
->    Einlesen korrigiert.
-
-#### Voreinstellung „Dominanz zum Kombipreis"
-
-Oben im Panel lässt sich auf **Dominanz zum Kombipreis** umschalten. Der sucht Partien wie
-Nacional Potosí – Always Ready: eine Mannschaft, die die letzten direkten Duelle gewann, in der
-Tabelle klar vorn steht und die bessere Siege-plus-Remis-Bilanz hat — und die **trotzdem 1,80
-oder mehr** bezahlt. Genau daraus lassen sich kurze Kombis über fünf bis sieben Tipps bauen.
-
-Welche Seite gestützt wird, entscheiden die Kriterien, nicht der Modelltipp. Weicht das Modell
-ab, erscheint die Zeile trotzdem — mit dem Abzeichen **Modell dagegen**. Die Stufe „Streng"
-lässt nur Partien durch, bei denen beide übereinstimmen.
-
-**Die Form kommt hier aus der Saisontabelle, nicht aus den letzten fünf Spielen.** Ein
-Formvergleich am Ort würde genau die gesuchten Partien aussortieren: Die auswärts spielende
-Seite steht dort fast immer schlechter da — Always Ready mit 66,7 % gegen 80 %, Tolima mit 40 %
-gegen 60 %. Die Venue-Form bleibt deshalb eine Spalte und ist bewusst kein Tor.
-
-**Die Kriterien sagen den Sieger gut vorher — aber der Markt preist sie ein.** Über 56
-archivierte Läufe und 5.754 Kandidaten:
-
-| Kern-Kriterien im Quotenbereich | Wetten | Treffer | Ertrag |
-|---|---|---|---|
-| ohne jeden Filter | 5.754 | 37,2 % | −10,6 % |
-| 1,00–1,50 | 363 | **73,8 %** | −3,2 % |
-| 1,50–1,80 | 318 | 57,5 % | −6,8 % |
-| ab 3,00 | 75 | 17,3 % | −42,0 % |
-
-Die Trefferquote folgt der Quote fast exakt. Auf den Stufen steht deshalb der **Ertrag je
-Tipp** statt der Trefferquote — und er ist auf allen vier negativ:
-
-| Stufe | Tipps je Tag | Treffer je Tipp | Gewinn je Tipp |
-|---|---|---|---|
-| Streng | 3,2 | 40,9 % | −16,1 % |
-| **Ausgewogen** (Vorgabe) | 4,7 | 37,4 % | −15,0 % |
-| Locker | 8,7 | 45,5 % | −11,5 % |
-| Weit | 49,3 | 41,7 % | −11,0 % |
-
-Stand 28.09.2026, nach zwei Korrekturen: Wo Tipico für den Favoriten keine Quote führte, bekam
-er früher die Quote des Gegners (Chelsea Frauen zu 23,00) – das machte „Locker“ zum Schein
-positiv. Und die Tabellen der Analysen bis 03.09. werden jetzt neu gerechnet, weil sie mehrere
-Saisons zusammenzählten. Die vier Zahlen sind untereinander nicht trennbar. „Ausgewogen" ist
-die Vorgabe, weil es bei gleichem gemessenem Ertrag anderthalbmal so viele Partien zeigt.
-
-**Für kurze Kombis ist genau dieser Wert entscheidend**, denn eine Kombi multipliziert den
-Gewinn je Tipp — nicht die Quote. Eine hohe Gesamtquote macht den Gewinn seltener, nicht
-größer. Das Panel zeigt unter den Treffern, was Kombis aus der gewählten Stufe gebracht hätten,
-gezogen über je zwei Spieltage (der Umfang eines üblichen Laufs):
-
-| Tipps | Quote Ø | Treffer | Ertrag | erwartet |
-|---|---|---|---|---|
-| 2 | 5,4 | 13,5 % | −30,3 % | −27,7 % |
-| 3 | 12,5 | 5,5 % | −36,5 % | −38,5 % |
-| 4 | 28,6 | 2,1 % | −49,7 % | −47,7 % |
-| 5 | 65,3 | 0,4 % | **−80,7 %** | −55,5 % |
-| 7 | 355,3 | 0,0 % | −100 % | −67,8 % |
-
-Die Fünferkombi, um die es geht, gab im Schnitt ein Fünftel des Einsatzes zurück; über 760
-gezogene Siebenerkombis kam keine einzige durch. Weichen „Ertrag" und „erwartet" weit
-voneinander ab, ist nicht die Rechnung falsch, sondern die Stichprobe zu dünn.
-
-Die Quote der gestützten Seite steht seit `schemaVersion: 5` für beide Seiten im Snapshot. In
-älteren Läufen wird die Gegenquote gerechnet und mit `≈` gekennzeichnet.
-
-
-#### Voreinstellung „Erste Halbzeit: zwei Tore“
-
-Die dritte Voreinstellung sucht keine Mannschaft, sondern ein **Torumfeld**: Partien, in denen
-schon zur Pause zwei Tore fallen sollen. Die Auswahl steht fest — gespielt wird immer
-`1. HZ Ü1,5`. Ohne jeden Filter trifft das in **35,4 %** der Partien zu.
-
-Gemessen wurde vor dem Entwurf, über 6.155 abgerechnete Partien mit Pausenstand. Was trennt:
-
-| Messwert | Zelle | Treffer | Lift |
-|---|---|---|---|
-| **erwartete Gesamttore** | ab 3,4 | 48,0 % | **+12,5 pp** |
-| Stärkedifferenz zwischen den Teams | ab 0,40 | 46,2 % | +10,8 pp |
-| Remiswahrscheinlichkeit | unter 0,22 | 44,1 % | +8,7 pp |
-| Halbzeitbilanz beider Teams | ab 0,50 | 39,6 % | +3,9 pp |
-| **Abwehrleistung** | Summe ab 2,2 | 37,9 % | +2,5 pp |
-
-Zwei Dinge daran sind überraschend. Die **Abwehrleistung trägt praktisch nichts** — „beide
-Abwehren stark“ liegt bei 33,1 %, „beide schwach“ bei 36,7 %. Und das eigens gebaute
-**Halbzeitmodell trennt schlechter als die schlichte Gesamttorerwartung**, bei halb so großer
-Stichprobe. Das Tor steht deshalb auf den erwarteten Toren des ganzen Spiels.
-
-Torschüsse und Passgenauigkeit wurden eigens nachgemessen (4.602 Partien aus dem
-Antwort-Cache): Für sich genommen trennen die Schüsse aufs Tor um +6,6 Punkte — **über die
-Torerwartung hinaus bringen sie aber nichts mehr** (+2,4 Punkte bei ±3,6), und die Passquote
-dreht dort sogar ins Minus. Sie sind deshalb kein Kriterium. Ballbesitz trennt gar nicht.
-
-**Das wirksamste einzelne Tor ist der Quotendeckel.** Bis 2,00 trifft die Auswahl in 50,0 %
-der Fälle, über alle Preise hinweg nur in 38,9 %. Der größere Teil des Gewinns kommt also
-aus der Meinung des Buchmachers; das Modell trägt die letzten vier Punkte bei. Das ist kein
-Schönheitsfehler, sondern die ehrliche Beschreibung dessen, was der Filter tut.
-
-| Stufe | Tipps je Tag | Treffer je Tipp | Gewinn je Tipp | 1. / 2. Zeithälfte |
-|---|---|---|---|---|
-| Streng | 5,8 | **59,7 %** | +6,8 % | 59,7 / 59,7 % |
-| **Ausgewogen** (Vorgabe) | 10,9 | 53,5 % | −2,2 % | 55,5 / 51,6 % |
-| Locker | 15,0 | 51,0 % | −3,8 % | 52,6 / 49,4 % |
-| Weit | 24,8 | 45,3 % | −9,3 % | 45,4 / 45,2 % |
-
-Stand 28.09.2026, **gemessen nur am laufenden Modell** (Version 3.2.0, 3.695 Partien). Über alle
-Modellversionen sah es fast gleich aus – dieser Filter hängt kaum an der Version. **Ein
-Warnzeichen gehört dazu:** Die Schwellen wurden auf denselben Daten gesucht, gegen die gemessen
-wird.
-
-**Für Kombis verliert jede Länge.** Aus der Vorgabestufe, gezogen über je zwei Spieltage:
-
-| Tipps | Treffer | Ertrag | erwartet |
-|---|---|---|---|
-| 2 | 27,3 % | −8,7 % | −4,3 % |
-| 3 | 14,0 % | −14,5 % | −6,4 % |
-| 4 | 7,5 % | −15,4 % | −8,5 % |
-| 5 | 3,1 % | −34,3 % | −10,5 % |
-| 6 | 1,5 % | **−38,5 %** | −12,4 % |
-| 7 | 0,8 % | **−47,4 %** | −14,3 % |
-
-Ein Sechser geht hier in etwa jedem siebzigsten Fall durch. Zum Vergleich: Der
-1x2-Filter liefert bei 67 % je Tipp eine Sechserkombi in rund 8 % der Fälle. Wer auf diesem
-Markt sechs oder sieben Tipps spielt, spielt sie auf Verdacht.
-
-**Die Ertragsspalte dieser Tabelle schwankt stark mit der Ziehung** — bei 0,5 % Trefferchance
-hängt der Siebener an einzelnen Treffern. Belastbar ist die Treffer je Tipp, nicht der
-Kombi-Ertrag.
-
-Anders als die beiden 1X2-Voreinstellungen stützt diese **keine Seite**. Im Wettschein landet
-sie als eigener Markt und verdrängt eine 1X2-Wette derselben Partie nicht.
-
-
-#### Voreinstellung „Remis-Kandidaten"
-
-Die vierte Voreinstellung sucht Partien, die **unentschieden** enden. Ohne jeden Filter sind
-das 25,4 % aller Partien.
-
-Bemerkenswert an dieser Regel ist, wie **wenig** sie prüft: Remischance des Modells ab 30 %,
-Quote höchstens 3,00 — mehr nicht. Das ist kein Versäumnis, sondern das Messergebnis. Jedes
-naheliegende Zusatztor senkt die Trefferquote:
-
-| Auf „Remischance ab 30 %" zusätzlich verlangt | n | Trefferquote |
-|---|---|---|
-| **nichts** | 283 | **35,7 %** |
-| Remis-Punkte ab 40 | 124 | 34,7 % |
-| Remis-Punkte ab 50 | 78 | **30,8 %** |
-| Datenvertrauen ab 80 | 208 | 32,2 % |
-| ohne Cross-League-Partien | 271 | 35,4 % |
-
-Auch die direkten Duelle tragen nichts bei: Drei H2H-Remis zusammen mit der Remischance
-liefern 30,3 % und damit weniger als die Remischance allein. Und `Tore ≤ 2,5`,
-`BTTS ≤ 0,50` und `Remischance ≥ 0,28` liefern **exakt dieselben Partien** — das
-Modell rechnet die Remischance aus genau diesen Größen. Remis-Punkte und direkte Duelle
-stehen deshalb als Spalten in der Trefferliste, nicht als Bedingung.
-
-| Stufe | Tipps je Tag | Treffer je Tipp | Gewinn je Tipp | 1. / 2. Zeithälfte |
-|---|---|---|---|---|
-| Streng | 1,2 | 20,7 % | −44,8 % | 35,7 / 6,7 % |
-| **Ausgewogen** (Vorgabe) | 2,6 | 27,9 % | −25,2 % | 33,3 / 22,6 % |
-| Locker | 3,2 | **32,5 %** | −5,0 % | 39,5 / 25,6 % |
-| Weit | 6,7 | 28,1 % | −16,9 % | 31,3 / 25,0 % |
-
-**Mit dem laufenden Modell trägt dieser Filter kaum noch.** Stand 28.09.2026, gemessen nur an
-Modellversion 3.2.0 (3.695 Partien). Über alle Versionen waren es 37,7 / 36,1 / 35,1 / 31,9 %.
-Das heutige Modell gibt nur bei 2 % der Spiele 30 % oder mehr auf ein Remis, die älteren bei
-8 % – die Bedingung greift seltener und trifft schlechter. „Streng“ liegt sogar unter dem Wert
-ohne Filter; bei 29 Tipps kann das auch Zufall sein. Wann nachjustiert wird, steht in der
-Wiedervorlage oben.
-
-**Für Kombis ist das der schwierigste der drei Märkte.** Ein Vierer ging in 0,3 % der Fälle
-durch, ein Sechser gar nicht. Zum Vergleich: Der 1x2-Filter liefert einen
-Vierer in 19,0 %, die Halbzeit-Voreinstellung in 7,5 %.
-
-**Die Ertragsspalte der Kombitabelle ist hier ab vier Tippsn wertlos.** In der Stufe „Streng"
-misst der Fünfer +554 % — das sind drei Treffer aus 720 Ziehungen bei einer
-Durchschnittsquote von 147. Dieselbe Fünferkombi misst in der Vorgabestufe −57 %. Zwei
-Zahlen, 600 Punkte auseinander, und beide bedeuten nichts. Verlässlich ist allein die
-Treffer je Tipp.
-
-Ein Vorbehalt gehört dazu: Die Regel ist **ein einziges Tor auf die
-Modellwahrscheinlichkeit**. Wird das Tormodell neu kalibriert, verschiebt sich diese Auswahl
-mit, ohne dass jemand an ihr dreht.
-
-
-Ein Streifen neben dem Knopf nennt, wie viele Partien übrig bleiben, und hebt den Filter mit
-einem Klick wieder auf. Escape schließt nur das Panel. Die Regler bleiben über Sitzungen
-erhalten, der aktive Filter **nicht** — nach dem Neuladen ist die Tabelle wieder vollständig.
-
-Der Quickpicker liest ausschließlich den geladenen Lauf und löst keinen API-Aufruf aus.
-Auf der Vorgabe stimmten die Tipps vom 16.08. bis 15.09.2026 in **68,7 % der Fälle** (134
-Tipps) gegenüber 47,2 % ohne jeden Filter. Das ist ein **Hinweis und kein Beweis** — dafür
-sind es zu wenige Spiele. Und Vorsicht bei langen Kombis: In einer Kombi müssen alle Tipps
-stimmen. Vier Tipps zu 68,7 % gehen in 22 % der Fälle durch, zu 58,3 % nur noch in 12 %.
-
-### Live-Ansicht
-
-Oben in der Seitenleiste wird zwischen **Pre-Match** und **Live** umgeschaltet. Die
-Live-Ansicht zeigt ausschließlich Partien aus dem letzten Dashboard-Lauf, die gerade
-laufen. Beim Überfahren einer Zeile öffnet sich ein Fenster mit Ballbesitz, Schüssen,
-Strafraumschüssen, Ecken, Paraden, Karten, xG, der Ereignisliste und der
-Pre-Match-Markttafel. Fehlende Statistiken erscheinen als `–` und werden nie als `0`
-gewertet.
-
-Der Abruf ist bewusst sparsam. Aus den Anstoßzeiten wird lokal bestimmt, welche Fixtures
-überhaupt laufen können, und die App meldet dem Server, welche davon sie beobachtet.
-Abhängig von deren Anzahl wählt der Dienst zwischen zwei Strategien:
+Der Live-Dienst (`src/live-service.ts`, Endpunkt `/api/live/board`) fragt ausschließlich
+Partien aus dem letzten Dashboard-Lauf ab, die gerade laufen können und von einer App
+beobachtet werden. Abhängig von deren Anzahl wählt er zwischen zwei Strategien:
 
 | Beobachtete Partien | Strategie | Kosten |
 |---|---|---|
 | bis 25 | **Bündelabruf** – `/fixtures?ids=` in 20er-Bündeln | 4 Anfragen pro Minute; eine Antwort enthält Spielstand, Minute, Ereignisse **und** Statistiken |
 | ab 26 | **Sammelabruf** – `/fixtures?live=all` im 15-s-Takt | 4 Anfragen pro Minute unabhängig von der Anzahl, plus ein 20er-Bündel je Minute für die Statistiken |
 
-Der Sammelabruf liefert keine Statistiken mit, dafür aber alle laufenden Partien in einem
-Aufruf. Da sich Statistiken laut API-Dokumentation ohnehin nur etwa einmal pro Minute
-ändern, werden sie im Minutentakt nachgezogen statt viermal pro Minute. An einem vollen
-Samstag mit rund 114 gleichzeitigen Partien senkt das den Verbrauch von 1.440 auf 600
-Anfragen pro Stunde.
-
-Weitere Sparmechanismen:
-
-- Abgewählte Wettbewerbe werden **nicht** abgefragt, nicht nur ausgeblendet.
-- Die Option **Nur bewertete Partien** beschränkt die Überwachung auf Begegnungen mit
-  Empfehlung – typisch weniger als die Hälfte des Umfangs.
-- keine laufende Partie oder Tab im Hintergrund: keine einzige Anfrage
-- Überfahren einer Zeile: keine zusätzliche Anfrage, die Daten liegen bereits vor
-- Beendete Partien fallen dauerhaft aus dem Umfang, die Abfrage schrumpft im Lauf des Abends
-
-Zwei Bremsen sichern das Tageskontingent ab: `LIVE_DAILY_REQUEST_BUDGET` (Standard 2.000)
-und die bestehende `API_DAILY_RESERVE`. Der Verbrauch steht in der Seitenleiste.
-Ligen ohne Statistikabdeckung werden nach einem erfolglosen Versuch nicht erneut abgefragt.
+Ohne laufende Partie entsteht keine Anfrage. Spiele, deren Liga laut API-Football keine
+Live-Statistik führt, bekommen keinen eigenen Statistik-Abruf. Zwei Bremsen sichern das
+Tageskontingent ab: `LIVE_DAILY_REQUEST_BUDGET` und die bestehende `API_DAILY_RESERVE`.
 
 Jeder Abruf wird als JSON-Zeile nach `data/live-snapshots/JJJJ-MM-TT.jsonl` geschrieben,
 solange sich Minute, Spielstand oder Statistiken geändert haben. Das kostet keine
-zusätzlichen Anfragen und schafft die Datenbasis für spätere Live-Auswertungen, da
-API-Football keine historischen Live-Quoten vorhält.
-
-Die H2H-Anzeige kann neben Ergebnis, BTTS und Gesamtspiel-Torlinien auch `1. HZ Über`
-für die Linien 0,5 und 1,5 in den letzten fünf direkten Duellen darstellen. Ausschließlich
-vorhandene Halbzeitstände zählen; fehlende Werte erscheinen als `–`.
-
-Ein gefülltes grünes Shield kennzeichnet die besten 20 % der xG-verifizierten Defensiven
-eines Wettbewerbs in ihrer Heim-/Auswärtsrolle. Der Index kombiniert 70 %
-gegnerbereinigtes xGA mit 30 % gegnerbereinigten tatsächlichen Gegentoren. Ein
-umrandetes Shield markiert die besten 20 %, wenn nur die Torhistorie ausreichend belegt
-ist. Ein Vergleich wird erst ab acht qualifizierten Teams gebildet; Tooltip und ARIA-Text
-zeigen Quelle, Perzentil, Stichprobe und xG-Abdeckung.
-
-`next48` ist das Standardfenster des Dashboards und umfasst exakt den Zeitpunkt des
-Starts bis 48 Stunden später. Dafür werden nötigenfalls drei Kalendertage geladen;
-Spiele außerhalb der exakten Zeitgrenzen werden verworfen.
-
-Lokaler, chatgesteuerter Fußball-Analyzer für den Codex-Agenten in VS Code. Du hängst
-einen Tipico-Screenshot mit Ländern und Ligen an den Chat; Codex liest die Ligaauswahl,
-übernimmt die konkreten Fixtures aus der zugehörigen `Screenshots/YYYY-MM/data.json` und
-startet dieses Programm. Das lokale Frontend präsentiert anschließend den neuesten Lauf;
-es löst selbst keine Analyse aus.
-
-Das Programm verwendet **keine API-Football-Predictions**. Wahrscheinlichkeiten entstehen
-deterministisch aus abgeschlossenen Ligaspielen, getrennten Heim-/Auswärtswerten, jüngerer
-Form, Liga-Basiswerten und einer Poisson-Tormatrix.
+zusätzlichen Anfragen und schafft die Datenbasis für spätere Live-Auswertungen.
 
 ## Einrichtung
 
@@ -418,9 +114,6 @@ Hänge den Screenshot an und schreibe beispielsweise:
 
 Codex folgt den Anweisungen in `AGENTS.md`. Die entsprechende direkte CLI-Nutzung lautet:
 
-Der wiederkehrende Katalog für 1X2-, Remis-, H2H- und Außenseiterabfragen ist in
-[`docs/STANDARD-ABFRAGETYPEN.md`](docs/STANDARD-ABFRAGETYPEN.md) festgehalten.
-
 ```powershell
 npm run draw -- --select "Deutschland|Bundesliga" --select "England|Premier League" --dates both
 ```
@@ -443,8 +136,8 @@ npm run goals -- --select "Deutschland|Bundesliga" --dates both
 
 Der Bericht zeigt für jedes Spiel Über und Unter 1,5, 2,5 und 3,5 sowie in einer
 separaten Halbzeittabelle Über und Unter 0,5 und 1,5 für die erste Halbzeit. Beide
-Tabellen enthalten erwartete Tore, eigenes Datenvertrauen und Warnsignale. Das System ist in `docs/TORLINIEN-KRITERIEN.md` und
-`docs/TORLINIEN-MODELL.md` dokumentiert.
+Tabellen enthalten erwartete Tore, eigenes Datenvertrauen und Warnsignale. Das Modell steht in `src/model.ts`,
+seine Stellschrauben mit Begründung in `src/config.ts`.
 
 Die konkreten Partien werden aus `SELECTION.events` der zum Auftrag gehörenden
 `Screenshots/YYYY-MM/data.json` gelesen. Für jede dort ausgewählte Partie grenzt `--match`
@@ -553,22 +246,21 @@ npm run aliases -- --select "Deutschland|Bundesliga" --id 78 --api-country "Germ
 
 ## Modell und Schwellen
 
-Reine Remis-Analysen verwenden das dokumentierte 100-Punkte-System aus
-`docs/REMIS-KRITERIEN.md` und `docs/REMIS-PUNKTESYSTEM.md`. Die Ausgabe enthält immer genau
+Reine Remis-Analysen verwenden das 100-Punkte-System aus `src/draw-criteria.ts`. Die Ausgabe enthält immer genau
 zwei Tabellen: alle analysierten Spiele und die zwölf stärksten Kandidaten.
 
 Für Pokale, Qualifikationen und andere Wettbewerbe ohne gemeinsame Ligatabelle
 verwendet die CLI automatisch das separate Remis-Profil aus
-`docs/CROSS-LEAGUE-REMIS-SYSTEM.md`.
+`src/cross-league-draw-criteria.ts`.
 
-Reine 1X2-Anfragen verwenden analog `docs/1X2-KRITERIEN.md` und
-`docs/1X2-PUNKTESYSTEM.md`. Der Bericht zeigt je Spiel den favorisierten Tipp `1` oder
+Reine 1X2-Anfragen verwenden analog die Favoritenpunkte aus
+`src/favorite-criteria.ts`. Der Bericht zeigt je Spiel den favorisierten Tipp `1` oder
 `2`, die verwendete Quote, den Punktwert und die Bewertung. Auch hier folgen auf die
 Gesamttabelle die sechzehn stärksten Kandidaten.
 
 Für internationale Qualifikationen, Pokalspiele und andere Partien ohne belastbare
-gemeinsame Tabelle verwendet die CLI automatisch das in
-`docs/CROSS-LEAGUE-1X2-SYSTEM.md` beschriebene Cross-League-Modell.
+gemeinsame Tabelle verwendet die CLI automatisch das Cross-League-Modell aus
+`src/cross-league-criteria.ts`.
 
 Die weiteren Märkte verwenden das Poisson-Modell für:
 
@@ -621,23 +313,22 @@ Der tatsächliche Klassenunterschied kommt separat über das Ligarating dazu. Au
 Differenz beider Ligaratings entsteht ein Torfaktor `10 ** (Δ / 1200)` (900 bis 31.08.2026,
 danach 1500, seit 05.10.2026 1200 - Begründung in `src/config.ts`), der auf die
 erwarteten Heimtore multipliziert und von den Auswärtstoren geteilt wird; er ist auf
-0,3 bis 3,5 begrenzt. Ligen ohne belastbares eigenes Rating erhalten das schwächste
-belastbare Rating ihres Pools abzüglich 120 Punkten — wer in der Elo-Kette aus
-Pokalbegegnungen nie auftaucht, ist unterklassig und nicht Mittelfeld. Beide Werte
+0,3 bis 3,5 begrenzt. Ligen ohne belastbares eigenes Rating behalten ihr eigenes Rating, zur Schätzung hin
+gezogen, je weniger Duelle und Vereine es trägt (seit Modellversion 3.6.0); ohne eigenen Stand
+erhalten sie das schwächste belastbare Rating ihres Pools abzüglich 120 Punkten. Beide Werte
 erscheinen als Detailzeile am 1X2-Markt; geschätzte Ratings werden als Warnung
 ausgewiesen. Die Stellschrauben stehen in `config.strength`.
 
 Gemessen am DFB-Pokal-Lauf vom 22.08.2026 sinkt die mittlere Abweichung zur
-Marktwahrscheinlichkeit dadurch von 43,2 auf 8,4 Prozentpunkte. Details und Grenzen der
-Kalibrierung stehen in [docs/TORLINIEN-MODELL.md](docs/TORLINIEN-MODELL.md).
+Marktwahrscheinlichkeit dadurch von 43,2 auf 8,4 Prozentpunkte. Den heutigen Stand der
+Messungen führt `AGENTS.md` (Abschnitt „Pflege“).
 
-Enthält eine reine Remis- oder 1X2-Analyse tatsächlich Cross-League-Partien, baut
-die CLI die Ligastärke bedarfsgesteuert nur für die ausgewählten Pokal- und
-Qualifikationswettbewerbe auf. Reine Ligaspiele lösen keine Strength-Abfragen aus.
-Pro Analyse sind dafür standardmäßig höchstens 100 zusätzliche API-Anfragen erlaubt
-(bis 29.09.2026 waren es 25 - zu wenig, eine Pokalsaison kostet rund einen Aufruf je
-teilnehmendem Verein); die Grenze kann über `STRENGTH_ON_DEMAND_REQUEST_BUDGET` angepasst
-werden. Die neueste Saison wird zuerst geladen, weil das Modell sie gerade braucht.
+Enthält eine Analyse Cross-League-Partien, lädt die Torlinien-Analyse vor der Rechnung die
+fehlende Ligastärke nur für die ausgewählten Pokal- und Qualifikationswettbewerbe nach. Reine
+Ligaspiele lösen keine Strength-Abfragen aus. Pro Analyse sind dafür standardmäßig höchstens
+300 zusätzliche API-Anfragen erlaubt (seit 19.10.2026; eine Pokalsaison kostet rund einen
+Aufruf je teilnehmendem Verein); die Grenze kann über `STRENGTH_ON_DEMAND_REQUEST_BUDGET`
+angepasst werden. Die neueste Saison wird zuerst geladen, weil das Modell sie gerade braucht.
 
 Ein weltweiter Vorabaufbau bleibt als optionale Wartungsfunktion verfügbar, ebenso das
 gezielte Nachladen einzelner Pokale über ihre API-Liga-ID:

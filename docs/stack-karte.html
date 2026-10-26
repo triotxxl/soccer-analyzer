@@ -1,0 +1,838 @@
+<title>Analyzer-Stack</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,500..800&family=Public+Sans:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: eine Karte in vier Spalten (Quellen → Kommandozeile → Speicher → Server & App), darunter die Claude-Ebene; Detailspalte rechts, Linien nur für den gewählten Baustein. */
+:root {
+  --bg: #EDF0EE;
+  --surface: #FFFFFF;
+  --surface-2: #F5F7F6;
+  --ink: #16201D;
+  --muted: #59665F;
+  --line: #D2DAD6;
+  --src: #A0640F;
+  --cli: #2D5FA6;
+  --store: #1C7560;
+  --app: #6A4DB0;
+  --claude: #AE452D;
+  --warn-bg: #FBEFD9;
+  --warn-ink: #7A4A06;
+  --free-bg: #E3F1EB;
+  --free-ink: #165C4B;
+  --focus: #2D5FA6;
+  --font-display: "Archivo", "Arial Narrow", system-ui, sans-serif;
+  --font-body: "Public Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0F1513; --surface: #17201D; --surface-2: #1D2724; --ink: #E3EBE7; --muted: #98A69F; --line: #2D3A36;
+    --src: #E3A548; --cli: #82A9EE; --store: #52C4A2; --app: #AC95F1; --claude: #EF8668;
+    --warn-bg: #3A2B12; --warn-ink: #F2C77D; --free-bg: #133129; --free-ink: #8FDCC3; --focus: #82A9EE;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0F1513; --surface: #17201D; --surface-2: #1D2724; --ink: #E3EBE7; --muted: #98A69F; --line: #2D3A36;
+  --src: #E3A548; --cli: #82A9EE; --store: #52C4A2; --app: #AC95F1; --claude: #EF8668;
+  --warn-bg: #3A2B12; --warn-ink: #F2C77D; --free-bg: #133129; --free-ink: #8FDCC3; --focus: #82A9EE;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.5;
+}
+.page {
+  max-width: 1480px;
+  margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 32px 64px;
+  display: grid;
+  gap: 48px;
+}
+h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; margin: 0; }
+h1 { font-size: clamp(30px, 4vw, 44px); font-weight: 800; font-stretch: 112%; letter-spacing: -0.01em; line-height: 1.05; }
+h2 { font-size: 24px; font-weight: 750; font-stretch: 108%; }
+h3 { font-size: 17px; font-weight: 700; }
+p { margin: 0; }
+code, .mono { font-family: var(--font-mono); font-size: 0.86em; }
+.eyebrow { font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+
+/* Kopf */
+.head { display: grid; gap: 14px; max-width: 900px; }
+.head p { color: var(--muted); max-width: 68ch; }
+.legend { display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: 13px; color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 7px; }
+.legend i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+
+/* Arbeitsfläche */
+.workspace { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 24px; align-items: start; }
+.map-scroll { min-width: 0; }
+.map {
+  position: relative;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 20px;
+  display: grid;
+  gap: 28px;
+}
+.wires { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 0; overflow: visible; }
+.wires path.wire { fill: none; stroke-width: 1.8; }
+.wires .w-src { stroke: var(--src); } .wires .w-cli { stroke: var(--cli); } .wires .w-store { stroke: var(--store); }
+.wires .w-app { stroke: var(--app); } .wires .w-claude { stroke: var(--claude); }
+.wires marker path { stroke: none; }
+.wires #m-src path { fill: var(--src); } .wires #m-cli path { fill: var(--cli); } .wires #m-store path { fill: var(--store); }
+.wires #m-app path { fill: var(--app); } .wires #m-claude path { fill: var(--claude); }
+
+.band { position: relative; z-index: 1; display: grid; gap: 12px; }
+.band-title { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.band-title h2 { font-size: 18px; }
+.band-title p { color: var(--muted); font-size: 13px; }
+.cols { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 20px 48px; }
+.col { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.col-head { display: flex; align-items: center; gap: 8px; padding: 0 2px 2px; font-size: 12px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; }
+.col-head::before { content: ""; width: 14px; height: 3px; border-radius: 2px; background: var(--c); }
+.col-head span { color: var(--muted); font-weight: 500; letter-spacing: 0; text-transform: none; }
+
+.node {
+  --c: var(--cli);
+  appearance: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--c);
+  border-radius: 6px;
+  padding: 10px 12px 11px;
+  cursor: pointer;
+  display: grid;
+  gap: 3px;
+  transition: opacity 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+}
+.node:hover { border-color: var(--c); }
+.node:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.node .n-name { font-family: var(--font-display); font-weight: 700; font-size: 15px; font-stretch: 105%; line-height: 1.2; }
+.node .n-line { font-size: 12.5px; color: var(--muted); line-height: 1.4; }
+.node .n-path { font-family: var(--font-mono); font-size: 11px; color: var(--muted); overflow-wrap: anywhere; }
+.node .chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.node[aria-pressed="true"] { border-color: var(--c); box-shadow: 0 0 0 2px var(--c); }
+.map.has-sel .node:not([aria-pressed="true"]):not(.rel) { opacity: 0.38; }
+.node.rel { border-color: var(--c); }
+
+.chip { display: inline-block; font-size: 11px; font-weight: 600; line-height: 1; padding: 4px 6px; border-radius: 4px; white-space: nowrap; }
+.chip.free { background: var(--free-bg); color: var(--free-ink); }
+.chip.cost { background: var(--warn-bg); color: var(--warn-ink); }
+.chip.plain { background: var(--surface-2); color: var(--muted); border: 1px solid var(--line); }
+
+.t-src { --c: var(--src); } .t-cli { --c: var(--cli); } .t-store { --c: var(--store); } .t-app { --c: var(--app); } .t-claude { --c: var(--claude); }
+
+/* Detailspalte */
+.detail {
+  position: sticky;
+  top: calc(env(safe-area-inset-top, 0px) + 16px);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-top: 4px solid var(--c, var(--cli));
+  border-radius: 10px;
+  padding: 18px 18px 20px;
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+}
+.detail .d-kind { font-size: 12px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; color: var(--c); }
+.detail h3 { font-size: 22px; font-stretch: 108%; margin-top: 2px; }
+.detail .d-text { font-size: 14.5px; }
+.detail dl { margin: 0; display: grid; gap: 10px; }
+.detail dt { font-size: 11.5px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; color: var(--muted); }
+.detail dd { margin: 3px 0 0; font-size: 13.5px; min-width: 0; }
+.detail dd code { overflow-wrap: anywhere; }
+.detail ul { margin: 4px 0 0; padding-left: 18px; display: grid; gap: 3px; }
+.links { display: grid; gap: 6px; }
+.link-btn {
+  appearance: none; font: inherit; color: inherit; text-align: left; cursor: pointer;
+  background: var(--surface-2); border: 1px solid var(--line); border-left: 3px solid var(--c);
+  border-radius: 5px; padding: 6px 9px; display: grid; gap: 1px; width: 100%;
+}
+.link-btn:hover { border-color: var(--c); }
+.link-btn:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.link-btn b { font-size: 13px; font-weight: 650; }
+.link-btn span { font-size: 12px; color: var(--muted); }
+.hint { font-size: 12.5px; color: var(--muted); }
+
+/* Ablauf */
+.section { display: grid; gap: 18px; }
+.section > header { display: grid; gap: 6px; max-width: 760px; }
+.section > header p { color: var(--muted); }
+.flow { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; counter-reset: step; }
+.step { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 14px; display: grid; gap: 6px; align-content: start; counter-increment: step; }
+.step .s-num { font-family: var(--font-display); font-weight: 800; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.step .s-num::before { content: counter(step, decimal-leading-zero) " · "; }
+.step h3 { font-size: 16px; }
+.step p { font-size: 13.5px; color: var(--muted); }
+.step code { color: var(--ink); }
+.step.in-run { border-top: 3px solid var(--cli); }
+.run-note { font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 8px; }
+.run-note i { width: 22px; height: 3px; background: var(--cli); border-radius: 2px; display: inline-block; }
+
+/* Tabellen */
+.two { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 32px; align-items: start; }
+.table-wrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; }
+table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-size: 11.5px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; color: var(--muted); background: var(--surface-2); }
+tr:last-child td { border-bottom: 0; }
+td.grp { font-family: var(--font-display); font-weight: 700; font-size: 12.5px; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); background: var(--surface-2); }
+td .mono { white-space: nowrap; }
+.yes { color: var(--free-ink); font-weight: 600; }
+.no { color: var(--warn-ink); font-weight: 600; }
+
+footer { font-size: 12.5px; color: var(--muted); border-top: 1px solid var(--line); padding-top: 16px; }
+
+/* Quickpick-Filter */
+.reach { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)) minmax(0, 1.6fr); gap: 12px; }
+.reach-step { --c: var(--cli); background: var(--surface); border: 1px solid var(--line); border-top: 3px solid var(--c); border-radius: 8px; padding: 12px 14px; display: grid; gap: 4px; align-content: start; min-width: 0; }
+.reach-step b { font-family: var(--font-display); font-size: 15px; }
+.reach-step p { font-size: 13px; color: var(--muted); }
+.users { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 6px; font-size: 13px; }
+.users li { min-width: 0; overflow-wrap: anywhere; }
+.filters { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 20px; align-items: start; }
+.filter-list { display: grid; gap: 14px; position: sticky; top: calc(env(safe-area-inset-top, 0px) + 16px); }
+.filter-group { display: grid; gap: 5px; }
+.filter-group-title { font-size: 11.5px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; color: var(--muted); }
+.filter-btn { appearance: none; font: inherit; color: inherit; text-align: left; cursor: pointer; background: var(--surface); border: 1px solid var(--line); border-left: 3px solid var(--line); border-radius: 5px; padding: 7px 10px; display: grid; gap: 1px; }
+.filter-btn:hover { border-left-color: var(--cli); }
+.filter-btn:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.filter-btn[aria-pressed="true"] { border-color: var(--cli); border-left-color: var(--cli); box-shadow: 0 0 0 1px var(--cli); }
+.filter-btn b { font-size: 14px; font-weight: 650; }
+.filter-btn span { font-size: 12px; color: var(--muted); }
+.filter-panel { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 20px; display: grid; gap: 18px; min-width: 0; }
+.fp-head { display: grid; gap: 6px; }
+.fp-head h3 { font-size: 24px; font-stretch: 108%; }
+.fp-meta { display: flex; flex-wrap: wrap; gap: 6px; }
+.fp-cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; }
+.fp-block { display: grid; gap: 6px; min-width: 0; }
+.fp-block h4 { margin: 0; font-size: 11.5px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; color: var(--muted); }
+.fp-block ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; font-size: 14px; }
+.fp-block ul.inputs { font-size: 13.5px; color: var(--muted); }
+.fp-files { display: flex; flex-wrap: wrap; gap: 6px 12px; font-size: 13px; }
+.warnbox { background: var(--warn-bg); color: var(--warn-ink); border-radius: 6px; padding: 10px 12px; font-size: 14px; font-weight: 500; }
+details.honesty { font-size: 13.5px; color: var(--muted); }
+details.honesty summary { cursor: pointer; color: var(--ink); font-weight: 600; }
+details.honesty p { margin-top: 6px; }
+.levels td, .levels th { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.levels td.hint-cell { white-space: normal; min-width: 220px; color: var(--muted); font-size: 12.5px; }
+.levels tr.is-default td { background: var(--free-bg); }
+.levels tr.is-default td:first-child::after { content: " · Vorgabe"; font-weight: 600; color: var(--free-ink); }
+.fixed-list { display: flex; flex-wrap: wrap; gap: 6px; }
+@media (max-width: 1100px) { .reach { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 860px) {
+  .filters { grid-template-columns: minmax(0, 1fr); }
+  .filter-list { position: static; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+  .fp-cols { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 520px) { .reach { grid-template-columns: minmax(0, 1fr); } }
+
+@media (max-width: 1240px) {
+  .workspace { grid-template-columns: minmax(0, 1fr); }
+  .detail { position: static; max-height: none; }
+}
+@media (max-width: 1000px) {
+  .two { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 820px) {
+  .cols { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+  .wires { display: none; }
+}
+@media (max-width: 520px) {
+  .cols { grid-template-columns: minmax(0, 1fr); }
+  .map { padding: 14px; }
+}
+@media (prefers-reduced-motion: reduce) { .node { transition: none; } }
+</style>
+
+<div class="page">
+  <header class="head">
+    <span class="eyebrow">api-football-analyzer · Stand 26.10.2026</span>
+    <h1>Wie der Analyzer zusammenhängt</h1>
+    <p>Von der Tipico-Datei bis zur Anzeige in Neo: welche Teile Daten holen, rechnen, speichern und zeigen, und wer von Claudes Seite daran arbeitet. Klick auf einen Baustein, dann siehst du, woher er seine Daten bekommt und wohin er sie gibt.</p>
+    <div class="legend" aria-label="Farben">
+      <span><i style="background:var(--src)"></i>Quelle von außen</span>
+      <span><i style="background:var(--cli)"></i>Kommandozeile (Node)</span>
+      <span><i style="background:var(--store)"></i>Speicher</span>
+      <span><i style="background:var(--app)"></i>Server und App</span>
+      <span><i style="background:var(--claude)"></i>Claude</span>
+      <span><span class="chip free">0 Aufrufe</span> kostet kein API-Budget</span>
+      <span><span class="chip cost">kostet Aufrufe</span> braucht API-Football</span>
+    </div>
+  </header>
+
+  <div class="workspace">
+    <div class="map-scroll">
+      <div class="map" id="map">
+        <svg class="wires" id="wires" aria-hidden="true">
+          <defs>
+            <marker id="m-src" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z"/></marker>
+            <marker id="m-cli" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z"/></marker>
+            <marker id="m-store" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z"/></marker>
+            <marker id="m-app" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z"/></marker>
+            <marker id="m-claude" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z"/></marker>
+          </defs>
+          <g id="wire-layer"></g>
+        </svg>
+
+        <section class="band" aria-labelledby="b1">
+          <div class="band-title"><h2 id="b1">Daten und Code</h2><p>Was im Repository und auf deinem PC läuft</p></div>
+          <div class="cols" id="cols-main"></div>
+        </section>
+
+        <section class="band" aria-labelledby="b2">
+          <div class="band-title"><h2 id="b2">Claude-Ebene</h2><p>Wer am Projekt arbeitet und womit</p></div>
+          <div class="cols" id="cols-claude"></div>
+        </section>
+      </div>
+    </div>
+
+    <aside class="detail" id="detail" aria-live="polite"></aside>
+  </div>
+
+  <section class="section" id="filter" aria-labelledby="filter-h">
+    <header>
+      <h2 id="filter-h">Quickpick-Filter</h2>
+      <p>Sieben Regeln, die aus den Spielen einer Analyse Tipps für Kombis aussuchen. Sie rechnen keine eigene Wahrscheinlichkeit, sondern lesen, was die Analyse schon gerechnet hat, und prüfen Bedingung für Bedingung. Bedingungen, Stufen und Messwerte unten kommen direkt aus dem Code.</p>
+    </header>
+
+    <div class="reach" aria-label="Wo die Filter greifen">
+      <div class="reach-step t-cli"><span class="eyebrow">1 · Analyse</span><b>Punkte und Chancen</b><p>Favoritenpunkte (<code>src/favorite-criteria.ts</code>), Remis-Punkte und Wahrscheinlichkeiten (<code>src/model.ts</code>) landen je Spiel im Snapshot.</p></div>
+      <div class="reach-step t-store"><span class="eyebrow">2 · Snapshot</span><b>Spiele mit Quoten</b><p><code>output/dashboard-latest.json</code>: Tabelle, Form, direkte Duelle, Märkte mit Tipico-Quoten.</p></div>
+      <div class="reach-step t-cli"><span class="eyebrow">3 · Regel</span><b><code>evaluateFixture</code></b><p>In <code>src/quickpick.ts</code>. Die erste nicht erfüllte Bedingung ist der Grund fürs Rausfallen, sonst kommt ein Tipp mit Quote heraus.</p></div>
+      <div class="reach-step t-app"><span class="eyebrow">4 · Genutzt von</span><b>Wo sie greifen</b>
+        <ul class="users">
+          <li><span class="chip free">aktiv</span> <code>tools/quickpick-report.ts</code>: rechnet alle Stufen an alten Spielen nach</li>
+          <li><span class="chip free">aktiv</span> <code>test/rules/quickpick.spec.ts</code>: hält die Regeln fest</li>
+          <li><span class="chip free">aktiv</span> <code>tools/kombi-tipps.ts</code>: dieselbe Regel wie „Kombi-Tipps ab 1,60“, über <code>src/kombi-tipps.ts</code></li>
+          <li><span class="chip cost">offen</span> Neo: noch nicht angeschlossen</li>
+          <li><span class="chip plain">bis 26.10.</span> alte App: filterte die Tabelle und legte Treffer in den Wettschein</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="filters">
+      <nav class="filter-list" id="filter-list" aria-label="Filter wählen"></nav>
+      <article class="filter-panel" id="filter-panel" aria-live="polite"></article>
+    </div>
+  </section>
+
+  <section class="section" aria-labelledby="flow-h">
+    <header>
+      <h2 id="flow-h">Ablauf einer Analyse</h2>
+      <p>Die Reihenfolge ist deine Vorgabe vom 05.10.2026: erst zuordnen, dann Daten nachziehen, erst am Ende analysieren. Die Schritte 3 bis 8 erledigt <code>npm run dashboard</code> in einem Lauf.</p>
+      <p class="run-note"><i></i>blauer Rand = Teil von <code>npm run dashboard</code></p>
+    </header>
+    <ol class="flow" style="list-style:none;margin:0;padding:0">
+      <li class="step"><span class="s-num">Vorher</span><h3>Zuordnen</h3><p><code>npm run prepare-analysis</code> zeigt Wettbewerbe und Spiele ohne API-Gegenstück. Aliase setzen und wiederholen, bis nur echte Lücken bleiben.</p><span><span class="chip free">praktisch 0 Aufrufe</span></span></li>
+      <li class="step"><span class="s-num">Vorher</span><h3>Daten nachziehen</h3><p>Teams ohne Elo: Saisons nachladen, Listen in <code>src/elo-config.ts</code> ergänzen, <code>npm run elo -- build</code>.</p><span><span class="chip cost">kleine Nachladungen</span></span></li>
+      <li class="step in-run"><span class="s-num">Lauf</span><h3>Tipico importieren</h3><p><code>data.json</code> landet in den <code>tipico_*</code>-Tabellen, Wettbewerbe werden den API-Ligen zugeordnet.</p><span><span class="chip free">0 Aufrufe</span></span></li>
+      <li class="step in-run"><span class="s-num">Lauf</span><h3>Elo nachziehen</h3><p>Neue Ergebnisse aus dem Cache. Einmal pro Woche zusätzlich die laufenden Saisons aller Ligen.</p><span><span class="chip cost">Wochenrunde bis 600</span></span></li>
+      <li class="step in-run"><span class="s-num">Lauf</span><h3>Rechnen</h3><p>Torlinien (vorher fehlende Ligastärke nachladen), Remis-Punkte, Favoriten. Die Modelle bekommen Daten und geben Wahrscheinlichkeiten zurück.</p><span><span class="chip cost">Ligastärke bis 300</span></span></li>
+      <li class="step in-run"><span class="s-num">Lauf</span><h3>Snapshot schreiben</h3><p><code>output/dashboard-latest.json</code> und eine datierte Kopie. Prognosen gehen zusätzlich in die Datenbank.</p><span><span class="chip free">0 Aufrufe</span></span></li>
+      <li class="step in-run"><span class="s-num">Lauf</span><h3>Abrechnen</h3><p>Beendete Spiele abrechnen, danach die Kurzfassung, wie gut das Modell zuletzt lag.</p><span><span class="chip cost">bis 200</span></span></li>
+      <li class="step in-run"><span class="s-num">Lauf</span><h3>Sichern</h3><p>Datenbank geprüft und gepackt nach <code>data/backups/</code>, dann zu MEGA. Rund 15 Sekunden.</p><span><span class="chip free">0 Aufrufe</span></span></li>
+      <li class="step"><span class="s-num">Danach</span><h3>Lücken prüfen</h3><p><code>npm run coverage</code> und <code>npm run data-check</code> listen fehlendes Elo, fehlende Ligastärke und Datenfehler.</p><span><span class="chip free">0 Aufrufe</span></span></li>
+      <li class="step"><span class="s-num">Danach</span><h3>Ansehen</h3><p><code>npm run neo</code> startet Neo auf Port 5174. Es liest den neuesten Snapshot.</p><span><span class="chip free">0 Aufrufe</span></span></li>
+    </ol>
+  </section>
+
+  <section class="section" aria-labelledby="cmd-h">
+    <header>
+      <h2 id="cmd-h">Alle Befehle</h2>
+      <p>Jeder Befehl startet mit <code>npm run</code>. Zusätzliche Angaben kommen nach <code>--</code>, etwa <code>npm run dashboard -- --dates next48</code>.</p>
+    </header>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Befehl</th><th>Was er tut</th><th>API-Football</th></tr></thead>
+        <tbody>
+          <tr><td class="grp" colspan="3">Analysieren</td></tr>
+          <tr><td><code>prepare-analysis</code></td><td>Vor jeder Analyse: offene Ligen, Spiele ohne Gegenstück, Teams ohne Elo</td><td><span class="chip free">praktisch 0</span></td></tr>
+          <tr><td><code>dashboard</code></td><td>Der Hauptlauf: Import, Elo, Rechnen, Snapshot, Abrechnung, Sicherung</td><td><span class="chip cost">kostet</span></td></tr>
+          <tr><td><code>analyze</code></td><td>Einzelne Ligen oder Spiele für Screenshot-Aufträge (<code>--select</code>, <code>--match</code>)</td><td><span class="chip cost">kostet</span></td></tr>
+          <tr><td><code>draw</code></td><td>Reine Remis-Analyse mit dem 100-Punkte-System</td><td><span class="chip cost">kostet</span></td></tr>
+          <tr><td><code>favorites</code></td><td>Reine 1X2-Favoritenanalyse</td><td><span class="chip cost">kostet</span></td></tr>
+          <tr><td><code>goals</code></td><td>Torlinien für Spiel und erste Halbzeit</td><td><span class="chip cost">kostet</span></td></tr>
+          <tr><td><code>venue-form</code></td><td>Heimform gegen Auswärtsform auf dem letzten 1X2-Umfang</td><td><span class="chip free">0</span></td></tr>
+          <tr><td><code>live</code></td><td>Laufende Spiele in der Kommandozeile</td><td><span class="chip cost">kostet</span></td></tr>
+          <tr><td><code>kombi-tipps</code></td><td>Je Spiel der wahrscheinlichste Tipp ab einer Mindestquote, nach fairem Tipico-Preis</td><td><span class="chip free">0</span></td></tr>
+          <tr><td class="grp" colspan="3">Abrechnen und messen</td></tr>
+          <tr><td><code>settle</code></td><td>Beendete Spiele abrechnen; <code>--budget</code> begrenzt</td><td><span class="chip cost">1 je Spiel</span></td></tr>
+          <tr><td><code>report</code></td><td>Wie gut das Modell lag, nach Markt und Ligastärke</td><td><span class="chip free">0</span></td></tr>
+          <tr><td><code>edge-report</code></td><td>Wie gut das Modell dort liegt, wo es vom Preis abweicht, mit Ablehnungsregister</td><td><span class="chip free">0</span></td></tr>
+          <tr><td><code>quickpick-report</code></td><td>Quickpick-Filter an alten Spielen nachrechnen</td><td><span class="chip free">0</span></td></tr>
+          <tr><td><code>draw-signals-report</code></td><td>Kriterien des Remis-Scores einzeln prüfen</td><td><span class="chip free">0</span></td></tr>
+          <tr><td><code>btts-check</code></td><td>Vorab festgelegte BTTS-Prüfung (bis rund Mitte November)</td><td><span class="chip free">0</span></td></tr>
+          <tr><td><code>live-model-report</code></td><td>Live-Chancen gegen eingetretene Ergebnisse</td><td><span class="chip free">0</span></td></tr>
+          <tr><td><code>elo-backtest</code></td><td>Team-Elo an einem Zeitraum prüfen</td><td><span class="chip free">0</span></td></tr>
+          <tr><td class="grp" colspan="3">Daten pflegen</td></tr>
+          <tr><td><code>aliases</code></td><td>Tipico-Wettbewerb einer API-Liga zuordnen</td><td><span class="chip plain">wenig</span></td></tr>
+          <tr><td><code>team-aliases</code></td><td>Tipico-Teamnamen einem API-Team zuordnen, auch je Wettbewerb</td><td><span class="chip plain">wenig</span></td></tr>
+          <tr><td><code>elo</code></td><td>Team-Elo: <code>import</code>, <code>build</code>, <code>ranking</code>, <code>team</code> kostenlos, <code>backfill</code> lädt nach</td><td><span class="chip plain">je nach Befehl</span></td></tr>
+          <tr><td><code>strength</code></td><td>Ligastärke für einen Pokal nachladen (<code>--competition</code>)</td><td><span class="chip cost">kostet</span></td></tr>
+          <tr><td><code>coverage</code></td><td>Teams ohne Elo und Spiele ohne Ligastärke im letzten Snapshot</td><td><span class="chip free">0</span></td></tr>
+          <tr><td><code>data-check</code></td><td>Falsche Daten finden: Zuordnungen, geteilte Team-IDs, Saisonlücken</td><td><span class="chip free">0</span></td></tr>
+          <tr><td><code>backfill-results</code></td><td>Ergebniszeilen aus dem Cache nachtragen (<code>--scan</code>)</td><td><span class="chip free">0</span></td></tr>
+          <tr><td><code>backfill-half-stats</code></td><td>Statistik je Halbzeit nachholen</td><td><span class="chip cost">1 je Spiel</span></td></tr>
+          <tr><td><code>add-tipico-names</code></td><td>Tipico-Namen in einen vorhandenen Snapshot schreiben</td><td><span class="chip free">0</span></td></tr>
+          <tr><td><code>insights-probe</code></td><td>Detailkennzahlen eines Spiels prüfen</td><td><span class="chip cost">rund 4</span></td></tr>
+          <tr><td><code>smoke</code></td><td>Verbindung zu API-Football testen</td><td><span class="chip cost">1</span></td></tr>
+          <tr><td><code>backup</code></td><td>Datenbank sichern, auch zu MEGA</td><td><span class="chip free">0</span></td></tr>
+          <tr><td><code>restore</code></td><td>Neueste Sicherung von MEGA zurückspielen (<code>--force</code> ersetzt)</td><td><span class="chip free">0</span></td></tr>
+          <tr><td class="grp" colspan="3">App und Entwicklung</td></tr>
+          <tr><td><code>neo</code></td><td>Neo starten, Port 5174</td><td><span class="chip free">0</span></td></tr>
+          <tr><td><code>neo:build</code></td><td>Neo für <code>dist/neo</code> bauen</td><td><span class="chip free">0</span></td></tr>
+          <tr><td><code>neo:preview</code></td><td>Gebautes Neo ansehen, Port 4174</td><td><span class="chip free">0</span></td></tr>
+          <tr><td><code>test</code></td><td>Alle Tests: Node-Tests, dann <code>app:test</code></td><td><span class="chip free">0</span></td></tr>
+          <tr><td><code>app:test</code></td><td>Vitest für Neo, <code>apps/shared</code> und die Quickpick-Regeln</td><td><span class="chip free">0</span></td></tr>
+          <tr><td><code>typecheck</code></td><td>TypeScript für Wurzel und Neo prüfen</td><td><span class="chip free">0</span></td></tr>
+          <tr><td><code>stack-karte</code></td><td>Die Filterregeln aus dem Code in diese Karte schreiben</td><td><span class="chip free">0</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="section" aria-labelledby="lib-h">
+    <header>
+      <h2 id="lib-h">Bibliotheken und was nicht im Repository liegt</h2>
+      <p>Das Projekt kommt mit wenigen Paketen aus. Datenbank, HTTP und Tests bringt Node 24 selbst mit, TypeScript läuft ohne Bauschritt direkt in Node.</p>
+    </header>
+    <div class="two">
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Paket</th><th>Version</th><th>Wofür</th></tr></thead>
+          <tbody>
+            <tr><td class="grp" colspan="3">In Node 24 eingebaut</td></tr>
+            <tr><td><span class="mono">node:sqlite</span></td><td>Node 24.18</td><td>Die Datenbank, ohne zusätzliches Paket</td></tr>
+            <tr><td><span class="mono">fetch</span></td><td>Node 24.18</td><td>Aufrufe an API-Football</td></tr>
+            <tr><td><span class="mono">node --test</span></td><td>Node 24.18</td><td>Tests unter <code>test/*.test.ts</code></td></tr>
+            <tr><td class="grp" colspan="3">Laufen mit</td></tr>
+            <tr><td><span class="mono">megajs</span></td><td>1.3</td><td>Sicherung zu MEGA hochladen und zurückholen</td></tr>
+            <tr><td><span class="mono">react · react-dom</span></td><td>19.2</td><td>Oberfläche von Neo</td></tr>
+            <tr><td><span class="mono">@phosphor-icons/react</span></td><td>2.1</td><td>Symbole in Neo</td></tr>
+            <tr><td><span class="mono">flag-icons</span></td><td>7.5</td><td>Länderflaggen (<code>countryFlags.ts</code>)</td></tr>
+            <tr><td><span class="mono">@fontsource/jetbrains-mono</span></td><td>5.3</td><td>Schrift von Neo</td></tr>
+            <tr><td class="grp" colspan="3">Nur zum Bauen und Testen</td></tr>
+            <tr><td><span class="mono">vite · @vitejs/plugin-react</span></td><td>8.2 · 6.0</td><td>Server und Build von Neo, trägt die Daten-Endpunkte</td></tr>
+            <tr><td><span class="mono">vitest · jsdom</span></td><td>4.1 · 30</td><td>Tests von Neo, <code>apps/shared</code> und den Quickpick-Regeln</td></tr>
+            <tr><td><span class="mono">@testing-library/*</span></td><td>16 · 14 · 7</td><td>Oberfläche im Test bedienen</td></tr>
+            <tr><td><span class="mono">typescript · @types/*</span></td><td>5.9</td><td><code>npm run typecheck</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Liegt nur auf diesem PC</th><th>In der Sicherung?</th></tr></thead>
+          <tbody>
+            <tr><td><code>data/analyzer.sqlite</code><br><span class="hint">Prognosen, Ergebnisse, Elo, Ligastärke</span></td><td class="yes">ja, lokal und MEGA</td></tr>
+            <tr><td><code>.env</code><br><span class="hint">API-Schlüssel, MEGA-Zugang</span></td><td class="no">nein, von Hand</td></tr>
+            <tr><td><code>data/cache/</code><br><span class="hint">füllt sich mit der nächsten Analyse</span></td><td class="no">nein</td></tr>
+            <tr><td><code>output/</code><br><span class="hint">Snapshots für Neo und Rückrechnungen</span></td><td class="no">nein</td></tr>
+            <tr><td><code>data.json</code><br><span class="hint">dein Tipico-Export</span></td><td class="no">nein</td></tr>
+            <tr><td>Claudes Notizen<br><span class="hint">Daueraufträge, Vorlieben</span></td><td class="no">nein, von Hand kopieren</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <footer>Quelle: <code>docs/stack-karte.html</code> im Repository. <code>test/stack-karte.test.ts</code> schlägt fehl, sobald ein Befehl, ein Paket, eine Tabelle, ein Skill, ein Agent, eine App, ein genannter Pfad oder eine Filterregel nicht mehr zur Karte passt. Die Filterregeln schreibt <code>npm run stack-karte</code> aus dem Code hinein. Die alte App (<code>apps/analyzer</code>) ist seit 26.10.2026 entfernt.</footer>
+</div>
+
+<script type="application/json" id="quickpick-data">{"groups":[{"id":"daves","label":"Daves Filter","title":"Filter, die nach Tabelle, direkten Duellen (H2H) und Form eine Mannschaft aussuchen"},{"id":"modell","label":"Modell-Filter","title":"Filter, die nach den Wahrscheinlichkeiten und erwarteten Toren des Modells aussuchen"},{"id":"tipico","label":"Tipico-Filter","title":"Filter, die nach der Tipico-Quote ohne Aufschlag aussuchen – nicht nach dem Modell"}],"presets":[{"id":"daves1x2","label":"Daves 1x2-Filter","group":"daves","massstab":"trefferquote","description":"Klar überlegene Mannschaften für eine Kombi: Die Tabelle muss den Vorsprung zeigen, die Form ihn bestätigen, und die direkten Duelle (H2H) dürfen nicht dagegen sprechen.","criteria":["Tabelle: mehr Punkte je Spiel, weiter vorn und keine schlechtere Tordifferenz","Letzte Spiele am Ort: die getippte Mannschaft besser als der Gegner – wie deutlich, bestimmt die Stufe. Ein Remis zählt nicht als Niederlage","Direkte Duelle: kein Rückstand und keine Niederlagen in Folge, sobald es zwei Duelle gibt","Das Modell hält den Favoriten für stark genug","Quote ab 1,30, und das Modell tippt dieselbe Mannschaft"],"warnung":"Jede Stufe lag an alten Spielen im Minus – und je mehr Spiele in der Kombi, desto seltener geht der Schein durch. Rechne nicht mit Gewinn.","honesty":"Rechne nicht mit Gewinn. 2 von 3 Tipps stimmten – aber zu den Quoten, die es dafür gibt, stand am Ende jede Stufe im Minus: die Vorgabe knapp, die anderen deutlich. Dazu wurden die Schwellen an genau den Spielen gesucht, an denen sie jetzt gemessen werden. In einer Kombi müssen alle Tipps stimmen: Je mehr Spiele du zusammenlegst, desto seltener geht der Schein durch.","defaults":{"preset":"daves1x2","minOdds":1.3,"strongMinimum":60,"weakMaximum":50,"minPoints":70,"minPointsPerGame":0.2,"minGoalDifference":0,"minPositionGap":1,"requireStreak":false},"levels":[{"id":"streng","label":"Streng","values":{"strongMinimum":70,"weakMaximum":50,"minPoints":70,"minPointsPerGame":0.5,"minGoalDifference":0.4,"minPositionGap":3},"note":"3,2/Tag · 64,2 %","hint":"Die engste Auswahl, aber nicht die beste: knapp 2 von 3 Tipps stimmen – genauso viele wie bei „Ausgewogen“, bei halb so vielen Spielen und größerem Verlust."},{"id":"ausgewogen","label":"Ausgewogen","values":{"strongMinimum":60,"weakMaximum":50,"minPoints":70,"minPointsPerGame":0.2,"minGoalDifference":0,"minPositionGap":1},"note":"6,0/Tag · 66,5 %","hint":"Die beste der vier Stufen: 2 von 3 Tipps stimmen, und der Verlust ist mit rund 1 % am kleinsten. Die Vorgabe."},{"id":"locker","label":"Locker","values":{"strongMinimum":50,"weakMaximum":67,"minPoints":70,"minPointsPerGame":0.2,"minGoalDifference":0,"minPositionGap":1},"note":"7,9/Tag · 63,8 %","hint":"Mehr Auswahl, aber es wird teuer: nur noch gut 6 von 10 Tipps stimmen, und auf Dauer verlierst du damit Geld."},{"id":"weit","label":"Weit","values":{"strongMinimum":50,"weakMaximum":67,"minPoints":65,"minPointsPerGame":0.2,"minGoalDifference":0,"minPositionGap":1},"note":"11,2/Tag · 59,9 %","hint":"Nur zum Überblick, nicht zum Spielen: knapp 6 von 10 Tipps stimmen, und der Verlust ist deutlich."}]},{"id":"dominanz","label":"Dominanz zum Kombipreis","group":"daves","massstab":"roi","description":"Eine Mannschaft, die die letzten direkten Duelle gewonnen hat, in der Tabelle klar vorn steht und seltener verliert als der Gegner – und für die es trotzdem 1,80 oder mehr gibt. Gedacht für kurze Kombis.","criteria":["Direkte Duelle (H2H): mindestens zwei Siege in Folge","Tabelle: Vorsprung bei Punkten je Spiel und beim Platz","Verliert über die Saison deutlich seltener als der Gegner","Quote ab 1,80 – gedacht für Kombis. Je mehr Spiele in der Kombi, desto größer der Verlust","Die letzten fünf Spiele sind hier bewusst keine Bedingung, sie werden nur angezeigt"],"warnung":"Der Buchmacher preist diese Stärke ein: An alten Spielen gingen auf jeder Stufe rund 11 bis 16 % je Tipp verloren. Rechne nicht mit Gewinn.","honesty":"Dieser Filter findet den Sieger gut – aber der Buchmacher weiß das auch und rechnet es in die Quote ein. Auf jeder Stufe verlierst du damit auf Dauer rund elf bis sechzehn Prozent. Hohe Quoten und gute Begründungen: ja. Gewinn: nein.","defaults":{"preset":"dominanz","minPointsPerGame":0.3,"minPositionGap":3,"minNonLossGap":10,"minOdds":1.8,"maxOdds":3.5,"minStreak":2,"requireModelSide":false},"levels":[{"id":"streng","label":"Streng","values":{"minOdds":1.8,"maxOdds":2.5,"minStreak":2,"requireModelSide":true},"note":"3,2/Tag · −16,1 % Gewinn","hint":"Nur Spiele, bei denen auch das Modell dieselbe Mannschaft tippt, Quote 1,80 bis 2,50. Nicht erkennbar besser als die Vorgabe – nur die kürzeste Liste."},{"id":"ausgewogen","label":"Ausgewogen","values":{"minOdds":1.8,"maxOdds":3.5,"minStreak":2,"requireModelSide":false},"note":"4,7/Tag · −15,0 % Gewinn","hint":"Auch Spiele, bei denen das Modell anders tippt – die sind gekennzeichnet. Quote bis 3,50. Gleich gut wie „Streng“, aber deutlich mehr Auswahl. Die Vorgabe."},{"id":"locker","label":"Locker","values":{"minOdds":1.5,"maxOdds":99,"minStreak":2,"requireModelSide":false},"note":"8,7/Tag · −11,5 % Gewinn","hint":"Quote ab 1,50, nach oben offen. Mehr Auswahl und kürzere Quoten: Es stimmen mehr Tipps, aber der Verlust bleibt gleich. Genau darum geht es bei diesem Filter."},{"id":"weit","label":"Weit","values":{"minOdds":1.5,"maxOdds":99,"minStreak":0,"requireModelSide":false},"note":"49,3/Tag · −11,0 % Gewinn","hint":"Ohne Bedingung an die direkten Duelle: rund 49 statt 5 Spiele am Tag, bei gleichem Verlust. Nur zum Überblick, nicht zum Spielen."}]},{"id":"remisScore","label":"Remis-Score","group":"daves","massstab":"trefferquote","description":"Spiele, in denen beide Mannschaften ähnlich stark auftreten. Jedes Spiel sammelt Punkte für einzelne Hinweise auf ein Unentschieden – aufgeklappt steht, wofür.","criteria":["Tabelle: ähnlich viele Punkte und Tore je Spiel, Heimbilanz gegen Auswärtsbilanz","Form am Ort ähnlich – zählt nur, wenn beide gegen ähnlich starke Gegner gespielt haben","Spielbild der letzten Spiele: Schüsse aufs Tor, xG (erwartete Tore aus Chancen) und Ballbesitz ähnlich verteilt, soweit die Liga diese Zahlen liefert","Wenige Tore erwartet, oft knappe Spiele, zur Pause meist eng","Direkte Duelle (H2H) ohne Testspiele: Remis und wenige Tore","Gefährliche Angriffe und Großchancen fehlen, weil es diese Zahlen nicht gibt"],"warnung":"Die Punkte je Hinweis sind gesetzt, nicht gemessen, und geprüft ist erst wenig – das kann auch Zufall sein. Rechne nicht mit Gewinn.","honesty":"An alten Spielen geprüft endete in der Vorgabe knapp jedes dritte Spiel unentschieden. Die Punkte je Hinweis sind gesetzt, und es waren erst wenige Spiele: Das kann auch Zufall sein. Ein Schein mit vier Spielen ging so gut wie nie durch. Rechne nicht mit Gewinn.","defaults":{"preset":"remisScore","minScore":14,"minEvaluable":15},"levels":[{"id":"streng","label":"Streng","values":{"minScore":16},"note":"0,6/Tag · 32,0 % Treffer","hint":"Remis-Score ab 16 von 25. Gut 3 von 10 Tipps stimmten, bei nur 25 alten Spielen – nicht besser als die Vorgabe. Weniger als ein Spiel am Tag."},{"id":"ausgewogen","label":"Ausgewogen","values":{"minScore":14},"note":"1,9/Tag · 31,2 % Treffer","hint":"Remis-Score ab 14 von 25. Knapp jedes dritte Spiel endete unentschieden, etwa zwei Spiele am Tag. Zuletzt seltener als am Anfang."},{"id":"locker","label":"Locker","values":{"minScore":12},"note":"6,2/Tag · 30,1 % Treffer","hint":"Remis-Score ab 12 von 25. Knapp jedes dritte Spiel endete unentschieden – nur wenig mehr als ohne Filter. Unterm Strich ein Verlust."},{"id":"weit","label":"Weit","values":{"minScore":10},"note":"14,9/Tag · 27,7 % Treffer","hint":"Remis-Score ab 10 von 25. Nur zum Überblick: kaum mehr Unentschieden als ohne Filter, unterm Strich ein deutlicher Verlust."}]},{"id":"modell1x2","label":"Sieger laut Modell","group":"modell","massstab":"trefferquote","description":"Spiele, deren Sieger das Modell am sichersten sieht – gerechnet aus den erwarteten Toren beider Mannschaften, nicht aus den Quoten.","criteria":["Getippt wird die Mannschaft, der das Modell die höhere Siegchance gibt – nicht immer dieselbe wie der Sieger-Tipp in der Tabelle, der sich zuerst nach den Quoten richtet","Das Modell gibt ihr mindestens 60 %","Quote 1,30 bis 2,00 – darüber gewinnt der Favorit des Modells kaum öfter als jedes zweite Mal, egal wie sicher das Modell ist","Spiele zwischen verschiedenen Ligen ohne Stärkevergleich fallen weg: Dort kennt das Modell den Klassenunterschied nicht"],"warnung":"Die Treffer kommen fast ganz aus der Quote, nicht aus dem Modell. Rechne nicht mit Gewinn.","honesty":"Etwa 6 von 10 Tipps stimmen – ohne Filter gewinnt der Favorit des Modells nur knapp jedes zweite Spiel. Das kommt fast ganz aus der Quote: Das Modell weiß nichts, was der Buchmacher nicht schon eingepreist hat, und wo es sich deutlich sicherer ist als die Quote, stimmt nur jeder zweite Tipp. In den letzten Tagen stimmte nur gut jeder zweite, vor allem bei Länderspielen – bei so wenigen Spielen kann das auch Zufall sein. Ein Schein mit vier Spielen ging in etwa 1 von 5 Fällen durch. Rechne nicht mit Gewinn.","defaults":{"preset":"modell1x2","minOdds":1.3,"maxOdds":2,"minWinProbability":0.6},"levels":[{"id":"streng","label":"Streng","values":{"minWinProbability":0.65},"note":"1,9/Tag · 71,9 % Treffer","hint":"Siegchance laut Modell ab 65 %, Quote 1,30 bis 2,00. Gut 7 von 10 Tipps stimmen, aber es sind nur wenige Spiele – das Plus kann auch Zufall sein."},{"id":"ausgewogen","label":"Ausgewogen","values":{"minWinProbability":0.6},"note":"4,5/Tag · 63,1 % Treffer","hint":"Siegchance laut Modell ab 60 %, Quote 1,30 bis 2,00. Etwa 6 von 10 Tipps stimmen. Die Vorgabe."},{"id":"locker","label":"Locker","values":{"minWinProbability":0.55},"note":"10,5/Tag · 62,3 % Treffer","hint":"Siegchance laut Modell ab 55 %, Quote 1,30 bis 2,00. Trifft genauso oft wie die Vorgabe, liefert aber mehr als doppelt so viele Spiele."},{"id":"weit","label":"Weit","values":{"minWinProbability":0.5},"note":"21,6/Tag · 60,9 % Treffer","hint":"Siegchance laut Modell ab 50 %, Quote 1,30 bis 2,00. Nur zum Überblick: sehr viele Spiele, etwa 6 von 10 Tipps stimmen."}]},{"id":"hz15","label":"Erste Halbzeit: zwei Tore","group":"modell","massstab":"trefferquote","description":"Spiele, in denen schon bis zur Pause mindestens zwei Tore fallen sollen. Gesucht wird keine Mannschaft, sondern ein torreiches Spiel: viele erwartete Tore, wenig Chance auf ein Unentschieden, und eine Quote, die sich noch lohnt.","criteria":["Mindestens 3,2 erwartete Tore im ganzen Spiel – das wichtigste Merkmal","Höchstens 23 % Chance auf ein Unentschieden – offene Spiele statt abwartender","Quote höchstens 2,00 – wirkt am stärksten, weil auch der Buchmacher Tore erwartet","Die letzten Halbzeiten beider Mannschaften zählen nur in der strengsten Stufe","Abwehrwerte spielen bewusst keine Rolle – sie helfen hier nachweislich nicht"],"warnung":"Die Treffer kommen vor allem aus der Quotengrenze, das Modell trägt wenig bei. Rechne nicht mit Gewinn.","honesty":"Der Filter hilft deutlich: Statt 35 von 100 Spielen stimmen gut 50. Aber der größere Teil davon kommt aus der Quotengrenze, also aus der Meinung des Buchmachers – das Modell steuert nur wenig bei. Und für Kombis bleibt es schwierig: Ein Schein mit vier Spielen geht in 7 von 100 Fällen durch, mit sechs Spielen in 1 bis 2 von 100.","defaults":{"preset":"hz15","minExpectedGoals":3.2,"maxDrawProbability":0.23,"minOdds":1.3,"maxOdds":2,"minFirstHalfRate":0},"levels":[{"id":"streng","label":"Streng","values":{"minOdds":1.3,"maxOdds":1.95,"minFirstHalfRate":0.45},"note":"5,8/Tag · 59,7 % Treffer","hint":"Quote höchstens 1,95, und bei beiden Mannschaften müssen zuletzt oft zwei Tore bis zur Pause gefallen sein. 6 von 10 Tipps stimmen – die beste Stufe, aber nur knapp sechs Spiele am Tag."},{"id":"ausgewogen","label":"Ausgewogen","values":{"minOdds":1.3,"maxOdds":2,"minFirstHalfRate":0},"note":"10,9/Tag · 53,5 % Treffer","hint":"Quote höchstens 2,00, ohne Blick auf die letzten Halbzeiten. Gut 5 von 10 Tipps stimmen, bei doppelt so vielen Spielen wie „Streng“. Die Vorgabe."},{"id":"locker","label":"Locker","values":{"minOdds":1.3,"maxOdds":2.1,"minFirstHalfRate":0},"note":"15,0/Tag · 51,0 % Treffer","hint":"Quote höchstens 2,10. Mehr Spiele, aber nur noch etwa jeder zweite Tipp stimmt, und unterm Strich ein kleiner Verlust."},{"id":"weit","label":"Weit","values":{"minOdds":1.3,"maxOdds":2.4,"minFirstHalfRate":0},"note":"24,8/Tag · 45,3 % Treffer","hint":"Quote höchstens 2,40. Nur zum Überblick: Weniger als jeder zweite Tipp stimmt, und du verlierst auf Dauer."}]},{"id":"remis","label":"Remis-Kandidaten","group":"modell","massstab":"trefferquote","description":"Spiele, die am ehesten unentschieden enden. Gesucht wird kein Sieger, sondern ein geteilter Punkt – zu einer Quote, die sich noch lohnt.","criteria":["Das Modell gibt dem Unentschieden mindestens 30 % – die einzige Bedingung","Quote höchstens 3,00 – über 4,00 endet nur noch jedes sechste Spiel unentschieden","Die Remis-Punkte sind bewusst keine Bedingung: Damit stimmen weniger Tipps, nicht mehr","Die direkten Duelle (H2H) sind bewusst keine Bedingung – sie helfen hier nicht","Erwartete Tore und BTTS ebenfalls nicht – das Modell rechnet die Chance schon daraus"],"warnung":"Mit dem heutigen Modell stimmen kaum mehr Tipps als ganz ohne Filter. Rechne nicht mit Gewinn.","honesty":"Mit dem heutigen Modell stimmen nur knapp 3 von 10 Tipps – kaum mehr als ohne Filter, wo es 1 von 4 sind. Frühere Modellversionen trafen öfter; die Zahlen hier gelten nur für das heutige. Ein Schein mit vier Spielen ging in 3 von 1.000 Fällen durch. Rechne nicht mit Gewinn. Und schau dir in der Kombi-Tabelle nur an, wie oft ein Schein durchgeht – die Gewinnspalte springt dort ab vier Spielen wild hin und her und sagt nichts.","defaults":{"preset":"remis","minOdds":1.3,"maxOdds":3,"minDrawProbability":0.3},"levels":[{"id":"streng","label":"Streng","values":{"minOdds":1.3,"maxOdds":3,"minDrawProbability":0.31},"note":"1,2/Tag · 20,7 % Treffer","hint":"Chance auf Unentschieden ab 31 %, Quote höchstens 3,00. Mit dem heutigen Modell stimmten nur 2 von 10 Tipps – weniger als ohne Filter. Bei 29 Spielen kann das auch Zufall sein. Etwa ein Spiel am Tag."},{"id":"ausgewogen","label":"Ausgewogen","values":{"minOdds":1.3,"maxOdds":3,"minDrawProbability":0.3},"note":"2,6/Tag · 27,9 % Treffer","hint":"Chance auf Unentschieden ab 30 %, Quote höchstens 3,00. Knapp 3 von 10 Tipps stimmen – kaum mehr als ohne Filter. Zwei bis drei Spiele am Tag. Die Vorgabe."},{"id":"locker","label":"Locker","values":{"minOdds":1.3,"maxOdds":99,"minDrawProbability":0.3},"note":"3,2/Tag · 32,5 % Treffer","hint":"Chance auf Unentschieden ab 30 %, Quote nach oben offen. Gut 3 von 10 Tipps stimmen – mit dem heutigen Modell die beste Stufe, aber das kann auch Zufall sein."},{"id":"weit","label":"Weit","values":{"minOdds":1.3,"maxOdds":99,"minDrawProbability":0.29},"note":"6,7/Tag · 28,1 % Treffer","hint":"Chance auf Unentschieden ab 29 %, Quote offen. Nur zum Überblick: knapp 3 von 10 Tipps stimmen, unterm Strich ein deutlicher Verlust."}]},{"id":"kombi","label":"Kombi-Tipps ab 1,60","group":"tipico","massstab":"trefferquote","description":"Je Spiel genau ein Tipp aus allen Wettarten: der, dem die Tipico-Quote ohne Aufschlag die höchste Chance gibt – Quote ab 1,60. Das Modell entscheidet nicht mit.","criteria":["Je Spiel nur ein Tipp – aus Sieg, Remis, BTTS (beide Teams treffen) und allen Torlinien, auch der 1. Halbzeit","Maßstab ist die Chance laut Tipico: die Chance, die Tipico dem Tipp selbst gibt, aus der Quote ohne Aufschlag gerechnet","Quote ab 1,60. Die Stufen begrenzen die Quote nach oben – je näher an 1,60, desto wahrscheinlicher der Tipp","Nur Tipps, bei denen Tipico auch die Gegenseite anbietet – sonst lässt sich der Aufschlag nicht herausrechnen","Die wahrscheinlichsten Tipps liegen fast alle knapp über 1,60. Fällt eine Quote in der Tipico-App darunter, nimm den Ersatz (aufgeklappt) oder das nächste Spiel der Liste","Auffällige Spiele fallen weg und stehen unter der Liste","Bei Spielen zwischen verschiedenen Ligen ohne Stärkevergleich fällt der Sieger-Tipp weg"],"warnung":"Rechne nicht mit Gewinn, denn der Aufschlag von Tipico steckt in jedem Tipp – und prüf jeden Preis vor dem Setzen in der Tipico-App.","honesty":"Gut 5 von 10 Tipps stimmen – genau so oft, wie die Quote es sagt. Der Filter sucht je Spiel den wahrscheinlichsten Tipp ab 1,60, keinen Vorteil. Der Aufschlag von Tipico steckt in jedem Tipp: Eine Kombi aus 4 Tipps geht etwa jedes zehnte Mal auf und kostet auf Dauer rund ein Viertel des Einsatzes, eine aus 7 rund 40 %. Eine Liste, die gut getroffen hat, beweist nichts. Rechne nicht mit Gewinn. Die Quoten sind so alt wie die letzte Analyse – prüf jeden Preis vor dem Setzen in der Tipico-App; fällt er unter 1,60, nimm den Ersatz oder das nächste Spiel.","defaults":{"preset":"kombi","minOdds":1.6,"limit":null,"maxOdds":1.65},"levels":[{"id":"streng","label":"Streng","values":{"maxOdds":1.65},"note":"59,3/Tag · 57,5 % Treffer","hint":"Quote 1,60 bis 1,65. Knapp 6 von 10 Tipps stimmen – so oft, wie die Quote sagt. Die Vorgabe."},{"id":"ausgewogen","label":"Ausgewogen","values":{"maxOdds":1.7},"note":"86,5/Tag · 56,4 % Treffer","hint":"Quote 1,60 bis 1,70. Mehr Spiele, ein Tipp stimmt etwas seltener."},{"id":"locker","label":"Locker","values":{"maxOdds":1.8},"note":"106,5/Tag · 55,7 % Treffer","hint":"Quote 1,60 bis 1,80. Noch mehr Spiele, gut jeder zweite Tipp stimmt."},{"id":"weit","label":"Weit","values":{"maxOdds":99},"note":"113,5/Tag · 54,8 % Treffer","hint":"Ohne Grenze nach oben: jedes Spiel mit einem Tipp ab 1,60. Nur zum Überblick."}]}]}</script>
+<script>
+const NODES = {
+  // Quellen
+  q_tipico: { band: "main", col: 0, t: "src", kind: "Quelle", name: "Tipico-Export", line: "Spiele und Quoten zum Analysieren", path: "data.json", chips: [["plain", "von dir abgelegt"]],
+    text: "Du legst die exportierte data.json ins Repository. Sie bestimmt, welche Spiele analysiert werden, und liefert die Quoten. Der Analyzer greift nie selbst auf Tipico zu.",
+    facts: [["Wichtig", "Eine Tipico-Quote ändert nie den Tipp des Modells. Sie färbt nur nachgelagert, etwa als Value."]] },
+  q_api: { band: "main", col: 0, t: "src", kind: "Quelle", name: "API-Football", line: "Ansetzungen, Ergebnisse, Statistik, Live", path: "src/api.ts", chips: [["cost", "7.500 am Tag"]],
+    text: "Die Sportdaten: Ansetzungen, Ergebnisse, Ereignisse, Statistiken, Aufstellungen und Live-Stände. Jede Antwort geht zuerst in den Cache.",
+    facts: [["Tarif", "Pro: 7.500 Aufrufe am Tag, 300 je Minute, 5 je Sekunde. Bei Limit wartet der Auftrag 60 Sekunden und macht weiter."], ["Schlüssel", "<code>API_FOOTBALL_KEY</code> in <code>.env</code>"], ["Nicht genutzt", "<code>/predictions</code> bleibt draußen."]] },
+  q_mega: { band: "main", col: 0, t: "src", kind: "Quelle und Ablage", name: "MEGA", line: "Sicherungen in der Cloud", path: "src/mega-store.ts · src/remote-backup.ts", chips: [["plain", "6 Sicherungen"]],
+    text: "Cloud-Ablage für die Datenbank-Sicherungen über das Paket megajs. Von hier holt npm run restore die Datenbank auf einen anderen PC.",
+    facts: [["Zugang", "<code>MEGA_EMAIL</code>, <code>MEGA_PASSWORD</code>, <code>MEGA_FOLDER</code> in <code>.env</code>"], ["Regel", "Immer nur ein PC zur Zeit. Vor dem Wechsel <code>npm run restore -- --force</code>."]] },
+
+  // Kommandozeile
+  a_prepare: { band: "main", col: 1, t: "cli", kind: "Befehl", name: "Zuordnen", line: "Tipico-Namen auf API-Football abbilden", path: "npm run prepare-analysis", chips: [["free", "praktisch 0"]],
+    text: "Der erste Schritt jeder Analyse. Nennt offene Ligen mit Kandidaten, Tipico-Spiele ohne API-Ansetzung mit den ähnlichsten Spielen der Liga und Teams ohne Elo.",
+    facts: [["Datei", "<code>tools/prepare-analysis.ts</code>"], ["Danach", "Aliase mit <code>npm run aliases</code> und <code>npm run team-aliases</code> setzen und erneut laufen lassen."]] },
+  a_dashboard: { band: "main", col: 1, t: "cli", kind: "Befehl", name: "Analyse", line: "Der Hauptlauf vom Import bis zur Sicherung", path: "npm run dashboard -- --dates next48", chips: [["cost", "kostet Aufrufe"]],
+    text: "Importiert Tipico, ordnet zu, zieht das Elo nach, rechnet die Modelle und schreibt den Snapshot. Danach rechnet er fällige Spiele ab, druckt die Kalibrier-Kurzfassung und sichert die Datenbank.",
+    facts: [["Dateien", "<code>src/cli.ts</code> → <code>src/analyzer.ts</code> → <code>src/dashboard.ts</code>, Import in <code>src/tipico.ts</code>"], ["Budgets", "<ul><li>Ligastärke vor der Rechnung: bis 300</li><li>Abrechnung am Ende: bis 200</li><li>Elo-Wochenrunde: bis 600</li><li>xG-Aufbau: bis 250</li></ul>"], ["Zeiträume", "<code>next48</code> = genau 48 Stunden ab jetzt, <code>twentyone</code> = heute plus 20 Tage"]] },
+  a_model: { band: "main", col: 1, t: "cli", kind: "Rechenkerne", name: "Modelle", line: "Torerwartung, Ligastärke, Elo, Punkte, Filter", path: "src/model.ts · elo.ts · strength-factor.ts …", chips: [["free", "reine Rechnung"]],
+    text: "Rechnen nur, ohne selbst Daten zu holen. Sie bekommen Zahlen und geben Wahrscheinlichkeiten, Punkte und Faktoren zurück. Deshalb rufen Analyse, Tests und Rückrechnungen genau dieselbe Fassung auf.",
+    facts: [["Wer was rechnet", "<ul><li><code>model.ts</code>: Tore nach Poisson</li><li><code>strength-factor.ts</code>: Ligastärke</li><li><code>elo.ts</code>: Team-Elo</li><li><code>draw-criteria.ts</code>, <code>draw-signals.ts</code>: Remis-Punkte</li><li><code>favorite-criteria.ts</code>: Favoriten-Punkte</li><li><code>quickpick-*.ts</code>: die sieben Filter, siehe Baustein „Quickpick-Filter“</li><li><code>live-model.ts</code>: Live-Chancen</li></ul>"], ["Version", "<code>goalLineModelVersion</code> 3.6.0 in <code>src/config.ts</code>"]] },
+  a_quick: { band: "main", col: 1, t: "cli", kind: "Regeln", name: "Quickpick-Filter", line: "Sieben Filter, die Spiele für Tipps auswählen", path: "src/quickpick.ts · quickpick-*.ts", chips: [["free", "0 Aufrufe"], ["plain", "noch nicht in Neo"]],
+    text: "Jeder Filter prüft ein Spiel des Snapshots Bedingung für Bedingung und gibt einen Tipp mit Quote zurück oder den ersten Grund, warum das Spiel rausfällt. Die Regeln rechnen selbst keine Wahrscheinlichkeit, sie lesen, was die Analyse schon gerechnet hat.",
+    facts: [["Einstieg", "<code>evaluateFixture</code> in <code>src/quickpick.ts</code>, Gerüst in <code>src/quickpick-core.ts</code>"], ["Alle Regeln", "Abschnitt „Quickpick-Filter“ unter der Karte: Bedingungen, Stufen und gemessene Trefferquoten je Filter"], ["Greift heute in", "<code>npm run quickpick-report</code> und den Tests <code>test/rules/quickpick.spec.ts</code>. Neo ruft sie noch nicht auf."]] },
+  a_settle: { band: "main", col: 1, t: "cli", kind: "Befehl", name: "Abrechnung", line: "Ergebnisse holen, Prognosen abrechnen", path: "npm run settle", chips: [["cost", "1 je Spiel"]],
+    text: "Holt beendete Spiele, rechnet die Prognosen ab und schreibt je Spiel eine Zeile mit Ständen, Torminuten und Statistik. Verlegte oder abgesagte Spiele kommen auf Wiedervorlage.",
+    facts: [["Dateien", "<code>src/settle.ts</code>, <code>src/fixture-result.ts</code>"], ["Wann", "Automatisch am Ende jeder Analyse, frühestens 110 Minuten nach Anpfiff"]] },
+  a_care: { band: "main", col: 1, t: "cli", kind: "Befehle", name: "Pflege", line: "Zuordnungen, Elo, Ligastärke, Sicherung", path: "aliases · elo · strength · coverage · data-check · backup · restore", chips: [["free", "Prüfen 0"], ["cost", "Nachladen kostet"]],
+    text: "Hält die Datengrundlage sauber: Zuordnungen setzen, Elo- und Ligastärke-Saisons nachladen, Lücken und falsche Daten finden, sichern und zurückspielen.",
+    facts: [["Kostenlos", "<code>coverage</code>, <code>data-check</code>, <code>elo -- build</code>, <code>backup</code>"], ["Kostet", "<code>elo -- backfill</code>, <code>strength -- --competition</code>"], ["Anleitung", "Skill <code>datenpflege</code>"]] },
+  a_reports: { band: "main", col: 1, t: "cli", kind: "Befehle", name: "Messen", line: "Modell und Filter an alten Spielen prüfen", path: "report · edge-report · quickpick-report · btts-check …", chips: [["free", "0 Aufrufe"]],
+    text: "Prüfen an abgerechneten Spielen, wie gut Modell und Filter liegen. Sie lesen nur Snapshots und Datenbank und dürfen deshalb auch vom Prüfer-Agenten ausgeführt werden.",
+    facts: [["Alle", "<code>report</code>, <code>edge-report</code>, <code>quickpick-report</code>, <code>draw-signals-report</code>, <code>btts-check</code>, <code>live-model-report</code>, <code>kombi-tipps</code>, <code>elo-backtest</code>"], ["Offen", "BTTS-Prüfung bis rund Mitte November, Nachmessung Ligastärke bei rund 750 Spielen"]] },
+
+  // Speicher
+  s_alias: { band: "main", col: 2, t: "store", kind: "Speicher", name: "Zuordnungen", line: "Tipico-Name → API-Liga oder Team", path: "data/league-aliases.json · team-aliases.json", chips: [["plain", "im Repository"]],
+    text: "Welcher Tipico-Name zu welcher API-Liga oder welchem Team gehört. Liegt im Repository, damit sie auf jedem PC gleich ist. Ein Name kann je Wettbewerb ein eigenes Ziel haben.",
+    facts: [["Gelesen von", "<code>src/resolver.ts</code>, <code>src/team-resolver.ts</code>"]] },
+  s_cache: { band: "main", col: 2, t: "store", kind: "Speicher", name: "API-Cache", line: "Rohe Antworten von API-Football", path: "data/cache/", chips: [["plain", "nicht gesichert"]],
+    text: "Jede Antwort von API-Football als eigene Datei. So kosten mehrere Analysen hintereinander nur einmal. Abgelaufenes bleibt liegen und wird erst bei Bedarf neu geholt.",
+    facts: [["Gültig", "<ul><li>Spiele und Quoten: 6 Stunden</li><li>Saisons und Teamhistorien: 24 Stunden</li><li>Duelle und Ligadaten: 7 Tage</li><li>Beendete Spiele: 30 Tage</li></ul>"], ["Datei", "<code>src/cache.ts</code>"]] },
+  s_db: { band: "main", col: 2, t: "store", kind: "Speicher", name: "Datenbank", line: "Prognosen, Ergebnisse, Elo, Ligastärke", path: "data/analyzer.sqlite · rund 0,9 GB", chips: [["plain", "24 Tabellen"]],
+    text: "Das Gedächtnis des Projekts. Liegt nicht im Repository; fehlt sie, verweigert die Analyse den Start, statt still eine leere anzulegen.",
+    facts: [["Tabellen", "<ul><li>Tipico: <code>tipico_imports</code>, <code>tipico_fixtures</code>, <code>tipico_competitions</code>, <code>tipico_teams</code></li><li>Prognosen: <code>goal_line_predictions</code>, <code>goal_line_prediction_scopes</code>, <code>goal_line_analysis_runs</code>, <code>profile_predictions</code>, <code>profile_prediction_scopes</code>, <code>profile_analysis_runs</code>, <code>runs</code>, <code>candidates</code></li><li>Ergebnisse: <code>fixture_results</code>, <code>fixture_expected_goals</code>, <code>settle_deferrals</code></li><li>Elo: <code>elo_matches</code>, <code>elo_ratings</code>, <code>elo_history</code>, <code>elo_league_seasons</code>, <code>elo_meta</code></li><li>Ligastärke: <code>strength_matches</code>, <code>strength_team_leagues</code>, <code>league_strength_snapshots</code>, <code>strength_build_progress</code></li></ul>"], ["Datei", "<code>src/database.ts</code> mit <code>node:sqlite</code>"]] },
+  s_output: { band: "main", col: 2, t: "store", kind: "Speicher", name: "Snapshots", line: "Ergebnis jeder Analyse als JSON", path: "output/dashboard-latest.json", chips: [["plain", "über 100 Dateien"]],
+    text: "Das Ergebnis jeder Analyse. Neo liest den neuesten, Marktprofil und Rückrechnungen lesen die datierten Kopien.",
+    facts: [["Format", "<code>schemaVersion: 8</code>, Typen in <code>apps/shared/src/types.ts</code>"], ["Geschrieben von", "<code>src/dashboard.ts</code>"]] },
+  s_backup: { band: "main", col: 2, t: "store", kind: "Speicher", name: "Sicherungen", line: "Eine gepackte Datenbank je Tag", path: "data/backups/analyzer-JJJJ-MM-TT.sqlite.gz", chips: [["plain", "rund 190 MB"]],
+    text: "Nach jeder Analyse über die Online-Sicherung von SQLite kopiert, mit quick_check geprüft und gepackt. Die neuesten 6 bleiben. Scheitert etwas, bleibt die bisherige.",
+    facts: [["Dateien", "<code>src/backup.ts</code>, <code>tools/backup.ts</code>, <code>tools/restore.ts</code>"], ["Abschalten", "<code>BACKUP_AFTER_ANALYSIS=0</code>"]] },
+
+  // Server & App
+  v_endpoints: { band: "main", col: 3, t: "app", kind: "Server", name: "Daten-Endpunkte", line: "Liefern Neo die Daten über HTTP", path: "apps/shared/server/endpoints.ts", chips: [["cost", "Live, Details"]],
+    text: "Ein Vite-Plugin, das mit dem Server von Neo startet. Die App selbst rechnet keine Wahrscheinlichkeit, sie fragt hier nach.",
+    facts: [["Endpunkte", "<ul><li><code>/api/dashboard/latest</code>: neuester Snapshot</li><li><code>/api/live/board</code>: laufende Spiele mit Live-Chancen</li><li><code>/api/fixture/insights</code>: Detailkennzahlen, einmalig rund 4 Aufrufe je Spiel</li><li><code>/api/market-profile</code>: Marktprofil aus Snapshots und Datenbank</li></ul>"]] },
+  v_shared: { band: "main", col: 3, t: "app", kind: "Bausteine", name: "apps/shared", line: "Typen, Abruf, Namen, Wappen, Flaggen", path: "apps/shared/src/ · styles/base.css", chips: [["plain", "für jede App"]],
+    text: "Was jede App braucht: die Typen des Snapshots, das Abrufen von Dashboard und Live, die Namenssuche, Wappen mit Initialen als Ersatz, Flaggen sowie Farben und Schrift.",
+    facts: [["Dateien", "<code>types.ts</code>, <code>data.ts</code>, <code>liveData.ts</code>, <code>names.ts</code>, <code>TeamCrest.tsx</code>, <code>countryFlags.ts</code>"]] },
+  u_neo: { band: "main", col: 3, t: "app", kind: "App", name: "Neo Dashboard", line: "Die einzige App, im Aufbau", path: "npm run neo · Port 5174", chips: [["free", "0 Aufrufe"]],
+    text: "Zeigt bisher die Spiele des neuesten Snapshots nach Anstoß. Noch ohne Live-Ansicht, Filter oder Wettschein. Die alte App ist seit 26.10.2026 entfernt; ihre Entscheidungen gelten hier nicht von selbst.",
+    facts: [["Dateien", "<code>apps/neo/src/App.tsx</code>, <code>apps/neo/vite.config.ts</code>"], ["Technik", "React 19, Vite 8, Tests mit Vitest"]] },
+
+  // Claude
+  c_rules: { band: "claude", col: 0, t: "claude", kind: "Anweisung", name: "AGENTS.md", line: "Regeln, Messstände, deine Entscheidungen", path: "AGENTS.md", chips: [["plain", "jede Sitzung"]],
+    text: "Die Arbeitsanweisung im Repository. Sie wird in jede Sitzung geladen: Ablauf einer Analyse, Grenzen wie „kein Tipico-Zugriff“, Messstände und was du wann entschieden hast.",
+    facts: [["Wichtig", "Code-Kommentare und diese Datei dürfen Fachbegriffe nutzen. Alles, was du in der App liest, braucht einfache Sprache."]] },
+  c_memory: { band: "claude", col: 0, t: "claude", kind: "Gedächtnis", name: "Notizen", line: "Daueraufträge und Vorlieben", path: "~/.claude/projects/…/memory/", chips: [["plain", "nicht im Repository"]],
+    text: "Was über eine Sitzung hinaus gelten soll, etwa „erst zuordnen, dann analysieren“ oder „bei 100 U21-Spielen nachmessen“. MEMORY.md ist das Verzeichnis, jede Notiz eine eigene Datei.",
+    facts: [["Beim PC-Wechsel", "Von Hand kopieren, sonst fehlen die Daueraufträge."]] },
+  c_main: { band: "claude", col: 1, t: "claude", kind: "Sitzung", name: "Hauptsitzung", line: "Claude Code in VS Code", path: "diese Unterhaltung", chips: [["cost", "darf Aufrufe auslösen"]],
+    text: "Führt Analysen aus, pflegt Daten und ändert Code. Gibt Prüfaufträge zu Algorithmen ungefragt an den Prüfer-Agenten ab und setzt danach um, was du entscheidest.",
+    facts: [["Vor und nach Code-Änderungen", "<code>npm test</code> und <code>npm run typecheck</code>"]] },
+  c_pruefer: { band: "claude", col: 1, t: "claude", kind: "Agent", name: "Prüfer-Agent", line: "Misst Algorithmen, nur lesend", path: ".claude/agents/fussball-algorithmen-pruefer.md", chips: [["free", "ohne API"]],
+    text: "Prüft Elo, Torerwartung, Ligastärke, Punkte, Filter, Live-Chancen und Abrechnung an alten Spielen. Erstellt auch die qualitativen Tipplisten. Läuft mit Opus.",
+    facts: [["Werkzeuge", "Lesen, Suchen, Shell, Web; Schreiben und API-Football sperrt der Wächter"]] },
+  c_skills: { band: "claude", col: 2, t: "claude", kind: "Skills", name: "Fachwissen auf Abruf", line: "Wird nur bei Bedarf geladen", path: ".claude/skills/ · ~/.claude/skills/", chips: [["plain", "2 im Projekt"], ["plain", "2 global"]],
+    text: "Anleitungen, die erst geladen werden, wenn eine Aufgabe sie braucht. So bleibt jede Sitzung schlank. Die Design- und UX-Skills im Projekt sind seit 26.10.2026 entfernt; ein neuer Skill-Stack entsteht.",
+    facts: [["Fürs Projekt", "<ul><li><code>datenpflege</code>: Zuordnung, Elo-Lücken, Beweisregeln</li><li><code>qualitative-tipps</code>: Gegnerstärke, mit Skript <code>gegnerstaerke.ts</code></li></ul>"], ["Global, für alle Projekte", "<code>interface-design</code> (Gestaltung von Oberflächen), <code>find-skills</code> (Skills finden und installieren)"]] },
+  c_hook: { band: "claude", col: 3, t: "claude", kind: "Hook", name: "Wächter", line: "Prüft jeden Befehl des Prüfers vorher", path: ".claude/hooks/pruefer-waechter.ts", chips: [["plain", "mit Test"]],
+    text: "Läuft vor jedem Shell-Befehl des Prüfer-Agenten. Erlaubt nur lesende Befehle und sperrt API-Aufrufe und Schreibzugriffe.",
+    facts: [["Pflicht", "Jedes neue npm-Script muss dort als erlaubt oder gesperrt eingeordnet sein, sonst schlägt <code>test/pruefer-waechter.test.ts</code> fehl."]] },
+  c_sync: { band: "claude", col: 3, t: "claude", kind: "Hook", name: "Karten-Hook", line: "Hält die Filterregeln dieser Karte aktuell", path: ".claude/hooks/stack-karte-sync.ts", chips: [["free", "0 Aufrufe"]],
+    text: "Läuft nach jeder Änderung, die Claude an einer Filter-Datei macht. Er schreibt die Regeln sofort in diese Karte und erinnert Claude daran, sie neu zu veröffentlichen. Veröffentlichen kann nur Claude selbst.",
+    facts: [["Eingerichtet in", "<code>.claude/settings.json</code>, nach Edit und Write"], ["Löst aus bei", "<code>src/quickpick*.ts</code> und <code>src/kombi-tipps.ts</code>"], ["Dahinter", "<code>npm run stack-karte</code>; ändern sich die Regeln nicht, bleibt er still"]] },
+  c_mcp: { band: "claude", col: 3, t: "claude", kind: "Verbindungen", name: "Werkzeuge außerhalb", line: "Browser und Dokumente", path: "MCP", chips: [["plain", "nach Bedarf"]],
+    text: "Claude in Chrome bedient deinen Browser, etwa um Neo anzusehen. Claude Docs legt Dokumente an. Beide berühren das Repository nicht.",
+    facts: [] }
+};
+
+const EDGES = [
+  ["q_tipico", "a_prepare", "Wettbewerbe und Teamnamen"],
+  ["q_tipico", "a_dashboard", "Spiele und Quoten"],
+  ["q_api", "s_cache", "jede Antwort wird gespeichert"],
+  ["s_cache", "a_prepare", "Ligaliste und Ansetzungen"],
+  ["s_cache", "a_dashboard", "Ansetzungen, Historien, Statistik"],
+  ["s_cache", "a_settle", "Ergebnisse und Halbzeitwerte"],
+  ["s_cache", "a_care", "Saisons für Elo und Ligastärke"],
+  ["s_cache", "v_endpoints", "Live-Stände und Detailkennzahlen"],
+  ["s_alias", "a_prepare", "bekannte Zuordnungen"],
+  ["s_alias", "a_dashboard", "Zuordnungen"],
+  ["a_care", "s_alias", "Aliase setzen"],
+  ["a_dashboard", "a_model", "rechnet mit"],
+  ["s_db", "a_dashboard", "Elo, Ligastärke, Zuordnungen"],
+  ["a_dashboard", "s_db", "Tipico-Import und Prognosen"],
+  ["a_dashboard", "s_output", "Snapshot"],
+  ["a_dashboard", "a_settle", "am Ende automatisch"],
+  ["a_settle", "s_db", "Ergebnisse und Abrechnung"],
+  ["a_dashboard", "s_backup", "Sicherung nach jeder Analyse"],
+  ["s_backup", "q_mega", "hochladen, 6 behalten"],
+  ["q_mega", "s_db", "npm run restore"],
+  ["a_care", "s_db", "Elo und Ligastärke nachladen"],
+  ["s_db", "a_reports", "nur lesen"],
+  ["s_output", "a_reports", "nur lesen"],
+  ["a_reports", "a_model", "rufen dieselbe Rechnung"],
+  ["s_output", "a_quick", "Spiele mit Punkten, Chancen und Quoten"],
+  ["a_model", "a_quick", "Favoriten- und Remis-Punkte"],
+  ["a_quick", "a_reports", "quickpick-report rechnet sie nach"],
+  ["s_output", "v_endpoints", "neuester Snapshot"],
+  ["s_db", "v_endpoints", "Marktprofil"],
+  ["a_model", "v_endpoints", "Live-Modell"],
+  ["v_endpoints", "u_neo", "JSON über HTTP"],
+  ["v_shared", "u_neo", "Typen, Abruf, Wappen"],
+  ["c_rules", "c_main", "in jeder Sitzung geladen"],
+  ["c_memory", "c_main", "Daueraufträge"],
+  ["c_skills", "c_main", "bei Bedarf geladen"],
+  ["c_skills", "c_pruefer", "qualitative-tipps, datenpflege"],
+  ["c_main", "c_pruefer", "gibt Prüfaufträge ab"],
+  ["c_hook", "c_pruefer", "sperrt API und Schreiben"],
+  ["a_quick", "c_sync", "eine Regeländerung löst ihn aus"],
+  ["c_sync", "c_main", "erinnert ans Veröffentlichen"],
+  ["c_mcp", "c_main", "Browser, Dokumente"],
+  ["c_main", "a_dashboard", "führt Analysen aus"],
+  ["c_main", "a_care", "pflegt Daten"],
+  ["c_main", "u_neo", "baut die App"],
+  ["c_pruefer", "a_reports", "misst, nur lesend"]
+];
+
+const COLS = {
+  main: [["Quellen", "von außen", "src"], ["Kommandozeile", "npm run …", "cli"], ["Speicher", "auf deinem PC", "store"], ["Server und App", "im Browser", "app"]],
+  claude: [["Anweisungen", "", "claude"], ["Wer arbeitet", "", "claude"], ["Wissen", "", "claude"], ["Hooks und Zugänge", "", "claude"]]
+};
+
+const map = document.getElementById("map");
+const detail = document.getElementById("detail");
+const wireLayer = document.getElementById("wire-layer");
+const buttons = {};
+let selected = "a_dashboard";
+
+function buildColumns(band, host) {
+  COLS[band].forEach(([title, sub, t], index) => {
+    const col = document.createElement("div");
+    col.className = "col";
+    const head = document.createElement("div");
+    head.className = "col-head t-" + t;
+    head.innerHTML = title + (sub ? " <span>" + sub + "</span>" : "");
+    col.appendChild(head);
+    for (const [id, node] of Object.entries(NODES)) {
+      if (node.band !== band || node.col !== index) continue;
+      const button = document.createElement("button");
+      button.type = "button";
+      button.id = "node-" + id;
+      button.className = "node t-" + node.t;
+      button.dataset.id = id;
+      button.setAttribute("aria-pressed", "false");
+      button.innerHTML = '<span class="n-name">' + node.name + '</span>'
+        + '<span class="n-line">' + node.line + '</span>'
+        + '<span class="n-path">' + node.path + '</span>'
+        + '<span class="chips">' + node.chips.map(([kind, label]) => '<span class="chip ' + kind + '">' + label + '</span>').join("") + '</span>';
+      button.addEventListener("click", () => select(id));
+      buttons[id] = button;
+      col.appendChild(button);
+    }
+    host.appendChild(col);
+  });
+}
+buildColumns("main", document.getElementById("cols-main"));
+buildColumns("claude", document.getElementById("cols-claude"));
+
+function linkButton(id, label) {
+  const node = NODES[id];
+  return '<button type="button" class="link-btn t-' + node.t + '" data-go="' + id + '"><b>' + node.name + '</b><span>' + label + '</span></button>';
+}
+
+function renderDetail(id) {
+  const node = NODES[id];
+  const incoming = EDGES.filter((edge) => edge[1] === id);
+  const outgoing = EDGES.filter((edge) => edge[0] === id);
+  detail.className = "detail t-" + node.t;
+  detail.innerHTML = '<div><div class="d-kind">' + node.kind + '</div><h3>' + node.name + '</h3></div>'
+    + '<p class="d-text">' + node.text + '</p>'
+    + '<dl>'
+    + '<div><dt>Wo</dt><dd><code>' + node.path + '</code></dd></div>'
+    + node.facts.map(([label, value]) => '<div><dt>' + label + '</dt><dd>' + value + '</dd></div>').join("")
+    + (incoming.length ? '<div><dt>Bekommt von</dt><dd class="links">' + incoming.map((edge) => linkButton(edge[0], edge[2])).join("") + '</dd></div>' : "")
+    + (outgoing.length ? '<div><dt>Gibt an</dt><dd class="links">' + outgoing.map((edge) => linkButton(edge[1], edge[2])).join("") + '</dd></div>' : "")
+    + '</dl>'
+    + '<p class="hint">In der Karte: durchgezogene Linie = gibt an, gestrichelt = bekommt von. Klick auf einen verbundenen Baustein springt dorthin.</p>';
+  detail.querySelectorAll("[data-go]").forEach((button) => {
+    button.addEventListener("click", () => {
+      select(button.dataset.go);
+      const target = buttons[button.dataset.go];
+      if (target && window.matchMedia("(max-width: 1240px)").matches) target.scrollIntoView({ block: "center", behavior: "smooth" });
+    });
+  });
+}
+
+function select(id) {
+  selected = id;
+  map.classList.add("has-sel");
+  const related = new Set();
+  for (const [from, to] of EDGES) {
+    if (from === id) related.add(to);
+    if (to === id) related.add(from);
+  }
+  for (const [key, button] of Object.entries(buttons)) {
+    button.setAttribute("aria-pressed", String(key === id));
+    button.classList.toggle("rel", related.has(key));
+  }
+  renderDetail(id);
+  drawWires();
+}
+
+function drawWires() {
+  wireLayer.innerHTML = "";
+  if (!selected || window.matchMedia("(max-width: 820px)").matches) return;
+  const box = map.getBoundingClientRect();
+  const rectOf = (id) => {
+    const r = buttons[id].getBoundingClientRect();
+    return { l: r.left - box.left, r: r.right - box.left, t: r.top - box.top, b: r.bottom - box.top, cx: (r.left + r.right) / 2 - box.left, cy: (r.top + r.bottom) / 2 - box.top };
+  };
+  const relevant = EDGES.filter((edge) => edge[0] === selected || edge[1] === selected);
+  for (const [from, to] of relevant) {
+    const a = rectOf(from);
+    const b = rectOf(to);
+    let d;
+    if (Math.abs(a.cx - b.cx) < 8) {
+      // gleiche Spalte: rechts in den Zwischenraum ausbiegen
+      const bulge = Math.min(40, 18 + Math.abs(a.cy - b.cy) * 0.06);
+      d = "M" + a.r + "," + a.cy + " C" + (a.r + bulge) + "," + a.cy + " " + (b.r + bulge) + "," + b.cy + " " + (b.r + 2) + "," + b.cy;
+    } else if (b.cx > a.cx) {
+      const mid = (a.r + b.l) / 2;
+      d = "M" + a.r + "," + a.cy + " C" + mid + "," + a.cy + " " + mid + "," + b.cy + " " + (b.l - 2) + "," + b.cy;
+    } else {
+      const mid = (a.l + b.r) / 2;
+      d = "M" + a.l + "," + a.cy + " C" + mid + "," + a.cy + " " + mid + "," + b.cy + " " + (b.r + 2) + "," + b.cy;
+    }
+    const t = NODES[from].t;
+    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    path.setAttribute("d", d);
+    path.setAttribute("class", "wire w-" + t);
+    path.setAttribute("marker-end", "url(#m-" + t + ")");
+    if (to === selected) path.setAttribute("stroke-dasharray", "5 4");
+    wireLayer.appendChild(path);
+  }
+}
+
+// ---- Quickpick-Filter: Daten aus dem Code (npm run stack-karte), Beschriftungen hier ----
+const QUICKPICK = JSON.parse(document.getElementById("quickpick-data").textContent);
+
+const PARAM_LABELS = {
+  minOdds: "Quote ab",
+  maxOdds: "Quote bis",
+  strongMinimum: "Form am Ort der getippten Mannschaft ab",
+  weakMaximum: "Form am Ort des Gegners höchstens",
+  minPoints: "Favoritenpunkte ab",
+  minPointsPerGame: "Vorsprung Punkte je Spiel ab",
+  minGoalDifference: "Vorsprung Tordifferenz je Spiel ab",
+  minPositionGap: "Plätze Vorsprung ab",
+  requireStreak: "Siegesserie nötig",
+  minNonLossGap: "Seltener verloren, Vorsprung ab",
+  minStreak: "Siege in Folge im H2H ab",
+  requireModelSide: "Modell muss dieselbe Mannschaft tippen",
+  minScore: "Remis-Punkte ab (von 25)",
+  minEvaluable: "Bewertbare Remis-Punkte mindestens",
+  minWinProbability: "Siegchance laut Modell ab",
+  minExpectedGoals: "Erwartete Tore im Spiel ab",
+  maxDrawProbability: "Remis-Chance laut Modell höchstens",
+  minFirstHalfRate: "Halbzeitbilanz beider Teams ab",
+  minDrawProbability: "Remis-Chance laut Modell ab"
+};
+const PERCENT_POINTS = new Set(["strongMinimum", "weakMaximum"]);
+const PROBABILITIES = new Set(["minWinProbability", "maxDrawProbability", "minFirstHalfRate", "minDrawProbability"]);
+const ODDS = new Set(["minOdds", "maxOdds"]);
+const IGNORED = new Set(["preset", "limit"]);
+
+const FILTER_INFO = {
+  "daves1x2": { tip: "1 oder 2: die klar überlegene Mannschaft", files: ["src/quickpick-daves.ts", "src/favorite-criteria.ts"],
+    inputs: ["Favoritenpunkte und Sieger-Tipp aus der Analyse", "Tabelle: Punkte, Tordifferenz, Platz", "Form am Ort der letzten Spiele", "Direkte Duelle (H2H)", "1X2-Quote"] },
+  "dominanz": { tip: "1 oder 2: die Seite, die Tabelle und H2H stützen", files: ["src/quickpick-dominanz.ts"],
+    inputs: ["Tabelle: Punkte je Spiel, Platz, Siege plus Remis je Spiel", "Direkte Duelle (H2H), Testspiele zählen mit", "Quote der gestützten Mannschaft", "Tipp des Modells, nur zur Markierung"] },
+  "remisScore": { tip: "X: Unentschieden", files: ["src/quickpick-remisscore.ts", "src/draw-signals.ts"],
+    inputs: ["Tabelle mit Heim- und Auswärtsbilanz", "Form am Ort und Stärke der letzten Gegner", "Spielbild der letzten Spiele: Schüsse aufs Tor, xG, Ballbesitz", "Erwartete Tore", "Direkte Duelle ohne Testspiele"] },
+  "modell1x2": { tip: "1 oder 2: der Favorit des Modells", files: ["src/quickpick-modell1x2.ts"],
+    inputs: ["Sieg- und Remis-Chance des Modells", "Ob die Chance belastbar ist (Ligastärke bekannt)", "Quote der getippten Mannschaft"] },
+  "hz15": { tip: "1. Halbzeit über 1,5 Tore", files: ["src/quickpick-hz15.ts"],
+    inputs: ["Erwartete Tore im ganzen Spiel", "Remis-Chance des Modells", "Quote für 1. HZ über 1,5", "Halbzeitbilanz der letzten Spiele (nur Stufe Streng)"] },
+  "remis": { tip: "X: Unentschieden", files: ["src/quickpick-remis.ts"],
+    inputs: ["Remis-Chance des Modells", "Remis-Quote"] },
+  "kombi": { tip: "Ein Tipp je Spiel aus allen 14 Wettarten", files: ["src/quickpick-kombi.ts", "src/kombi-tipps.ts", "src/fair-price.ts"],
+    inputs: ["Quoten und Gegenquoten aller Wettarten", "Chance laut Tipico ohne Aufschlag", "Ob die Chance des Modells belastbar ist"] }
+};
+
+const comma = (value, digits) => value.toFixed(digits).replace(".", ",");
+function formatValue(key, value) {
+  if (typeof value === "boolean") return value ? "ja" : "nein";
+  if (typeof value !== "number") return String(value);
+  if (ODDS.has(key)) return value >= 99 ? "ohne Grenze" : comma(value, 2);
+  if (PROBABILITIES.has(key)) return value === 0 ? "keine" : Math.round(value * 100) + " %";
+  if (PERCENT_POINTS.has(key)) return value + " %";
+  if (key === "minNonLossGap") return value + " Punkte";
+  return Number.isInteger(value) ? String(value) : comma(value, 1);
+}
+const escapeHtml = (text) => String(text).replace(/[&<>"]/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[ch]);
+
+const filterList = document.getElementById("filter-list");
+const filterPanel = document.getElementById("filter-panel");
+const filterButtons = {};
+let activeFilter = QUICKPICK.presets[0].id;
+
+for (const group of QUICKPICK.groups) {
+  const wrap = document.createElement("div");
+  wrap.className = "filter-group";
+  wrap.innerHTML = '<div class="filter-group-title" title="' + escapeHtml(group.title) + '">' + escapeHtml(group.label) + '</div>';
+  for (const preset of QUICKPICK.presets.filter((entry) => entry.group === group.id)) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "filter-btn";
+    button.setAttribute("aria-pressed", "false");
+    button.innerHTML = '<b>' + escapeHtml(preset.label) + '</b><span>' + escapeHtml((FILTER_INFO[preset.id] || {}).tip || "") + '</span>';
+    button.addEventListener("click", () => showFilter(preset.id));
+    filterButtons[preset.id] = button;
+    wrap.appendChild(button);
+  }
+  filterList.appendChild(wrap);
+}
+
+function showFilter(id) {
+  activeFilter = id;
+  for (const [key, button] of Object.entries(filterButtons)) button.setAttribute("aria-pressed", String(key === id));
+  const preset = QUICKPICK.presets.find((entry) => entry.id === id);
+  const info = FILTER_INFO[id] || { tip: "", files: [], inputs: [] };
+  const group = QUICKPICK.groups.find((entry) => entry.id === preset.group);
+  const varying = [...new Set(preset.levels.flatMap((level) => Object.keys(level.values)))].filter((key) => !IGNORED.has(key));
+  const fixed = Object.keys(preset.defaults).filter((key) => !IGNORED.has(key) && !varying.includes(key));
+  const isDefault = (level) => varying.every((key) => level.values[key] === preset.defaults[key]);
+  const label = (key) => escapeHtml(PARAM_LABELS[key] || key);
+
+  filterPanel.innerHTML =
+    '<div class="fp-head"><span class="eyebrow">' + escapeHtml(group ? group.label : preset.group) + '</span>'
+    + '<h3>' + escapeHtml(preset.label) + '</h3>'
+    + '<div class="fp-meta"><span class="chip plain">Tipp: ' + escapeHtml(info.tip) + '</span>'
+    + '<span class="chip plain">Maßstab: ' + (preset.massstab === "roi" ? "was ein Tipp im Schnitt einbringt" : "wie oft ein Tipp stimmt") + '</span></div>'
+    + '<p>' + escapeHtml(preset.description) + '</p></div>'
+    + '<div class="warnbox">' + escapeHtml(preset.warnung) + '</div>'
+    + '<div class="fp-cols">'
+    + '<div class="fp-block"><h4>Bedingungen</h4><ul>' + preset.criteria.map((line) => '<li>' + escapeHtml(line) + '</li>').join("") + '</ul></div>'
+    + '<div class="fp-block"><h4>Liest aus dem Snapshot</h4><ul class="inputs">' + info.inputs.map((line) => '<li>' + escapeHtml(line) + '</li>').join("") + '</ul>'
+    + '<h4 style="margin-top:10px">Dateien</h4><div class="fp-files">' + info.files.map((file) => '<code>' + escapeHtml(file) + '</code>').join("") + '</div></div>'
+    + '</div>'
+    + (fixed.length ? '<div class="fp-block"><h4>Gilt auf jeder Stufe</h4><div class="fixed-list">'
+      + fixed.map((key) => '<span class="chip plain">' + label(key) + ': ' + escapeHtml(formatValue(key, preset.defaults[key])) + '</span>').join("") + '</div></div>' : "")
+    + '<div class="fp-block"><h4>Stufen</h4><div class="table-wrap"><table class="levels"><thead><tr><th>Stufe</th>'
+    + varying.map((key) => '<th>' + label(key) + '</th>').join("") + '<th>Gemessen</th><th>Einordnung</th></tr></thead><tbody>'
+    + preset.levels.map((level) => '<tr' + (isDefault(level) ? ' class="is-default"' : "") + '><td>' + escapeHtml(level.label) + '</td>'
+      + varying.map((key) => '<td>' + escapeHtml(formatValue(key, level.values[key] ?? preset.defaults[key])) + '</td>').join("")
+      + '<td>' + escapeHtml(level.note) + '</td><td class="hint-cell">' + escapeHtml(level.hint) + '</td></tr>').join("")
+    + '</tbody></table></div></div>'
+    + '<details class="honesty"><summary>Ganze Einordnung</summary><p>' + escapeHtml(preset.honesty) + '</p></details>';
+}
+showFilter(activeFilter);
+
+select(selected);
+if ("ResizeObserver" in window) new ResizeObserver(() => drawWires()).observe(map);
+window.addEventListener("resize", drawWires);
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(drawWires);
+</script>

@@ -46,17 +46,14 @@ export const BLOCKED_SCRIPTS: Readonly<Record<string, string>> = {
   "insights-probe": "ruft API-Football auf",
   "backfill-results": "schreibt in die Datenbank",
   "backfill-half-stats": "ruft API-Football auf und schreibt in die Datenbank",
-  "kelly-tracker": "schreibt docs/kelly-tracker.json",
   "prepare-analysis": "kann API-Football aufrufen (Ligaliste, Ansetzungen) und schreibt in den Cache",
   "add-tipico-names": "schreibt in die Dashboard-Snapshots unter output/",
   backup: "schreibt eine Sicherung der Datenbank, lädt sie zu MEGA hoch und löscht ältere",
   restore: "ersetzt die Datenbank durch eine Sicherung",
-  app: "startet den Server der App",
-  "app:build": "schreibt den Build der App",
-  "app:preview": "startet einen Server",
   neo: "startet den Server des Neo Dashboards",
   "neo:build": "schreibt den Build des Neo Dashboards",
-  "neo:preview": "startet einen Server"
+  "neo:preview": "startet einen Server",
+  "stack-karte": "schreibt docs/stack-karte.html"
 };
 
 /**
@@ -68,7 +65,7 @@ export const BLOCKED_SCRIPTS: Readonly<Record<string, string>> = {
  * Datenbank `readOnly`, kein API-Client).
  */
 export const ALLOWED_SCRIPTS = new Set([
-  "test", "typecheck", "app:test", "report", "edge-report", "edge-report:simulate",
+  "test", "typecheck", "app:test", "report", "edge-report",
   "quickpick-report", "draw-signals-report", "elo-backtest", "elo", "snapshot-history",
   "btts-check", "live-model-report", "coverage", "kombi-tipps", "data-check"
 ]);

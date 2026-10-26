@@ -37,7 +37,7 @@ misst; du änderst nichts. Korrekturen setzt die Hauptsitzung um, nachdem David 
    gehören dazu) und den Datenstand - jüngster `output/dashboard-*.json`, `elo_meta`, Zeilenzahl der
    benutzten Tabellen.
 3. Lies den Code vom API-Feld bis zur Anzeige in der App, dazu seine Tests
-   (`test/*.test.ts`, `apps/analyzer/src/*.test.ts(x)`).
+   (`test/*.test.ts`, `test/rules/*.spec.ts`, `apps/neo/src/*.test.tsx`).
 4. Bringt der Auftrag einen Plan, eine Formel oder eine Quelle mit (Planpfad, Artikel, Davids
    Wortlaut), lies sie zuerst und halte fest, welche Frage genau zu beantworten ist.
 
@@ -103,8 +103,8 @@ ist kein Prüfergebnis und wird so benannt.
 | Weiche Liga / Spiele zwischen Ligen | `src/analyzer.ts` |
 | xG, letzte Spiele, Torlinienfilter | `src/xg.ts`, `src/recent-stats.ts`, `src/goal-line-filter.ts` |
 | Tipico-Import und Marktzuordnung | `src/tipico.ts` |
-| Quickpicker | `src/quickpick*.ts`, `apps/analyzer/src/quickpick*.ts` |
-| Kelly, Marktprofil, fairer Preis | `src/market-profile.ts` (`autoDecide`, `AUTO_RULE`), `src/market-profile-service.ts` (Leser der Snapshots), `src/fair-price.ts`, `src/offset-logit.ts`, `apps/analyzer/src/kelly.ts` |
+| Quickpicker | `src/quickpick*.ts`, Tests `test/rules/quickpick.spec.ts` |
+| Kelly, Marktprofil, fairer Preis | `src/market-profile.ts` (`autoDecide`, `AUTO_RULE`), `src/market-profile-service.ts` (Leser der Snapshots), `src/fair-price.ts`, `src/offset-logit.ts` (die Kelly-Auswahl selbst ist seit 26.10.2026 mit der alten App entfernt) |
 | Live-Chancen | `src/live-model.ts` (`liveChances`, `isShortMatch`), `src/live-board.ts`, `tools/live-model-report.ts` |
 | Heim-/Gast-Aufteilung | `src/model.ts` (`shiftHomeAway`, ab Werk aus über `config.goalLineHomeShift`) |
 | Zuordnung Tipico ↔ API, Platzhaltertermine | `src/analyzer.ts` (`requestedFixtureScope`), `tools/prepare-analysis.ts` |
@@ -113,7 +113,6 @@ ist kein Prüfergebnis und wird so benannt.
 | Team-Elo | `src/elo*.ts` (Rechenkern `elo.ts`, Listen `elo-config.ts`, Einordnung `elo-competitions.ts`, Pflege `elo-update.ts`, Lesen `elo-store.ts`), `tools/elo.ts`, `tools/elo-backtest.ts` |
 | Ergebnisse, Abrechnung, Kalibrierung | `src/fixture-result.ts`, `src/settle.ts`, `src/calibration.ts` |
 | Spielstatus (geplant, läuft, beendet) | `src/util.ts` |
-| Rechnungen der App | `apps/analyzer/src/heatmap.ts`, `apps/analyzer/src/kelly.ts` |
 | Rückrechnungen | `tools/edge-report.ts`, `tools/quickpick-report.ts`, `tools/draw-signals-report.ts`, `tools/btts-check.ts`, `tools/snapshot-history.ts` (gemeinsamer Leser) |
 | Kombi-Auswahl nach fairem Preis | `src/kombi-tipps.ts` (Regel), `tools/kombi-tipps.ts` (Auswahl, Rückblick, `--messen`) |
 
@@ -223,7 +222,7 @@ Vom Billigen zum Teuren:
 - Archivierte Analysen: `output/dashboard-*.json`. Antwort-Cache: `data/cache/*.json` im Format
   `{ storedAt, value }`, Dateiname = sha256 des Schlüssels `endpunkt?query` (die Ligaliste etwa
   unter `leagues?`).
-- Erlaubt: `npm test`, `npm run typecheck`, `npm run report`, `npm run edge-report -- --simulate`,
+- Erlaubt: `npm test`, `npm run typecheck`, `npm run report`, `npm run edge-report`,
   `npm run quickpick-report` (ohne `--write`), `npm run draw-signals-report`, `npm run btts-check`,
   `npm run live-model-report -- …`, `npm run coverage`, `npm run kombi-tipps -- …`, `npm run elo-backtest -- …`,
   `npm run elo -- ranking`, `npm run elo -- team <ID>`,

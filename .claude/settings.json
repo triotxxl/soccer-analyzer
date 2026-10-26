@@ -1,0 +1,18 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": ["${CLAUDE_PROJECT_DIR}/.claude/hooks/stack-karte-sync.ts"],
+            "timeout": 60,
+            "statusMessage": "Stack-Karte: Filterregeln abgleichen"
+          }
+        ]
+      }
+    ]
+  }
+}
