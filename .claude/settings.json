@@ -1,4 +1,12 @@
 {
+  "permissions": {
+    "allow": [
+      "ClaudeInChromeDomain(claude.ai)",
+      "mcp__claude-in-chrome__tabs_create_mcp",
+      "ClaudeInChromeDomain(fonts.googleapis.com)",
+      "mcp__claude-in-chrome__tabs_context_mcp"
+    ]
+  },
   "hooks": {
     "PostToolUse": [
       {
@@ -7,7 +15,9 @@
           {
             "type": "command",
             "command": "node",
-            "args": ["${CLAUDE_PROJECT_DIR}/.claude/hooks/stack-karte-sync.ts"],
+            "args": [
+              "${CLAUDE_PROJECT_DIR}/.claude/hooks/stack-karte-sync.ts"
+            ],
             "timeout": 60,
             "statusMessage": "Stack-Karte: Filterregeln abgleichen"
           }
