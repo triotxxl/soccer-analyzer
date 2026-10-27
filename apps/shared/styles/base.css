@@ -1,43 +1,55 @@
 /* Gemeinsame Grundlage aller Apps: Farben, Schrift, Reset. App-eigene Stile stehen in der
-   styles.css der jeweiligen App und bauen auf diesen Tokens auf. */
-:root {
-  color-scheme: dark;
-  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
-  background: #181818;
-  color: #d4d4d4;
-  font-synthesis: none;
-  --bg: #181818;
-  --shell: #1e1e1e;
-  --surface: #252526;
-  --surface-2: #2d2d30;
-  --line: #3c3c3c;
-  --line-soft: #2b2b2b;
-  --text: #d4d4d4;
-  --muted: #a0a0a0;
-  --dim: #868686;
-  --accent: #3794ff;
-  --accent-soft: #1f3a4d;
-  --green: #89d185;
-  --gold: #cca700;
-  --red: #f14c4c;
-  --home: #75beff;
-  --away: #ce9178;
-  --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+   styles.css der jeweiligen App und bauen auf diesen Tokens auf. Farben und Schriften stammen aus
+   der freigegebenen Referenz docs/neo-referenz.html (26./27.10.2026); die Schriften laden lokal über
+   @fontsource (main.tsx der App). */
+/* Farben (Neo-Referenz, 26.10.2026): Inhalte und Darstellungsformen wie NEO-Kickoff, nur die Farbwerte neu.
+   Dunkel ist der Standard und auf Lesbarkeit gestimmt: Flächen neutral-warm (Graphit) statt blaugrau,
+   Text gebrochenes Weiß (rund 14:1), Nebentext rund 7:1 auf --surface. Blau bleibt nur als Akzent und als
+   Farbe der Heimmannschaft, wie in der Referenz. */
+:root{
+  --bg:#131312; --surface:#1b1b19; --surface-2:#232321; --ink:#ebe8e2; --muted:#aaa69e; --line:#34332f;
+  --accent:#7ea6f8; --accent-soft:#272a2f; --accent-ink:#0d1526;
+  --home:#4cbcc4; --draw:#77746d; --away:#d58cb4; --home-ink:#0f2224; --away-ink:#2b1221; /* Heim/Gast eigene Töne, nicht der Akzent */
+  --win:#3aa86a; --loss:#e05a4c; --tie:#5f5d58; --nav:#0e0e0d; --lime:#95cc62; --amber:#e6a94a;
+  /* Flächen unter weißer Schrift (Form, Ergebnis, Stufen): je ≥ 4,5:1 */
+  --win-fill:#27804e; --loss-fill:#bf4236; --tie-fill:#5f5d58;
+  --f-display:"Barlow Condensed","Arial Narrow",sans-serif;
+  --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,"Cascadia Mono",Consolas,monospace;
+  --r:10px;
+  color-scheme:dark;
+}
+@media (prefers-color-scheme: light){
+  :root:not([data-theme="dark"]){
+    --bg:#f0efec; --surface:#ffffff; --surface-2:#f7f6f3; --ink:#1a1917; --muted:#5c5953; --line:#dcdad5;
+    --accent:#2457c5; --accent-soft:#eceef2; --accent-ink:#ffffff;
+    --home:#0e7f88; --draw:#aaa69e; --away:#a63f78; --home-ink:#ffffff; --away-ink:#ffffff;
+    --win:#1f8a4c; --loss:#c8372d; --tie:#9e9a92; --nav:#e6e4df; --lime:#7cb342; --amber:#d98a1c;
+    --win-fill:#27804e; --loss-fill:#c8372d; --tie-fill:#76726b;
+    color-scheme:light;
+  }
+}
+:root[data-theme="light"]{
+  --bg:#f0efec; --surface:#ffffff; --surface-2:#f7f6f3; --ink:#1a1917; --muted:#5c5953; --line:#dcdad5;
+  --accent:#2457c5; --accent-soft:#eceef2; --accent-ink:#ffffff;
+  --home:#0e7f88; --draw:#aaa69e; --away:#a63f78; --home-ink:#ffffff; --away-ink:#ffffff;
+  --win:#1f8a4c; --loss:#c8372d; --tie:#9e9a92; --nav:#e6e4df; --lime:#7cb342; --amber:#d98a1c;
+    --win-fill:#27804e; --loss-fill:#c8372d; --tie-fill:#76726b;
+  color-scheme:light;
 }
 
 * { box-sizing: border-box; }
-html, body, #root { min-height: 100%; margin: 0; }
-body { min-width: 320px; background: radial-gradient(900px 520px at 6% -6%, rgba(255,255,255,.035), transparent 60%), var(--bg); }
+html, body, #root { height: 100%; margin: 0; }
+body { min-width: 320px; -webkit-font-smoothing: antialiased; }
 button, input, select { font: inherit; }
 button { color: inherit; cursor: pointer; }
-button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-::-webkit-scrollbar { width: 10px; height: 10px; }
-::-webkit-scrollbar-thumb { background: #424242; border-radius: 8px; }
-::-webkit-scrollbar-track { background: transparent; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+::selection { background: color-mix(in srgb, var(--accent) 35%, transparent); color: var(--ink); }
+* { scrollbar-color: var(--line) transparent; }
 
 .visually-hidden { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 
-/* Wappen (shared/src/TeamCrest.tsx); im Analyzer halten Übersicht und Torphasen-Zeilen dafür
-   eine 16px-Spalte. Größen je Ort stehen in der App. */
-.team-crest { width: 16px; height: 16px; flex: 0 0 auto; object-fit: contain; }
-.team-crest.fallback { display: grid; place-items: center; border-radius: 4px; background: rgba(255,255,255,.07); color: #8a8a8a; font-size: 7px; font-weight: 700; }
+/* Wappen (shared/src/TeamCrest.tsx): Bild aus dem Snapshot, sonst die Anfangsbuchstaben. */
+.team-crest { width: 18px; height: 18px; flex: 0 0 auto; object-fit: contain; }
+.team-crest.fallback { display: inline-grid; place-items: center; border-radius: 50%; background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--line); color: var(--muted); font-size: 8px; font-weight: 700; }
+.team-crest.crest-lg { width: 24px; height: 24px; }

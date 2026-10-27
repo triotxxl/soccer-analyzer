@@ -547,7 +547,17 @@ Seit 19.10.2026 liegen die Oberflächen unter `apps/` (vorher `frontend/`), seit
 alte App `apps/analyzer/` (Abschnitt „Pflege“):
 
 - `apps/neo/` - das **Neo Dashboard** (`npm run neo`, Port 5174, `neo:build`, `neo:preview`), die
-  einzige App. Sie liest den Snapshot, den `npm run dashboard` schreibt.
+  einzige App. Sie liest den Snapshot, den `npm run dashboard` schreibt. **Seit 27.10.2026 die Startseite der
+  freigegebenen Referenz `docs/neo-referenz.html`** (aus Davids Vorlage `docs/NEO-Kickoff-referenz.html`), mit echten
+  Daten: Spiele (nach Anstoß oder Liga, 1X2-Balken aus `pick` + Remis + Rest, Tipico-Quoten, `dataConfidence` als
+  „Datenlage“), Teams (Ligatabellen aus `fixture.table`; Form = letzte fünf Tabellenspiele heim und auswärts, seit
+  `schemaVersion: 9` je Tabellenzeile `form` aus `tableForm` in `src/draw-criteria.ts` - dieselben Saisonpartien und
+  dieselbe Eingrenzung wie `buildTable`, 0 Aufrufe; nicht `form.home`/`form.away` der Spiele, die nur am Spielort
+  zählen. Zonen gibt es nicht), Predictions (je Spiel der wahrscheinlichste Tipp aus 1X2, Über/Unter 2,5, BTTS; Quelle „Autoren“
+  gesperrt mit „folgt“, Davids Entscheidung - Autoren-Tipps kommen später), Zeitraum- und Wettbewerbsauswahl
+  (Pokal heuristisch, `isCup` in `apps/neo/src/neoData.ts`). Die Detailansicht ist ein Platzhalter. Rechnung rein in
+  `neoData.ts`, Bedienzustand in `useNeoState.ts` (localStorage `neo:state:v1`). Design-System:
+  `.interface-design/system.md`.
 - `apps/shared/` - Bausteine für Apps: `server/endpoints.ts` (`dataEndpoints()`: Dashboard, Live,
   Detailkennzahlen, Marktprofil), `src/` (`types.ts`, `data.ts`, `liveData.ts`, `names.ts`,
   `TeamCrest.tsx`, `countryFlags.ts`), `styles/base.css` (Farb-Tokens, Schrift, Reset, Wappen) und

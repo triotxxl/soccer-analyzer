@@ -173,6 +173,46 @@ export function tableScopeOf(fixture: ApiFixture): TableScope {
   return { season: fixture.league.season, stage: roundStage(round).stage, matchdaysOnly: true };
 }
 
+/** Zählt eine Partie für die Tabelle? Gemeinsame Eingrenzung von `buildTable` und `tableForm`. */
+function countsForTable(fixture: ApiFixture, cutoff: number, scope?: TableScope): boolean {
+  if (fixture.fixture.timestamp >= cutoff) return false;
+  if (!scope) return true;
+  if (fixture.league.season !== scope.season) return false;
+  if (!scope.matchdaysOnly) return true;
+  const round = roundStage(fixture.league.round ?? "");
+  return round.matchday && (scope.stage === null || round.stage === scope.stage);
+}
+
+/**
+ * Die letzten `limit` Ergebnisse jedes Teams aus genau den Partien, aus denen `buildTable` die
+ * Tabelle rechnet (gleicher Abschnitt, gleicher Cutoff), neueste zuerst. Anders als die Form im
+ * Modell (`form.home`/`form.away`, nur am Spielort) zählen hier Heim- und Auswärtsspiele - die
+ * Spalte „Form“ einer Tabelle. Kostet nichts: Die Saisonpartien liegen beim Tabellenbau vor.
+ */
+export function tableForm(
+  fixtures: ApiFixture[],
+  cutoff: number,
+  scope?: TableScope,
+  limit = 5
+): Map<number, Array<"win" | "draw" | "loss">> {
+  const counted = fixtures
+    .filter((fixture) => countsForTable(fixture, cutoff, scope) && completedScore(fixture))
+    .sort((left, right) => right.fixture.timestamp - left.fixture.timestamp);
+  const form = new Map<number, Array<"win" | "draw" | "loss">>();
+  const add = (teamId: number, own: number, other: number) => {
+    const list = form.get(teamId) ?? [];
+    if (list.length >= limit) return;
+    list.push(own > other ? "win" : own < other ? "loss" : "draw");
+    form.set(teamId, list);
+  };
+  for (const fixture of counted) {
+    const [home, away] = completedScore(fixture)!;
+    add(fixture.teams.home.id, home, away);
+    add(fixture.teams.away.id, away, home);
+  }
+  return form;
+}
+
 /**
  * `scope` weggelassen heißt: alles zählen, was vor dem Cutoff liegt. Das bleibt für die
  * Cross-League-Pfade so, die bewusst über den gesamten verfügbaren Bestand mitteln.
@@ -200,15 +240,7 @@ export function buildTable(fixtures: ApiFixture[], cutoff: number, scope?: Table
   };
 
   for (const fixture of fixtures) {
-    if (fixture.fixture.timestamp >= cutoff) continue;
-    if (scope) {
-      if (fixture.league.season !== scope.season) continue;
-      if (scope.matchdaysOnly) {
-        const round = roundStage(fixture.league.round ?? "");
-        if (!round.matchday) continue;
-        if (scope.stage !== null && round.stage !== scope.stage) continue;
-      }
-    }
+    if (!countsForTable(fixture, cutoff, scope)) continue;
     const score = completedScore(fixture);
     if (!score) continue;
     const home = get(fixture.teams.home.id);

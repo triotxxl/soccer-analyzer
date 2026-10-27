@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildTable, leagueAverages, roundStage, scoreDrawFixture, tableScopeOf } from "../src/draw-criteria.ts";
+import { buildTable, leagueAverages, roundStage, scoreDrawFixture, tableForm, tableScopeOf } from "../src/draw-criteria.ts";
 import { formatDrawAnalysis } from "../src/output.ts";
 import type { ApiFixtureOdds, DrawScoreRow } from "../src/types.ts";
 import { fixture, history } from "./helpers.ts";
@@ -199,6 +199,28 @@ test("Ausgabe enthält nur Gesamttabelle und Top-12-Tabelle", () => {
   assert.equal((output.match(/Heim 1 – Auswärts 1/g) ?? []).length, 2);
   assert.equal((output.match(/Heim 13 – Auswärts 13/g) ?? []).length, 1);
   assert.doesNotMatch(output, /API-Aufrufe|Gewinnzusage/);
+});
+
+test("tableForm nimmt die Tabellenspiele heim und auswärts, neueste zuerst, höchstens fünf", () => {
+  const cutoff = 2_000_000_000;
+  const target = fixture({ id: 9, timestamp: cutoff + 100, homeId: 1, awayId: 2, season: 2026, round: "Clausura - 7" });
+  const fixtures = [
+    // Apertura und Pokal zählen nicht, ebenso das Spiel nach dem Cutoff.
+    fixture({ id: 1, timestamp: cutoff - 900, homeId: 1, awayId: 2, homeGoals: 5, awayGoals: 0, season: 2026, round: "Apertura - 1" }),
+    fixture({ id: 2, timestamp: cutoff - 800, homeId: 1, awayId: 3, homeGoals: 2, awayGoals: 0, season: 2026, round: "Clausura - 1" }),
+    fixture({ id: 3, timestamp: cutoff - 700, homeId: 4, awayId: 1, homeGoals: 1, awayGoals: 1, season: 2026, round: "Clausura - 2" }),
+    fixture({ id: 4, timestamp: cutoff - 600, homeId: 1, awayId: 5, homeGoals: 0, awayGoals: 1, season: 2026, round: "Clausura - 3" }),
+    fixture({ id: 5, timestamp: cutoff - 500, homeId: 6, awayId: 1, homeGoals: 0, awayGoals: 3, season: 2026, round: "Clausura - 4" }),
+    fixture({ id: 6, timestamp: cutoff - 450, homeId: 1, awayId: 7, homeGoals: 2, awayGoals: 2, season: 2026, round: "Clausura - Semi-finals" }),
+    fixture({ id: 7, timestamp: cutoff - 400, homeId: 1, awayId: 2, homeGoals: 1, awayGoals: 2, season: 2026, round: "Clausura - 5" }),
+    fixture({ id: 8, timestamp: cutoff - 300, homeId: 3, awayId: 1, homeGoals: 0, awayGoals: 2, season: 2026, round: "Clausura - 6" }),
+    fixture({ id: 10, timestamp: cutoff + 50, homeId: 1, awayId: 4, homeGoals: 9, awayGoals: 0, season: 2026, round: "Clausura - 7" })
+  ];
+  const form = tableForm(fixtures, cutoff, tableScopeOf(target));
+  assert.deepEqual(form.get(1), ["win", "loss", "win", "loss", "draw"]);
+  assert.deepEqual(form.get(2), ["win"]);
+  const table = buildTable(fixtures, cutoff, tableScopeOf(target)).find((entry) => entry.id === 1)!;
+  assert.equal(table.played, 6); // dieselbe Eingrenzung wie die Tabelle, die Form zeigt davon die letzten fünf
 });
 
 test("buildTable ohne Geltungsbereich zählt weiter alles vor dem Cutoff", () => {

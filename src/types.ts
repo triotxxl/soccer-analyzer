@@ -407,7 +407,8 @@ export interface GoalLineRow {
   probabilities: GoalLineProbabilities;
   defense?: { home: DefensiveProfile; away: DefensiveProfile };
   strength?: LeagueStrengthComparison;
-  standings?: Array<TableRow & { teamName: string }>;
+  /** `form`: letzte fünf Tabellenspiele des Teams, neueste zuerst (`tableForm`). */
+  standings?: Array<TableRow & { teamName: string; form: Array<"win" | "draw" | "loss"> }>;
   firstHalf: {
     expectedHomeGoals: number;
     expectedAwayGoals: number;

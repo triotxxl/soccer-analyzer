@@ -40,7 +40,8 @@ let named = 0;
 let withoutCompetition = 0;
 const enrich = (document: DashboardDocument): DashboardDocument => ({
   ...document,
-  schemaVersion: 8,
+  // Tipico-Namen kamen mit 8; ein neuerer Snapshot behält seine Version.
+  schemaVersion: document.schemaVersion > 8 ? document.schemaVersion : 8,
   fixtures: document.fixtures.map((fixture) => {
     const event = events.get(fixture.fixtureId);
     const competition = event ? competitions.get(event.competitionId) : undefined;

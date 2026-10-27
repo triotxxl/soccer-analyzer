@@ -3,7 +3,7 @@ import { config, TEAM_ALIASES_FILE } from "./config.ts";
 import { AnalyzerDatabase } from "./database.ts";
 import { scoreCrossLeagueFixture } from "./cross-league-criteria.ts";
 import { scoreCrossLeagueDrawFixture } from "./cross-league-draw-criteria.ts";
-import { buildTable, consensusOdds, leagueAverages, scoreDrawFixture, tableScopeOf } from "./draw-criteria.ts";
+import { buildTable, consensusOdds, leagueAverages, scoreDrawFixture, tableForm, tableScopeOf } from "./draw-criteria.ts";
 import { scoreFavoriteFixture } from "./favorite-criteria.ts";
 import { strengthPool } from "./league-strength.ts";
 import {
@@ -611,7 +611,9 @@ export async function runGoalLineAnalysis(
     // die laufende und die vorige Saison, und innerhalb einer Saison führt API-Football
     // Apertura und Clausura unter derselben ID. Ohne den Zuschnitt auf Saison und Abschnitt
     // summiert sich das zu einem Bestand, den es als Tabelle nie gab.
-    const standingsByCompetition = new Map<string, { table: TableRow[]; teamNames: Map<number, string> }>();
+    const standingsByCompetition = new Map<string, {
+      table: TableRow[]; teamNames: Map<number, string>; forms: Map<number, Array<"win" | "draw" | "loss">>;
+    }>();
     for (const fixture of fixtures) {
       const key = standingsKey(fixture);
       if (standingsByCompetition.has(key)) continue;
@@ -629,7 +631,9 @@ export async function runGoalLineAnalysis(
         teamNames.set(match.teams.home.id, match.teams.home.name);
         teamNames.set(match.teams.away.id, match.teams.away.name);
       }
-      standingsByCompetition.set(key, { table: buildTable(history, targetTimestamp, scope), teamNames });
+      standingsByCompetition.set(key, {
+        table: buildTable(history, targetTimestamp, scope), teamNames, forms: tableForm(history, targetTimestamp, scope)
+      });
     }
 
     const baselineCache = new Map<string, LeagueBaseline>();
@@ -831,7 +835,7 @@ export async function runGoalLineAnalysis(
           // Eine leere Tabelle ist bei reinen Pokalwettbewerben der richtige Zustand: Dort
           // gibt es keine Spieltage, aus denen sich ein Klassement ergibt.
           if (!entry || entry.table.length === 0) return undefined;
-          return entry.table.map((row) => ({ ...row, teamName: entry.teamNames.get(row.id) ?? "?" }));
+          return entry.table.map((row) => ({ ...row, teamName: entry.teamNames.get(row.id) ?? "?", form: entry.forms.get(row.id) ?? [] }));
         })(),
         probabilities: goalLineProbabilities(
           model.expectedHomeGoals,
