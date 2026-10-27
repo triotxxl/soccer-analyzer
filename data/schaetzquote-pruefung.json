@@ -1,0 +1,398 @@
+{
+  "createdAt": "2026-10-21T20:02:18.016Z",
+  "method": "Median der proportional entmargten Buchmacher (ohne Tipico), mal MEDIAN_BOOK, vorab festgelegt vom Prüfer 21.10.2026",
+  "games": [
+    {
+      "fixtureId": 1549770,
+      "game": "Llaneros FC – Deportivo Cali",
+      "league": "Kolumbien · Primera A, Clausura",
+      "kickoff": "2026-10-22T01:15:00+02:00",
+      "apiUpdate": "2026-10-21T16:07:32+00:00",
+      "link": "https://sports.tipico.de/de/event/728520910",
+      "lines": [
+        {
+          "line": "Über/Unter 1,5",
+          "books": 7,
+          "estOver": 1.39,
+          "estUnder": 2.76
+        },
+        {
+          "line": "Über/Unter 3,5",
+          "books": 7,
+          "estOver": 4.08,
+          "estUnder": 1.19
+        },
+        {
+          "line": "1. HZ Über/Unter 1,5",
+          "books": 7,
+          "estOver": 3.21,
+          "estUnder": 1.28
+        }
+      ]
+    },
+    {
+      "fixtureId": 1640380,
+      "game": "Columbus Crew – Saint Louis City SC",
+      "league": "USA · U.S. Open Cup",
+      "kickoff": "2026-10-22T02:00:00+02:00",
+      "apiUpdate": "2026-10-21T16:15:33+00:00",
+      "link": "https://sports.tipico.de/de/event/728571310",
+      "lines": [
+        {
+          "line": "Über/Unter 1,5",
+          "books": 7,
+          "estOver": 1.13,
+          "estUnder": 5.04
+        },
+        {
+          "line": "Über/Unter 2,5",
+          "books": 7,
+          "estOver": 1.49,
+          "estUnder": 2.43
+        },
+        {
+          "line": "1. HZ Über/Unter 0,5",
+          "books": 7,
+          "estOver": 1.22,
+          "estUnder": 3.69
+        }
+      ]
+    },
+    {
+      "fixtureId": 1640021,
+      "game": "SE Palmeiras – Fluminense FC",
+      "league": "Copa Libertadores · Finalrunde",
+      "kickoff": "2026-10-22T02:30:00+02:00",
+      "apiUpdate": "2026-10-21T16:15:32+00:00",
+      "link": "https://sports.tipico.de/de/event/728139410",
+      "lines": [
+        {
+          "line": "Über/Unter 1,5",
+          "books": 7,
+          "estOver": 1.42,
+          "estUnder": 2.64
+        },
+        {
+          "line": "Über/Unter 3,5",
+          "books": 7,
+          "estOver": 4.38,
+          "estUnder": 1.17
+        },
+        {
+          "line": "1. HZ Über/Unter 1,5",
+          "books": 8,
+          "estOver": 3.18,
+          "estUnder": 1.29
+        }
+      ]
+    },
+    {
+      "fixtureId": 1551006,
+      "game": "Atlas FC – Club America",
+      "league": "Mexiko · Liga MX, Apertura",
+      "kickoff": "2026-10-22T03:00:00+02:00",
+      "apiUpdate": "2026-10-21T16:37:23+00:00",
+      "link": "https://sports.tipico.de/de/event/728482910",
+      "lines": [
+        {
+          "line": "Über/Unter 1,5",
+          "books": 7,
+          "estOver": 1.16,
+          "estUnder": 4.55
+        },
+        {
+          "line": "Über/Unter 3,5",
+          "books": 7,
+          "estOver": 2.38,
+          "estUnder": 1.51
+        },
+        {
+          "line": "1. HZ Über/Unter 0,5",
+          "books": 7,
+          "estOver": 1.26,
+          "estUnder": 3.35
+        }
+      ]
+    },
+    {
+      "fixtureId": 1551007,
+      "game": "Puebla FC – CF Monterrey",
+      "league": "Mexiko · Liga MX, Apertura",
+      "kickoff": "2026-10-22T03:00:00+02:00",
+      "apiUpdate": "2026-10-21T16:15:32+00:00",
+      "link": "https://sports.tipico.de/de/event/728482810",
+      "lines": [
+        {
+          "line": "Über/Unter 1,5",
+          "books": 7,
+          "estOver": 1.19,
+          "estUnder": 4.15
+        },
+        {
+          "line": "Über/Unter 3,5",
+          "books": 7,
+          "estOver": 2.68,
+          "estUnder": 1.41
+        },
+        {
+          "line": "1. HZ Über/Unter 0,5",
+          "books": 8,
+          "estOver": 1.29,
+          "estUnder": 3.13
+        }
+      ]
+    },
+    {
+      "fixtureId": 1549752,
+      "game": "Independiente Santa Fe – Jaguares de Cordoba",
+      "league": "Kolumbien · Primera A, Clausura",
+      "kickoff": "2026-10-22T03:20:00+02:00",
+      "apiUpdate": "2026-10-21T16:15:32+00:00",
+      "link": "https://sports.tipico.de/de/event/728521010",
+      "lines": [
+        {
+          "line": "Über/Unter 1,5",
+          "books": 7,
+          "estOver": 1.14,
+          "estUnder": 4.84
+        },
+        {
+          "line": "Über/Unter 3,5",
+          "books": 7,
+          "estOver": 2.19,
+          "estUnder": 1.6
+        },
+        {
+          "line": "1. HZ Über/Unter 0,5",
+          "books": 7,
+          "estOver": 1.22,
+          "estUnder": 3.66
+        }
+      ]
+    },
+    {
+      "fixtureId": 1551009,
+      "game": "CF Pachuca – Cruz Azul FC",
+      "league": "Mexiko · Liga MX, Apertura",
+      "kickoff": "2026-10-22T05:10:00+02:00",
+      "apiUpdate": "2026-10-21T16:37:23+00:00",
+      "link": "https://sports.tipico.de/de/event/728483110",
+      "lines": [
+        {
+          "line": "Über/Unter 1,5",
+          "books": 7,
+          "estOver": 1.14,
+          "estUnder": 4.78
+        },
+        {
+          "line": "Über/Unter 3,5",
+          "books": 7,
+          "estOver": 2.38,
+          "estUnder": 1.51
+        },
+        {
+          "line": "1. HZ Über/Unter 0,5",
+          "books": 7,
+          "estOver": 1.27,
+          "estUnder": 3.31
+        }
+      ]
+    },
+    {
+      "fixtureId": 1603065,
+      "game": "Al Hazm – Al Fayha",
+      "league": "Saudi Arabien · Saudi Professional Liga",
+      "kickoff": "2026-10-22T15:40:00+02:00",
+      "apiUpdate": "2026-10-21T17:22:40+00:00",
+      "link": "https://sports.tipico.de/de/event/728634710",
+      "lines": [
+        {
+          "line": "Über/Unter 1,5",
+          "books": 7,
+          "estOver": 1.29,
+          "estUnder": 3.27
+        },
+        {
+          "line": "Über/Unter 3,5",
+          "books": 7,
+          "estOver": 3.34,
+          "estUnder": 1.28
+        },
+        {
+          "line": "1. HZ Über/Unter 0,5",
+          "books": 8,
+          "estOver": 1.38,
+          "estUnder": 2.71
+        }
+      ]
+    },
+    {
+      "fixtureId": 1636434,
+      "game": "FC Kairat Almaty – Panathinaikos",
+      "league": "Conference League · Ligaphase",
+      "kickoff": "2026-10-22T16:30:00+02:00",
+      "apiUpdate": "2026-10-21T16:44:58+00:00",
+      "link": "https://sports.tipico.de/de/event/728138110",
+      "lines": [
+        {
+          "line": "Über/Unter 1,5",
+          "books": 7,
+          "estOver": 1.23,
+          "estUnder": 3.69
+        },
+        {
+          "line": "Über/Unter 3,5",
+          "books": 7,
+          "estOver": 2.97,
+          "estUnder": 1.34
+        },
+        {
+          "line": "1. HZ Über/Unter 0,5",
+          "books": 8,
+          "estOver": 1.33,
+          "estUnder": 2.95
+        }
+      ]
+    },
+    {
+      "fixtureId": 1597945,
+      "game": "Al Gharafa SC – Al Ahli",
+      "league": "Katar · Stars League",
+      "kickoff": "2026-10-22T18:45:00+02:00",
+      "apiUpdate": "2026-10-21T17:17:26+00:00",
+      "link": "https://sports.tipico.de/de/event/728716110",
+      "lines": [
+        {
+          "line": "Über/Unter 1,5",
+          "books": 7,
+          "estOver": 1.1,
+          "estUnder": 5.63
+        },
+        {
+          "line": "Über/Unter 2,5",
+          "books": 7,
+          "estOver": 1.42,
+          "estUnder": 2.65
+        },
+        {
+          "line": "1. HZ Über/Unter 0,5",
+          "books": 7,
+          "estOver": 1.2,
+          "estUnder": 3.9
+        }
+      ]
+    },
+    {
+      "fixtureId": 1636215,
+      "game": "FC Ararat-Armenia – AZ Alkmaar",
+      "league": "Europa League · Ligaphase",
+      "kickoff": "2026-10-22T18:45:00+02:00",
+      "apiUpdate": "2026-10-21T16:15:32+00:00",
+      "link": "https://sports.tipico.de/de/event/728059810",
+      "lines": [
+        {
+          "line": "Über/Unter 1,5",
+          "books": 7,
+          "estOver": 1.14,
+          "estUnder": 4.87
+        },
+        {
+          "line": "Über/Unter 2,5",
+          "books": 7,
+          "estOver": 1.52,
+          "estUnder": 2.35
+        },
+        {
+          "line": "1. HZ Über/Unter 0,5",
+          "books": 7,
+          "estOver": 1.24,
+          "estUnder": 3.48
+        }
+      ]
+    },
+    {
+      "fixtureId": 1636258,
+      "game": "Dinamo Zagreb – NEC Nijmegen",
+      "league": "Europa League · Ligaphase",
+      "kickoff": "2026-10-22T18:45:00+02:00",
+      "apiUpdate": "2026-10-21T16:15:32+00:00",
+      "link": "https://sports.tipico.de/de/event/728060010",
+      "lines": [
+        {
+          "line": "Über/Unter 1,5",
+          "books": 7,
+          "estOver": 1.14,
+          "estUnder": 4.87
+        },
+        {
+          "line": "Über/Unter 2,5",
+          "books": 7,
+          "estOver": 1.53,
+          "estUnder": 2.33
+        },
+        {
+          "line": "1. HZ Über/Unter 0,5",
+          "books": 7,
+          "estOver": 1.23,
+          "estUnder": 3.55
+        }
+      ]
+    },
+    {
+      "fixtureId": 1636424,
+      "game": "FC Iberia 1999 – Mjällby AIF",
+      "league": "Conference League · Ligaphase",
+      "kickoff": "2026-10-22T18:45:00+02:00",
+      "apiUpdate": "2026-10-21T16:44:58+00:00",
+      "link": "https://sports.tipico.de/de/event/728451710",
+      "lines": [
+        {
+          "line": "Über/Unter 1,5",
+          "books": 7,
+          "estOver": 1.26,
+          "estUnder": 3.45
+        },
+        {
+          "line": "Über/Unter 3,5",
+          "books": 7,
+          "estOver": 3.11,
+          "estUnder": 1.31
+        },
+        {
+          "line": "1. HZ Über/Unter 0,5",
+          "books": 8,
+          "estOver": 1.36,
+          "estUnder": 2.82
+        }
+      ]
+    },
+    {
+      "fixtureId": 1636459,
+      "game": "FC Nordsjælland – CSKA Sofia",
+      "league": "Conference League · Ligaphase",
+      "kickoff": "2026-10-22T18:45:00+02:00",
+      "apiUpdate": "2026-10-21T16:44:58+00:00",
+      "link": "https://sports.tipico.de/de/event/728138210",
+      "lines": [
+        {
+          "line": "Über/Unter 1,5",
+          "books": 7,
+          "estOver": 1.12,
+          "estUnder": 5.16
+        },
+        {
+          "line": "Über/Unter 2,5",
+          "books": 7,
+          "estOver": 1.49,
+          "estUnder": 2.43
+        },
+        {
+          "line": "1. HZ Über/Unter 0,5",
+          "books": 7,
+          "estOver": 1.23,
+          "estUnder": 3.63
+        }
+      ]
+    }
+  ]
+}

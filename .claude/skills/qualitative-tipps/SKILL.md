@@ -60,22 +60,44 @@ siehe `references/methode.md`) ihr die höhere Siegchance geben **und** ihr Vors
 
 **Torlinie und BTTS.** Ein Kandidat braucht **mindestens drei Viertel der Sichten über dem fairen
 Preis** und einen Schnitt **mindestens 5 Punkte über fair**. Liegen nur ein oder zwei Sichten weit
-vorn, ist das eine Ausreißer-Sicht und kein Kandidat.
+vorn, ist das eine Ausreißer-Sicht und kein Kandidat. **Liegt „realistisch“ unter 50 %, entfällt
+der Tipp** (Davids Entscheidung vom 25.10.2026, analog zur Sieg-Regel) - es bleiben nur Tipps, die
+nach der vorsichtigen Rechnung eher aufgehen als nicht; am 25.10. 28 von 65 Kandidaten.
 
 **Meldungen stufen nur herab, nie hinauf.** Das verhindert, dass eine gute Geschichte eine schwache
 Rechnung trägt.
 
 - **Eine Stufe herab:**
   - ein wichtiger Ausfall beim gestützten Team (Stammtorwart, Torjäger, zwei oder mehr Stammspieler),
-  - erwartete starke Rotation, etwa vor einem Ligaspitzenspiel oder bei „Elf zuletzt ≤ 5 von 11“,
+  - erwartete starke Rotation **für dieses Spiel**, etwa vor einem Ligaspitzenspiel, einem
+    Pokal-Rückspiel in den nächsten Tagen oder direkt nach einem Spiel unter der Woche. „Elf zuletzt
+    ≤ 5 von 11“ zählt nur, wenn die Wechsel auch hier zu erwarten sind - stammen sie aus einem
+    Europapokal- oder Pokalspiel und kehrt die Stammelf am Wochenende zurück, keine Herabstufung
+    (Davids Entscheidung vom 25.10.2026; Milan, AZ, Cali, Colo Colo, Nacional, San Pedro),
   - ein Trainerwechsel in den letzten 4 Wochen beim gestützten Team, ohne Ergebnisse danach,
-  - ein großer Abstand zum Markt (realistisch mehr als 5 Punkte über fair).
+  - ein großer Abstand zum Markt (realistisch mehr als 5 Punkte über fair),
+  - ein Reserveteam mit ungeklärtem Aufstiegsrecht (Sport Huancayo II am 25.10.2026),
+  - der gestützten Mannschaft fehlt nur noch der Setzplatz, das Ziel selbst ist sicher (Antofagasta
+    am 25.10.2026) - beides Davids Entscheidungen vom 25.10.2026.
 - **Streichen:**
   - keine Motivation, etwa rechnerisch schon aufgestiegen oder abgestiegen (Atlético FC am 22.10.2026),
   - Spiel um nichts für ein Filialteam,
   - unklare Wertung, etwa Rückspiel mit Vorsprung, wo „weiterkommen“ und „Sieg nach 90 Minuten“
-    auseinanderfallen.
+    auseinanderfallen,
+  - ein Remis reicht der gestützten Mannschaft zum Ziel, etwa zum Aufstieg am letzten Spieltag
+    (Davids Entscheidung vom 25.10.2026, General Caballero).
 - **Ausfälle beim Gegner** bestätigen höchstens. Sie stehen in der Begründung.
+- **Welche Ausfälle zählen** (Davids Entscheidung vom 23.10.2026): nur **neue** - Sperre, frische
+  Verletzung - oder Ausfälle zusammen mit einer gewechselten Elf. Stellte das Team zuletzt mehrmals
+  dieselbe Elf, stecken Langzeitausfälle schon in der Form und zählen nicht doppelt. Das gilt auch
+  für Listen aus automatisch erstellten Vorschauen (starting11); deren pauschales „rotation likely“
+  allein stuft nicht herab, nur die eigene „Elf zuletzt ≤ 5 von 11“.
+- **Zwei Gründe, zwei Stufen:** Rotation und neue Ausfälle zugleich stufen zwei Stufen herab
+  (Olympiakos, Sparta, PSG am 25.10.2026).
+- **Realistisch liegt der Gegner vorn → „kein belastbarer Siegtipp“** (Davids Entscheidung vom
+  23.10.2026): Sieht „realistisch“ (fair + ¼ Abstand) die andere Mannschaft oder das Remis als
+  wahrscheinlichsten Ausgang vor der gestützten Seite, entfällt der Tipp. Das trifft vor allem
+  Tipps gegen Tipico (FCSB – Rapid Bukarest, Talleres – Defensa, Libertad, Cartaginés am 24./25.10.).
 
 ## Was in jeden Tipp gehört
 
@@ -101,6 +123,9 @@ Rechnung trägt.
 2. **Rotation:** nächstes Ligaspiel in 2–3 Tagen, Tabellenlage, „Elf zuletzt x von 11“ aus dem Skript
    (stammt nur aus Spielen, die der Analyzer selbst abgerechnet hat).
 3. **Trainerwechsel:** Das Skript meldet „TRAINERWECHSEL“ mit Datum. Im Netz bestätigen.
+   API-Football schreibt Trainer uneinheitlich; Kurzformen und Transliterationen („J. Vik“/„Jorgen
+   Vik“, „Skripnik“/„Skrypnyk“) erkennt das Skript seit 23.10.2026 als dieselbe Person. Bleibt ein
+   Fehlalarm, ist es dieselbe Person mit anderem Nachnamen - im Netz klären, nicht herabstufen.
 4. **Motivation und Wertung:**
    - Tabelle (Aufstieg oder Klassenerhalt rechnerisch entschieden?), Filialteams ohne Aufstiegsrecht,
    - Hin- und Rückspiel: Hinspielstand, Sieg nach 90 Minuten gegen „kommt weiter“,
@@ -111,6 +136,9 @@ Recherche nur für Kandidaten der Regel und für Spiele, bei denen eine einzelne
 könnte. Quellen als Links in den Bericht.
 
 ## Grenzen
+
+- **Frauenspiele bleiben ohne Tipp**, bis das Frauen-Elo (`club-women`, im Skript fest `system = 'club'`)
+  an alten Spielen geprüft ist (Davids Entscheidung vom 25.10.2026).
 
 - AGENTS.md „Grenzen“ gilt: kein `/predictions`, keine veränderten Modellwahrscheinlichkeiten
   (die eigenen Sichten sind eigene Rechnungen und so benannt), keine Gewinnzusage, kein Tipico-Zugriff.

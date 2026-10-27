@@ -894,6 +894,11 @@
     "country": "Finland",
     "league": "Ykkösliiga"
   },
+  "finnland|ykkosliiga promotion relegation playoff": {
+    "leagueId": 1087,
+    "country": "Finland",
+    "league": "Ykkösliiga"
+  },
   "frankreich|division 1 frauen": {
     "leagueId": 64,
     "country": "France",
@@ -918,6 +923,11 @@
     "leagueId": 1196,
     "country": "Ghana",
     "league": "Division One League"
+  },
+  "griechenland|gamma ethniki gr 1": {
+    "leagueId": 576,
+    "country": "Greece",
+    "league": "Gamma Ethniki - Group 1"
   },
   "griechenland|gamma ethniki gr 10": {
     "leagueId": 694,
@@ -1754,6 +1764,11 @@
     "country": "Slovenia",
     "league": "2. SNL"
   },
+  "slowenien|pokal": {
+    "leagueId": 375,
+    "country": "Slovenia",
+    "league": "Cup"
+  },
   "slowenien|prvaliga": {
     "leagueId": 373,
     "country": "Slovenia",
@@ -2130,6 +2145,11 @@
     "league": "Pro League"
   },
   "venezuela|primera division clausura": {
+    "leagueId": 299,
+    "country": "Venezuela",
+    "league": "Primera División"
+  },
+  "venezuela|primera division clausura hauptrunde gruppe a": {
     "leagueId": 299,
     "country": "Venezuela",
     "league": "Primera División"

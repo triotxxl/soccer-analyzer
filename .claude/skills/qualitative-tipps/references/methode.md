@@ -64,6 +64,26 @@ Gepaarter Log-Loss bzw. Brier je Spiel, negativ = Bereinigung besser. Zwei Zeitr
    gefittet, die beide Prüfzeiträume enthalten. Eine saubere Messung ist David vorgeschlagen; vorher
    nichts ändern.
 
+## Gemessen am 25.10.2026: Tor-Regel ohne E, A = B einmal (verworfen)
+
+Vorab festgelegt (Prüfer, 0 Aufrufe): Ligaspiele 10.09.–24.10.2026, je Spiel der letzte Snapshot vor
+Anpfiff, fair aus beiden Tipico-Quoten der Linie, mit der Regel „realistisch < 50 % entfällt“. Die
+Alternative ließ E bei Torlinien/BTTS nicht mitstimmen und zählte B nicht, wenn λ_B = λ_A (bei 31 %
+der Spiele, wenn die letzten 10 alles Ligaspiele sind).
+
+| | Tipps | Treffer | fair | Treffer − fair | Ertrag je Tipp |
+|---|---|---|---|---|---|
+| Regel wie bisher | 1.530 | 54,8 % | 53,5 % | +1,4 ± 1,2 | −6,0 ± 2,0 % |
+| Alternative | 2.103 | 54,5 % | 54,1 % | +0,5 ± 1,1 | −7,5 ± 2,0 % |
+
+Unterschied gepoolt −0,9 ± 0,8 (Z1 +0,7 ± 1,5, Z2 −2,2 ± 1,0), Grenze „in beiden Zeiträumen > 0 und
+≥ +2 SE“ verfehlt. **E wirkt bei Torlinien als Bremse**: Sie rechnet fast überall Ü2,5 ≈ 52 % und
+BTTS ≈ 55 % und stimmt deshalb oft gegen Grenzfälle; ohne sie kommen vor allem schwache Zusatztipps
+durch (nur in der Alternative: 744 Tipps, Treffer − fair −1,5, Ertrag −10,8 %). Davids Entscheidung
+vom 25.10.2026: **Regel beibehalten.** Die 50-%-Regel halbiert die Liste ohne erkennbare
+Ertragsänderung (ohne sie 3.785 Tipps, −4,6 ± 1,6 %). In keiner Fassung schlagen die Tor-Tipps den
+Preis. Vorbehalt: `elo_before` aus dem heutigen Elo-Aufbau, 44 Anstoßtage als Bündel.
+
 ## Bekannte Schwächen
 
 - **Die Bereinigung bevorzugt Teams aus der schwächeren Liga.** Am deutlichsten in B: Lincoln –

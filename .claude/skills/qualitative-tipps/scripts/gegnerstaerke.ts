@@ -206,10 +206,33 @@ function profileOf(teamId: number) {
   // „Luca Privitelli Gian“/„Gian Luca Privitelli“): gleich bei gleichem Ende oder gemeinsamem Namensteil.
   const plain = (name: string) => name.toLowerCase().replace(/ø/g, "o").replace(/æ/g, "ae").replace(/ß/g, "ss")
     .replace(/ł/g, "l").replace(/đ/g, "d").normalize("NFD").replace(/[̀-ͯ.]/g, "");
+  // Dazu Kurzform gegen vollen Namen mit kurzem oder transliteriertem Nachnamen („J. Vik“/„Jorgen
+  // Vik“, „K. Kurbatovs“/„Kirils Kurbatov“, „V. Skripnik“/„Viktor Skrypnyk“, „H. Silbas“/„Haim
+  // Silvas“ - Fehlalarme vom 23.10.2026): gleicher Anfangsbuchstabe und Nachname bis auf y/i, ein
+  // End-s oder ab fünf Buchstaben einen Buchstaben Unterschied.
+  const editDistance = (a: string, b: string) => {
+    let prior = Array.from({ length: b.length + 1 }, (_, j) => j);
+    for (let i = 1; i <= a.length; i += 1) {
+      const next = [i];
+      for (let j = 1; j <= b.length; j += 1) {
+        next[j] = Math.min(next[j - 1]! + 1, prior[j]! + 1, prior[j - 1]! + (a[i - 1] === b[j - 1] ? 0 : 1));
+      }
+      prior = next;
+    }
+    return prior[b.length]!;
+  };
+  const sameSurname = (a: string, b: string) => {
+    const [sa, sb] = [a.replace(/y/g, "i"), b.replace(/y/g, "i")];
+    return sa === sb || sa.replace(/s$/, "") === sb.replace(/s$/, "") ||
+      (Math.min(sa.length, sb.length) >= 5 && editDistance(sa, sb) <= 1);
+  };
   const sameCoach = (x: string, y: string) => {
     const [cx, cy] = [plain(x).replace(/\s+/g, ""), plain(y).replace(/\s+/g, "")];
     const words = (s: string) => plain(s).split(/\s+/).filter((t) => t.length >= 4);
-    return cx.endsWith(cy.slice(-5)) || cy.endsWith(cx.slice(-5)) || words(x).some((t) => words(y).includes(t));
+    if (cx.endsWith(cy.slice(-5)) || cy.endsWith(cx.slice(-5)) || words(x).some((t) => words(y).includes(t))) return true;
+    const [tx, ty] = [plain(x).replace(/-/g, " ").split(/\s+/).filter(Boolean), plain(y).replace(/-/g, " ").split(/\s+/).filter(Boolean)];
+    if (tx.length < 2 || ty.length < 2) return false;
+    return tx[0]![0] === ty[0]![0] && sameSurname(tx[tx.length - 1]!, ty[ty.length - 1]!);
   };
   const coaches: string[] = [];
   for (const coach of all.map((g) => g.coach).filter(Boolean) as string[]) {
