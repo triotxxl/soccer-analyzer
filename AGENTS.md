@@ -587,15 +587,19 @@ alte App `apps/analyzer/` (Abschnitt „Pflege“):
   veröffentlichen** - Artifact-Werkzeug mit `url` oben und `file_path: docs/stack-karte.html`; in
   einer neuen Sitzung vorher `action: "read"` auf die URL. Ohne `url` entstünde ein zweiter Link.
 
-## UI/UX: Skills und Design-Agent
+## UI/UX: Skills in der Hauptsitzung
 
-- **Seit 26.10.2026 (Davids Entscheidung) gestaltet der Agent `ui-ux-designer`** (`.claude/agents/`, Opus):
-  Ansichten entwerfen, bauen, umbauen und prüfen in `apps/neo/` und `apps/shared/`. **Bei jedem UI/UX-Auftrag
-  automatisch einsetzen**, ohne dass David ihn nennt. Die Hauptsitzung gibt Davids Wortlaut und einen Bildpfad
-  mit, reicht seine offenen Entscheidungen (höchstens drei, Empfehlung zuerst) unverändert als Auswahlfrage an
-  David weiter, sieht nach der Umsetzung am Bildschirm nach (er selbst kann die App nicht ansehen) und
-  veröffentlicht die Stack-Karte. Kleine, klar beschriebene UI-Änderungen darf die Hauptsitzung selbst machen
-  und lädt dafür dieselben Skills.
+- **Die Hauptsitzung gestaltet Neo selbst** (Davids Entscheidung vom 26.10.2026): Ansichten entwerfen, bauen,
+  umbauen und prüfen in `apps/neo/` und `apps/shared/`, mit den Skills `interface-design` und `impeccable` (vor
+  der Arbeit laden). Den Agenten `ui-ux-designer` gab es nur am 26.10.2026 und ist entfernt: Er konnte nichts im
+  Browser ansehen, und seine Entwürfe sahen am Bildschirm fehlerhaft aus (verschobene Navigation in
+  `docs/neo-referenz.html`). **Gebaut heißt nicht geprüft:** Jede Ansicht vor der Übergabe im Browser ansehen
+  (Claude in Chrome, Desktop-Breiten 1280/1440/1600, dunkel und hell) und Fehler beheben, nicht nur Detektor
+  und jsdom. Richtungsfragen (höchstens drei, Empfehlung zuerst) fragt die Hauptsitzung David direkt.
+- **Davids Abläufe** stehen in `docs/design-ablaeufe.html`, veröffentlicht als
+  https://claude.ai/artifact/PNk9KpNYL34KBfeZ1GNTqi (seit 26.10.2026): wer was macht, fünf Abläufe (neue Ansicht,
+  ändern, prüfen, Screenshot, Design-System) mit Beispielsätzen, Slash-Befehle, was er entscheidet. Ändert sich
+  Skill oder Ablauf, im selben Schritt nachziehen und unter derselben URL neu veröffentlichen.
 - **Skills im Projekt** (installiert mit `npx skills add … --copy`, Versionen in `skills-lock.json`,
   aktualisieren mit `npx skills update -p`):
   - `interface-design` **baut**. Das Design-System steht in `.interface-design/system.md` - die einzige Quelle
@@ -610,10 +614,9 @@ alte App `apps/analyzer/` (Abschnitt „Pflege“):
   (`detect`), Kontext, Berichte und den Live-Modus. **Von David am 26.10.2026 freigegeben**, Version 0.1.17 liegt.
   Den Detektor-Hook (`/impeccable hooks on`, schreibt `.impeccable/` und `.claude/settings.local.json`) gibt es
   nur auf Davids Wunsch; der Live-Modus startet einen Server und bleibt der Hauptsitzung vorbehalten.
-- **Wächter `.claude/hooks/design-waechter.ts`** (Test `test/design-waechter.test.ts`): erlaubt Tests,
-  Typprüfung, `neo:build` und `stack-karte` (`ALLOWED_SCRIPTS`), sperrt jedes andere npm-Skript, die
-  Analyse-Kommandozeile, Werkzeuge unter `tools/`, Netzzugriffe aus der Shell, neue Pakete, Git-Schreibbefehle
-  und `.env`; die Engine von `impeccable` ist erlaubt. `npm run neo` bleibt gesperrt, weil der Server bei Live und Detailkennzahlen die API fragt.
+- Der Wächter des Agenten (`.claude/hooks/design-waechter.ts`) ist mit ihm entfernt. `npm run neo` startet einen
+  Server, der bei Live und Detailkennzahlen die API fragt - zum Ansehen einer Ansicht genügt meist `neo:build` und
+  `neo:preview` oder eine statische Datei.
 
 ## Sprache der sichtbaren Texte
 

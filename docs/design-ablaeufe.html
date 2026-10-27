@@ -1,0 +1,389 @@
+<title>Design-Abläufe für Neo</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,500..800&family=Public+Sans:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: Rollenleiste oben, darunter Ablauf-Wähler (links Auswahl, rechts Schritte + Sätze), danach Nachschlageteil; Stil wie die Stack-Karte. */
+:root {
+  --bg: #EDF0EE;
+  --surface: #FFFFFF;
+  --surface-2: #F5F7F6;
+  --ink: #16201D;
+  --muted: #59665F;
+  --line: #D2DAD6;
+  --you: #A0640F;
+  --main: #2D5FA6;
+  --agent: #AE452D;
+  --app: #6A4DB0;
+  --ok-bg: #E3F1EB;
+  --ok-ink: #165C4B;
+  --ask-bg: #FBEFD9;
+  --ask-ink: #7A4A06;
+  --focus: #2D5FA6;
+  --font-display: "Archivo", "Arial Narrow", system-ui, sans-serif;
+  --font-body: "Public Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0F1513; --surface: #17201D; --surface-2: #1D2724; --ink: #E3EBE7; --muted: #98A69F; --line: #2D3A36;
+    --you: #E3A548; --main: #82A9EE; --agent: #EF8668; --app: #AC95F1;
+    --ok-bg: #133129; --ok-ink: #8FDCC3; --ask-bg: #3A2B12; --ask-ink: #F2C77D; --focus: #82A9EE;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0F1513; --surface: #17201D; --surface-2: #1D2724; --ink: #E3EBE7; --muted: #98A69F; --line: #2D3A36;
+  --you: #E3A548; --main: #82A9EE; --agent: #EF8668; --app: #AC95F1;
+  --ok-bg: #133129; --ok-ink: #8FDCC3; --ask-bg: #3A2B12; --ask-ink: #F2C77D; --focus: #82A9EE;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.55; }
+.page {
+  max-width: 1160px; margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 32px 64px;
+  display: grid; gap: 44px;
+}
+h1, h2, h3 { font-family: var(--font-display); margin: 0; text-wrap: balance; }
+h1 { font-size: clamp(30px, 4vw, 42px); font-weight: 800; font-stretch: 112%; line-height: 1.05; }
+h2 { font-size: 23px; font-weight: 750; font-stretch: 108%; }
+h3 { font-size: 17px; font-weight: 700; }
+p { margin: 0; }
+code { font-family: var(--font-mono); font-size: 0.86em; background: var(--surface-2); border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; overflow-wrap: anywhere; }
+a { color: var(--main); }
+.eyebrow { font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.lead { color: var(--muted); max-width: 70ch; }
+.section { display: grid; gap: 16px; }
+.section > header { display: grid; gap: 6px; max-width: 760px; }
+.section > header p { color: var(--muted); }
+
+/* Rollen */
+.roles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.role { --c: var(--main); background: var(--surface); border: 1px solid var(--line); border-top: 4px solid var(--c); border-radius: 8px; padding: 14px 16px; display: grid; gap: 6px; align-content: start; min-width: 0; position: relative; }
+.role:not(:last-child)::after { content: "→"; position: absolute; right: -13px; top: 18px; color: var(--muted); font-size: 16px; }
+.role .who { font-size: 12px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; color: var(--c); }
+.role h3 { font-size: 18px; }
+.role p { font-size: 13.5px; color: var(--muted); }
+.role ul { margin: 2px 0 0; padding-left: 18px; font-size: 13.5px; display: grid; gap: 3px; }
+.r-you { --c: var(--you); } .r-main { --c: var(--main); } .r-agent { --c: var(--agent); } .r-app { --c: var(--app); }
+.skill { display: inline-block; font-family: var(--font-mono); font-size: 11.5px; padding: 2px 6px; border-radius: 4px; background: var(--surface-2); border: 1px solid var(--line); }
+
+/* Ablauf-Wähler */
+.flows { display: grid; grid-template-columns: 270px minmax(0, 1fr); gap: 20px; align-items: start; }
+.flow-list { display: grid; gap: 8px; position: sticky; top: calc(env(safe-area-inset-top, 0px) + 16px); }
+.flow-btn { appearance: none; font: inherit; color: inherit; text-align: left; cursor: pointer; background: var(--surface); border: 1px solid var(--line); border-left: 4px solid var(--line); border-radius: 6px; padding: 10px 12px; display: grid; gap: 2px; }
+.flow-btn:hover { border-left-color: var(--main); }
+.flow-btn:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.flow-btn[aria-selected="true"] { border-color: var(--main); border-left-color: var(--main); box-shadow: 0 0 0 1px var(--main); }
+.flow-btn b { font-family: var(--font-display); font-size: 15.5px; font-weight: 700; }
+.flow-btn span { font-size: 12.5px; color: var(--muted); }
+.flow-panel { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 22px; display: grid; gap: 20px; min-width: 0; }
+.flow-panel > header { display: grid; gap: 6px; }
+.flow-panel > header h3 { font-size: 24px; font-stretch: 108%; }
+.flow-panel > header p { color: var(--muted); }
+.steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; counter-reset: step; }
+.step { --c: var(--main); counter-increment: step; display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 12px; padding-bottom: 14px; position: relative; }
+.step::before { content: counter(step); width: 28px; height: 28px; border-radius: 50%; background: var(--surface); border: 2px solid var(--c); color: var(--c); font-family: var(--font-display); font-weight: 800; font-size: 13px; display: grid; place-items: center; font-variant-numeric: tabular-nums; position: relative; z-index: 1; }
+.step:not(:last-child)::after { content: ""; position: absolute; left: 14px; top: 28px; bottom: 0; width: 2px; background: var(--line); }
+.step .actor { font-size: 11.5px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; color: var(--c); }
+.step p { font-size: 14.5px; }
+.step .note { font-size: 13px; color: var(--muted); margin-top: 2px; }
+.s-you { --c: var(--you); } .s-main { --c: var(--main); } .s-agent { --c: var(--agent); } .s-app { --c: var(--app); }
+.two { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
+.box { background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; display: grid; gap: 8px; align-content: start; min-width: 0; }
+.box h4 { margin: 0; font-size: 11.5px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; color: var(--muted); }
+.box ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; font-size: 14px; }
+.box.decide { background: var(--ask-bg); border-color: transparent; color: var(--ask-ink); }
+.box.decide h4 { color: var(--ask-ink); }
+.prompts { display: grid; gap: 8px; }
+.prompt { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: start; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; }
+.prompt q { font-size: 14.5px; quotes: "„" "“"; }
+.prompt .hint { display: block; font-size: 12.5px; color: var(--muted); margin-top: 3px; }
+.copy { appearance: none; font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer; color: var(--main); background: transparent; border: 1px solid var(--line); border-radius: 5px; padding: 4px 9px; white-space: nowrap; }
+.copy:hover { border-color: var(--main); }
+.copy:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.copy.done { color: var(--ok-ink); background: var(--ok-bg); border-color: transparent; }
+
+/* Nachschlagen */
+.table-wrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; }
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-size: 11.5px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; color: var(--muted); background: var(--surface-2); }
+tr:last-child td { border-bottom: 0; }
+td:first-child { white-space: nowrap; }
+.auto-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
+.auto-grid .box.ok { background: var(--ok-bg); border-color: transparent; color: var(--ok-ink); }
+.auto-grid .box.ok h4 { color: var(--ok-ink); }
+.limits { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.limit { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; display: grid; gap: 4px; }
+.limit b { font-family: var(--font-display); font-size: 15px; }
+.limit p { font-size: 13.5px; color: var(--muted); }
+footer { font-size: 12.5px; color: var(--muted); border-top: 1px solid var(--line); padding-top: 16px; }
+
+@media (max-width: 960px) {
+  .roles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .role::after { display: none; }
+  .flows { grid-template-columns: minmax(0, 1fr); }
+  .flow-list { position: static; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+}
+@media (max-width: 640px) {
+  .roles, .two, .auto-grid, .limits { grid-template-columns: minmax(0, 1fr); }
+  .flow-panel { padding: 16px; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="page">
+  <header class="section" style="gap:12px">
+    <span class="eyebrow">api-football-analyzer · Stand 26.10.2026</span>
+    <h1>So gestaltest du Neo mit Claude</h1>
+    <p class="lead">Du beschreibst im Chat, was du willst. Claude gestaltet und baut direkt hier mit den Skills interface-design und impeccable, sieht sich das Ergebnis im Browser an und fragt dich bei Richtungsfragen. Du entscheidest die Richtung und gibst das Ergebnis frei. Wähle unten, was du gerade vorhast.</p>
+  </header>
+
+  <section class="section" aria-labelledby="roles-h">
+    <header><h2 id="roles-h">Wer macht was</h2></header>
+    <div class="roles">
+      <div class="role r-you"><span class="who">Du</span><h3>Sagst, was du brauchst</h3>
+        <ul><li>beschreibst den Zweck, gern mit Screenshot</li><li>wählst bei offenen Fragen</li><li>schaust dir Neo an</li><li>sagst, wann committet wird</li></ul></div>
+      <div class="role r-main"><span class="who">Claude im Chat</span><h3>Gestaltet, baut und prüft</h3>
+        <ul><li>baut mit <span class="skill">interface-design</span>, prüft mit <span class="skill">impeccable</span></li><li>sieht jede Ansicht im Browser an, bevor du sie bekommst</li><li>stellt dir Richtungsfragen als Auswahl</li><li>schreibt Tests, committet auf Zuruf, pflegt die Stack-Karte</li></ul></div>
+      <div class="role r-app"><span class="who">Neo</span><h3>Das Ergebnis</h3>
+        <ul><li><code>apps/neo</code>, gemeinsame Teile in <code>apps/shared</code></li><li>starten mit <code>npm run neo</code></li><li>ansehen auf localhost:5174</li><li>Design-System in <code>.interface-design/system.md</code></li></ul></div>
+    </div>
+  </section>
+
+  <section class="section" aria-labelledby="flows-h">
+    <header>
+      <h2 id="flows-h">Was hast du gerade vor?</h2>
+      <p>Fünf Abläufe decken fast alles ab. Die Beispielsätze kannst du kopieren und anpassen. Die Skills musst du nicht nennen, Claude lädt sie von selbst.</p>
+    </header>
+    <div class="flows">
+      <div class="flow-list" role="tablist" aria-label="Ablauf wählen" id="flow-list"></div>
+      <article class="flow-panel" id="flow-panel" role="tabpanel" aria-live="polite"></article>
+    </div>
+  </section>
+
+  <section class="section" aria-labelledby="short-h">
+    <header>
+      <h2 id="short-h">Abkürzung: Befehle direkt im Chat</h2>
+      <p>Beide Skills lassen sich auch gezielt mit einem Schrägstrich aufrufen. Das ist gut, wenn du genau einen Schritt willst, etwa nur eine Prüfung. Für alles andere reicht ein normaler Satz.</p>
+    </header>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Eingabe</th><th>Was passiert</th></tr></thead>
+        <tbody>
+          <tr><td><code>/impeccable</code></td><td>zeigt ein Menü, was für den aktuellen Stand sinnvoll ist</td></tr>
+          <tr><td><code>/impeccable critique apps/neo</code></td><td>prüft, wie gut die Oberfläche für dich funktioniert: Aufbau, Übersicht, was zuerst ins Auge fällt</td></tr>
+          <tr><td><code>/impeccable audit apps/neo</code></td><td>prüft die Technik: Kontrast, Bedienung per Tastatur, Bildschirmgrößen, Tempo</td></tr>
+          <tr><td><code>/impeccable clarify apps/neo</code></td><td>macht Beschriftungen, Hinweise und Fehlermeldungen verständlicher</td></tr>
+          <tr><td><code>/impeccable distill apps/neo</code></td><td>sucht, was weg kann, damit die Ansicht ruhiger wird</td></tr>
+          <tr><td><code>/impeccable harden apps/neo</code></td><td>prüft leere, ladende und fehlerhafte Zustände, lange Namen, fehlende Daten</td></tr>
+          <tr><td><code>/impeccable polish apps/neo</code></td><td>letzter Schliff vor dem Commit</td></tr>
+          <tr><td><code>/impeccable layout</code> · <code>typeset</code></td><td>Abstände und Ausrichtung · Schrift und Größen</td></tr>
+          <tr><td><code>/impeccable quieter</code> · <code>bolder</code></td><td>eine zu laute Ansicht beruhigen · eine zu blasse kräftiger machen</td></tr>
+          <tr><td><code>/interface-design</code></td><td>Gestaltungsauftrag nach den Regeln für Dashboards und Datenansichten</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="section" aria-labelledby="auto-h">
+    <header><h2 id="auto-h">Was von selbst läuft, was du entscheidest</h2></header>
+    <div class="auto-grid">
+      <div class="box ok"><h4>Läuft von selbst</h4>
+        <ul>
+          <li>Claude lädt beide Skills bei jedem Gestaltungsauftrag</li>
+          <li>jede Ansicht wird im Browser angesehen, bevor du sie bekommst</li>
+          <li>das Wörterbuch für sichtbare Texte gilt</li>
+          <li>Tests und Typprüfung nach jeder Änderung</li>
+          <li>Claude zieht die Stack-Karte nach, wenn sich etwas ändert</li>
+        </ul></div>
+      <div class="box decide"><h4>Entscheidest du</h4>
+        <ul>
+          <li>Richtung einer neuen Ansicht: Dichte, Farbe, Aufbau</li>
+          <li>jede Richtungsfrage (höchstens drei, mit Empfehlung)</li>
+          <li>ob Muster ins Design-System kommen</li>
+          <li>Regeln der alten App, die in Neo wieder gelten sollen</li>
+          <li>neue Pakete und den automatischen Detektor von impeccable</li>
+          <li>wann committet wird</li>
+        </ul></div>
+    </div>
+  </section>
+
+  <section class="section" aria-labelledby="limits-h">
+    <header><h2 id="limits-h">Gut zu wissen</h2></header>
+    <div class="limits">
+      <div class="limit"><b>Gebaut heißt nicht geprüft</b><p>Tests und der Design-Detektor finden keine verschobene Navigation. Deshalb sieht Claude jede Ansicht in Chrome an, in mehreren Breiten, dunkel und hell, bevor du sie bekommst.</p></div>
+      <div class="limit"><b>Das Design-System gibt es noch nicht</b><p>Der erste größere Auftrag legt die Richtung fest. Danach bietet Claude an, sie in <code>.interface-design/system.md</code> zu speichern. Sag ja, dann bleibt Neo einheitlich.</p></div>
+      <div class="limit"><b>Regeln der alten App gelten nicht von selbst</b><p>Etwa „Value nur hinter einem Schalter“ oder „Grün heißt empfehlenswert“. Claude fragt dich, bevor so etwas wieder eingebaut wird.</p></div>
+      <div class="limit"><b>Live kostet API-Aufrufe</b><p>Eine Live-Ansicht oder Detailkennzahlen in Neo fragen API-Football ab. Gebaut wird mit Testdaten; echte Abrufe passieren erst, wenn du Neo nutzt.</p></div>
+      <div class="limit"><b>Ein gutes Bild hilft mehr als viele Worte</b><p>Screenshots von Neo oder von einer Seite, die dir gefällt, kannst du einfach in den Chat ziehen. Sag dazu, was du übernehmen willst: Dichte, Aufbau oder Farben.</p></div>
+      <div class="limit"><b>Nichts ist ein Gewinnversprechen</b><p>Gestaltung ändert keine Tipps und keine Wahrscheinlichkeiten. Warnungen bleiben sichtbar, auch wenn eine Ansicht ruhiger werden soll.</p></div>
+    </div>
+  </section>
+
+  <section class="section" aria-labelledby="where-h">
+    <header><h2 id="where-h">Wo liegt was</h2></header>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Was</th><th>Wo</th></tr></thead>
+        <tbody>
+          <tr><td>Neo</td><td><code>apps/neo/src/</code>, gemeinsame Bausteine in <code>apps/shared/</code></td></tr>
+          <tr><td>Skills</td><td><code>.claude/skills/interface-design/</code>, <code>.claude/skills/impeccable/</code>, Versionen in <code>skills-lock.json</code></td></tr>
+          <tr><td>Design-System</td><td><code>.interface-design/system.md</code> (entsteht beim ersten größeren Auftrag)</td></tr>
+          <tr><td>Regeln dazu</td><td><code>AGENTS.md</code>, Abschnitte „UI/UX: Skills in der Hauptsitzung“ und „Sprache der sichtbaren Texte“</td></tr>
+          <tr><td>Gesamtbild</td><td><a href="https://claude.ai/artifact/9J2Abc4DKRZTt2W7TK9Vu3" target="_blank" rel="noopener">Stack-Karte</a> (<code>docs/stack-karte.html</code>)</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <footer>Quelle: <code>docs/design-ablaeufe.html</code>. Ändert sich ein Ablauf oder ein Skill, zieht Claude diese Seite mit der Stack-Karte nach.</footer>
+</div>
+
+<script>
+const FLOWS = [
+  {
+    id: "neu", name: "Neue Ansicht bauen", short: "eine Ansicht, die es in Neo noch nicht gibt",
+    intro: "Für alles, was neu entsteht: eine Spielliste, eine Detailansicht, eine Übersicht je Liga. Hier fällt die Richtung, deshalb fragt Claude zuerst.",
+    steps: [
+      ["you", "Du", "Du beschreibst, wofür du die Ansicht brauchst, nicht wie sie aussehen soll. Ein Screenshot einer Seite, die dir gefällt, hilft.", "Zum Beispiel: welche Spiele, welche Zahlen, was du damit entscheiden willst."],
+      ["main", "Claude", "Claude sieht nach, welche Daten die Analyse liefert, und schlägt eine Richtung vor, mit höchstens drei offenen Fragen und einer Empfehlung.", ""],
+      ["you", "Du", "Du wählst.", "Keine Meinung? Dann nimm die Empfehlung."],
+      ["main", "Claude", "Claude baut die Ansicht mit interface-design, schreibt Tests und prüft sie mit impeccable.", ""],
+      ["main", "Claude", "Claude sieht sie im Browser an, in mehreren Breiten, dunkel und hell, und behebt, was schief aussieht.", "Erst danach bekommst du sie."],
+      ["app", "Neo", "Du schaust sie dir an und sagst, was nicht passt.", "Dann geht es mit „Etwas ändern“ weiter."],
+      ["main", "Claude", "Claude bietet an, die Entscheidungen im Design-System zu speichern.", "Sag ja, damit spätere Ansichten genauso aussehen."],
+      ["you", "Du", "Zum Schluss: „mach einen Commit“.", ""]
+    ],
+    prompts: [
+      ["Bau mir in Neo eine Spielliste für die nächsten 48 Stunden, nach Anstoß sortiert, mit 1X2-Quote und der Chance laut Modell.", "Zweck und Inhalt reichen, das Aussehen schlägt Claude vor."],
+      ["Ich brauche in Neo eine Detailansicht für ein Spiel: Form beider Teams, direkte Duelle und alle Märkte mit Quote.", ""],
+      ["[Screenshot anhängen] So eine dichte Tabelle möchte ich für die Spiele. Übernimm den Aufbau, nicht die Farben.", "Sag dazu, was du vom Vorbild willst."]
+    ],
+    decide: ["Richtung: Dichte, Farbe, Aufbau", "welche Daten sichtbar sind", "ob die Muster ins Design-System kommen"],
+    result: ["eine neue Ansicht in apps/neo", "Tests, die sie absichern", "auf Wunsch ein gespeichertes Design-System"]
+  },
+  {
+    id: "aendern", name: "Etwas ändern", short: "klein und konkret an einer bestehenden Ansicht",
+    intro: "Für Änderungen, die du genau benennen kannst. Je konkreter der Satz, desto schneller geht es.",
+    steps: [
+      ["you", "Du", "Du sagst genau, was sich ändern soll, und wo.", "„Spalte X breiter“ statt „sieht komisch aus“."],
+      ["main", "Claude", "Änderung, Tests und Typprüfung, dann ein Blick im Browser. Weicht sie vom Design-System ab, sagt Claude es dir.", ""],
+      ["app", "Neo", "Du schaust nach und sagst, ob es passt.", ""]
+    ],
+    prompts: [
+      ["Mach die Quoten in der Spielliste rechtsbündig, damit die Kommas untereinander stehen.", ""],
+      ["Die Wappen in Neo sind zu groß, halbiere sie.", ""],
+      ["Schreib in Neo „Spiel“ statt „Partie“ und prüf, ob noch andere Wörter aus dem Wörterbuch falsch sind.", ""]
+    ],
+    decide: ["nur, ob dir das Ergebnis gefällt", "bei Abweichung vom Design-System: Ausnahme oder System ändern"],
+    result: ["die Änderung samt Tests", "kein neuer Entwurf, keine Rückfragen bei klaren Wünschen"]
+  },
+  {
+    id: "pruefen", name: "Prüfen lassen", short: "du willst wissen, was besser ginge",
+    intro: "Wenn dir etwas nicht gefällt, du aber nicht genau weißt, warum. Claude prüft mit impeccable und im Browser und liefert eine Liste, du suchst aus, was umgesetzt wird.",
+    steps: [
+      ["you", "Du", "Du nennst die Ansicht und deine Frage.", "Etwa: übersichtlich? verständlich? zu voll?"],
+      ["main", "Claude", "Claude prüft mit impeccable: Aufbau und Übersicht, Technik und Barrierefreiheit, Texte. Dazu der Blick im Browser.", "Der Design-Detektor findet handfeste Fehler im Code, der Browser zeigt, was schief aussieht."],
+      ["main", "Claude", "Claude zeigt dir das Ergebnis als Liste: muss, sollte, kann, in einfacher Sprache.", ""],
+      ["you", "Du", "Du wählst, was umgesetzt wird.", "Der Rest bleibt einfach liegen."],
+      ["main", "Claude", "Umsetzung wie bei „Etwas ändern“.", ""]
+    ],
+    prompts: [
+      ["Prüf die Spielliste in Neo: Was ist unübersichtlich, und was würdest du ändern?", ""],
+      ["Prüf, ob alle Texte in Neo verständlich sind und die Warnungen noch warnen.", ""],
+      ["/impeccable critique apps/neo", "Nur die Prüfung, ohne Umsetzung."]
+    ],
+    decide: ["welche Punkte der Liste umgesetzt werden"],
+    result: ["eine Liste muss / sollte / kann", "danach nur die Änderungen, die du willst"]
+  },
+  {
+    id: "screenshot", name: "Mit Screenshot", short: "ein Bild sagt, was dich stört oder was du willst",
+    intro: "Für Rückmeldungen zu dem, was du siehst, oder für Vorbilder von anderen Seiten. Claude sieht das Bild direkt im Chat.",
+    steps: [
+      ["you", "Du", "Screenshot von Neo oder einer anderen Seite in den Chat ziehen oder einfügen.", ""],
+      ["you", "Du", "Dazu ein Satz: was stört, oder was du übernehmen willst.", "Ohne Satz muss Claude raten, und das wird selten gut."],
+      ["main", "Claude", "Claude ordnet ein und setzt um, oder fragt bei einer Richtungsfrage zurück. Danach Vergleich im Browser.", ""],
+      ["app", "Neo", "Du vergleichst mit deinem Bild.", ""]
+    ],
+    prompts: [
+      ["[Screenshot von Neo] Hier ist es mir zu voll. Was kann weg?", ""],
+      ["[Screenshot einer anderen Seite] Diese Filterleiste gefällt mir. Bau sowas für die Ligen in Neo.", "Vorbilder werden als Richtung genommen, nicht kopiert."]
+    ],
+    decide: ["was vom Vorbild übernommen wird", "Richtungsfragen, falls welche kommen"],
+    result: ["Änderung nach deinem Bild", "bei Vorbildern: übertragen auf deine Daten und Regeln"]
+  },
+  {
+    id: "system", name: "Design-System pflegen", short: "einheitlich bleiben, Regeln ansehen oder ändern",
+    intro: "Das Design-System hält Farben, Abstände, Schriften und Bausteine fest. Es entsteht nach dem ersten größeren Auftrag und sorgt dafür, dass jede neue Ansicht dazupasst.",
+    steps: [
+      ["main", "Claude", "Nach einer größeren Gestaltung bietet Claude an, die Muster zu speichern.", "Datei: .interface-design/system.md"],
+      ["you", "Du", "Du sagst ja, oder was anders festgehalten werden soll.", ""],
+      ["main", "Claude", "Später kannst du es dir zeigen lassen, Neo dagegen prüfen oder es ändern.", "Bei einer Änderung zieht Claude Neo nach."]
+    ],
+    prompts: [
+      ["Zeig mir das Design-System von Neo in einfachen Worten.", ""],
+      ["Prüf Neo gegen das Design-System: Wo weicht etwas ab?", ""],
+      ["Ändere im Design-System den Grundabstand auf 8 Pixel und zieh Neo nach.", ""]
+    ],
+    decide: ["was ins System kommt", "jede Änderung am System"],
+    result: ["eine Datei mit allen Gestaltungsregeln von Neo", "einheitliche Ansichten, auch Wochen später"]
+  }
+];
+
+const ACTOR = { you: "s-you", main: "s-main", agent: "s-agent", app: "s-app" };
+const list = document.getElementById("flow-list");
+const panel = document.getElementById("flow-panel");
+const buttons = {};
+const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+
+for (const flow of FLOWS) {
+  const b = document.createElement("button");
+  b.type = "button"; b.className = "flow-btn"; b.id = "tab-" + flow.id;
+  b.setAttribute("role", "tab"); b.setAttribute("aria-controls", "flow-panel"); b.setAttribute("aria-selected", "false");
+  b.innerHTML = "<b>" + esc(flow.name) + "</b><span>" + esc(flow.short) + "</span>";
+  b.addEventListener("click", () => show(flow.id, true));
+  buttons[flow.id] = b;
+  list.appendChild(b);
+}
+
+function show(id, fromClick) {
+  const flow = FLOWS.find((f) => f.id === id) || FLOWS[0];
+  for (const [key, b] of Object.entries(buttons)) b.setAttribute("aria-selected", String(key === flow.id));
+  panel.setAttribute("aria-labelledby", "tab-" + flow.id);
+  panel.innerHTML =
+    '<header><span class="eyebrow">Ablauf</span><h3>' + esc(flow.name) + '</h3><p>' + esc(flow.intro) + '</p></header>'
+    + '<ol class="steps">' + flow.steps.map(([who, label, text, note]) =>
+        '<li class="step ' + ACTOR[who] + '"><div><span class="actor">' + esc(label) + '</span><p>' + esc(text) + '</p>'
+        + (note ? '<p class="note">' + esc(note) + '</p>' : '') + '</div></li>').join("") + '</ol>'
+    + '<div class="prompts"><span class="eyebrow">So kannst du es schreiben</span>'
+    + flow.prompts.map(([text, hint], i) =>
+        '<div class="prompt"><div><q>' + esc(text) + '</q>' + (hint ? '<span class="hint">' + esc(hint) + '</span>' : '') + '</div>'
+        + '<button type="button" class="copy" data-text="' + esc(text) + '" id="copy-' + flow.id + '-' + i + '">Kopieren</button></div>').join("")
+    + '</div>'
+    + '<div class="two"><div class="box decide"><h4>Du entscheidest</h4><ul>' + flow.decide.map((t) => '<li>' + esc(t) + '</li>').join("") + '</ul></div>'
+    + '<div class="box"><h4>Am Ende hast du</h4><ul>' + flow.result.map((t) => '<li>' + esc(t) + '</li>').join("") + '</ul></div></div>';
+  panel.querySelectorAll(".copy").forEach((btn) => btn.addEventListener("click", () => copy(btn)));
+  if (fromClick) { try { history.replaceState(null, "", "#" + flow.id); } catch (e) {} }
+}
+
+function copy(btn) {
+  const text = btn.dataset.text;
+  const done = () => { btn.textContent = "Kopiert"; btn.classList.add("done"); setTimeout(() => { btn.textContent = "Kopieren"; btn.classList.remove("done"); }, 1600); };
+  const fallback = () => {
+    const q = btn.parentElement.querySelector("q");
+    const range = document.createRange(); range.selectNodeContents(q);
+    const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(range);
+    btn.textContent = "Markiert";
+  };
+  try { navigator.clipboard.writeText(text).then(done, fallback); } catch (e) { fallback(); }
+}
+
+const start = (location.hash || "").replace("#", "");
+show(FLOWS.some((f) => f.id === start) ? start : "neu", false);
+</script>
