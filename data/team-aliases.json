@@ -6876,6 +6876,11 @@
     "apiTeamId": 4111,
     "apiTeamName": "Awassa Kenema"
   },
+  "hb k ge pigef f": {
+    "tipicoName": "HB Køge Pigef. (F)",
+    "apiTeamId": 13982,
+    "apiTeamName": "Køge W"
+  },
   "heart of midloth f": {
     "tipicoName": "Heart of Midloth. (F)",
     "apiTeamId": 23295,
@@ -12007,6 +12012,11 @@
     "tipicoName": "SSD Vis Pesaro 1898",
     "apiTeamId": 1708,
     "apiTeamName": "Vis Pesaro"
+  },
+  "ssv jeddeloh ii": {
+    "tipicoName": "SSV Jeddeloh II",
+    "apiTeamId": 1655,
+    "apiTeamName": "SSV Jeddeloh"
   },
   "st andrews fc": {
     "tipicoName": "St Andrews FC",
