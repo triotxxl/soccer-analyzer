@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildTable, leagueAverages, roundStage, scoreDrawFixture, tableForm, tableScopeOf } from "../src/draw-criteria.ts";
+import { buildTable, h2hHistory, leagueAverages, roundStage, scoreDrawFixture, tableForm, tablePositions, tableScopeOf } from "../src/draw-criteria.ts";
 import { formatDrawAnalysis } from "../src/output.ts";
 import type { ApiFixtureOdds, DrawScoreRow } from "../src/types.ts";
 import { fixture, history } from "./helpers.ts";
@@ -221,6 +221,39 @@ test("tableForm nimmt die Tabellenspiele heim und auswärts, neueste zuerst, hö
   assert.deepEqual(form.get(2), ["win"]);
   const table = buildTable(fixtures, cutoff, tableScopeOf(target)).find((entry) => entry.id === 1)!;
   assert.equal(table.played, 6); // dieselbe Eingrenzung wie die Tabelle, die Form zeigt davon die letzten fünf
+});
+
+test("tablePositions rechnet den Platz nach jedem Spieltag wie buildTable", () => {
+  const cutoff = 2_000_000_000;
+  const scope = tableScopeOf(fixture({ id: 99, timestamp: cutoff + 10, homeId: 1, awayId: 2, season: 2026, round: "Regular Season - 4" }));
+  const fixtures = [
+    fixture({ id: 1, timestamp: cutoff - 900, homeId: 1, awayId: 2, homeGoals: 0, awayGoals: 1, season: 2026, round: "Regular Season - 1" }),
+    fixture({ id: 2, timestamp: cutoff - 890, homeId: 3, awayId: 4, homeGoals: 2, awayGoals: 0, season: 2026, round: "Regular Season - 1" }),
+    fixture({ id: 3, timestamp: cutoff - 800, homeId: 1, awayId: 3, homeGoals: 4, awayGoals: 0, season: 2026, round: "Regular Season - 2" }),
+    // Nachholspiel von Spieltag 2, gespielt nach Spieltag 3: zählt zu Spieltag 2
+    fixture({ id: 4, timestamp: cutoff - 600, homeId: 2, awayId: 4, homeGoals: 1, awayGoals: 1, season: 2026, round: "Regular Season - 2" }),
+    fixture({ id: 5, timestamp: cutoff - 700, homeId: 4, awayId: 1, homeGoals: 0, awayGoals: 3, season: 2026, round: "Regular Season - 3" }),
+    fixture({ id: 6, timestamp: cutoff - 690, homeId: 2, awayId: 3, homeGoals: 2, awayGoals: 2, season: 2026, round: "Regular Season - 3" }),
+    // Vorsaison und Spiele nach dem Cutoff zählen nicht
+    fixture({ id: 7, timestamp: cutoff - 99_000, homeId: 1, awayId: 2, homeGoals: 9, awayGoals: 0, season: 2025, round: "Regular Season - 1" }),
+    fixture({ id: 8, timestamp: cutoff + 5, homeId: 3, awayId: 2, homeGoals: 9, awayGoals: 0, season: 2026, round: "Regular Season - 4" })
+  ];
+  const positions = tablePositions(fixtures, cutoff, scope);
+  assert.deepEqual(positions.get(1), [3, 2, 1]);
+  assert.deepEqual(positions.get(2), [2, 1, 2]);
+  const final = buildTable(fixtures, cutoff, scope);
+  for (const row of final) assert.equal(positions.get(row.id)!.at(-1), row.position);
+  assert.deepEqual(tablePositions(fixtures, cutoff, { ...scope, season: 2025 }).get(1), [1]);
+  assert.equal(tablePositions(fixtures, cutoff, { season: 2026, stage: null, matchdaysOnly: false }).size, 0);
+});
+
+test("h2hHistory führt bis zu zehn Duelle mit Wettbewerb, neueste zuerst", () => {
+  const duels = Array.from({ length: 12 }, (_, index) => fixture({ id: 100 + index, timestamp: 1_000_000 + index * 1000, homeId: index % 2 ? 1 : 2, awayId: index % 2 ? 2 : 1, homeGoals: 1, awayGoals: 0 }));
+  const history = h2hHistory(duels, 1);
+  assert.equal(history.length, 10);
+  assert.equal(history[0]!.fixtureId, 111);
+  assert.equal(history[0]!.teamWasHome, true);
+  assert.equal(typeof history[0]!.league, "string");
 });
 
 test("buildTable ohne Geltungsbereich zählt weiter alles vor dem Cutoff", () => {

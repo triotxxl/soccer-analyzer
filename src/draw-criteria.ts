@@ -214,6 +214,62 @@ export function tableForm(
 }
 
 /**
+ * Platz jedes Teams nach jedem Spieltag des Abschnitts - der Tabellenverlauf. Gezählt werden genau
+ * die Partien von `buildTable` (gleiche Eingrenzung, gleiche Reihenfolge nach Punkten, Tordifferenz,
+ * Toren), nur schrittweise bis Spieltag 1, 2, … . Ein Nachholspiel zählt zu seinem Spieltag, nicht zu
+ * seinem Datum - so lesen auch die Ligen ihre Tabelle „nach dem 8. Spieltag“. `null` heißt: Das Team
+ * hatte bis dahin kein Spiel. Ohne Spieltagsangaben (`matchdaysOnly: false`) gibt es keinen Verlauf.
+ */
+export function tablePositions(
+  fixtures: ApiFixture[],
+  cutoff: number,
+  scope: TableScope
+): Map<number, Array<number | null>> {
+  const positions = new Map<number, Array<number | null>>();
+  if (!scope.matchdaysOnly) return positions;
+  const matchdayOf = (fixture: ApiFixture) => Number((fixture.league.round ?? "").split(" - ").pop());
+  const counted = fixtures.filter((fixture) => countsForTable(fixture, cutoff, scope) && completedScore(fixture));
+  const matchdays = [...new Set(counted.map(matchdayOf))].filter(Number.isFinite).sort((left, right) => left - right);
+  const teams = new Set(counted.flatMap((fixture) => [fixture.teams.home.id, fixture.teams.away.id]));
+  for (const id of teams) positions.set(id, []);
+  for (const matchday of matchdays) {
+    const table = buildTable(counted.filter((fixture) => matchdayOf(fixture) <= matchday), Number.POSITIVE_INFINITY);
+    const byTeam = new Map(table.map((row) => [row.id, row.position]));
+    for (const id of teams) positions.get(id)!.push(byTeam.get(id) ?? null);
+  }
+  return positions;
+}
+
+/**
+ * Die letzten `limit` direkten Duelle mit Wettbewerb, neueste zuerst - nur für die Anzeige. Die
+ * Bezugsseite ist wie in `h2hSummary` die aktuelle Heimmannschaft.
+ */
+export function h2hHistory(fixtures: ApiFixture[], currentHomeTeamId: number, limit = 10): RecentMatchSummary[] {
+  return fixtures
+    .filter((match) => completedScore(match))
+    .sort((left, right) => right.fixture.timestamp - left.fixture.timestamp)
+    .slice(0, limit)
+    .map((match) => {
+      const score = completedScore(match)!;
+      const halfTimeHomeGoals = match.score.halftime?.home;
+      const halfTimeAwayGoals = match.score.halftime?.away;
+      return {
+        fixtureId: match.fixture.id,
+        teamWasHome: match.teams.home.id === currentHomeTeamId,
+        friendly: /\b(friendl|freundschaft)/i.test(match.league.name),
+        league: match.league.name,
+        date: match.fixture.date,
+        homeTeam: match.teams.home.name,
+        awayTeam: match.teams.away.name,
+        homeGoals: score[0],
+        awayGoals: score[1],
+        halfTimeHomeGoals: typeof halfTimeHomeGoals === "number" ? halfTimeHomeGoals : null,
+        halfTimeAwayGoals: typeof halfTimeAwayGoals === "number" ? halfTimeAwayGoals : null
+      };
+    });
+}
+
+/**
  * `scope` weggelassen heißt: alles zählen, was vor dem Cutoff liegt. Das bleibt für die
  * Cross-League-Pfade so, die bewusst über den gesamten verfügbaren Bestand mitteln.
  */
@@ -452,7 +508,8 @@ function h2hSummary(
     allDraws: completed.length > 0 && draws === completed.length,
     recentHomeTeamResults,
     recentBttsResults,
-    recentMatches
+    recentMatches,
+    history: h2hHistory(fixtures, currentHomeTeamId)
   };
 }
 

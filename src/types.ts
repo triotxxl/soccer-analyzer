@@ -408,7 +408,14 @@ export interface GoalLineRow {
   defense?: { home: DefensiveProfile; away: DefensiveProfile };
   strength?: LeagueStrengthComparison;
   /** `form`: letzte fünf Tabellenspiele des Teams, neueste zuerst (`tableForm`). */
-  standings?: Array<TableRow & { teamName: string; form: Array<"win" | "draw" | "loss"> }>;
+  standings?: Array<TableRow & {
+    teamName: string;
+    form: Array<"win" | "draw" | "loss">;
+    /** Platz nach jedem Spieltag dieses Abschnitts (`tablePositions`), ab schemaVersion 11. */
+    positions?: Array<number | null>;
+    /** Dasselbe für die Vorsaison; fehlt, wenn das Team dort nicht in dieser Liga spielte. */
+    previousPositions?: Array<number | null>;
+  }>;
   firstHalf: {
     expectedHomeGoals: number;
     expectedAwayGoals: number;
@@ -526,6 +533,8 @@ export interface RecentMatchSummary {
    * ist es unbekannt.
    */
   friendly?: boolean;
+  /** Wettbewerb der Partie (`league.name` von API-Football), ab schemaVersion 11 nur in `h2hSummary.history`. */
+  league?: string;
   /**
    * Die Spielstatistik beider Seiten, aus `fixture_results` beim Dashboard-Lauf angehängt
    * (ab schemaVersion 6). Fehlt sie, führt die Liga keine Statistik oder sie wurde noch nicht
@@ -571,6 +580,11 @@ export interface DrawScoreRow {
     recentHomeTeamResults: Array<"win" | "draw" | "loss">;
     recentBttsResults: boolean[];
     recentMatches?: RecentMatchSummary[];
+    /**
+     * Bis zu 10 direkte Duelle, neueste zuerst, mit Wettbewerb - nur für die Anzeige (H2H in Neo, ab
+     * schemaVersion 11). `recentMatches` bleibt bei fünf, weil Remis-Score und Statistik darauf stehen.
+     */
+    history?: RecentMatchSummary[];
   };
   rating:
     | "sehr stark"

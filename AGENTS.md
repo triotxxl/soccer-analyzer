@@ -564,7 +564,19 @@ alte App `apps/analyzer/` (Abschnitt „Pflege“):
   0-5, 6+; vier wahrscheinlichste Endstände aus der Poisson-Matrix; Pausenstand aus den Halbzeit-λ; erstes Tor =
   λ-Anteil × P(mindestens ein Tor)). Bei `probabilityReliable: false` fehlen Halbzeit, erstes Tor und Endstände. Halbzeit-1X2,
   erstes Tor und Endstände sind **nicht an alten Spielen geprüft** - die App sagt das; wer sie für Filter oder Tipps nutzt,
-  misst vorher. Über/Unter 0,5 und 4,5 haben keine Tipico-Quote. Rechnung rein in
+  misst vorher. Über/Unter 0,5 und 4,5 haben keine Tipico-Quote. **Reiter H2H seit 28.10.2026**
+  (`apps/neo/src/components/H2HPanel.tsx`, nach Davids Entscheidungen aus der impeccable-Prüfung vom selben Tag): Kopfzeile
+  „In den Duellen“, Block **„Direkte Duelle (H2H)“** mit Filter „Alle / Nur in <Heim>“ (Bilanz mit höchstem Sieg und
+  Datum, Häufigkeiten als „5 von 8“ mit einem Kästchen je Duell - bewusst nicht in der Zeilenform der Marktchancen, damit
+  sie nicht als Chance gelesen werden -, letzte Duelle, Torphasen der Duelle) und Block **„Aktuelle Saison“**, unabhängig
+  vom Filter (Form Liga und Heim/Auswärts, Tabellenverlauf, Torphasen der Saison). Unter 5 Duellen bzw. Spielen
+  „kann auch Zufall sein“. Testspiele zählen dort nicht mit. Daten ab `schemaVersion: 11`, 0 Aufrufe:
+  `h2h.history` (bis zu 10 Duelle mit Wettbewerb, `h2hHistory` in `src/draw-criteria.ts`; `h2h.matches` bleibt bei
+  fünf, weil Remis-Score und Statistik darauf stehen) und je Tabellenzeile `positions`/`previousPositions` (Platz nach
+  jedem Spieltag dieser und der Vorsaison, `tablePositions` - dieselben Partien und dieselbe Reihenfolge wie
+  `buildTable`, Nachholspiele zählen zu ihrem Spieltag). Bei Pokalspielen kommen Form und Verlauf aus der Tabelle eines
+  anderen Spiels im Snapshot (`tableEntryOf`). **Nur die Torphasen** kommen beim Öffnen aus `/api/fixture/insights`
+  (`useInsights`, rund vier Aufrufe beim ersten Mal je Spiel, danach gespeichert). Rechnung rein in
   `neoData.ts`, Bedienzustand in `useNeoState.ts` (localStorage `neo:state:v1`). Design-System:
   `.interface-design/system.md`.
 - `apps/shared/` - Bausteine für Apps: `server/endpoints.ts` (`dataEndpoints()`: Dashboard, Live,

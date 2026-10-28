@@ -82,6 +82,24 @@ Sicherheit.
 - **Ausgang `.oc`:** Text | Prozent | Tipico-Quote („–“ ohne Quote), darunter 5px-Balken auf `--track`. Mit Seite
   Türkis/Grau/Rosé, ohne Seite gedämpft; der wahrscheinlichste Ausgang hat fette Zahl und 7px-Balken (ohne Seite
   `--best-bar`). Unter 1 % steht „< 1 %“, sonst ganze Prozente.
+- **H2H** (seit 28.10.2026, Referenz `renderH2H`): Kopf mit Kernzeile „In den Duellen“ (Siege, Remis, Ø Tore) statt
+  „Am ehesten“. Zwei Blöcke `.h2h-block` mit Kopf `.block-h` (Display 19px, Linie darunter): **„Direkte Duelle (H2H)“**
+  mit dem Filter „Alle / Nur in <Heim>“ rechts (Bilanz, Letzte Duelle, Torphasen der Duelle) und **„Aktuelle Saison“**,
+  „gilt unabhängig vom Filter oben“ (Form, Tabellenverlauf, Torphasen der Saison). Abschnitte darin als `.tgroup` mit
+  `h4`, Kacheltitel `h5`; Werkzeuge eines Abschnitts rechts in `.tgroup-bar`.
+- **Bilanz `.duel`:** Teams mit Wappen, Mitte „8 Duelle“; Siege groß (Display 28px) in Teamfarbe an den Enden, Remis
+  mittig grau, „keine Siege“ grau; 10px-Balken Heim/Remis/Gast; eine Zeile Tore; „Höchster Sieg“ mit Datum.
+- **Häufigkeit `.hf`** (Duelle, nie Chancen): „5 von 8“ zuerst, Anteil gedämpft, darunter ein Kästchen (12×8px) je
+  Duell, neueste links; ohne Seite `--best-bar`, „zu null“ in Teamfarbe. Absichtlich nicht `.oc`, damit es nicht wie
+  eine Modellchance aussieht; darunter „So oft war es in den Duellen – keine Chance für das nächste Spiel.“
+- **Wenige Spiele:** unter 5 Duellen bzw. Spielen `.duel-warn` (Bernstein-Punkt mit Ring) „Nur n … – kann auch Zufall
+  sein.“, in Bilanz und Torphasen.
+- **Torphasen `.ph-tile`:** je Team eine Kachel, „erzielt“ in Teamfarbe, „kassiert“ grau, Stärke 10–45 % (Zahl bleibt
+  ≥ 4,5:1 lesbar). Kein Grün/Rot.
+- **Tabellenverlauf:** Linien Heim/Gast mit Namen am Ende („3. Dortmund“), keine Zonen-Bänder, Trend in Worten
+  („1 Platz besser“).
+- **Form `.fv`:** Teamspalte 120–200px, „Alle Spiele“ und bei Ligaspielen „Heim / Auswärts“ (Heim zu Hause, Gast
+  auswärts), Punkte als „8 von 12 Pkt.“.
 - **Leerzustand `.empty`:** Titel in Display-Schrift, ein Satz mit Grund und nächstem Schritt.
 - **Zustände:** Hover = 6 % Text auf Fläche, Fokus = 2px-Akzentrahmen (in Listen nach innen), gesperrt = 60 %.
 

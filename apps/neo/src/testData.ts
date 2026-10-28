@@ -1,4 +1,5 @@
-import type { DashboardDocument, DashboardFixture, DashboardMarket, DashboardMarketKey, FormResult } from "../../shared/src/types";
+import type { DashboardDocument, DashboardFixture, DashboardMarket, DashboardMarketKey, FormResult, FixtureInsights } from "../../shared/src/types";
+import type { RecentMatchSummary } from "../../../src/types";
 
 /**
  * Kleiner Snapshot für die Tests: zwei Ligen an zwei Tagen und ein Pokalspiel ohne belastbares 1X2.
@@ -14,7 +15,24 @@ export function market(key: DashboardMarketKey, probability: number, extra: Part
 const table = (teams: string[]) => teams.map((teamName, i) => ({
   position: i + 1, teamName, played: 8, wins: 5 - i, draws: 1, losses: 2 + i, points: 16 - 3 * i, goalsFor: 14 - i, goalsAgainst: 8 + i,
   form: (i === 0 ? ["win", "draw", "win", "loss", "win"] : i === 1 ? ["loss"] : []) as FormResult[],
+  positions: i === 0 ? [3, 2, 1, 1] : i === 1 ? [1, 1, 2, 2] : [2, 3, 3, 3],
+  ...(i === 0 ? { previousPositions: [5, 4, 4, 3] } : {}),
 }));
+
+/** Direkte Duelle London - Leeds: fünf Pflichtspiele (neueste zuerst) und ein Testspiel, das nicht zählt. */
+const duel = (id: number, date: string, londonHome: boolean, london: number, leeds: number, extra: Partial<RecentMatchSummary> = {}): RecentMatchSummary => ({
+  fixtureId: id, teamWasHome: londonHome, date, league: "Premier League", friendly: false,
+  homeTeam: londonHome ? "London FC" : "Leeds AFC", awayTeam: londonHome ? "Leeds AFC" : "London FC",
+  homeGoals: londonHome ? london : leeds, awayGoals: londonHome ? leeds : london, ...extra,
+});
+export const HISTORY: RecentMatchSummary[] = [
+  duel(501, "2026-04-18T14:30:00Z", false, 0, 3),
+  duel(502, "2025-11-29T15:00:00Z", true, 2, 0),
+  duel(503, "2025-07-12T15:00:00Z", true, 4, 4, { friendly: true, league: "Friendlies Clubs" }),
+  duel(504, "2025-03-08T15:00:00Z", false, 1, 1),
+  duel(505, "2024-10-19T15:00:00Z", true, 3, 0),
+  duel(506, "2024-02-24T15:00:00Z", false, 0, 2),
+];
 
 export function fixture(id: number, extra: Partial<DashboardFixture>): DashboardFixture {
   return {
@@ -33,7 +51,7 @@ export function fixture(id: number, extra: Partial<DashboardFixture>): Dashboard
 }
 
 export const DOCUMENT: DashboardDocument = {
-  schemaVersion: 10,
+  schemaVersion: 11,
   meta: {
     createdAt: "2026-10-27T13:00:00.000Z", timezone: "Europe/Berlin", sourceFile: "data.json", totalTipicoEvents: 3, selectedTipicoEvents: 3,
     selectedCompetitions: 3, fixtureCount: 3, firstAvailableDate: "2026-10-27", lastAvailableDate: "2026-10-28", maximumDays: 2, maximumHours: 48,
@@ -52,6 +70,7 @@ export const DOCUMENT: DashboardDocument = {
         market("over25", 0.71, { odds: 1.5 }), market("under25", 0.29, { odds: 2.6 }),
         market("btts", 0.5, { odds: 1.9 }), market("bttsNo", 0.5, { odds: 1.9 }),
       ],
+      h2h: { outcomes: [], btts: [], draws: 1, consecutiveDraws: 0, matches: HISTORY.slice(0, 5), history: HISTORY },
       marketDetail: {
         totalGoals: [0.06, 0.17, 0.24, 0.23, 0.16, 0.08, 0.06],
         exactScores: [{ home: 1, away: 1, probability: 0.12 }, { home: 1, away: 2, probability: 0.11 }, { home: 0, away: 1, probability: 0.09 }, { home: 2, away: 1, probability: 0.08 }],
@@ -69,4 +88,20 @@ export const DOCUMENT: DashboardDocument = {
       marketDetail: { totalGoals: [0.1, 0.2, 0.25, 0.2, 0.13, 0.07, 0.05], exactScores: null, halfTime: null, firstGoal: null },
     }),
   ],
+};
+
+/** Detailkennzahlen für London - Leeds (Torphasen): zwei Duelle mit Torminuten, ein Ligaspiel je Team. */
+const im = (id: number, home: number, away: number, goals: Array<[number, number]>, extra: Partial<FixtureInsights["h2h"][number]> = {}) => ({
+  fixtureId: id, date: "2026-04-18T14:30:00Z", leagueId: 39, league: "Premier League", country: "England", season: 2026,
+  home: { id: home, name: String(home) }, away: { id: away, name: String(away) }, homeGoals: 0, awayGoals: 0,
+  halfTimeHomeGoals: null, halfTimeAwayGoals: null, goals: goals.map(([teamId, minute]) => ({ teamId, minute })),
+  minutesComplete: true, stats: { home: null, away: null }, ...extra,
+});
+export const INSIGHTS: FixtureInsights = {
+  fixtureId: 2, league: { id: 39, name: "Premier League", country: "England", season: 2026 },
+  home: { id: 10, name: "London FC" }, away: { id: 20, name: "Leeds AFC" },
+  homeMatches: [im(601, 10, 30, [[10, 12], [10, 80]]), im(602, 40, 10, [[40, 33]])],
+  awayMatches: [im(603, 50, 20, [[20, 5], [50, 88]])],
+  h2h: [im(501, 20, 10, [[20, 3], [20, 50], [20, 91]]), im(502, 10, 20, [[10, 44], [10, 60]]), im(503, 10, 20, [[10, 1]], { league: "Friendlies Clubs" })],
+  coverage: { matches: 3, withMinutes: 3, withStats: 0 }, fetchedAt: "2026-10-28T10:00:00Z", apiRequests: 4,
 };

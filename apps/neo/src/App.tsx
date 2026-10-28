@@ -141,8 +141,8 @@ function Dashboard({ document }: { document: DashboardDocument }) {
           )}
         </section>
         <Splitter split={ui.split} onSplit={(split) => set({ split })} container={() => mainRef.current} />
-        <DetailPanel fixture={detailFixture} team={ui.view === "teams" ? team : null} timezone={tz} markets={ui.view === "fixtures"}
-          ou={ui.ou} onOu={(ou) => set({ ou })} moreOpen={ui.moreOpen} onMoreOpen={(moreOpen) => set({ moreOpen })} />
+        <DetailPanel fixture={detailFixture} fixtures={document.fixtures} team={ui.view === "teams" ? team : null} timezone={tz} markets={ui.view === "fixtures"}
+          ui={ui} onUi={set} />
       </main>
     </div>
   );

@@ -512,7 +512,7 @@ td.pts{font-weight:600;font-family:var(--f-mono)}
 @media (prefers-reduced-motion:reduce){.more summary::before{transition:none}}
 .dist-x .over{color:var(--ink);font-weight:600}
 .tile-h{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
-.tile-h h4{margin:0;font-family:var(--f-display);font-weight:600;font-size:17px;letter-spacing:.02em;text-transform:uppercase}
+.tile-h h4,.tile-h h5{margin:0;font-family:var(--f-display);font-weight:600;font-size:17px;letter-spacing:.02em;text-transform:uppercase}
 .tile-h span{font-size:12px;color:var(--muted);text-align:right}
 .oc{display:grid;grid-template-columns:minmax(0,1fr) auto auto;column-gap:10px;row-gap:4px;align-items:baseline}
 .oc-l{font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -527,6 +527,100 @@ td.pts{font-weight:600;font-family:var(--f-mono)}
 .oc.best .oc-bar i:not(.h):not(.a){background:var(--best-bar)}
 .oc .oc-bar i.h{background:var(--home)} .oc .oc-bar i.d{background:var(--draw)} .oc .oc-bar i.a{background:var(--away)}
 .tiles-note{margin:14px 2px 0;max-width:75ch}
+/* H2H (Neo-Referenz 28.10.2026): dieselbe Sprache wie die Marktchancen - Gruppenkopf, flache Kacheln, keine Ampel. */
+/* Kopfleiste ohne Umbruch bis 1024px (wie in apps/neo): längere Texte kürzen statt umbrechen */
+.topbar-in{gap:8px 24px}
+.brand h1,.cpick-btn > span,.top-meta,.pill,.nav button span{white-space:nowrap}
+.brand,.nav,.cpick,.top-meta{flex:none}
+.top-meta{flex:0 1 auto;min-width:0}
+.top-meta .pill{min-width:0;overflow:hidden;text-overflow:ellipsis}
+@media (max-width:1500px){.top-meta .season{display:none}}
+/* Unter 1180px: Navigation nur mit Symbol und Zähler; der Name bleibt für Screenreader im Knopf */
+@media (max-width:1180px){.nav button > span:not(.count){position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}}
+@media (max-width:1100px){.top-meta{display:none}}
+.h2h-stack{display:flex;flex-direction:column;gap:36px}
+.h2h-stack > .note{margin:0 2px}
+/* Zwei Blöcke (Prüfung 28.10.2026): „Direkte Duelle (H2H)“ mit dem Filter, „Aktuelle Saison“ ohne */
+.h2h-block{display:flex;flex-direction:column;gap:20px}
+.h2h-block .tgroup + .tgroup{margin-top:0}
+.block-bar{display:flex;align-items:center;justify-content:space-between;gap:8px 16px;flex-wrap:wrap;padding-bottom:10px;border-bottom:1px solid var(--line)}
+.block-h{margin:0;font-family:var(--f-display);font-weight:600;font-size:19px;letter-spacing:.02em;text-transform:uppercase;line-height:1.1}
+.block-h span{margin-left:8px;font-family:var(--f-body);font-size:12px;font-weight:400;letter-spacing:0;text-transform:none;color:var(--muted)}
+/* Häufigkeit in den Duellen: „5 von 8“ zuerst, Anteil gedämpft, ein Kästchen je Duell - absichtlich anders als .oc */
+.hf{display:grid;grid-template-columns:minmax(0,1fr) auto 40px;column-gap:10px;row-gap:6px;align-items:baseline}
+.hf-l{font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hf-n{font-family:var(--f-mono);font-size:13px;font-weight:500}
+.hf-p{font-family:var(--f-mono);font-size:12px;color:var(--muted);text-align:right}
+.hf-pips{grid-column:1/-1;display:flex;gap:3px}
+.hf-pips i{width:12px;height:8px;border-radius:2px;box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--muted) 45%, transparent)}
+.hf-pips i.on{background:var(--best-bar);box-shadow:none}
+.hf-pips.h i.on{background:var(--home)} .hf-pips.a i.on{background:var(--away)}
+.h2h-notes{display:flex;flex-direction:column;gap:6px;margin-top:10px}
+.h2h-notes .note{margin:0}
+.duel-counts span.zero b{color:var(--muted)}
+.duel-best{margin:0;display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 16px;font-size:13px;color:var(--muted)}
+.duel-best-l{font-size:11px;font-weight:500;letter-spacing:.06em;text-transform:uppercase}
+.duel-best strong{color:var(--ink);font-weight:600}
+.duel-best em{font-style:normal;font-family:var(--f-mono);font-size:12px}
+/* Vergleich, letzte Duelle, Form: Kacheln wie die Marktchancen; Balken auf derselben Schiene */
+.cmp-tile{gap:12px}
+.cmp-tile .cmp .v{font-size:15px}
+.half{background:var(--track)}
+.mt-tile{gap:0;padding:4px 14px}
+.mt-tile .mt{border-bottom-color:color-mix(in srgb, var(--line) 70%, transparent)}
+.form-tile{gap:12px}
+/* Gruppenkopf mit Werkzeugen rechts (Tabellenverlauf, Torphasen) */
+.tgroup-bar{display:flex;align-items:center;justify-content:space-between;gap:8px 16px;flex-wrap:wrap;margin-bottom:10px}
+.tgroup-bar .tgroup-h{margin-bottom:0}
+.tgroup-tools{display:flex;align-items:center;gap:8px 14px;flex-wrap:wrap}
+.tgroup-tools .chk{align-self:center}
+.perf-tile{gap:12px}
+.perf-tile .pc-dot{fill:var(--surface-2)}
+@container (min-width:760px){.ph-tiles{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.ph-tile{gap:8px}
+.ph-tile .tile-h h5{display:flex;align-items:center;gap:8px}
+.ph-tile .ph-row{grid-template-columns:64px 24px repeat(6,minmax(0,1fr));gap:4px}
+.ph-tile .ph-t{font-size:20px;font-weight:600}
+.ph-tile .ph-t.sc{color:var(--tone)} .ph-tile .ph-t.co{color:var(--muted)}
+.ph-tile.h{--tone:var(--home)} .ph-tile.a{--tone:var(--away)}
+.ph-tile .ph-c{height:30px;border:0;background:var(--track);font-size:12px}
+.ph-tile .ph-c.sc{background:color-mix(in srgb, var(--tone) var(--a), var(--surface-2));color:var(--ink)}
+.ph-tile .ph-c.co{background:color-mix(in srgb, var(--muted) var(--a), var(--surface-2));color:var(--ink)}
+.fv{display:grid;justify-content:start;grid-template-columns:minmax(120px,200px) auto;column-gap:28px;row-gap:10px;align-items:center}
+.fv.venue{grid-template-columns:minmax(120px,200px) auto auto}
+.fv-h{font-size:11px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.fv-cell{display:flex;align-items:center;gap:10px}
+.fv-cell small{width:56px;font-size:12px;color:var(--muted);text-align:right}
+.fv-cell .form{width:102px}
+.fv-cell em{min-width:92px;font-style:normal;font-family:var(--f-mono);font-size:12px;color:var(--muted);text-align:right}
+.tgroup-h span{margin-left:8px;font-family:var(--f-body);font-size:12px;font-weight:400;letter-spacing:0;text-transform:none}
+.oc-o.none{border-color:transparent;background:transparent}
+@container (min-width:420px){.h2h-tiles .tile.duel{grid-column:1/-1}}
+@container (min-width:900px){.h2h-tiles{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.duel{gap:12px;padding:16px}
+.duel-row{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center;gap:12px}
+.duel-side{display:flex;align-items:center;gap:10px;min-width:0}
+.duel-side.a{justify-content:flex-end;text-align:right}
+.duel-side .crest.lg{width:32px;height:32px}
+.duel-name{font-weight:600;font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.duel-n{display:flex;flex-direction:column;align-items:center;line-height:1}
+.duel-n b{font-family:var(--f-display);font-size:24px;font-weight:600}
+.duel-n span{font-size:12px;color:var(--muted);margin-top:2px}
+/* Siege links und rechts an den Enden des Balkens, Remis in der Mitte; Farbe = Seite wie im Balken */
+.duel-counts{display:grid;grid-template-columns:1fr auto 1fr;align-items:baseline;gap:12px;margin-top:4px}
+.duel-counts span{display:flex;align-items:baseline;gap:8px}
+.duel-counts .d{justify-content:center}
+.duel-counts .a{justify-content:flex-end}
+.duel-counts b{font-family:var(--f-display);font-size:28px;font-weight:600;line-height:1;letter-spacing:.01em}
+.duel-counts .h b{color:var(--home)} .duel-counts .a b{color:var(--away)} .duel-counts .d b{font-size:20px;color:var(--muted);font-weight:500}
+.duel-counts em{font-style:normal;font-family:var(--f-mono);font-size:12px;color:var(--muted)}
+.duel-split{display:flex;gap:2px;height:10px;border-radius:5px;overflow:hidden;background:var(--track)}
+.duel-split i{display:block;min-width:4px}
+.duel-split .h{background:var(--home)} .duel-split .d{background:var(--draw)} .duel-split .a{background:var(--away)}
+.duel-text{margin:2px 0 0;font-size:13px;line-height:1.55;color:var(--muted);max-width:75ch;text-wrap:pretty}
+/* Hinweis bei wenigen Duellen: Bernstein heißt Hinweis (system.md), Text bleibt in Schriftfarbe */
+.duel-warn{margin:0;display:flex;align-items:center;gap:8px;font-size:13px}
+.duel-warn::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--amber);flex:none;box-shadow:0 0 0 1px color-mix(in srgb, var(--ink) 40%, transparent)}
 .chips{display:flex;gap:4px;flex-wrap:wrap}
 .chips button{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:2px 9px;font-family:var(--f-mono);font-size:12px;cursor:pointer;color:var(--muted)}
 .chips button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
@@ -602,14 +696,7 @@ td.pts{font-weight:600;font-family:var(--f-mono)}
 .pd-opt:disabled{opacity:.6;cursor:not-allowed}
 .pd-opt b{display:inline-flex;align-items:center;gap:6px}
 @media (max-width:820px){#root{height:auto}}
-/* Echte Texte sind länger als die Mockwerte der Referenz („Analyse vom …“, „Di., 27.10. – Do., 29.10.“):
-   Kopfleiste ohne Umbruch, etwas engere Abstände. */
-.topbar-in{gap:8px 24px}
-.brand h1,.cpick-btn > span,.top-meta,.pill,.nav button span{white-space:nowrap}
-.brand,.nav,.cpick,.top-meta{flex:none}
-.top-meta{flex:0 1 auto;min-width:0}
-.top-meta .pill{min-width:0;overflow:hidden;text-overflow:ellipsis}
-@media (max-width:1500px){.top-meta .season{display:none}}
+/* Kopfleiste ohne Umbruch: steht seit 28.10.2026 in der Referenz und kommt mit ihr oben herein. */
 /* Mit Form für jedes Team (schemaVersion 9) braucht die Form-Spalte fünf Kästchen: in der schmalen
    Liste engere Zellen und gekürzte Teamnamen statt seitlichem Scrollen. */
 @container (max-width:580px){
@@ -618,5 +705,6 @@ td.pts{font-weight:600;font-family:var(--f-mono)}
   .form{gap:2px}
 }
 @container (max-width:580px){ td.go, thead th:last-child{display:none} }
-.oc-o.none{border-color:transparent;background:transparent}
 .seg button:disabled{cursor:not-allowed}
+/* H2H in Neo: Lade- und Fehlerzeile der Torphasen (Detailkennzahlen kommen erst beim Öffnen) */
+.ph-state{margin:0;font-size:13px;color:var(--muted)}

@@ -1,6 +1,6 @@
 import { countryFlagCode } from "../../shared/src/countryFlags";
 import { competitionCountry, competitionLeague, teamName, type NameSource } from "../../shared/src/names";
-import type { DashboardDocument, DashboardFixture, DashboardMarket, DashboardMarketKey, FormResult } from "../../shared/src/types";
+import type { DashboardDocument, DashboardFixture, DashboardMarket, DashboardMarketKey, FormResult, InsightMatch } from "../../shared/src/types";
 
 /**
  * Alles, was Neo aus dem Snapshot ableitet - rein, ohne React und ohne Netz. Aufbau und Regeln
@@ -315,6 +315,106 @@ export function leagueTables(fixtures: readonly DashboardFixture[], competitions
   }
   return tables;
 }
+
+// ===== H2H (direkte Duelle) =====================================================
+
+/** Unter so vielen Duellen bzw. Spielen steht „kann auch Zufall sein“ (Davids Entscheidung 28.10.2026). */
+export const H2H_FEW = 5;
+
+export interface Duel {
+  id: number;
+  date: string;
+  league: string | null;
+  /** War das heutige Heimteam in diesem Duell zu Hause? */
+  ourHome: boolean;
+  homeGoals: number;
+  awayGoals: number;
+  /** Tore aus Sicht des heutigen Heim- bzw. Gastteams. */
+  gh: number;
+  ga: number;
+  res: FormResult;
+}
+
+/**
+ * Die direkten Duelle eines Spiels, neueste zuerst, ohne Testspiele (`h2hSummary` zählt sie mit, für
+ * eine Bilanz taugen sie nicht). Ab schemaVersion 11 bis zu 10 Duelle mit Wettbewerb (`h2h.history`),
+ * davor die fünf aus `h2h.matches` ohne Wettbewerb.
+ */
+export function duelsOf(fixture: Pick<DashboardFixture, "h2h">): Duel[] {
+  const list = fixture.h2h.history ?? fixture.h2h.matches;
+  return list.filter((m) => m.friendly !== true).map((m) => {
+    const gh = m.teamWasHome ? m.homeGoals : m.awayGoals, ga = m.teamWasHome ? m.awayGoals : m.homeGoals;
+    return {
+      id: m.fixtureId, date: m.date, league: m.league ?? null, ourHome: m.teamWasHome,
+      homeGoals: m.homeGoals, awayGoals: m.awayGoals, gh, ga, res: gh > ga ? "win" : gh < ga ? "loss" : "draw",
+    };
+  });
+}
+
+export interface DuelStats {
+  n: number; wH: number; dr: number; wA: number; gH: number; gA: number;
+  bestH: Duel | null; bestA: Duel | null;
+}
+
+export function duelStats(duels: readonly Duel[]): DuelStats {
+  const best = (res: FormResult) => duels.filter((d) => d.res === res)
+    .reduce<Duel | null>((top, d) => (!top || Math.abs(d.gh - d.ga) > Math.abs(top.gh - top.ga) ? d : top), null);
+  return {
+    n: duels.length,
+    wH: duels.filter((d) => d.res === "win").length, dr: duels.filter((d) => d.res === "draw").length,
+    wA: duels.filter((d) => d.res === "loss").length,
+    gH: duels.reduce((s, d) => s + d.gh, 0), gA: duels.reduce((s, d) => s + d.ga, 0),
+    bestH: best("win"), bestA: best("loss"),
+  };
+}
+
+type TableEntry = NonNullable<DashboardFixture["table"]>[number];
+
+/**
+ * Die Tabellenzeile eines Teams: zuerst aus der Tabelle des Spiels, sonst - bei Pokalspielen, die keine
+ * Tabelle tragen - aus der Tabelle eines anderen Spiels im Snapshot („jeweils in der eigenen Liga“).
+ */
+export function tableEntryOf(fixtures: readonly DashboardFixture[], fixture: DashboardFixture, teamName: string):
+  { row: TableEntry; size: number; competition: string } | null {
+  for (const f of [fixture, ...fixtures]) {
+    const row = f.table?.find((r) => r.teamName === teamName);
+    if (row) return { row, size: f.table!.length, competition: competitionId(f) };
+  }
+  return null;
+}
+
+/** Die Viertelstunde eines Tors (wie `scoringPeriodIndex` in src/fixture-insights.ts). */
+export const periodOf = (minute: number) => Math.min(Math.max(Math.ceil(Math.max(minute, 1) / 15), 1), 6) - 1;
+export const PERIOD_LABELS = ["0'", "15'", "30'", "45'", "60'", "75'", "90'"];
+
+export interface PhaseCounts { games: number; scored: number[]; conceded: number[] }
+
+/** Tore je Viertelstunde aus Spielen mit vollständigen Torminuten; Spiele mit Lücken bleiben draußen. */
+export function phaseCounts(matches: readonly InsightMatch[], teamId: number): PhaseCounts {
+  const scored = [0, 0, 0, 0, 0, 0], conceded = [0, 0, 0, 0, 0, 0];
+  const complete = matches.filter((m) => m.minutesComplete);
+  for (const m of complete) for (const g of m.goals) (g.teamId === teamId ? scored : conceded)[periodOf(g.minute)]! += 1;
+  return { games: complete.length, scored, conceded };
+}
+
+/**
+ * Ligaspiele der laufenden Saison eines Teams aus den Detailkennzahlen. Die Liga ist das häufigste
+ * Paar aus Wettbewerb und Saison in seinen letzten Spielen - bei einem Pokalspiel ist `insights.league`
+ * der Pokal, die Torphasen sollen aber aus der eigenen Liga kommen.
+ */
+export function seasonMatches(matches: readonly InsightMatch[], teamId: number, venue: "home" | "away" | null): InsightMatch[] {
+  // Erst die jüngste Saison, darin der häufigste Wettbewerb: Früh in der Saison stehen unter den letzten
+  // 20 Spielen mehr aus der Vorsaison - das häufigste Paar insgesamt wäre dann die Vorsaison.
+  const latest = Math.max(...matches.map((m) => m.season));
+  const count = new Map<number, number>();
+  for (const m of matches) if (m.season === latest) count.set(m.leagueId, (count.get(m.leagueId) ?? 0) + 1);
+  const main = [...count.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
+  return matches.filter((m) => m.season === latest && m.leagueId === main
+    && (venue === null || (venue === "home" ? m.home.id === teamId : m.away.id === teamId)));
+}
+
+/** Formpunkte: Sieg 3, Remis 1. */
+export const formPoints = (list: readonly FormResult[]) => list.reduce((s, r) => s + (r === "win" ? 3 : r === "draw" ? 1 : 0), 0);
 
 // ===== Saison und Stand ========================================================
 

@@ -3,7 +3,7 @@ import { config, TEAM_ALIASES_FILE } from "./config.ts";
 import { AnalyzerDatabase } from "./database.ts";
 import { scoreCrossLeagueFixture } from "./cross-league-criteria.ts";
 import { scoreCrossLeagueDrawFixture } from "./cross-league-draw-criteria.ts";
-import { buildTable, consensusOdds, leagueAverages, scoreDrawFixture, tableForm, tableScopeOf } from "./draw-criteria.ts";
+import { buildTable, consensusOdds, leagueAverages, scoreDrawFixture, tableForm, tablePositions, tableScopeOf } from "./draw-criteria.ts";
 import { scoreFavoriteFixture } from "./favorite-criteria.ts";
 import { strengthPool } from "./league-strength.ts";
 import {
@@ -613,6 +613,7 @@ export async function runGoalLineAnalysis(
     // summiert sich das zu einem Bestand, den es als Tabelle nie gab.
     const standingsByCompetition = new Map<string, {
       table: TableRow[]; teamNames: Map<number, string>; forms: Map<number, Array<"win" | "draw" | "loss">>;
+      positions: Map<number, Array<number | null>>; previousPositions: Map<number, Array<number | null>>;
     }>();
     for (const fixture of fixtures) {
       const key = standingsKey(fixture);
@@ -632,7 +633,11 @@ export async function runGoalLineAnalysis(
         teamNames.set(match.teams.away.id, match.teams.away.name);
       }
       standingsByCompetition.set(key, {
-        table: buildTable(history, targetTimestamp, scope), teamNames, forms: tableForm(history, targetTimestamp, scope)
+        table: buildTable(history, targetTimestamp, scope), teamNames, forms: tableForm(history, targetTimestamp, scope),
+        // Tabellenverlauf (Neo, H2H): dieselben Partien Spieltag für Spieltag; `history` enthält auch die
+        // Vorsaison, deshalb kostet der Vorjahresverlauf ebenfalls nichts.
+        positions: tablePositions(history, targetTimestamp, scope),
+        previousPositions: tablePositions(history, targetTimestamp, { ...scope, season: scope.season - 1 })
       });
     }
 
@@ -835,7 +840,11 @@ export async function runGoalLineAnalysis(
           // Eine leere Tabelle ist bei reinen Pokalwettbewerben der richtige Zustand: Dort
           // gibt es keine Spieltage, aus denen sich ein Klassement ergibt.
           if (!entry || entry.table.length === 0) return undefined;
-          return entry.table.map((row) => ({ ...row, teamName: entry.teamNames.get(row.id) ?? "?", form: entry.forms.get(row.id) ?? [] }));
+          return entry.table.map((row) => ({
+            ...row, teamName: entry.teamNames.get(row.id) ?? "?", form: entry.forms.get(row.id) ?? [],
+            positions: entry.positions.get(row.id) ?? [],
+            ...(entry.previousPositions.has(row.id) ? { previousPositions: entry.previousPositions.get(row.id)! } : {})
+          }));
         })(),
         probabilities: goalLineProbabilities(
           model.expectedHomeGoals,

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import type { PerfRange, Venue } from "./components/H2HPanel";
 import type { DayScope, TipMarket } from "./neoData";
 
 export type NeoView = "fixtures" | "teams" | "preds";
@@ -24,6 +25,14 @@ export interface NeoState {
   ou: number;
   /** „Weitere Märkte“ aufgeklappt. */
   moreOpen: boolean;
+  /** Detailansicht bei „Spiele“: Marktchancen oder H2H. */
+  fxSide: "markets" | "h2h";
+  /** H2H: alle Duelle oder nur die im Stadion des Heimteams. */
+  h2hVenue: Venue;
+  perfRange: PerfRange;
+  perfPrev: boolean;
+  /** Torphasen der Saison: Heimteam nur zu Hause, Gast nur auswärts. */
+  phSplit: boolean;
 }
 
 export const SPLIT = { min: 0.25, max: 0.65, def: 0.4 };
@@ -32,6 +41,7 @@ const STORAGE_KEY = "neo:state:v1";
 const DEFAULTS: NeoState = {
   view: "fixtures", scope: null, calMonth: null, deselected: [], closedCountries: [], fixture: null, team: null, tip: null,
   fxOrder: "kickoff", teamsByLeague: false, split: SPLIT.def, pmarkets: ["1x2", "ou", "btts"], pmin: 0, pmax: 100, ou: 2.5, moreOpen: false,
+  fxSide: "markets", h2hVenue: "all", perfRange: "10", perfPrev: false, phSplit: true,
 };
 
 function load(): NeoState {

@@ -189,6 +189,8 @@ export interface DashboardFixture {
     draws: number;
     consecutiveDraws: number;
     matches: RecentMatchSummary[];
+    /** Bis zu 10 Duelle mit Wettbewerb, neueste zuerst, nur Anzeige (ab schemaVersion 11). */
+    history?: RecentMatchSummary[];
   };
   defense?: { home: DefensiveProfile; away: DefensiveProfile };
   strength?: LeagueStrengthComparison;
@@ -212,6 +214,10 @@ export interface DashboardFixture {
      * schemaVersion 9. Nicht zu verwechseln mit `form.home`/`form.away` (nur am Spielort).
      */
     form?: FormResult[];
+    /** Platz nach jedem Spieltag, ab schemaVersion 11 (`tablePositions`); `null` = noch kein Spiel. */
+    positions?: Array<number | null>;
+    /** Dasselbe für die Vorsaison, nur für Teams, die dort in dieser Liga spielten. */
+    previousPositions?: Array<number | null>;
   }>;
   expectedGoals: { home: number; away: number; total: number };
   expectedFirstHalfGoals?: { home: number; away: number; total: number };
@@ -231,7 +237,7 @@ export interface DashboardFixture {
 }
 
 export interface DashboardDocument {
-  schemaVersion: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
+  schemaVersion: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11;
   meta: {
     createdAt: string;
     timezone: string;
@@ -560,7 +566,8 @@ export function buildDashboardDocument(input: DashboardInput): DashboardDocument
       },
       h2h: {
         outcomes: h2h?.recentHomeTeamResults ?? [], btts: h2h?.recentBttsResults ?? [], draws: h2h?.draws ?? 0,
-        consecutiveDraws: h2h?.consecutiveDraws ?? 0, matches: withMatchStats(h2h?.recentMatches ?? [], recentStats)
+        consecutiveDraws: h2h?.consecutiveDraws ?? 0, matches: withMatchStats(h2h?.recentMatches ?? [], recentStats),
+        ...(h2h?.history ? { history: h2h.history } : {})
       },
       ...(row.defense ? { defense: row.defense } : {}),
       ...(row.strength ? { strength: row.strength } : {}),
@@ -569,7 +576,9 @@ export function buildDashboardDocument(input: DashboardInput): DashboardDocument
         wins: standing.wins, draws: standing.draws, losses: standing.played - standing.wins - standing.draws,
         points: standing.points, goalsFor: standing.goalsFor, goalsAgainst: standing.goalsAgainst,
         homePlayed: standing.homePlayed, homePoints: standing.homePoints,
-        awayPlayed: standing.awayPlayed, awayPoints: standing.awayPoints, form: standing.form
+        awayPlayed: standing.awayPlayed, awayPoints: standing.awayPoints, form: standing.form,
+        ...(standing.positions ? { positions: standing.positions } : {}),
+        ...(standing.previousPositions ? { previousPositions: standing.previousPositions } : {})
       })) } : {}),
       expectedGoals: { home: row.expectedHomeGoals, away: row.expectedAwayGoals, total: row.expectedTotalGoals },
       expectedFirstHalfGoals: {
@@ -591,7 +600,7 @@ export function buildDashboardDocument(input: DashboardInput): DashboardDocument
   const createdAt = Date.parse(input.createdAt);
   const latestKickoff = fixtures.reduce((latest, fixture) => Math.max(latest, Date.parse(fixture.kickoff)), createdAt);
   return {
-    schemaVersion: 10,
+    schemaVersion: 11,
     meta: {
       createdAt: input.createdAt, timezone: config.timezone, sourceFile: input.sourceFile,
       totalTipicoEvents: input.totalTipicoEvents, selectedTipicoEvents: input.selectedTipicoEvents,

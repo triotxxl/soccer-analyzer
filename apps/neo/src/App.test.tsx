@@ -1,11 +1,13 @@
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
-import { DOCUMENT } from "./testData";
+import { DOCUMENT, INSIGHTS } from "./testData";
 
 const list = () => within(document.querySelector<HTMLElement>("section.panel.detail")!);
 const serve = (body: unknown, status = 200) =>
-  vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify(body), { status })));
+  vi.stubGlobal("fetch", vi.fn(async (url: string) => String(url).includes("/api/fixture/insights")
+    ? new Response(JSON.stringify(INSIGHTS), { status: 200 })
+    : new Response(JSON.stringify(body), { status })));
 
 describe("Neo Dashboard", () => {
   beforeEach(() => window.localStorage.clear());
@@ -88,7 +90,7 @@ describe("Neo Dashboard", () => {
     const lead = document.querySelector(".sh-lead")!;
     expect(lead).toHaveTextContent("Leeds AFC gewinnt 60 %");
     expect(lead).toHaveTextContent("Über 2,5 Tore 71 %");
-    expect(detail.getByRole("button", { name: /H2H/ })).toBeDisabled();
+    expect(detail.getByRole("button", { name: /H2H/ })).toBeEnabled();
     expect(detail.getByRole("heading", { name: "Wer gewinnt" })).toBeInTheDocument();
     expect(detail.getByText("Erstes Tor").closest("article")).toHaveTextContent("53 %");
     // Torlinie 3,5 kommt ohne eigenen Markt aus der Torverteilung, ohne Quote.
@@ -112,6 +114,24 @@ describe("Neo Dashboard", () => {
     fireEvent.click(list().getByText("Heim (Tipico)").closest("button")!);
     expect(detail.getByText("Erstes Tor").closest("article")).toHaveTextContent("Kommt mit der nächsten Analyse.");
     expect(detail.getByText("Endergebnis").closest("article")).toHaveTextContent("55 %");
+  });
+
+  it("zeigt im H2H-Reiter Duelle, Saison und Torphasen", async () => {
+    serve(DOCUMENT);
+    render(<App />);
+    await screen.findAllByText("Leeds AFC");
+    const detail = within(document.querySelectorAll<HTMLElement>("section.panel")[1]!);
+    fireEvent.click(detail.getByRole("button", { name: "H2H" }));
+    expect(document.querySelector(".sh-lead")).toHaveTextContent("London FC 2 Siege");
+    expect(detail.getByRole("heading", { name: "Direkte Duelle (H2H) letzte 5" })).toBeInTheDocument();
+    expect(detail.getByText("Über 2,5").closest(".hf")).toHaveTextContent("2 von 5");
+    expect(detail.getAllByText(/Niederlage für London FC/).length).toBe(2);
+    expect(detail.getAllByText("Premier League").length).toBeGreaterThan(0);
+    expect(await detail.findAllByText("erzielt")).toHaveLength(4);
+    expect(detail.getByText(/aktuell 2./)).toBeInTheDocument();
+    fireEvent.click(detail.getByRole("button", { name: "Nur in London FC" }));
+    expect(detail.getByText(/Nur 2 Duelle – die Anteile/)).toBeInTheDocument();
+    expect(detail.getByText(/gilt unabhängig vom Filter oben/)).toBeInTheDocument();
   });
 
   it("meldet, wenn noch keine Analyse vorhanden ist", async () => {

@@ -3,6 +3,7 @@ import {
   completedScore,
   consensusOdds,
   formStats,
+  h2hHistory,
   recentTeamMatches,
   recentTeamResults,
   tablePpg
@@ -214,7 +215,8 @@ function h2hSummary(
     allDraws: completed.length > 0 && draws === completed.length,
     recentHomeTeamResults,
     recentBttsResults,
-    recentMatches
+    recentMatches,
+    history: h2hHistory(fixtures, currentHomeTeamId)
   };
 }
 

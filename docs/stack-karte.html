@@ -265,7 +265,7 @@ details.honesty p { margin-top: 6px; }
 
 <div class="page">
   <header class="head">
-    <span class="eyebrow">api-football-analyzer · Stand 27.10.2026</span>
+    <span class="eyebrow">api-football-analyzer · Stand 28.10.2026</span>
     <h1>Wie der Analyzer zusammenhängt</h1>
     <p>Von der Tipico-Datei bis zur Anzeige in Neo: welche Teile Daten holen, rechnen, speichern und zeigen, und wer von Claudes Seite daran arbeitet. Klick auf einen Baustein, dann siehst du, woher er seine Daten bekommt und wohin er sie gibt.</p>
     <div class="legend" aria-label="Farben">
@@ -508,7 +508,7 @@ const NODES = {
     facts: [["Tabellen", "<ul><li>Tipico: <code>tipico_imports</code>, <code>tipico_fixtures</code>, <code>tipico_competitions</code>, <code>tipico_teams</code></li><li>Prognosen: <code>goal_line_predictions</code>, <code>goal_line_prediction_scopes</code>, <code>goal_line_analysis_runs</code>, <code>profile_predictions</code>, <code>profile_prediction_scopes</code>, <code>profile_analysis_runs</code>, <code>runs</code>, <code>candidates</code></li><li>Ergebnisse: <code>fixture_results</code>, <code>fixture_expected_goals</code>, <code>settle_deferrals</code></li><li>Elo: <code>elo_matches</code>, <code>elo_ratings</code>, <code>elo_history</code>, <code>elo_league_seasons</code>, <code>elo_meta</code></li><li>Ligastärke: <code>strength_matches</code>, <code>strength_team_leagues</code>, <code>league_strength_snapshots</code>, <code>strength_build_progress</code></li></ul>"], ["Datei", "<code>src/database.ts</code> mit <code>node:sqlite</code>"]] },
   s_output: { band: "main", col: 2, t: "store", kind: "Speicher", name: "Snapshots", line: "Ergebnis jeder Analyse als JSON", path: "output/dashboard-latest.json", chips: [["plain", "über 100 Dateien"]],
     text: "Das Ergebnis jeder Analyse. Neo liest den neuesten, Marktprofil und Rückrechnungen lesen die datierten Kopien.",
-    facts: [["Format", "<code>schemaVersion: 10</code>, Typen in <code>apps/shared/src/types.ts</code>"], ["Geschrieben von", "<code>src/dashboard.ts</code>"]] },
+    facts: [["Format", "<code>schemaVersion: 11</code>, Typen in <code>apps/shared/src/types.ts</code>"], ["Geschrieben von", "<code>src/dashboard.ts</code>"]] },
   s_backup: { band: "main", col: 2, t: "store", kind: "Speicher", name: "Sicherungen", line: "Eine gepackte Datenbank je Tag", path: "data/backups/analyzer-JJJJ-MM-TT.sqlite.gz", chips: [["plain", "rund 190 MB"]],
     text: "Nach jeder Analyse über die Online-Sicherung von SQLite kopiert, mit quick_check geprüft und gepackt. Die neuesten 6 bleiben. Scheitert etwas, bleibt die bisherige.",
     facts: [["Dateien", "<code>src/backup.ts</code>, <code>tools/backup.ts</code>, <code>tools/restore.ts</code>"], ["Abschalten", "<code>BACKUP_AFTER_ANALYSIS=0</code>"]] },
@@ -521,7 +521,7 @@ const NODES = {
     text: "Was jede App braucht: die Typen des Snapshots, das Abrufen von Dashboard und Live, die Namenssuche, Wappen mit Initialen als Ersatz, Flaggen sowie Farben und Schrift.",
     facts: [["Dateien", "<code>types.ts</code>, <code>data.ts</code>, <code>liveData.ts</code>, <code>names.ts</code>, <code>TeamCrest.tsx</code>, <code>countryFlags.ts</code>"]] },
   u_neo: { band: "main", col: 3, t: "app", kind: "App", name: "Neo Dashboard", line: "Die einzige App, im Aufbau", path: "npm run neo · Port 5174", chips: [["free", "0 Aufrufe"]],
-    text: "Startseite wie die freigegebene Referenz (docs/neo-referenz.html), mit den echten Daten der neuesten Analyse: Spiele nach Anstoß oder Liga mit 1X2-Chancen, Tipico-Quoten und Datenlage, Teams aus den Ligatabellen, Modell-Tipps, Zeitraum- und Wettbewerbsauswahl. Rechts zeigt sie zum gewählten Spiel die Marktchancen (Endergebnis, 1. Halbzeit, erstes Tor, Gesamttore mit Linien, Über/Unter, beide treffen, doppelte Chance, exakte Ergebnisse) aus dem Feld marketDetail des Snapshots. H2H, Teamanalyse, Live und Wettschein fehlen noch. Die alte App ist seit 26.10.2026 entfernt; ihre Entscheidungen gelten hier nicht von selbst.",
+    text: "Startseite wie die freigegebene Referenz (docs/neo-referenz.html), mit den echten Daten der neuesten Analyse: Spiele nach Anstoß oder Liga mit 1X2-Chancen, Tipico-Quoten und Datenlage, Teams aus den Ligatabellen, Modell-Tipps, Zeitraum- und Wettbewerbsauswahl. Rechts zeigt sie zum gewählten Spiel die Marktchancen (Endergebnis, 1. Halbzeit, erstes Tor, Gesamttore mit Linien, Über/Unter, beide treffen, doppelte Chance, exakte Ergebnisse) aus dem Feld marketDetail des Snapshots, daneben den Reiter H2H (direkte Duelle, Form, Tabellenverlauf aus dem Snapshot; nur die Torphasen kosten beim ersten Öffnen rund vier Aufrufe über die Detailkennzahlen). Teamanalyse, Live und Wettschein fehlen noch. Die alte App ist seit 26.10.2026 entfernt; ihre Entscheidungen gelten hier nicht von selbst.",
     facts: [["Dateien", "<code>apps/neo/src/App.tsx</code>, <code>apps/neo/src/neoData.ts</code> (Rechnung aus dem Snapshot), <code>apps/neo/src/components/</code>, <code>apps/neo/vite.config.ts</code>"], ["Design-System", "<code>.interface-design/system.md</code>"], ["Technik", "React 19, Vite 8, Tests mit Vitest"]] },
 
   // Claude

@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
+  duelsOf, duelStats, phaseCounts, seasonMatches, tableEntryOf,
   bothScore, likelyTips, overUnder, percent,
   competitionsOf, competitionTree, countryCode, datePresets, dayKey, isCup, leagueTables, modelTips, oddsTriple, oneXTwo, scopeLabel,
   seasonLabel, sortName,
 } from "./neoData";
-import { DOCUMENT } from "./testData";
+import { DOCUMENT, INSIGHTS } from "./testData";
 
 const [league, other, cup] = DOCUMENT.fixtures as [typeof DOCUMENT.fixtures[0], typeof DOCUMENT.fixtures[0], typeof DOCUMENT.fixtures[0]];
 
@@ -114,6 +115,38 @@ describe("Marktchancen", () => {
   it("schreibt sehr kleine Chancen als „< 1 %“", () => {
     expect(percent(0.004)).toBe("< 1 %");
     expect(percent(0.012)).toBe("1 %");
+  });
+});
+
+describe("H2H", () => {
+  const london = DOCUMENT.fixtures[1]!;
+  it("zählt die Duelle aus Sicht des Heimteams, ohne Testspiele", () => {
+    const duels = duelsOf(london);
+    expect(duels.map((d) => d.id)).toEqual([501, 502, 504, 505, 506]);
+    const s = duelStats(duels);
+    expect([s.n, s.wH, s.dr, s.wA, s.gH, s.gA]).toEqual([5, 2, 1, 2, 6, 6]);
+    expect([s.bestH?.id, s.bestA?.id]).toEqual([505, 501]);
+    expect(duels[0]!.league).toBe("Premier League");
+  });
+  it("nimmt ohne Verlauf die fünf Duelle aus h2h.matches", () => {
+    const old = { ...london, h2h: { ...london.h2h, history: undefined } };
+    expect(duelsOf(old).length).toBe(4); // die fünf aus h2h.matches enthalten das Testspiel
+  });
+  it("findet die Tabellenzeile auch in der Tabelle eines anderen Spiels", () => {
+    const cup = DOCUMENT.fixtures[2]!;
+    expect(cup.table).toBeUndefined();
+    expect(tableEntryOf(DOCUMENT.fixtures, cup, "Heim FC")?.row.position).toBe(1);
+    expect(tableEntryOf(DOCUMENT.fixtures, london, "Leeds AFC")?.row.positions).toEqual([3, 2, 1, 1]);
+  });
+  it("verteilt die Tore auf Viertelstunden und lässt Spiele mit Lücken weg", () => {
+    const duelMatches = INSIGHTS.h2h.filter((m) => !/friendl/i.test(m.league));
+    expect(phaseCounts(duelMatches, 10)).toEqual({ games: 2, scored: [0, 0, 1, 1, 0, 0], conceded: [1, 0, 0, 1, 0, 1] });
+    const gap = [{ ...INSIGHTS.h2h[0]!, minutesComplete: false }];
+    expect(phaseCounts(gap, 10).games).toBe(0);
+    expect(seasonMatches(INSIGHTS.homeMatches, 10, "home").map((m) => m.fixtureId)).toEqual([601]);
+    // Früh in der Saison: mehr Spiele der Vorsaison - gezählt wird trotzdem nur die laufende
+    const early = [INSIGHTS.homeMatches[0]!, ...[1, 2, 3].map((i) => ({ ...INSIGHTS.homeMatches[0]!, fixtureId: 700 + i, season: 2025 }))];
+    expect(seasonMatches(early, 10, null).map((m) => m.fixtureId)).toEqual([601]);
   });
 });
 

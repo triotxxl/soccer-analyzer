@@ -552,7 +552,7 @@ td.pts{font-weight:600;font-family:var(--f-mono)}
 @media (prefers-reduced-motion:reduce){.more summary::before{transition:none}}
 .dist-x .over{color:var(--ink);font-weight:600}
 .tile-h{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
-.tile-h h4{margin:0;font-family:var(--f-display);font-weight:600;font-size:17px;letter-spacing:.02em;text-transform:uppercase}
+.tile-h h4,.tile-h h5{margin:0;font-family:var(--f-display);font-weight:600;font-size:17px;letter-spacing:.02em;text-transform:uppercase}
 .tile-h span{font-size:12px;color:var(--muted);text-align:right}
 .oc{display:grid;grid-template-columns:minmax(0,1fr) auto auto;column-gap:10px;row-gap:4px;align-items:baseline}
 .oc-l{font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -567,6 +567,100 @@ td.pts{font-weight:600;font-family:var(--f-mono)}
 .oc.best .oc-bar i:not(.h):not(.a){background:var(--best-bar)}
 .oc .oc-bar i.h{background:var(--home)} .oc .oc-bar i.d{background:var(--draw)} .oc .oc-bar i.a{background:var(--away)}
 .tiles-note{margin:14px 2px 0;max-width:75ch}
+/* H2H (Neo-Referenz 28.10.2026): dieselbe Sprache wie die Marktchancen - Gruppenkopf, flache Kacheln, keine Ampel. */
+/* Kopfleiste ohne Umbruch bis 1024px (wie in apps/neo): längere Texte kürzen statt umbrechen */
+.topbar-in{gap:8px 24px}
+.brand h1,.cpick-btn > span,.top-meta,.pill,.nav button span{white-space:nowrap}
+.brand,.nav,.cpick,.top-meta{flex:none}
+.top-meta{flex:0 1 auto;min-width:0}
+.top-meta .pill{min-width:0;overflow:hidden;text-overflow:ellipsis}
+@media (max-width:1500px){.top-meta .season{display:none}}
+/* Unter 1180px: Navigation nur mit Symbol und Zähler; der Name bleibt für Screenreader im Knopf */
+@media (max-width:1180px){.nav button > span:not(.count){position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}}
+@media (max-width:1100px){.top-meta{display:none}}
+.h2h-stack{display:flex;flex-direction:column;gap:36px}
+.h2h-stack > .note{margin:0 2px}
+/* Zwei Blöcke (Prüfung 28.10.2026): „Direkte Duelle (H2H)“ mit dem Filter, „Aktuelle Saison“ ohne */
+.h2h-block{display:flex;flex-direction:column;gap:20px}
+.h2h-block .tgroup + .tgroup{margin-top:0}
+.block-bar{display:flex;align-items:center;justify-content:space-between;gap:8px 16px;flex-wrap:wrap;padding-bottom:10px;border-bottom:1px solid var(--line)}
+.block-h{margin:0;font-family:var(--f-display);font-weight:600;font-size:19px;letter-spacing:.02em;text-transform:uppercase;line-height:1.1}
+.block-h span{margin-left:8px;font-family:var(--f-body);font-size:12px;font-weight:400;letter-spacing:0;text-transform:none;color:var(--muted)}
+/* Häufigkeit in den Duellen: „5 von 8“ zuerst, Anteil gedämpft, ein Kästchen je Duell - absichtlich anders als .oc */
+.hf{display:grid;grid-template-columns:minmax(0,1fr) auto 40px;column-gap:10px;row-gap:6px;align-items:baseline}
+.hf-l{font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hf-n{font-family:var(--f-mono);font-size:13px;font-weight:500}
+.hf-p{font-family:var(--f-mono);font-size:12px;color:var(--muted);text-align:right}
+.hf-pips{grid-column:1/-1;display:flex;gap:3px}
+.hf-pips i{width:12px;height:8px;border-radius:2px;box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--muted) 45%, transparent)}
+.hf-pips i.on{background:var(--best-bar);box-shadow:none}
+.hf-pips.h i.on{background:var(--home)} .hf-pips.a i.on{background:var(--away)}
+.h2h-notes{display:flex;flex-direction:column;gap:6px;margin-top:10px}
+.h2h-notes .note{margin:0}
+.duel-counts span.zero b{color:var(--muted)}
+.duel-best{margin:0;display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 16px;font-size:13px;color:var(--muted)}
+.duel-best-l{font-size:11px;font-weight:500;letter-spacing:.06em;text-transform:uppercase}
+.duel-best strong{color:var(--ink);font-weight:600}
+.duel-best em{font-style:normal;font-family:var(--f-mono);font-size:12px}
+/* Vergleich, letzte Duelle, Form: Kacheln wie die Marktchancen; Balken auf derselben Schiene */
+.cmp-tile{gap:12px}
+.cmp-tile .cmp .v{font-size:15px}
+.half{background:var(--track)}
+.mt-tile{gap:0;padding:4px 14px}
+.mt-tile .mt{border-bottom-color:color-mix(in srgb, var(--line) 70%, transparent)}
+.form-tile{gap:12px}
+/* Gruppenkopf mit Werkzeugen rechts (Tabellenverlauf, Torphasen) */
+.tgroup-bar{display:flex;align-items:center;justify-content:space-between;gap:8px 16px;flex-wrap:wrap;margin-bottom:10px}
+.tgroup-bar .tgroup-h{margin-bottom:0}
+.tgroup-tools{display:flex;align-items:center;gap:8px 14px;flex-wrap:wrap}
+.tgroup-tools .chk{align-self:center}
+.perf-tile{gap:12px}
+.perf-tile .pc-dot{fill:var(--surface-2)}
+@container (min-width:760px){.ph-tiles{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.ph-tile{gap:8px}
+.ph-tile .tile-h h5{display:flex;align-items:center;gap:8px}
+.ph-tile .ph-row{grid-template-columns:64px 24px repeat(6,minmax(0,1fr));gap:4px}
+.ph-tile .ph-t{font-size:20px;font-weight:600}
+.ph-tile .ph-t.sc{color:var(--tone)} .ph-tile .ph-t.co{color:var(--muted)}
+.ph-tile.h{--tone:var(--home)} .ph-tile.a{--tone:var(--away)}
+.ph-tile .ph-c{height:30px;border:0;background:var(--track);font-size:12px}
+.ph-tile .ph-c.sc{background:color-mix(in srgb, var(--tone) var(--a), var(--surface-2));color:var(--ink)}
+.ph-tile .ph-c.co{background:color-mix(in srgb, var(--muted) var(--a), var(--surface-2));color:var(--ink)}
+.fv{display:grid;justify-content:start;grid-template-columns:minmax(120px,200px) auto;column-gap:28px;row-gap:10px;align-items:center}
+.fv.venue{grid-template-columns:minmax(120px,200px) auto auto}
+.fv-h{font-size:11px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.fv-cell{display:flex;align-items:center;gap:10px}
+.fv-cell small{width:56px;font-size:12px;color:var(--muted);text-align:right}
+.fv-cell .form{width:102px}
+.fv-cell em{min-width:92px;font-style:normal;font-family:var(--f-mono);font-size:12px;color:var(--muted);text-align:right}
+.tgroup-h span{margin-left:8px;font-family:var(--f-body);font-size:12px;font-weight:400;letter-spacing:0;text-transform:none}
+.oc-o.none{border-color:transparent;background:transparent}
+@container (min-width:420px){.h2h-tiles .tile.duel{grid-column:1/-1}}
+@container (min-width:900px){.h2h-tiles{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.duel{gap:12px;padding:16px}
+.duel-row{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center;gap:12px}
+.duel-side{display:flex;align-items:center;gap:10px;min-width:0}
+.duel-side.a{justify-content:flex-end;text-align:right}
+.duel-side .crest.lg{width:32px;height:32px}
+.duel-name{font-weight:600;font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.duel-n{display:flex;flex-direction:column;align-items:center;line-height:1}
+.duel-n b{font-family:var(--f-display);font-size:24px;font-weight:600}
+.duel-n span{font-size:12px;color:var(--muted);margin-top:2px}
+/* Siege links und rechts an den Enden des Balkens, Remis in der Mitte; Farbe = Seite wie im Balken */
+.duel-counts{display:grid;grid-template-columns:1fr auto 1fr;align-items:baseline;gap:12px;margin-top:4px}
+.duel-counts span{display:flex;align-items:baseline;gap:8px}
+.duel-counts .d{justify-content:center}
+.duel-counts .a{justify-content:flex-end}
+.duel-counts b{font-family:var(--f-display);font-size:28px;font-weight:600;line-height:1;letter-spacing:.01em}
+.duel-counts .h b{color:var(--home)} .duel-counts .a b{color:var(--away)} .duel-counts .d b{font-size:20px;color:var(--muted);font-weight:500}
+.duel-counts em{font-style:normal;font-family:var(--f-mono);font-size:12px;color:var(--muted)}
+.duel-split{display:flex;gap:2px;height:10px;border-radius:5px;overflow:hidden;background:var(--track)}
+.duel-split i{display:block;min-width:4px}
+.duel-split .h{background:var(--home)} .duel-split .d{background:var(--draw)} .duel-split .a{background:var(--away)}
+.duel-text{margin:2px 0 0;font-size:13px;line-height:1.55;color:var(--muted);max-width:75ch;text-wrap:pretty}
+/* Hinweis bei wenigen Duellen: Bernstein heißt Hinweis (system.md), Text bleibt in Schriftfarbe */
+.duel-warn{margin:0;display:flex;align-items:center;gap:8px;font-size:13px}
+.duel-warn::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--amber);flex:none;box-shadow:0 0 0 1px color-mix(in srgb, var(--ink) 40%, transparent)}
 .chips{display:flex;gap:4px;flex-wrap:wrap}
 .chips button{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:2px 9px;font-family:var(--f-mono);font-size:12px;cursor:pointer;color:var(--muted)}
 .chips button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
@@ -1068,6 +1162,8 @@ function perfWindow(hs){
   if (S.perfRange === "all") return {from:1, to:S.perfPrev ? hs[0].total : played, played};
   return {from:Math.max(1, played - +S.perfRange + 1), to:played, played};
 }
+// Neo-Referenz 28.10.2026: keine Zonen-Bänder - Neo kennt keine Zonen (AGENTS.md, Abschnitt Apps)
+const PERF_ZONES = false;
 const perfColor = (teams, i) => teams.length === 1 ? "var(--accent)" : i === 0 ? "var(--home)" : "var(--away)";
 
 // Bedienelemente + Platzhalter; das SVG wird nach dem Einfügen passend zur Breite gezeichnet
@@ -1084,15 +1180,20 @@ function perfBody(teams){
   const legend = teams.map((k, i) => {
     const h = hs[i], vals = h.cur.slice(w.from - 1, Math.min(w.to, h.played));
     const now = h.cur[h.played - 1], trend = vals[0] - now;
-    return `<span><i class="sw" style="border-color:${perfColor(teams, i)}"></i><b>${esc(short(k))}</b> aktuell ${now}. · bester ${Math.min(...vals)}. · schlechtester ${Math.max(...vals)}. · Trend ${trend > 0 ? "▲ " + trend : trend < 0 ? "▼ " + -trend : "±0"}${S.perfPrev ? ` · Vorjahr am ${h.played}. Spieltag: ${h.prev[h.played - 1]}.` : ""}</span>`;
+    // Trend in Worten: ein kleinerer Platz ist besser, ein Pfeil ▲/▼ war dafür missverständlich
+    const plaetze = n => `${n} ${n === 1 ? "Platz" : "Plätze"}`;
+    const trendText = trend > 0 ? plaetze(trend) + " besser" : trend < 0 ? plaetze(-trend) + " schlechter" : "gleich";
+    return `<span><i class="sw" style="border-color:${perfColor(teams, i)}"></i><b>${esc(short(k))}</b> aktuell ${now}. · bester ${Math.min(...vals)}. · schlechtester ${Math.max(...vals)}. · im Zeitraum ${trendText}${S.perfPrev ? ` · Vorjahr am ${h.played}. Spieltag: ${h.prev[h.played - 1]}.` : ""}</span>`;
   }).join("");
+  const nowText = teams.map((k, i) => `${short(k)} aktuell Platz ${hs[i].cur[hs[i].played - 1]}`).join(", ");
   const range = S.perfRange !== "all" && w.played < +S.perfRange ? `<span>Erst ${w.played} Spieltage gespielt, daher ${w.played} statt ${S.perfRange}.</span>` : "";
   const prevSw = S.perfPrev ? `<span><i class="sw dash" style="border-color:var(--muted)"></i>gestrichelt: Vorjahr 25/26</span>` : "";
-  return `<div class="perf-chart" data-teams="${teams.join(",")}" role="img" aria-label="Tabellenplatz nach Spieltag, Spieltag ${w.from} bis ${w.to}"></div>
+  return `<div class="perf-chart" data-teams="${teams.join(",")}" role="img" aria-label="${esc(`Tabellenplatz nach Spieltag, Spieltag ${w.from} bis ${w.to}: ${nowText}`)}"></div>
     <div class="perf-legend">${legend}${prevSw}${range}</div>`;
 }
 function perfSvg(teams, W){
-  const H = 230, m = {l:30, r:40, t:14, b:26}, hs = teams.map(posHistory), n = Math.max(...hs.map(h => h.n)), lg = LG[T[teams[0]].lg];
+  // Zwei Teams: rechts Platz für „5. Leipzig“, damit die Linien nicht nur über die Farbe zu unterscheiden sind
+  const H = 230, m = {l:30, r:teams.length > 1 ? 104 : 40, t:14, b:26}, hs = teams.map(posHistory), n = Math.max(...hs.map(h => h.n)), lg = LG[T[teams[0]].lg];
   const sameLeague = teams.every(k => T[k].lg === T[teams[0]].lg);
   const {from, to, played} = perfWindow(hs);
   const span = Math.max(1, to - from), pw = W - m.l - m.r, ph = H - m.t - m.b;
@@ -1100,7 +1201,7 @@ function perfSvg(teams, W){
   const y = p => m.t + (n === 1 ? ph / 2 : (p - 1) / (n - 1) * ph);
   const half = ph / Math.max(1, n - 1) / 2;
   let s = `<svg class="pc" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" aria-hidden="true">`;
-  if (lg.full && sameLeague){ // Champions League (1–4) und Abstieg (letzte 2) als Bänder
+  if (PERF_ZONES && lg.full && sameLeague){ // Champions League (1–4) und Abstieg (letzte 2) als Bänder
     s += `<rect class="pc-zone-cl" x="${m.l}" y="${y(1) - half}" width="${pw}" height="${y(4) - y(1) + 2 * half}"/>`;
     s += `<rect class="pc-zone-down" x="${m.l}" y="${y(n - 1) - half}" width="${pw}" height="${y(n) - y(n - 1) + 2 * half}"/>`;
   }
@@ -1108,7 +1209,6 @@ function perfSvg(teams, W){
   for (const t of ticks) s += `<line class="pc-grid" x1="${m.l}" x2="${W - m.r}" y1="${y(t)}" y2="${y(t)}"/><text class="pc-axis" x="${m.l - 8}" y="${y(t) + 4}" text-anchor="end">${t}</text>`;
   const xs = to - from + 1, step = xs > 20 ? 5 : xs > 10 ? 2 : 1;
   for (let d = from; d <= to; d++) if ((d - from) % step === 0 || d === to) s += `<text class="pc-axis" x="${x(d)}" y="${H - 6}" text-anchor="middle">${d}</text>`;
-  s += `<text class="pc-axis" x="${m.l - 8}" y="${H - 6}" text-anchor="end">ST</text>`;
   if (to > played) s += `<line class="pc-now" x1="${x(played)}" x2="${x(played)}" y1="${m.t - 6}" y2="${H - m.b}"/><text class="pc-axis" x="${x(played) + 4}" y="${m.t - 2}">heute</text>`;
   const path = pts => pts.map((p, i) => `${i ? "L" : "M"}${x(p[0]).toFixed(1)},${y(p[1]).toFixed(1)}`).join("");
   const r = xs > 15 ? 2.5 : 3.5, ends = [];
@@ -1124,7 +1224,7 @@ function perfSvg(teams, W){
     s += cp.map(([d, p], j) => j === cp.length - 1 ? "" : `<circle cx="${x(d)}" cy="${y(p)}" r="${r}" class="pc-dot" style="stroke:${col}"><title>${name} · ${d}. Spieltag: Platz ${p}</title></circle>`).join("");
     const [ld, lp] = cp[cp.length - 1];
     s += `<circle cx="${x(ld)}" cy="${y(lp)}" r="5.5" style="fill:${col}"><title>${name} · ${ld}. Spieltag: Platz ${lp}</title></circle>`;
-    ends.push({x:x(ld) + 9, y:y(lp) + 4, t:lp + ".", col});
+    ends.push({x:x(ld) + 9, y:y(lp) + 4, t:teams.length > 1 ? `${lp}. ${name}` : lp + ".", col});
   });
   if (ends.length === 2 && Math.abs(ends[0].y - ends[1].y) < 13) ends[1].y = ends[0].y + 13; // Beschriftungen nicht übereinander
   s += ends.map(e => `<text class="pc-end" x="${e.x}" y="${e.y}" style="fill:${e.col}">${e.t}</text>`).join("");
@@ -1550,7 +1650,10 @@ const cmpRow = (label, lv, rv, l = lv, r = rv) => { const max = Math.max(l, r, 1
       </div></div><span class="v">${rv}</span></div>`; };
 const cmpNames = (l, r) => `<div class="cmp-names"><span><i class="dot h"></i>${l}</span><span>${r}<i class="dot a"></i></span></div>`;
 const teamTag = (k, cls) => `<span class="tm${cls ? " " + cls : ""}">${crest(k)}<span>${esc(short(k))}</span></span>`;
-const formChips = k => `<span class="form">${[...T[k].f].map(x => `<i class="${x}">${x}</i>`).join("")}</span>`;
+// Formkästchen, neueste links (wie in apps/neo); T[k].f steht chronologisch, ältestes zuerst
+const chipsOf = list => `<span class="form">${list.map(x => `<i class="${x}">${x}</i>`).join("")}</span>`;
+const formChips = k => chipsOf([...T[k].f].reverse());
+const formPoints = list => list.reduce((s, x) => s + (x === "S" ? 3 : x === "U" ? 1 : 0), 0);
 // Anteils-Kachel: Anteil in %, Farbbalken unten nach Höhe (invert: hoher Wert ist schlecht)
 function rateTile(label, v, n, sub, invert){
   const p = n ? Math.round(v / n * 100) : 0, q = invert ? 100 - p : p;
@@ -1566,10 +1669,12 @@ function heroBar(parts, label){
 // Ergebniszeile; Farbe aus Sicht von "me"
 function matchRow({d, comp, home, away, hg, ag}, me){
   const my = home === me ? hg : ag, op = home === me ? ag : hg, res = my > op ? "S" : my === op ? "U" : "N";
-  return `<div class="mt">
+  const verdict = res === "S" ? "Sieg" : res === "U" ? "Remis" : "Niederlage";
+  // Die Ergebnisfarbe trägt Sieg/Remis/Niederlage; für Screenreader steht es zusätzlich als Text da
+  return `<div class="mt" role="listitem">
       <span class="mt-d">${d.toLocaleDateString("de-DE", {day:"2-digit", month:"2-digit", year:"2-digit"})}<small>${esc(comp)}</small></span>
       ${teamTag(home, "mt-h" + (hg > ag ? " win" : ""))}
-      <span class="res ${res}" title="Aus Sicht von ${esc(short(me))}: ${res === "S" ? "Sieg" : res === "U" ? "Remis" : "Niederlage"}">${hg}:${ag}</span>
+      <span class="res ${res}" title="Aus Sicht von ${esc(short(me))}: ${verdict}">${hg}:${ag}<span class="sr">, ${verdict} für ${esc(short(me))}</span></span>
       ${teamTag(away, ag > hg ? "win" : "")}
     </div>`;
 }
@@ -1587,15 +1692,35 @@ function phaseBlocks(blocks, unit){
         ${axis}
       </div>`).join(`<hr class="ph-sep">`);
 }
+// Torphasen als Kacheln (H2H): je Block ein Team; tones = Farbe je Block (h/a), „kassiert“ immer grau
+function phaseTiles(blocks, unit, tones){
+  const max = Math.max(1, ...blocks.flatMap(b => [...b.sc, ...b.co]));
+  const total = arr => arr.reduce((s, v) => s + v, 0);
+  // Stärke 10-45 %: darüber sinkt der Kontrast der Zahl in der Zelle unter 4,5:1
+  const cells = (arr, kind, what) => arr.map((v, i) => `<span class="ph-c${v ? " " + kind : ""}"${v ? ` style="--a:${Math.round(10 + 35 * v / max)}%"` : ""} title="${PHASES[i]}–${PHASES[i + 1]}: ${v} ${v === 1 ? "Tor" : "Tore"} ${what}">${v}</span>`).join("");
+  const axis = `<div class="ph-row ph-axis" aria-hidden="true"><span></span><span></span>${[0,1,2,3,4,5].map(i => `<span><span>${PHASES[i]}</span>${i === 5 ? `<span>${PHASES[6]}</span>` : ""}</span>`).join("")}</div>`;
+  return blocks.map((b, i) => `
+      <article class="tile ph-tile ${tones[i]}">
+        <div class="tile-h"><h5>${crest(b.k)}${esc(short(b.k))}</h5><span>${b.games} ${b.games === 1 ? unit[0] : unit[1]}${b.note && b.note !== "alle Duelle" ? " · " + b.note : ""}</span></div>
+        <div class="ph-row"><span class="ph-l">erzielt</span><b class="ph-t sc">${total(b.sc)}</b>${cells(b.sc, "sc", "erzielt")}</div>
+        <div class="ph-row"><span class="ph-l">kassiert</span><b class="ph-t co">${total(b.co)}</b>${cells(b.co, "co", "kassiert")}</div>
+        ${axis}
+        ${b.games < H2H_FEW ? `<p class="duel-warn">Nur ${b.games} ${b.games === 1 ? unit[0] : unit[1]} – kann auch Zufall sein.</p>` : ""}
+      </article>`).join("");
+}
 const phSplitBox = () => `<label class="chk"><input type="checkbox" id="ph-split"${S.phSplit ? " checked" : ""}>Heim / Auswärts</label>`;
 const sumPhases = p => ({games:p.home.games + p.away.games, sc:p.home.sc.map((v, i) => v + p.away.sc[i]), co:p.home.co.map((v, i) => v + p.away.co[i])});
 
 // ===== Detail: Direkter Vergleich (H2H) =====================================
 // Umschalter rechts im Spiele-Reiter
+// Neo-Referenz: Die übrigen H2H-Abschnitte bleiben ausgeblendet, bis sie gestaltet sind.
+const H2H_LATER = true;
+// Unter so vielen Duellen sagen Anteile wenig (Davids Entscheidung 28.10.2026: Hinweis „kann auch Zufall sein“).
+const H2H_FEW = 5;
 const fxTabs = () => `<div class="seg" role="group" aria-label="Inhalt der Detailansicht">
-    <button data-fxside="markets" aria-pressed="true">Marktchancen</button>
-    <button aria-pressed="false" disabled title="Der direkte Vergleich folgt">H2H <span class="tag lig">folgt</span></button>
-  </div>`; // Neo-Referenz: H2H ist noch gesperrt (Davids Entscheidung vom 27.10.2026)
+    <button data-fxside="markets" aria-pressed="${S.fxSide !== "h2h"}">Marktchancen</button>
+    <button data-fxside="h2h" aria-pressed="${S.fxSide === "h2h"}">H2H</button>
+  </div>`; // Neo-Referenz: H2H wird Abschnitt für Abschnitt gestaltet (Davids Auftrag vom 28.10.2026), zuerst die Bilanz
 // Kopf der rechten Detailansicht – gleiche Struktur in allen Ansichten, damit beim Umschalten nichts springt:
 // Zeile 1: Eyebrow + Titel links, Umschalter rechts · Zeile 2 (feste Mindesthöhe): Infos links, Werkzeuge rechts
 function sideHead({eyebrow, title, meta = "", tools = "", lead = ""}){
@@ -1618,91 +1743,98 @@ const teamFxSelect = f => `<label class="fx-pick"><span class="sr">Spiel wählen
 function renderH2H(){
   const f = currentFixture(), {h, a} = f, H = short(h), A = short(a);
   const all = h2hMeetings(f), ms = S.h2hVenue === "home" ? all.filter(m => m.home === h) : all, s = h2hStats(ms);
+  const pctInt = v => s.n ? Math.round(v / s.n * 100) : 0;
+  // „keine Siege“ statt „0 Siege“ (Prüfung vom 28.10.2026)
+  const count = (v, c) => c === "d" ? (v ? `${v} Remis` : "kein Remis") : v ? `${v} ${v === 1 ? "Sieg" : "Siege"}` : "keine Siege";
+  const sides = [[s.wH, "h"], [s.dr, "d"], [s.wA, "a"]];
+  const avg = nf1.format((s.gH + s.gA) / (s.n || 1));
   const venueSeg = `<div class="seg" role="group" aria-label="Duelle filtern">
       <button data-venue="all" aria-pressed="${S.h2hVenue !== "home"}">Alle ${all.length}</button>
       <button data-venue="home" aria-pressed="${S.h2hVenue === "home"}">Nur in ${esc(H)}</button>
     </div>`;
-  sideHead({eyebrow:"Direkter Vergleich", title:matchTitle(f), meta:matchMeta(f), tools:venueSeg});
-  const pctInt = v => s.n ? Math.round(v / s.n * 100) : 0;
-  const bestTxt = m => m ? `${Math.max(m.gh, m.ga)}:${Math.min(m.gh, m.ga)}` : "–";
-  const rate = (label, v, sub) => rateTile(label, v, s.n, sub || `${v} / ${s.n} Duelle`);
+  // Kernzeile wie „Am ehesten“ bei den Marktchancen: die Bilanz der Duelle in einer Zeile
+  sideHead({eyebrow:"Direkter Vergleich", title:matchTitle(f), meta:matchMeta(f),
+    lead:s.n ? `<b>In den Duellen</b><span><strong>${esc(H)}</strong> ${count(s.wH, "h")}</span><span>${count(s.dr, "d")}</span><span><strong>${esc(A)}</strong> ${count(s.wA, "a")}</span><span>Ø <span class="num">${avg}</span> Tore</span>` : ""});
 
-  // Torphasen: Saison (optional nur Heim- bzw. Auswärtsspiele) oder nur die direkten Duelle
-  const src = S.phSrc === "h2h" ? "h2h" : "season";
-  let blocks;
-  if (src === "h2h"){
-    const sumB = key => toBuckets(ms.flatMap(m => m[key])), note = S.h2hVenue === "home" ? "nur in " + esc(H) : "alle Duelle";
-    blocks = [{k:h, opp:a, games:ms.length, note, sc:sumB("bH"), co:sumB("bA")},
-              {k:a, opp:h, games:ms.length, note, sc:sumB("bA"), co:sumB("bH")}];
-  } else {
-    const sh = seasonPhases(h), sa = seasonPhases(a);
-    blocks = [{k:h, ...(S.phSplit ? sh.home : sumPhases(sh)), note:S.phSplit ? "nur Heimspiele" : "alle Spiele"},
-              {k:a, ...(S.phSplit ? sa.away : sumPhases(sa)), note:S.phSplit ? "nur Auswärtsspiele" : "alle Spiele"}];
-  }
-  const phases = `
-    <section class="h2h-sec" aria-label="Torphasen">
-      ${secHead("Torphasen", src === "h2h" ? "Direkte Duelle" : "Ligaspiele · Saison 26/27", `
-        <div class="seg" role="group" aria-label="Datenbasis der Torphasen">
-          <button data-phsrc="season" aria-pressed="${src === "season"}">Saison</button>
-          <button data-phsrc="h2h" aria-pressed="${src === "h2h"}">Direkte Duelle</button>
-        </div>`)}
-      ${src === "season" ? phSplitBox() : `<span class="note">Folgt dem Filter oben: ${S.h2hVenue === "home" ? "nur Duelle in " + esc(H) : "alle Duelle"}.</span>`}
-      ${phaseBlocks(blocks, src === "h2h" ? ["Duell", "Duelle"] : ["Partie", "Partien"])}
-    </section>`;
+  // Gruppenkopf eines Abschnitts (h4) und eines Blocks (h3) - zwei Blöcke, damit klar ist, worauf der Filter wirkt
+  const group = (id, title, sub, body, tools = "") => `<section class="tgroup" aria-labelledby="${id}">
+      <div class="tgroup-bar"><h4 class="tgroup-h" id="${id}">${title}${sub ? ` <span>${sub}</span>` : ""}</h4>${tools ? `<div class="tgroup-tools">${tools}</div>` : ""}</div>${body}</section>`;
+  const block = (id, title, sub, body, tools = "") => `<section class="h2h-block" aria-labelledby="${id}">
+      <div class="block-bar"><h3 class="block-h" id="${id}">${title}${sub ? ` <span>${sub}</span>` : ""}</h3>${tools ? `<div class="tgroup-tools">${tools}</div>` : ""}</div>${body}</section>`;
+  const duelSub = S.h2hVenue === "home" ? `letzte ${s.n} in ${esc(H)}` : `letzte ${s.n}`;
+  const few = s.n && s.n < H2H_FEW ? `<p class="duel-warn">Nur ${s.n} ${s.n === 1 ? "Duell" : "Duelle"} – die Anteile können auch Zufall sein.</p>` : "";
+
+  // Häufigkeit in den Duellen (Prüfung vom 28.10.2026): bewusst NICHT die Zeilenform der Marktchancen - zuerst „5 von 8“,
+  // der Anteil gedämpft, darunter ein Kästchen je Duell (Reihenfolge wie „Letzte Duelle“, neueste links).
+  const freq = (label, hit, tone, title) => {
+    const v = ms.filter(hit).length;
+    return `<div class="hf"${title ? ` title="${title}"` : ""}>
+        <span class="hf-l">${label}</span><span class="hf-n">${v} von ${s.n}</span><span class="hf-p">${pctInt(v)} %</span>
+        <span class="hf-pips${tone ? " " + tone : ""}" role="img" aria-label="${v} von ${s.n} Duellen">${ms.map(m => `<i${hit(m) ? ' class="on"' : ""}></i>`).join("")}</span>
+      </div>`;
+  };
+  const dateOf = m => m.d.toLocaleDateString("de-DE", {day:"2-digit", month:"2-digit", year:"2-digit"});
+  const best = (m, k) => m ? `<span><strong>${esc(short(k))}</strong> ${Math.max(m.gh, m.ga)}:${Math.min(m.gh, m.ga)} <em>${dateOf(m)}</em></span>` : `<span><strong>${esc(short(k))}</strong> ohne Sieg</span>`;
+
+  const duels = !s.n
+    ? `<div class="empty"><b>${S.h2hVenue === "home" ? `Noch kein Duell in ${esc(H)}` : "Noch kein direktes Duell"}</b>${S.h2hVenue === "home" ? "Stell den Filter auf „Alle“, um auch die Duelle beim Gegner zu sehen." : "Die beiden Teams haben in den letzten Jahren nicht gegeneinander gespielt. Unten steht die aktuelle Saison."}</div>`
+    : `${group("h2h-bilanz", "Bilanz", "", `<div class="tiles h2h-tiles">
+        <article class="tile duel">
+          <div class="duel-row">
+            <div class="duel-side h">${crest(h, true)}<span class="duel-name">${esc(T[h].n)}</span></div>
+            <div class="duel-n"><b>${s.n}</b><span>${s.n === 1 ? "Duell" : "Duelle"}</span></div>
+            <div class="duel-side a"><span class="duel-name">${esc(T[a].n)}</span>${crest(a, true)}</div>
+          </div>
+          <div class="duel-counts">${sides.map(([v, c]) => `<span class="${c}${v ? "" : " zero"}"><b>${count(v, c)}</b><em>${pctInt(v)} %</em></span>`).join("")}</div>
+          <div class="duel-split" role="img" aria-label="${esc(H)} ${count(s.wH, "h")}, ${count(s.dr, "d")}, ${esc(A)} ${count(s.wA, "a")}">${sides.filter(p => p[0]).map(([v, c]) => `<i class="${c}" style="flex:${v}"></i>`).join("")}</div>
+          <p class="duel-text">Tore: ${esc(H)} ${s.gH}, ${esc(A)} ${s.gA} – im Schnitt ${avg} pro Duell.</p>
+          <p class="duel-best"><span class="duel-best-l">Höchster Sieg</span>${best(s.bestH, h)}${best(s.bestA, a)}</p>
+        </article>
+        <article class="tile">
+          <div class="tile-h"><h5>Tore</h5><span>beide Teams zusammen</span></div>
+          ${freq("Über 1,5", m => m.gh + m.ga > 1)}${freq("Über 2,5", m => m.gh + m.ga > 2)}${freq("Über 3,5", m => m.gh + m.ga > 3)}
+        </article>
+        <article class="tile">
+          <div class="tile-h"><h5>Treffer</h5><span>wer trifft, wer hält dicht</span></div>
+          ${freq("Beide treffen", m => m.gh > 0 && m.ga > 0)}${freq(esc(H) + " zu null", m => m.ga === 0, "h", esc(T[h].n) + " ohne Gegentor")}${freq(esc(A) + " zu null", m => m.gh === 0, "a", esc(T[a].n) + " ohne Gegentor")}
+        </article>
+      </div>
+      <div class="h2h-notes">${few}<p class="note">So oft war es in den Duellen – keine Chance für das nächste Spiel.</p></div>`)}
+    ${group("h2h-last", "Letzte Duelle", `Ergebnisfarbe aus Sicht von ${esc(H)}`, `<article class="tile mt-tile" role="list">${ms.map(m => matchRow(m, h)).join("")}</article>`)}
+    ${group("h2h-ph-duel", "Torphasen", "in den Duellen", `<div class="tiles ph-tiles">${phaseTiles([
+        {k:h, games:ms.length, note:"", sc:toBuckets(ms.flatMap(m => m.bH)), co:toBuckets(ms.flatMap(m => m.bA))},
+        {k:a, games:ms.length, note:"", sc:toBuckets(ms.flatMap(m => m.bA)), co:toBuckets(ms.flatMap(m => m.bH))}], ["Duell", "Duelle"], ["h", "a"])}</div>`)}`;
+
+  // Saison: gilt unabhängig vom Filter der Duelle
+  const venueForm = !LG[f.lg].cup;  // Form am Spielort nur bei Ligaspielen (Davids Wunsch 28.10.2026), in Neo form.home/away
+  const venueOf = (k, isHome) => teamLog(k).filter(m => m.isHome === isHome).slice(-5).reverse().map(m => m.res);
+  const sh = seasonPhases(h), sa = seasonPhases(a);
+  const seasonBlocks = [{k:h, ...(S.phSplit ? sh.home : sumPhases(sh)), note:S.phSplit ? "nur Heimspiele" : "alle Spiele"},
+                        {k:a, ...(S.phSplit ? sa.away : sumPhases(sa)), note:S.phSplit ? "nur Auswärtsspiele" : "alle Spiele"}];
+  const season = `
+    ${group("h2h-form", "Aktuelle Form", "letzte 5 Spiele, neueste links", `<article class="tile form-tile">
+        <div class="fv${venueForm ? " venue" : ""}">
+          <span></span><span class="fv-h">Alle Spiele</span>${venueForm ? `<span class="fv-h">Heim / Auswärts</span>` : ""}
+          ${[[h, "heim", true], [a, "auswärts", false]].map(([k, where, isHome]) => {
+            const recent = [...T[k].f].reverse(), here = venueForm ? venueOf(k, isHome) : null;
+            // Punkte „x von max.“: Am Spielort sind es oft weniger als 5 Spiele, eine nackte Summe wäre ungleich
+            const pts = list => `<em>${formPoints(list)} von ${list.length * 3} Pkt.</em>`;
+            return `${teamTag(k)}<span class="fv-cell">${chipsOf(recent)}${pts(recent)}</span>${here ? `<span class="fv-cell"><small>${where}</small>${chipsOf(here)}${pts(here)}</span>` : ""}`;
+          }).join("")}
+        </div>
+        <span class="note">Punkte: Sieg 3, Remis 1.${venueForm ? "" : " Heim / Auswärts nur bei Ligaspielen."}</span>
+      </article>`)}
+    ${group("h2h-perf", "Tabellenverlauf", `${T[h].lg === T[a].lg ? esc(LG[T[h].lg].n) : "jeweils in der eigenen Liga"} · Platz nach Spieltag`,
+      `<article class="tile perf-tile">${perfBody([h, a])}</article>`, perfControls())}
+    ${group("h2h-ph", "Torphasen", "Ligaspiele dieser Saison", `<div class="tiles ph-tiles">${phaseTiles(seasonBlocks, ["Spiel", "Spiele"], ["h", "a"])}</div>`, phSplitBox())}`;
 
   const target = document.getElementById("tiles-wrap");
-  target.className = "tiles-wrap flush";
-  target.innerHTML = `<div class="h2h-wrap">
-    <section class="h2h-sec" aria-label="Bilanz">
-      ${secHead("Bilanz", S.h2hVenue === "home" ? `letzte ${s.n} Duelle in ${esc(H)}` : `letzte ${s.n} Duelle`)}
-      <div class="hero">
-        <div class="hero-team h">
-          <span class="crest-box">${crest(h, true)}</span>
-          <b>${esc(T[h].n)}</b><span class="hero-pct">(${pctInt(s.wH)} %)</span>
-        </div>
-        <div class="hero-mid">
-          <div class="hero-n"><b>${s.n}</b><span>Duelle</span></div>
-          <div class="hero-bar-row">
-            <span class="hero-line"></span>
-            ${heroBar([[s.wH, "sh"], [s.dr, "sd"], [s.wA, "sa"]], `${esc(H)} ${s.wH} Siege, ${s.dr} Remis, ${esc(A)} ${s.wA} Siege`)}
-            <span class="hero-line"></span>
-          </div>
-          <div class="hero-legend"><span>${s.wH} ${s.wH === 1 ? "Sieg" : "Siege"}</span><span>${s.dr} Remis</span><span>${s.wA} ${s.wA === 1 ? "Sieg" : "Siege"}</span></div>
-        </div>
-        <div class="hero-team a">
-          <span class="crest-box">${crest(a, true)}</span>
-          <b>${esc(T[a].n)}</b><span class="hero-pct">(${pctInt(s.wA)} %)</span>
-        </div>
-      </div>
-      <p class="hero-text">${esc(T[h].n)} gegen ${esc(T[a].n)}: In den letzten ${s.n} Duellen${S.h2hVenue === "home" ? " in " + esc(H) : ""} gewann ${esc(H)} ${s.wH}-mal, ${esc(A)} ${s.wA}-mal, ${s.dr} ${s.dr === 1 ? "Spiel endete" : "Spiele endeten"} unentschieden. ${esc(H)} erzielte dabei ${s.gH} Tore, ${esc(A)} ${s.gA} – im Schnitt ${nf1.format((s.gH + s.gA) / (s.n || 1))} Tore pro Duell.</p>
-      <div class="rate-grid">
-        ${rate("Über 1,5", s.o15)}${rate("Über 2,5", s.o25)}${rate("Über 3,5", s.o35)}
-        ${rate("Beide treffen", s.btts)}${rate("Zu Null", s.csH, esc(T[h].n))}${rate("Zu Null", s.csA, esc(T[a].n))}
-      </div>
-    </section>
-    ${preMatchCards(f)}
-    <section class="h2h-sec" aria-label="Tabellenverlauf">
-      ${secHead("Tabellenverlauf", (T[h].lg === T[a].lg ? esc(LG[T[h].lg].n) : "jeweils in der eigenen Liga") + " · Platz nach Spieltag", perfControls())}
-      ${perfBody([h, a])}
-    </section>
-    <section class="h2h-sec" aria-label="Vergleich">
-      ${secHead("Vergleich", `letzte ${s.n} Duelle`)}
-      ${cmpNames(esc(H), esc(A))}
-      ${cmpRow("Tore", s.gH, s.gA)}
-      ${cmpRow("Tore pro Spiel", nf1.format(s.gH / (s.n || 1)), nf1.format(s.gA / (s.n || 1)), s.gH, s.gA)}
-      ${cmpRow("Spiele zu Null", s.csH, s.csA)}
-      <div class="cmp"><span class="v">${bestTxt(s.bestH)}</span><div class="cmp-mid"><span>Höchster Sieg</span></div><span class="v">${bestTxt(s.bestA)}</span></div>
-    </section>
-    ${phases}
-    <section class="h2h-sec" aria-label="Letzte Duelle">
-      ${secHead("Letzte Duelle", `Ergebnisfarbe aus Sicht von ${esc(H)}`)}
-      <div>${ms.map(m => matchRow(m, h)).join("")}</div>
-    </section>
-    <section class="h2h-sec" aria-label="Aktuelle Form">
-      ${secHead("Aktuelle Form", "letzte 5 Spiele")}
-      <div class="formrow">${teamTag(h)}${formChips(h)}</div><div class="formrow">${teamTag(a)}${formChips(a)}</div>
-    </section>
-    <p class="note">Mockdaten: Duelle, Aufstellungen, Ausfälle, Trainer (erfundene Namen) und Wetter sind Platzhalter.</p>
+  target.className = "tiles-wrap";
+  target.innerHTML = `<div class="h2h-stack">
+    ${block("h2h-b-duel", "Direkte Duelle (H2H)", s.n ? duelSub : "", duels, all.length ? venueSeg : "")}
+    ${block("h2h-b-season", "Aktuelle Saison", "Saison 26/27 · gilt unabhängig vom Filter oben", season)}
+    ${H2H_LATER ? `<p class="note h2h-later">Folgt später: Vor dem Spiel, Aufstellungen und Ausfälle.</p>` : preMatchCards(f)}
+    <p class="note">Mockdaten: Duelle, Spiele und Tabellenplätze sind Platzhalter.</p>
   </div>`;
 }
 
@@ -2026,7 +2158,7 @@ function render(){
   else if (S.view === "preds") renderPreds();
   else renderFixtures();
   // Neo-Referenz: Spiele zeigen rechts die Marktchancen; H2H, Teamanalyse und Tipps-Detail folgen.
-  if (S.view === "fixtures") renderMarkets(); else renderDetailPlaceholder();
+  if (S.view === "fixtures") (S.fxSide === "h2h" ? renderH2H : renderMarkets)(); else renderDetailPlaceholder();
   drawPerfCharts();
   renderPicker();
   renderDatePicker();
