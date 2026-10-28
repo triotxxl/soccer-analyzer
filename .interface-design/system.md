@@ -27,19 +27,43 @@ Ansichten folgen diesem System; Abweichungen werden benannt und mit David entsch
 | `--muted` | #aaa69e | #5c5953 | Nebentext (≈ 7:1) |
 | `--accent` | #7ea6f8 | #2457c5 | Auswahl, aktive Navigation, Fokus, Zähler |
 | `--accent-ink` | #0d1526 | #ffffff | Schrift auf Akzent |
-| `--home` / `--home-ink` | #4cbcc4 / #0f2224 | #0e7f88 / #fff | Heimmannschaft (Türkis) |
-| `--away` / `--away-ink` | #d58cb4 / #2b1221 | #a63f78 / #fff | Gastmannschaft (Rosé) |
+| `--home` / `--home-ink` | #49e4fd / #0f2224 | #0a758a / #fff | Heimmannschaft (Türkis) |
+| `--away` / `--away-ink` | #d784a5 / #2b1221 | #7a1544 / #fff | Gastmannschaft (Rosé, hell: Weinrot) |
 | `--draw` | #77746d | #77736c | Remis |
 | `--track` | #141413 | #e7e5e0 | Schiene unter den Balken der Marktchancen |
 | `--best-bar` | #cfcbc3 | #4a4742 | Balken des wahrscheinlichsten Ausgangs ohne Seite (≥ 3:1) |
-| `--win` / `--loss` | #3aa86a / #e05a4c | #1f8a4c / #c8372d | Sieg / Niederlage als Text und Linie |
-| `--win-fill` / `--loss-fill` / `--tie-fill` | #27804e / #bf4236 / #5f5d58 | #27804e / #c8372d / #76726b | Kästchen mit weißer Schrift (≥ 4,5:1) |
+| `--win` / `--loss` | #22ae84 / #e45e50 | #027d4e / #c21a16 | Sieg / Niederlage als Text und Linie |
+| `--win-fill` / `--loss-fill` / `--tie-fill` | #3f8253 / #c83407 / #5f5d58 | #3f8253 / #c83407 / #76726b | Kästchen mit weißer Schrift (≥ 4,5:1) |
 | `--amber` | #e6a94a | #d98a1c | Hinweis (z. B. Datenlage unter 50) |
 | `--lime` | #95cc62 | #7cb342 | Zwischenstufe in Bewertungen |
 
 **Bedeutungen:** Blau steht nur für Auswahl und Bedienung. Türkis und Rosé stehen nur für Heim und Gast, Grün
 und Rot nur für Sieg und Niederlage, Bernstein nur für Hinweise. Keine Ampel auf Chancen: eine Chance ist keine
 Sicherheit.
+
+### Farbe prüfen: Kontrast und Farbfehlsichtigkeit (seit 28.10.2026)
+
+Regeln aus dem Farbteil von `visual-design-foundations` (wshobson/agents, MIT; nur gelesen, nicht installiert),
+auf Neo zugeschnitten. Geprüft von `apps/shared/src/colorCheck.test.ts` (Rechnung in `colorCheck.ts`) an
+`apps/shared/styles/base.css`; derselbe Test hält die Farben der Referenz `docs/neo-referenz.html` gleich.
+
+- **Kontrast (WCAG 2.x):** Schrift ≥ 4,5:1 auf `--surface` und `--surface-2` (`--ink`, `--muted`, `--home`,
+  `--away`, `--win`, `--loss`); Schrift auf Füllungen ≥ 4,5:1. Linien und Bedienelemente ≥ 3:1.
+- **Farbfehlsichtigkeit:** Rund 8 von 100 Männern sehen Rot und Grün schwach. Paare, die Bedeutung tragen, bleiben
+  auch dann getrennt - gemessen als Abstand CIEDE2000 nach Simulation (Machado 2009; Rot-, Grün- und
+  Blau-Schwäche): Heim/Gast ≥ 20, Heim oder Gast gegen Remis ≥ 15, Sieg/Niederlage und ihre Füllungen ≥ 15
+  (im Test 19 bzw. 14 wegen der Rundung auf Hexwerte). Ohne Simulation Gast gegen Niederlage und Heim gegen
+  Sieg ≥ 20. Vorher lagen Heim/Gast bei 7-14 und Sieg/Niederlage bei 9-14.
+- **Wie getrennt wird:** über **Helligkeit**, nicht über einen neuen Farbton - Rot/Grün und Türkis/Rosé fallen bei
+  Rot-Grün-Schwäche auf dieselbe Achse. Dunkel ist Heim das hellere Türkis, hell ist Gast das dunklere Weinrot;
+  Sieg und Niederlage ebenso. Die Farbtöne blieben (höchstens rund 20° verschoben).
+- **Nie nur Farbe:** Form- und Ergebniskästchen tragen S/U/N, Linien im Tabellenverlauf den Namen am Ende, Balken
+  die feste Reihenfolge Heim - Remis - Gast. Die Stufen der Datenlage (Grün, Limette, Bernstein, Rot) sind bei
+  Rot-Grün-Schwäche kaum zu trennen und stehen deshalb immer mit Zahl oder Text.
+- **Harmonie:** Neo ist neutral-warm (Graphit) mit einem Akzent (Blau, nur Bedienung) und zwei Teamtönen rund 145°
+  auseinander (Türkis rund 200°, Rosé rund 345° in OKLCH). Neue Farben kommen nicht aus einer Farbkreis-Formel
+  (komplementär, triadisch), sondern brauchen eine Bedeutung aus der Liste oben; gesucht wird in OKLCH nahe an
+  einem bestehenden Ton, danach `npm run app:test`.
 
 ## Schrift
 

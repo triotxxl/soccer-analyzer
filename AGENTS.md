@@ -640,6 +640,12 @@ alte App `apps/analyzer/` (Abschnitt „Pflege“):
     auf Davids Wunsch, sonst gäbe es zwei Design-Systeme.
   - Taste Skill (tasteskill.dev) wurde geprüft und nicht übernommen: sein Kern ist Art Direction für
     Landingpages, sein Dashboard-Kapitel überschneidet sich mit `interface-design`.
+  - Aus `visual-design-foundations` (wshobson/agents, MIT) ist am 28.10.2026 **nur der Farbteil** übernommen
+    (Davids Wahl): Kontrast, Farbfehlsichtigkeit und Harmonie als Regeln in `.interface-design/system.md`
+    („Farbe prüfen“) und als Test `apps/shared/src/colorCheck.test.ts` über `apps/shared/styles/base.css` und die
+    Referenz. Der Skill ist nicht installiert - Typografie, Abstände und Tokens doppelten sich, seine Beispiele
+    (Inter, Blau als Marke, Tailwind) widersprechen Neo. Damit wurden Heim/Gast und Sieg/Niederlage über die
+    Helligkeit getrennt (bei Rot-Grün-Schwäche vorher Abstand 7-14, jetzt ≥ 19 bzw. ≥ 14).
 - **Die Engine von `impeccable`** (`scripts/impeccable`) lädt sich beim ersten Aufruf von den GitHub-Releases des
   Autors nach `~/.impeccable/bin/<version>/` (geprüft gegen `engine-checksums.txt`) und liefert den Design-Detektor
   (`detect`), Kontext, Berichte und den Live-Modus. **Von David am 26.10.2026 freigegeben**, Version 0.1.17 liegt.
