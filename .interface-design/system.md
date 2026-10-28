@@ -29,7 +29,9 @@ Ansichten folgen diesem System; Abweichungen werden benannt und mit David entsch
 | `--accent-ink` | #0d1526 | #ffffff | Schrift auf Akzent |
 | `--home` / `--home-ink` | #4cbcc4 / #0f2224 | #0e7f88 / #fff | Heimmannschaft (Türkis) |
 | `--away` / `--away-ink` | #d58cb4 / #2b1221 | #a63f78 / #fff | Gastmannschaft (Rosé) |
-| `--draw` | #77746d | #aaa69e | Remis |
+| `--draw` | #77746d | #77736c | Remis |
+| `--track` | #141413 | #e7e5e0 | Schiene unter den Balken der Marktchancen |
+| `--best-bar` | #cfcbc3 | #4a4742 | Balken des wahrscheinlichsten Ausgangs ohne Seite (≥ 3:1) |
 | `--win` / `--loss` | #3aa86a / #e05a4c | #1f8a4c / #c8372d | Sieg / Niederlage als Text und Linie |
 | `--win-fill` / `--loss-fill` / `--tie-fill` | #27804e / #bf4236 / #5f5d58 | #27804e / #c8372d / #76726b | Kästchen mit weißer Schrift (≥ 4,5:1) |
 | `--amber` | #e6a94a | #d98a1c | Hinweis (z. B. Datenlage unter 50) |
@@ -69,11 +71,25 @@ Sicherheit.
 - **Tageskopf `.day-h`** klebt oben; **Ligakopf `.grp`** mit Länderkürzel `.cc` und Schild `.tag` („Pokal“).
 - **Tabelle:** 11px-Kopf in Großbuchstaben, Zahlen rechtsbündig, Formkästchen 18px (S/U/N auf Füllfarben).
 - **Tipp `.tip`:** Zeit | Teams + Wettbewerb | Markt, Tipp, „Chance laut Modell“ | Prozent groß, Quote, 4px-Balken.
+- **Marktchancen** (seit 27.10.2026, `MarketsPanel.tsx`): Kopf mit Umschalter Marktchancen | H2H („folgt“, gesperrt),
+  Metazeile (Wettbewerb, Tag, Zeit, erwartete Tore, „Quoten: Tipico“) und Zeile `.sh-lead` „Am ehesten“ (je Markt
+  1X2, Über/Unter 2,5, BTTS der wahrscheinlichste Tipp, dieselben Kandidaten wie bei den Predictions). Darunter zwei
+  Gruppen `.tgroup` mit Kopf `.tgroup-h` (Display 14px, gedämpft): „Wer gewinnt“ (Endergebnis breit, 1. Halbzeit,
+  Erstes Tor) und „Wie viele Tore“ (Gesamttore breit mit Verteilung 0–6+, gestrichelter Linie und Linien-Chips
+  0,5–4,5; Über/Unter; Beide treffen), dann `details.more` „Weitere Märkte“ (Doppelte Chance, exakte Ergebnisse).
+- **Kachel `.tile`:** `--surface-2` ohne Rahmen, 8px Radius, Titel `h4` in Display 17px, Untertitel 12px. Raster
+  1 Spalte, ab 420px Breite 2 (Leitkachel `.wide` über die ganze Breite), ab 900px 3.
+- **Ausgang `.oc`:** Text | Prozent | Tipico-Quote („–“ ohne Quote), darunter 5px-Balken auf `--track`. Mit Seite
+  Türkis/Grau/Rosé, ohne Seite gedämpft; der wahrscheinlichste Ausgang hat fette Zahl und 7px-Balken (ohne Seite
+  `--best-bar`). Unter 1 % steht „< 1 %“, sonst ganze Prozente.
 - **Leerzustand `.empty`:** Titel in Display-Schrift, ein Satz mit Grund und nächstem Schritt.
 - **Zustände:** Hover = 6 % Text auf Fläche, Fokus = 2px-Akzentrahmen (in Listen nach innen), gesperrt = 60 %.
 
 ## Regeln aus dem Projekt
 
-- Bei `probabilityReliable: false` keine Chance und kein Balken; der Grund steht im Hinweis, die Quoten bleiben.
+- Bei `probabilityReliable: false` keine Chance und kein Balken; der Grund steht im Hinweis, die Quoten bleiben. In den
+  Marktchancen fallen damit Endergebnis, 1. Halbzeit, Erstes Tor, Doppelte Chance und exakte Ergebnisse weg; die
+  Tormärkte bleiben.
+- Märkte, die nicht an alten Spielen geprüft sind (1. Halbzeit, Erstes Tor, exakte Ergebnisse), sagen das im Kachelfuß.
 - Tipico-Quoten sind nur Anzeige und ändern keinen Tipp. Value und Vorteil zeigt die Startseite nicht.
 - Texte nach dem Wörterbuch in AGENTS.md; Warnungen kürzen, nie entschärfen („rechne nicht mit Gewinn“).

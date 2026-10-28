@@ -555,7 +555,16 @@ alte App `apps/analyzer/` (Abschnitt „Pflege“):
   dieselbe Eingrenzung wie `buildTable`, 0 Aufrufe; nicht `form.home`/`form.away` der Spiele, die nur am Spielort
   zählen. Zonen gibt es nicht), Predictions (je Spiel der wahrscheinlichste Tipp aus 1X2, Über/Unter 2,5, BTTS; Quelle „Autoren“
   gesperrt mit „folgt“, Davids Entscheidung - Autoren-Tipps kommen später), Zeitraum- und Wettbewerbsauswahl
-  (Pokal heuristisch, `isCup` in `apps/neo/src/neoData.ts`). Die Detailansicht ist ein Platzhalter. Rechnung rein in
+  (Pokal heuristisch, `isCup` in `apps/neo/src/neoData.ts`). **Detailansicht bei „Spiele“ seit 27.10.2026 die Marktchancen**
+  (`apps/neo/src/components/MarketsPanel.tsx`, Davids Freigabe der Referenz): „Am ehesten“ (1X2, Über/Unter 2,5, BTTS),
+  „Wer gewinnt“ (Endergebnis, 1. Halbzeit, Erstes Tor), „Wie viele Tore“ (Gesamttore mit Linien 0,5-4,5, Über/Unter,
+  BTTS), „Weitere Märkte“ (Doppelte Chance, exakte Ergebnisse); H2H gesperrt mit „folgt“, Teams und Predictions zeigen
+  weiter einen Platzhalter. Die neuen Märkte trägt der Snapshot ab `schemaVersion: 10` als `marketDetail`
+  (`marketDetail` in `src/model.ts`, 0 Aufrufe): aus **denselben** λH/λA wie 1X2, Torlinien und BTTS (Torverteilung
+  0-5, 6+; vier wahrscheinlichste Endstände aus der Poisson-Matrix; Pausenstand aus den Halbzeit-λ; erstes Tor =
+  λ-Anteil × P(mindestens ein Tor)). Bei `probabilityReliable: false` fehlen Halbzeit, erstes Tor und Endstände. Halbzeit-1X2,
+  erstes Tor und Endstände sind **nicht an alten Spielen geprüft** - die App sagt das; wer sie für Filter oder Tipps nutzt,
+  misst vorher. Über/Unter 0,5 und 4,5 haben keine Tipico-Quote. Rechnung rein in
   `neoData.ts`, Bedienzustand in `useNeoState.ts` (localStorage `neo:state:v1`). Design-System:
   `.interface-design/system.md`.
 - `apps/shared/` - Bausteine für Apps: `server/endpoints.ts` (`dataEndpoints()`: Dashboard, Live,

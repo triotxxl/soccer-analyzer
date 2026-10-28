@@ -1,6 +1,9 @@
 import type { DashboardDocument, DashboardFixture, DashboardMarket, DashboardMarketKey, FormResult } from "../../shared/src/types";
 
-/** Kleiner Snapshot für die Tests: zwei Ligen an zwei Tagen und ein Pokalspiel ohne belastbares 1X2. */
+/**
+ * Kleiner Snapshot für die Tests: zwei Ligen an zwei Tagen und ein Pokalspiel ohne belastbares 1X2.
+ * `marketDetail` trägt London - Leeds voll, das Pokalspiel ohne Richtung, Heim - Gast gar nicht (alte Analyse).
+ */
 export function market(key: DashboardMarketKey, probability: number, extra: Partial<DashboardMarket> = {}): DashboardMarket {
   return {
     key, label: key, selection: key, pick: null, selectionTone: "neutral", probability, odds: 2, confidence: 80, score: null,
@@ -30,7 +33,7 @@ export function fixture(id: number, extra: Partial<DashboardFixture>): Dashboard
 }
 
 export const DOCUMENT: DashboardDocument = {
-  schemaVersion: 9,
+  schemaVersion: 10,
   meta: {
     createdAt: "2026-10-27T13:00:00.000Z", timezone: "Europe/Berlin", sourceFile: "data.json", totalTipicoEvents: 3, selectedTipicoEvents: 3,
     selectedCompetitions: 3, fixtureCount: 3, firstAvailableDate: "2026-10-27", lastAvailableDate: "2026-10-28", maximumDays: 2, maximumHours: 48,
@@ -49,6 +52,12 @@ export const DOCUMENT: DashboardDocument = {
         market("over25", 0.71, { odds: 1.5 }), market("under25", 0.29, { odds: 2.6 }),
         market("btts", 0.5, { odds: 1.9 }), market("bttsNo", 0.5, { odds: 1.9 }),
       ],
+      marketDetail: {
+        totalGoals: [0.06, 0.17, 0.24, 0.23, 0.16, 0.08, 0.06],
+        exactScores: [{ home: 1, away: 1, probability: 0.12 }, { home: 1, away: 2, probability: 0.11 }, { home: 0, away: 1, probability: 0.09 }, { home: 2, away: 1, probability: 0.08 }],
+        halfTime: { home: 0.3, draw: 0.42, away: 0.28 },
+        firstGoal: { home: 0.4, none: 0.07, away: 0.53 },
+      },
     }),
     fixture(3, {
       kickoff: "2026-10-28T18:45:00.000Z", league: "DFB Pokal", homeTeam: "Dorf SV", awayTeam: "Heim FC", crossLeague: true, dataConfidence: 40,
@@ -57,6 +66,7 @@ export const DOCUMENT: DashboardDocument = {
         market("over25", 0.66, { odds: 1.55 }), market("under25", 0.34, { odds: 2.4 }),
         market("btts", 0.4, { odds: 2.1 }), market("bttsNo", 0.6, { odds: 1.7 }),
       ],
+      marketDetail: { totalGoals: [0.1, 0.2, 0.25, 0.2, 0.13, 0.07, 0.05], exactScores: null, halfTime: null, firstGoal: null },
     }),
   ],
 };

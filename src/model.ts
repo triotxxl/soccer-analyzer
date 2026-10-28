@@ -366,6 +366,52 @@ export function poissonProbabilities(homeLambda: number, awayLambda: number): Mo
   };
 }
 
+export interface MarketDetail {
+  /** Anteil 0, 1, 2, 3, 4, 5 und 6+ Tore; dieselbe Gesamtverteilung wie `goalLineProbabilities`. */
+  totalGoals: number[];
+  /** Die vier wahrscheinlichsten Endstände aus derselben Matrix wie `poissonProbabilities`. */
+  exactScores: Array<{ home: number; away: number; probability: number }>;
+  /** Stand zur Pause aus den Torerwartungen der ersten Halbzeit. */
+  halfTime: { home: number; draw: number; away: number };
+  /** Wer trifft zuerst: Anteil von λH bzw. λA an der Chance, dass überhaupt ein Tor fällt. */
+  firstGoal: { home: number; none: number; away: number };
+}
+
+/**
+ * Weitere Märkte für die Detailansicht, gerechnet aus genau den Torerwartungen, aus denen auch 1X2,
+ * Torlinien und BTTS stammen (unabhängige Poisson-Verteilung je Team). Keine neue Annahme: Die Werte
+ * folgen aus demselben Modell. Halbzeitstand und erstes Tor sind aber nicht an alten Spielen geprüft.
+ */
+export function marketDetail(homeLambda: number, awayLambda: number, firstHalfHome: number, firstHalfAway: number): MarketDetail {
+  const totalLambda = Math.max(0, homeLambda + awayLambda);
+  const counts = Array.from({ length: 6 }, (_, goals) => poisson(goals, totalLambda));
+  const totalGoals = [...counts, Math.max(0, 1 - counts.reduce((sum, p) => sum + p, 0))];
+  const scores: Array<{ home: number; away: number; probability: number }> = [];
+  let total = 0;
+  for (let home = 0; home <= 10; home += 1) {
+    for (let away = 0; away <= 10; away += 1) {
+      const probability = poisson(home, homeLambda) * poisson(away, awayLambda);
+      total += probability;
+      scores.push({ home, away, probability });
+    }
+  }
+  const exactScores = scores
+    .map((score) => ({ ...score, probability: score.probability / total }))
+    .sort((left, right) => right.probability - left.probability || left.home + left.away - (right.home + right.away))
+    .slice(0, 4);
+  const halfTime = poissonProbabilities(firstHalfHome, firstHalfAway);
+  const none = Math.exp(-totalLambda);
+  const scored = 1 - none;
+  return {
+    totalGoals,
+    exactScores,
+    halfTime: { home: halfTime.home, draw: halfTime.draw, away: halfTime.away },
+    firstGoal: totalLambda > 0
+      ? { home: (homeLambda / totalLambda) * scored, none, away: (awayLambda / totalLambda) * scored }
+      : { home: 0, none: 1, away: 0 },
+  };
+}
+
 export function goalLineProbabilities(
   homeLambda: number,
   awayLambda: number

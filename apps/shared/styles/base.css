@@ -9,7 +9,7 @@
 :root{
   --bg:#131312; --surface:#1b1b19; --surface-2:#232321; --ink:#ebe8e2; --muted:#aaa69e; --line:#34332f;
   --accent:#7ea6f8; --accent-soft:#272a2f; --accent-ink:#0d1526;
-  --home:#4cbcc4; --draw:#77746d; --away:#d58cb4; --home-ink:#0f2224; --away-ink:#2b1221; /* Heim/Gast eigene Töne, nicht der Akzent */
+  --track:#141413; --best-bar:#cfcbc3; --home:#4cbcc4; --draw:#77746d; --away:#d58cb4; --home-ink:#0f2224; --away-ink:#2b1221; /* Heim/Gast eigene Töne, nicht der Akzent */
   --win:#3aa86a; --loss:#e05a4c; --tie:#5f5d58; --nav:#0e0e0d; --lime:#95cc62; --amber:#e6a94a;
   /* Flächen unter weißer Schrift (Form, Ergebnis, Stufen): je ≥ 4,5:1 */
   --win-fill:#27804e; --loss-fill:#bf4236; --tie-fill:#5f5d58;
@@ -23,7 +23,7 @@
   :root:not([data-theme="dark"]){
     --bg:#f0efec; --surface:#ffffff; --surface-2:#f7f6f3; --ink:#1a1917; --muted:#5c5953; --line:#dcdad5;
     --accent:#2457c5; --accent-soft:#eceef2; --accent-ink:#ffffff;
-    --home:#0e7f88; --draw:#aaa69e; --away:#a63f78; --home-ink:#ffffff; --away-ink:#ffffff;
+    --track:#e7e5e0; --best-bar:#4a4742; --home:#0e7f88; --draw:#77736c; --away:#a63f78; --home-ink:#ffffff; --away-ink:#ffffff;
     --win:#1f8a4c; --loss:#c8372d; --tie:#9e9a92; --nav:#e6e4df; --lime:#7cb342; --amber:#d98a1c;
     --win-fill:#27804e; --loss-fill:#c8372d; --tie-fill:#76726b;
     color-scheme:light;
@@ -32,7 +32,7 @@
 :root[data-theme="light"]{
   --bg:#f0efec; --surface:#ffffff; --surface-2:#f7f6f3; --ink:#1a1917; --muted:#5c5953; --line:#dcdad5;
   --accent:#2457c5; --accent-soft:#eceef2; --accent-ink:#ffffff;
-  --home:#0e7f88; --draw:#aaa69e; --away:#a63f78; --home-ink:#ffffff; --away-ink:#ffffff;
+  --track:#e7e5e0; --best-bar:#4a4742; --home:#0e7f88; --draw:#77736c; --away:#a63f78; --home-ink:#ffffff; --away-ink:#ffffff;
   --win:#1f8a4c; --loss:#c8372d; --tie:#9e9a92; --nav:#e6e4df; --lime:#7cb342; --amber:#d98a1c;
     --win-fill:#27804e; --loss-fill:#c8372d; --tie-fill:#76726b;
   color-scheme:light;

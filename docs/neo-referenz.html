@@ -12,7 +12,7 @@
 :root{
   --bg:#131312; --surface:#1b1b19; --surface-2:#232321; --ink:#ebe8e2; --muted:#aaa69e; --line:#34332f;
   --accent:#7ea6f8; --accent-soft:#272a2f; --accent-ink:#0d1526;
-  --home:#4cbcc4; --draw:#77746d; --away:#d58cb4; --home-ink:#0f2224; --away-ink:#2b1221; /* Heim/Gast eigene Töne, nicht der Akzent */
+  --track:#141413; --best-bar:#cfcbc3; --home:#4cbcc4; --draw:#77746d; --away:#d58cb4; --home-ink:#0f2224; --away-ink:#2b1221; /* Heim/Gast eigene Töne, nicht der Akzent */
   --win:#3aa86a; --loss:#e05a4c; --tie:#5f5d58; --nav:#0e0e0d; --lime:#95cc62; --amber:#e6a94a;
   /* Flächen unter weißer Schrift (Form, Ergebnis, Stufen): je ≥ 4,5:1 */
   --win-fill:#27804e; --loss-fill:#bf4236; --tie-fill:#5f5d58;
@@ -26,7 +26,7 @@
   :root:not([data-theme="dark"]){
     --bg:#f0efec; --surface:#ffffff; --surface-2:#f7f6f3; --ink:#1a1917; --muted:#5c5953; --line:#dcdad5;
     --accent:#2457c5; --accent-soft:#eceef2; --accent-ink:#ffffff;
-    --home:#0e7f88; --draw:#aaa69e; --away:#a63f78; --home-ink:#ffffff; --away-ink:#ffffff;
+    --track:#e7e5e0; --best-bar:#4a4742; --home:#0e7f88; --draw:#77736c; --away:#a63f78; --home-ink:#ffffff; --away-ink:#ffffff;
     --win:#1f8a4c; --loss:#c8372d; --tie:#9e9a92; --nav:#e6e4df; --lime:#7cb342; --amber:#d98a1c;
     --win-fill:#27804e; --loss-fill:#c8372d; --tie-fill:#76726b;
     color-scheme:light;
@@ -35,7 +35,7 @@
 :root[data-theme="light"]{
   --bg:#f0efec; --surface:#ffffff; --surface-2:#f7f6f3; --ink:#1a1917; --muted:#5c5953; --line:#dcdad5;
   --accent:#2457c5; --accent-soft:#eceef2; --accent-ink:#ffffff;
-  --home:#0e7f88; --draw:#aaa69e; --away:#a63f78; --home-ink:#ffffff; --away-ink:#ffffff;
+  --track:#e7e5e0; --best-bar:#4a4742; --home:#0e7f88; --draw:#77736c; --away:#a63f78; --home-ink:#ffffff; --away-ink:#ffffff;
   --win:#1f8a4c; --loss:#c8372d; --tie:#9e9a92; --nav:#e6e4df; --lime:#7cb342; --amber:#d98a1c;
     --win-fill:#27804e; --loss-fill:#c8372d; --tie-fill:#76726b;
   color-scheme:light;
@@ -526,23 +526,47 @@ td.pts{font-weight:600;font-family:var(--f-mono)}
 .team-title{display:flex;align-items:center;gap:10px}
 .team-title .crest{width:24px;height:24px}
 .tiles{display:grid;grid-template-columns:1fr;gap:12px}
-@container (min-width:420px){.tiles{grid-template-columns:repeat(2,minmax(0,1fr))}}
-/* 3 Spalten als Zwischenstufe; die breite Kachel (Gesamttore) füllt dann die letzte Reihe */
-@container (min-width:660px){.tiles{grid-template-columns:repeat(3,minmax(0,1fr))}.tile.wide{grid-column:span 2}}
-@container (min-width:940px){.tiles{grid-template-columns:repeat(4,minmax(0,1fr))}.tile.wide{grid-column:auto}}
-.tile{border:1px solid var(--line);border-radius:8px;background:var(--surface-2);padding:14px;display:flex;flex-direction:column;gap:10px;min-width:0;container-type:inline-size}
+/* Neo-Referenz (Davids Entscheidung 27.10.2026): zwei Gruppen zu je drei Kacheln. Bei zwei Spalten geht die
+   Leitkachel jeder Gruppe (Endergebnis, Gesamttore) über die ganze Breite, ab 900px stehen drei nebeneinander. */
+@container (min-width:420px){.tiles{grid-template-columns:repeat(2,minmax(0,1fr))}.tile.wide{grid-column:1/-1}}
+@container (min-width:900px){.tiles{grid-template-columns:repeat(3,minmax(0,1fr))}.tile.wide{grid-column:auto}}
+.tile{border:0;border-radius:8px;background:var(--surface-2);padding:14px;display:flex;flex-direction:column;gap:10px;min-width:0;container-type:inline-size}
+.tgroup + .tgroup,.tgroup + .more{margin-top:20px}
+.tgroup-h{margin:0 2px 10px;font-family:var(--f-display);font-weight:600;font-size:14px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.more summary{cursor:pointer;display:flex;align-items:baseline;gap:10px;padding:10px 2px;font-family:var(--f-display);font-weight:600;font-size:14px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);list-style-position:inside}
+.more summary span{font-family:var(--f-body);font-size:12px;font-weight:400;letter-spacing:0;text-transform:none}
+.more summary:hover{color:var(--ink)}
+.more[open] summary{margin-bottom:6px}
+.sh-lead{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 14px;font-size:13px;color:var(--muted)}
+.sh-lead > b{font-family:var(--f-display);font-size:13px;font-weight:600;letter-spacing:.06em;text-transform:uppercase}
+.sh-lead span strong{color:var(--ink);font-weight:600}
+.sh-lead .num{color:var(--ink)}
+.dist .col.cut{position:relative}
+.dist .col.cut::before{content:"";position:absolute;left:-4px;top:0;bottom:0;border-left:1px dashed var(--muted)}
+.dist .col.cut::after{content:attr(data-line);position:absolute;left:0;top:-2px;font-family:var(--f-mono);font-size:11px;color:var(--muted)}
+.dist{padding-top:14px}
+.more summary{list-style:none}
+.more summary::-webkit-details-marker{display:none}
+.more summary::before{content:"";align-self:center;width:0;height:0;border-left:6px solid currentColor;border-block:5px solid transparent;transition:transform .15s}
+.more[open] summary::before{transform:rotate(90deg)}
+@media (prefers-reduced-motion:reduce){.more summary::before{transition:none}}
+.dist-x .over{color:var(--ink);font-weight:600}
 .tile-h{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
 .tile-h h4{margin:0;font-family:var(--f-display);font-weight:600;font-size:17px;letter-spacing:.02em;text-transform:uppercase}
-.tile-h span{font-size:11px;color:var(--muted);text-align:right}
+.tile-h span{font-size:12px;color:var(--muted);text-align:right}
 .oc{display:grid;grid-template-columns:minmax(0,1fr) auto auto;column-gap:10px;row-gap:4px;align-items:baseline}
 .oc-l{font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .oc-p{font-family:var(--f-mono);font-size:13px;font-weight:500;text-align:right}
 .oc-o{font-family:var(--f-mono);font-size:12px;color:var(--muted);min-width:40px;text-align:right;padding:1px 6px;border:1px solid var(--line);border-radius:4px;background:var(--surface)}
 .tip-q{font-family:var(--f-mono);font-weight:600;color:var(--ink)}
-.oc-bar{grid-column:1/-1;height:5px;border-radius:3px;background:var(--line);overflow:hidden}
+.oc-bar{grid-column:1/-1;height:5px;border-radius:3px;background:var(--track);overflow:hidden}
+.oc.best .oc-bar{height:7px}
 .oc-bar i{display:block;height:100%;background:var(--draw);border-radius:3px}
 .oc.best .oc-l{font-weight:600}
-.oc.best .oc-bar i{background:var(--accent)}
+.oc.best .oc-p{font-weight:600}
+.oc.best .oc-bar i:not(.h):not(.a){background:var(--best-bar)}
+.oc .oc-bar i.h{background:var(--home)} .oc .oc-bar i.d{background:var(--draw)} .oc .oc-bar i.a{background:var(--away)}
+.tiles-note{margin:14px 2px 0;max-width:75ch}
 .chips{display:flex;gap:4px;flex-wrap:wrap}
 .chips button{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:2px 9px;font-family:var(--f-mono);font-size:12px;cursor:pointer;color:var(--muted)}
 .chips button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
@@ -551,13 +575,15 @@ td.pts{font-weight:600;font-family:var(--f-mono)}
   .oc{grid-template-columns:auto 1fr auto}
   .oc-l{grid-column:1/-1;white-space:normal}
   .oc-p{text-align:left}
+  .oc-o{grid-column:3}
   .chips button{padding:2px 7px}
 }
 
 .dist{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px;align-items:end;height:110px}
 .dist .col{display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:4px;height:100%}
 .dist .bar{width:100%;background:var(--draw);border-radius:3px 3px 0 0;min-height:2px}
-.dist .col.best .bar{background:var(--accent)}
+.dist .col.best .bar{background:var(--best-bar)}
+.dist .col.best .v{color:var(--ink);font-weight:600}
 .dist .v{font-family:var(--f-mono);font-size:11px;color:var(--muted)}
 .dist-x{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px;font-family:var(--f-mono);font-size:11px;text-align:center;border-top:1px solid var(--line);padding-top:4px}
 .tile-foot{font-size:12px;color:var(--muted);margin-top:auto}
@@ -843,7 +869,7 @@ const dataTrust = f => Math.round(45 + seeded(f.id + "|daten")() * 55);
 // ===== Formatierung =========================================================
 const nf1 = new Intl.NumberFormat("de-DE", {minimumFractionDigits:1, maximumFractionDigits:1});
 const nf2 = new Intl.NumberFormat("de-DE", {minimumFractionDigits:2, maximumFractionDigits:2});
-const pct = p => p >= .1 ? Math.round(p * 100) + " %" : nf1.format(p * 100) + " %";
+const pct = p => p < .005 ? "< 1 %" : Math.round(p * 100) + " %";
 const time = d => d.toLocaleTimeString("de-DE", {hour:"2-digit", minute:"2-digit"});
 const wday = d => d.toLocaleDateString("de-DE", {weekday:"short", day:"2-digit", month:"2-digit"});
 const dateShort = d => wday(d) + " · " + time(d);
@@ -950,7 +976,7 @@ for (const f of ALLFX){
 
 // ===== Zustand ==============================================================
 const ALL = COMPS.map(c => c.id);
-let S = {view:"fixtures", from:"2026-10-23", to:"2026-10-25", dmode:"range", days:[], calM:null, fixture:"BL1-8-6", team:"FCB", ou:2.5, leagues:ALL.slice(), h2hVenue:"all", teamsByLeague:false, phSrc:"season", phSplit:true, perfRange:"10", perfPrev:false, sideTab:"team", teamFx:null, split:.4, psrc:"model", pmarkets:["1x2", "ou", "btts"], pmin:0, pmax:100, tip:null, fxSide:"markets", fxOrder:"kickoff"};
+let S = {view:"fixtures", from:"2026-10-23", to:"2026-10-25", dmode:"range", days:[], calM:null, fixture:"BL1-8-6", team:"FCB", ou:2.5, leagues:ALL.slice(), h2hVenue:"all", teamsByLeague:false, phSrc:"season", phSplit:true, perfRange:"10", perfPrev:false, sideTab:"team", teamFx:null, split:.4, psrc:"model", pmarkets:["1x2", "ou", "btts"], pmin:0, pmax:100, tip:null, fxSide:"markets", fxOrder:"kickoff", moreOpen:false};
 S.open = {}; // aufgeklappte Länder im Picker
 try { Object.assign(S, JSON.parse(localStorage.getItem("neo-kickoff-v3") || "{}")); } catch(e){}
 S.leagues = ALL.filter(id => (S.leagues || ALL).includes(id));
@@ -1567,16 +1593,17 @@ const sumPhases = p => ({games:p.home.games + p.away.games, sc:p.home.sc.map((v,
 // ===== Detail: Direkter Vergleich (H2H) =====================================
 // Umschalter rechts im Spiele-Reiter
 const fxTabs = () => `<div class="seg" role="group" aria-label="Inhalt der Detailansicht">
-    <button data-fxside="markets" aria-pressed="${S.fxSide !== "h2h"}">Marktchancen</button>
-    <button data-fxside="h2h" aria-pressed="${S.fxSide === "h2h"}">H2H</button>
-  </div>`;
+    <button data-fxside="markets" aria-pressed="true">Marktchancen</button>
+    <button aria-pressed="false" disabled title="Der direkte Vergleich folgt">H2H <span class="tag lig">folgt</span></button>
+  </div>`; // Neo-Referenz: H2H ist noch gesperrt (Davids Entscheidung vom 27.10.2026)
 // Kopf der rechten Detailansicht – gleiche Struktur in allen Ansichten, damit beim Umschalten nichts springt:
 // Zeile 1: Eyebrow + Titel links, Umschalter rechts · Zeile 2 (feste Mindesthöhe): Infos links, Werkzeuge rechts
-function sideHead({eyebrow, title, meta = "", tools = ""}){
+function sideHead({eyebrow, title, meta = "", tools = "", lead = ""}){
   const tabs = S.view === "fixtures" ? fxTabs() : S.view === "teams" ? sideTabs() : "";
   document.getElementById("mk-head").innerHTML = `<div class="sh">
     <div class="sh-top"><div class="sh-title"><h2 id="mk-title" class="vs">${title}</h2></div>${tabs}</div>
     <div class="sh-sub"><div class="mk-meta">${meta}</div>${tools ? `<div class="mk-tools">${tools}</div>` : ""}</div>
+    ${lead ? `<div class="sh-lead">${lead}</div>` : ""}
   </div>`;
 }
 const matchTitle = f => `${crest(f.h)}<span>${esc(T[f.h].n)}</span><span class="sep">–</span><span>${esc(T[f.a].n)}</span>${crest(f.a)}`;
@@ -1904,17 +1931,21 @@ function bookOdds(fid, okey, p){
   const r = seeded(fid + "|" + okey);
   return Math.min(99, Math.max(1.01, Math.round(1 / p * (.93 + r() * .05) * 100) / 100));
 }
-// Ausgänge einer Kachel; prefix + Index ergibt den Quoten-Schlüssel (z. B. "1x2:0" = Heimsieg)
-function outcomes(list, prefix, fid){
+// Ausgänge einer Kachel; prefix + Index ergibt den Quoten-Schlüssel (z. B. "1x2:0" = Heimsieg).
+// sides (h/d/a) färbt die Balken wie in der Spielliste: Heim Türkis, Remis Grau, Gast Rosé.
+// Ohne Seite hebt sich der wahrscheinlichste Ausgang neutral ab - Blau bleibt der Bedienung vorbehalten.
+function outcomes(list, prefix, fid, sides){
   const max = Math.max(...list.map(o => o[1]));
   return list.map(([l, p], i) => `
     <div class="oc${p === max && list.length > 1 ? " best" : ""}">
-      <span class="oc-l" title="${esc(l)}">${esc(l)}</span><span class="oc-p">${pct(p)}</span><span class="oc-o" title="Buchmacherquote (Mock)">${nf2.format(bookOdds(fid, prefix + ":" + i, p))}</span>
-      <span class="oc-bar"><i style="width:${(p * 100).toFixed(1)}%"></i></span>
+      <span class="oc-l" title="${esc(l)}">${esc(l)}</span><span class="oc-p">${pct(p)}</span><span class="oc-o" title="Buchmacherquote (Mock)"><span class="sr">Quote </span>${nf2.format(bookOdds(fid, prefix + ":" + i, p))}</span>
+      <span class="oc-bar"><i${sides ? ` class="${sides[i]}"` : ""} style="width:${(p * 100).toFixed(1)}%"></i></span>
     </div>`).join("");
 }
-const tile = (title, sub, body, foot = "") =>
-  `<article class="tile"><div class="tile-h"><h4>${title}</h4><span>${sub}</span></div>${body}${foot ? `<div class="tile-foot">${foot}</div>` : ""}</article>`;
+const HXA = ["h", "d", "a"];
+const tile = (title, sub, body, foot = "", wide = false) =>
+  `<article class="tile${wide ? " wide" : ""}"><div class="tile-h"><h4>${title}</h4><span>${sub}</span></div>${body}${foot ? `<div class="tile-foot">${foot}</div>` : ""}</article>`;
+const tileGroup = (title, tiles) => `<section class="tgroup"><h3 class="tgroup-h">${title}</h3><div class="tiles">${tiles.join("")}</div></section>`;
 
 function renderMarkets(){
   const f = currentFixture();
@@ -1925,27 +1956,47 @@ function renderMarkets(){
     return;
   }
   const {h, a} = f, p = mock(f), H = short(h), A = short(a), l = LG[f.lg];
+  const lineFmt = v => nf1.format(v);
+  const overAt = line => p.dist.reduce((s, v, n) => n > line ? s + v : s, 0);
+  const over = overAt(S.ou);
+  // „Am ehesten“ (Davids Entscheidung 27.10.2026): der wahrscheinlichste Ausgang aus Endergebnis, Über/Unter 2,5 und
+  // Beide treffen - dieselben Märkte wie bei den Predictions, keine eigene Rechnung. Fest 2,5, unabhängig von der gewählten Linie.
+  const top = list => list.reduce((b, x) => x[1] > b[1] ? x : b);
+  const o25 = overAt(2.5);
+  const likely = [
+    top([[H + " gewinnt", p.home], ["Unentschieden", p.draw], [A + " gewinnt", p.away]]),
+    o25 >= .5 ? ["Über 2,5 Tore", o25] : ["Unter 2,5 Tore", 1 - o25],
+    p.btts >= .5 ? ["Beide treffen", p.btts] : ["Nicht beide treffen", 1 - p.btts],
+  ];
   sideHead({eyebrow:S.view === "teams" ? "Marktchancen · Spiel von " + esc(short(S.team)) : "Marktchancen", title:matchTitle(f),
     meta:matchMeta(f) + `<span>Erwartete Tore <b>${nf1.format(p.lh)} : ${nf1.format(p.la)}</b></span><span>Quoten: Buchmacher (Mock)</span>`,
-    tools:S.view === "teams" ? teamFxSelect(f) : ""});
+    tools:S.view === "teams" ? teamFxSelect(f) : "",
+    lead:`<b>Am ehesten</b>${likely.map(([t, v]) => `<span><strong>${esc(t)}</strong> <span class="num">${pct(v)}</span></span>`).join("")}`});
 
-  const lineFmt = v => nf1.format(v);
-  const over = p.dist.reduce((s, v, n) => n > S.ou ? s + v : s, 0);
   const dMax = Math.max(...p.dist);
-  const distHtml = `<div class="dist">${p.dist.map(v => `<div class="col${v === dMax ? " best" : ""}"><span class="v">${Math.round(v * 100)}</span><span class="bar" style="height:${(v / dMax * 82).toFixed(1)}%"></span></div>`).join("")}</div>
-    <div class="dist-x">${["0","1","2","3","4","5","6+"].map(x => `<span>${x}</span>`).join("")}</div>`;
-  const ouChips = `<div class="chips" role="group" aria-label="Torlinie">${[0.5,1.5,2.5,3.5,4.5].map(v => `<button data-ou="${v}" aria-pressed="${v === S.ou}">${lineFmt(v)}</button>`).join("")}</div>`;
+  // Gesamttore zeigt die gewählte Torlinie: Spalten darüber sind markiert, darunter stehen die Knöpfe der Linie.
+  const cutAt = Math.ceil(S.ou); // erste Spalte über der Linie: dort steht der gestrichelte Trenner mit dem Wert der Linie
+  const distHtml = `<div class="dist" aria-label="Torlinie ${lineFmt(S.ou)}: Spalten rechts der gestrichelten Linie zählen für Über">${p.dist.map((v, n) => `<div class="col${v === dMax ? " best" : ""}${n === cutAt ? ' cut" data-line="' + lineFmt(S.ou) : ""}"><span class="v">${Math.round(v * 100)}</span><span class="bar" style="height:${(v / dMax * 82).toFixed(1)}%"></span></div>`).join("")}</div>
+    <div class="dist-x">${["0","1","2","3","4","5","6+"].map((x, n) => `<span${n > S.ou ? ' class="over"' : ""}>${x}</span>`).join("")}</div>`;
+  const ouChips = `<div class="chips" role="group" aria-label="Torlinie für Über / Unter">${[0.5,1.5,2.5,3.5,4.5].map(v => `<button data-ou="${v}" aria-pressed="${v === S.ou}">${lineFmt(v)}</button>`).join("")}</div>`;
 
-  document.getElementById("tiles-wrap").innerHTML = `<div class="tiles">${[
-    tile("Endergebnis", "1X2 · 90 Min.", outcomes([[H + " (1)", p.home], ["Remis (X)", p.draw], [A + " (2)", p.away]], "1x2", f.id)),
-    tile("Doppelte Chance", "zwei von drei", outcomes([["1X · " + H + " o. Remis", p.home + p.draw], ["12 · kein Remis", p.home + p.away], ["X2 · " + A + " o. Remis", p.draw + p.away]], "dc", f.id)),
-    tile("Über / Unter", "Tore gesamt", ouChips + outcomes([["Über " + lineFmt(S.ou), over], ["Unter " + lineFmt(S.ou), 1 - over]], "ou" + S.ou, f.id)),
-    tile("Beide treffen", "BTTS", outcomes([["Ja", p.btts], ["Nein", 1 - p.btts]], "btts", f.id)),
-    tile("1. Halbzeit", "Stand zur Pause", outcomes([[H, p.ht[0]], ["Remis", p.ht[1]], [A, p.ht[2]]], "ht", f.id)),
-    tile("Erstes Tor", "wer trifft zuerst", outcomes([[H, p.first[0]], ["Kein Tor", p.first[1]], [A, p.first[2]]], "first", f.id)),
-    tile("Exakte Ergebnisse", "Top 4", outcomes(p.cs.map(([sc, v]) => [sc.replace(":", " : "), v]), "cs", f.id)),
-    tile("Gesamttore", "Verteilung, in %", distHtml, "Erwartet <b>" + nf1.format(p.lh + p.la) + "</b> Tore").replace('class="tile"', 'class="tile wide"'),
-  ].join("")}</div>`;
+  document.getElementById("tiles-wrap").innerHTML = [
+    tileGroup("Wer gewinnt", [
+      tile("Endergebnis", "1X2 · 90 Min.", outcomes([[H + " (1)", p.home], ["Remis (X)", p.draw], [A + " (2)", p.away]], "1x2", f.id, HXA), "", true),
+      tile("1. Halbzeit", "Stand zur Pause", outcomes([[H, p.ht[0]], ["Remis", p.ht[1]], [A, p.ht[2]]], "ht", f.id, HXA)),
+      tile("Erstes Tor", "wer trifft zuerst", outcomes([[H, p.first[0]], ["Kein Tor", p.first[1]], [A, p.first[2]]], "first", f.id, HXA)),
+    ]),
+    tileGroup("Wie viele Tore", [
+      tile("Gesamttore", "Verteilung in % · rechts der Linie: Über", distHtml + ouChips, "Erwartet <b>" + nf1.format(p.lh + p.la) + "</b> Tore", true),
+      tile("Über / Unter", "Tore gesamt · Linie " + lineFmt(S.ou), outcomes([["Über " + lineFmt(S.ou), over], ["Unter " + lineFmt(S.ou), 1 - over]], "ou" + S.ou, f.id)),
+      tile("Beide treffen", "BTTS · beide Teams treffen", outcomes([["Ja", p.btts], ["Nein", 1 - p.btts]], "btts", f.id)),
+    ]),
+    `<details class="more" id="more-mk"${S.moreOpen ? " open" : ""}><summary>Weitere Märkte <span>Doppelte Chance, exakte Ergebnisse</span></summary><div class="tiles">${[
+      tile("Doppelte Chance", "zwei von drei", outcomes([[H + " oder Remis (1X)", p.home + p.draw], ["Kein Remis (12)", p.home + p.away], [A + " oder Remis (X2)", p.draw + p.away]], "dc", f.id)),
+      tile("Exakte Ergebnisse", "Top 4", outcomes(p.cs.map(([sc, v]) => [sc.replace(":", " : "), v]), "cs", f.id)),
+    ].join("")}</div></details>`,
+  ].join("") + `
+  <p class="note tiles-note">Chancen sind Schätzungen des Modells, die Quoten stammen vom Buchmacher und ändern keinen Tipp. Auch wahrscheinliche Ausgänge treten oft nicht ein – rechne nicht mit Gewinn.</p>`;
 }
 
 // ===== Detailansicht: Platzhalter (Neo-Referenz) ===========================
@@ -1974,7 +2025,8 @@ function render(){
   if (S.view === "teams") renderTeams();
   else if (S.view === "preds") renderPreds();
   else renderFixtures();
-  renderDetailPlaceholder(); // Neo-Referenz: Detailansicht folgt (renderMarkets, renderH2H, renderTeamDetail ruhen)
+  // Neo-Referenz: Spiele zeigen rechts die Marktchancen; H2H, Teamanalyse und Tipps-Detail folgen.
+  if (S.view === "fixtures") renderMarkets(); else renderDetailPlaceholder();
   drawPerfCharts();
   renderPicker();
   renderDatePicker();
@@ -2083,7 +2135,7 @@ document.addEventListener("click", e => {
   if (d.tip){ sideBody().scrollTop = 0; if (window.matchMedia("(max-width:820px)").matches) document.querySelector("#mk-head").scrollIntoView({block:"start"}); }
   if (d.psrc) document.getElementById("dd-src-btn")?.focus();
   // Nach dem Neuzeichnen den Fokus aufs Gewählte zurücksetzen, sonst springt die Tastatur an den Listenanfang.
-  const refocus = d.fx ? `[data-fx="${d.fx}"]` : d.tip ? `[data-tip="${d.tip}"]` : d.view ? `[data-view="${d.view}"]` : d.group ? `[data-group="${d.group}"]` : d.fxorder ? `[data-fxorder="${d.fxorder}"]` : null;
+  const refocus = d.fx ? `[data-fx="${d.fx}"]` : d.tip ? `[data-tip="${d.tip}"]` : d.view ? `[data-view="${d.view}"]` : d.group ? `[data-group="${d.group}"]` : d.fxorder ? `[data-fxorder="${d.fxorder}"]` : d.ou ? `[data-ou="${d.ou}"]` : null;
   if (refocus) document.querySelector(refocus)?.focus({preventScroll:true});
 });
 // Torphasen: Häkchen „Heim / Auswärts“
@@ -2094,6 +2146,8 @@ document.addEventListener("input", e => {
   if (e.target.id === "pp-max" && max < min) e.target.value = min;
   document.getElementById(e.target.id + "-v").textContent = e.target.value + " %";
 });
+// „Weitere Märkte“ bleibt beim Wechsel des Spiels so offen oder zu, wie David es zuletzt hatte.
+document.addEventListener("toggle", e => { if (e.target.id === "more-mk"){ S.moreOpen = e.target.open; save(); } }, true);
 document.addEventListener("change", e => {
   if (e.target.id === "pp-min" || e.target.id === "pp-max"){
     S.pmin = +document.getElementById("pp-min").value; S.pmax = +document.getElementById("pp-max").value;

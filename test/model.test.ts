@@ -10,6 +10,7 @@ import {
   firstHalfPlayedMatches,
   leagueBaseline,
   goalLineProbabilities,
+  marketDetail,
   playedMatches,
   poissonProbabilities,
   recalibrateGoals,
@@ -518,4 +519,30 @@ test("homeShift hebt den Heimsieg, ohne die Torlinien zu ändern", () => {
 
   assert.equal(config.goalLineHomeShift, 0, "eingeschaltet wird erst nach der BTTS-Prüfung");
   assert.deepEqual(analyzeFixture(upcoming, history(base), history(base), { homeShift: config.goalLineHomeShift }), plain);
+});
+
+test("marketDetail passt zu Torlinien und 1X2 derselben Torerwartung", () => {
+  const detail = marketDetail(1.6, 1.1, 0.7, 0.5);
+  const lines = goalLineProbabilities(1.6, 1.1);
+  const outcome = poissonProbabilities(1.6, 1.1);
+  const half = poissonProbabilities(0.7, 0.5);
+  assert.equal(detail.totalGoals.length, 7);
+  assert.ok(Math.abs(detail.totalGoals.reduce((sum, p) => sum + p, 0) - 1) < 1e-12);
+  assert.ok(Math.abs(detail.totalGoals.slice(0, 3).reduce((sum, p) => sum + p, 0) - lines.under25) < 1e-12);
+  assert.ok(Math.abs(detail.totalGoals.slice(0, 4).reduce((sum, p) => sum + p, 0) - lines.under35) < 1e-12);
+  assert.equal(detail.exactScores.length, 4);
+  assert.deepEqual(detail.exactScores.map((score) => `${score.home}:${score.away}`), ["1:1", "1:0", "2:1", "2:0"]);
+  assert.ok(detail.exactScores.every((score, index, all) => index === 0 || all[index - 1]!.probability >= score.probability));
+  const draws = detail.exactScores.filter((score) => score.home === score.away).reduce((sum, score) => sum + score.probability, 0);
+  assert.ok(draws <= outcome.draw);
+  assert.deepEqual(detail.halfTime, { home: half.home, draw: half.draw, away: half.away });
+  assert.ok(Math.abs(detail.firstGoal.home + detail.firstGoal.none + detail.firstGoal.away - 1) < 1e-12);
+  assert.ok(Math.abs(detail.firstGoal.none - detail.totalGoals[0]!) < 1e-12);
+  assert.ok(detail.firstGoal.home > detail.firstGoal.away);
+});
+
+test("marketDetail ohne Torerwartung kennt kein erstes Tor", () => {
+  const detail = marketDetail(0, 0, 0, 0);
+  assert.deepEqual(detail.firstGoal, { home: 0, none: 1, away: 0 });
+  assert.equal(detail.totalGoals[0], 1);
 });

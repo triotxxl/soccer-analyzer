@@ -228,6 +228,45 @@ export function modelTips(fixtures: readonly DashboardFixture[], markets: readon
   return best;
 }
 
+// ===== Marktchancen (Detailansicht eines Spiels) ===============================
+
+/** „Am ehesten“ im Kopf: je Markt der wahrscheinlichste Tipp, dieselben Kandidaten wie bei den Predictions. */
+export function likelyTips(fixture: DashboardFixture, source: NameSource): Tip[] {
+  const candidates = tipCandidates(fixture, source);
+  return TIP_MARKETS.flatMap(([market]) =>
+    candidates.filter((t) => t.market === market).sort((a, b) => b.probability - a.probability).slice(0, 1));
+}
+
+export const OU_LINES = [0.5, 1.5, 2.5, 3.5, 4.5] as const;
+const LINE_MARKETS: Partial<Record<number, [over: DashboardMarketKey, under: DashboardMarketKey]>> = {
+  1.5: ["over15", "under15"], 2.5: ["over25", "under25"], 3.5: ["over35", "under35"],
+};
+
+/** Anteil der Torzahlen über `line` aus der Verteilung 0 … 5, 6+. */
+export const overAt = (dist: readonly number[], line: number) => dist.reduce((sum, p, goals) => (goals > line ? sum + p : sum), 0);
+
+export interface TwoWay { yes: number; no: number; oddsYes: number | null; oddsNo: number | null }
+
+/**
+ * Über/Unter einer Linie. 1,5 / 2,5 / 3,5 kommen aus den Märkten (mit Tipico-Quote), 0,5 und 4,5 aus der
+ * Torverteilung (`marketDetail`, ab schemaVersion 10, ohne Quote). Beide stehen auf derselben Torerwartung.
+ */
+export function overUnder(fixture: DashboardFixture, line: number): TwoWay | null {
+  const keys = LINE_MARKETS[line];
+  const over = keys && marketOf(fixture, keys[0]), under = keys && marketOf(fixture, keys[1]);
+  if (over && under) return over.probabilityReliable === false ? null : { yes: over.probability, no: under.probability, oddsYes: over.odds, oddsNo: under.odds };
+  const dist = fixture.marketDetail?.totalGoals;
+  if (!dist) return null;
+  const p = overAt(dist, line);
+  return { yes: p, no: 1 - p, oddsYes: null, oddsNo: null };
+}
+
+export function bothScore(fixture: DashboardFixture): TwoWay | null {
+  const yes = marketOf(fixture, "btts"), no = marketOf(fixture, "bttsNo");
+  if (!yes || yes.probabilityReliable === false) return null;
+  return { yes: yes.probability, no: no?.probability ?? 1 - yes.probability, oddsYes: yes.odds, oddsNo: no?.odds ?? null };
+}
+
 // ===== Teams ===================================================================
 
 export interface TeamRow {
@@ -285,7 +324,7 @@ export function seasonLabel(createdAt: string): string {
   return `Saison ${String(start).padStart(2, "0")}/${String((start + 1) % 100).padStart(2, "0")}`;
 }
 
-export const percent = (p: number) => `${Math.round(p * 100)} %`;
+export const percent = (p: number) => (p < 0.005 ? "< 1 %" : `${Math.round(p * 100)} %`);
 export const oddsFormat = (o: number | null) => (o == null ? "–" : o.toLocaleString("de-DE", { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
 export const goalsFormat = (g: number) => g.toLocaleString("de-DE", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 

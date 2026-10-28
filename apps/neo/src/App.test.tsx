@@ -79,6 +79,41 @@ describe("Neo Dashboard", () => {
     expect(screen.getByText(/rechne nicht mit Gewinn/)).toBeInTheDocument();
   });
 
+  it("zeigt rechts die Marktchancen des gewählten Spiels", async () => {
+    serve(DOCUMENT);
+    render(<App />);
+    await screen.findAllByText("Leeds AFC");
+    const detail = within(document.querySelectorAll<HTMLElement>("section.panel")[1]!);
+    expect(detail.getByRole("heading", { name: /London FC.*Leeds AFC/ })).toBeInTheDocument();
+    const lead = document.querySelector(".sh-lead")!;
+    expect(lead).toHaveTextContent("Leeds AFC gewinnt 60 %");
+    expect(lead).toHaveTextContent("Über 2,5 Tore 71 %");
+    expect(detail.getByRole("button", { name: /H2H/ })).toBeDisabled();
+    expect(detail.getByRole("heading", { name: "Wer gewinnt" })).toBeInTheDocument();
+    expect(detail.getByText("Erstes Tor").closest("article")).toHaveTextContent("53 %");
+    // Torlinie 3,5 kommt ohne eigenen Markt aus der Torverteilung, ohne Quote.
+    fireEvent.click(detail.getByRole("button", { name: "3,5" }));
+    const ou = detail.getByText("Über / Unter").closest("article")!;
+    expect(ou).toHaveTextContent("Über 3,530 %");
+    expect(ou).toHaveTextContent("keine Quote");
+    fireEvent.click(detail.getByText("Weitere Märkte"));
+    expect(detail.getByText("1 : 1")).toBeInTheDocument();
+    expect(detail.getByText(/rechne nicht mit Gewinn/)).toBeInTheDocument();
+  });
+
+  it("zeigt ohne belastbares 1X2 nur die Tormärkte und bei alten Analysen einen Hinweis", async () => {
+    serve(DOCUMENT);
+    render(<App />);
+    fireEvent.click((await screen.findByText("Dorf SV")).closest("button")!);
+    const detail = within(document.querySelectorAll<HTMLElement>("section.panel")[1]!);
+    expect(detail.getByText("Endergebnis").closest("article")).toHaveTextContent("keine belastbare Chance");
+    expect(detail.getByText("Gesamttore").closest("article")!.querySelector(".dist")).not.toBeNull();
+    expect(document.querySelector(".sh-lead")).not.toHaveTextContent("gewinnt");
+    fireEvent.click(list().getByText("Heim (Tipico)").closest("button")!);
+    expect(detail.getByText("Erstes Tor").closest("article")).toHaveTextContent("Kommt mit der nächsten Analyse.");
+    expect(detail.getByText("Endergebnis").closest("article")).toHaveTextContent("55 %");
+  });
+
   it("meldet, wenn noch keine Analyse vorhanden ist", async () => {
     serve({}, 404);
     render(<App />);

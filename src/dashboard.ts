@@ -2,6 +2,7 @@ import { mkdir, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { config, ROOT_DIR } from "./config.ts";
 import { recentAverage, type MatchSideStats, type RecentAverage } from "./recent-stats.ts";
+import { marketDetail, type MarketDetail } from "./model.ts";
 import { teamNameSimilarity } from "./team-resolver.ts";
 import type { DefensiveProfile, DrawAnalysisResult, FavoriteAnalysisResult, GoalLineAnalysisResult, GoalLineRow, LeagueStats, LeagueStrengthComparison, LiveCoverage, RecentMatchSummary, TipicoOdds } from "./types.ts";
 import type { EloSystem } from "./elo-config.ts";
@@ -214,12 +215,23 @@ export interface DashboardFixture {
   }>;
   expectedGoals: { home: number; away: number; total: number };
   expectedFirstHalfGoals?: { home: number; away: number; total: number };
+  /**
+   * Ab schemaVersion 10: weitere Märkte für die Detailansicht (`marketDetail` in `src/model.ts`),
+   * aus denselben Torerwartungen wie die Märkte. Halbzeitstand, erstes Tor und exakte Ergebnisse
+   * hängen an der Richtung und fehlen deshalb, wenn das 1X2 nicht belastbar ist.
+   */
+  marketDetail?: {
+    totalGoals: number[];
+    exactScores: MarketDetail["exactScores"] | null;
+    halfTime: MarketDetail["halfTime"] | null;
+    firstGoal: MarketDetail["firstGoal"] | null;
+  };
   scores: { favorite: number | null; draw: number | null };
   markets: DashboardMarket[];
 }
 
 export interface DashboardDocument {
-  schemaVersion: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
+  schemaVersion: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
   meta: {
     createdAt: string;
     timezone: string;
@@ -565,6 +577,7 @@ export function buildDashboardDocument(input: DashboardInput): DashboardDocument
         away: row.firstHalf.expectedAwayGoals,
         total: row.firstHalf.expectedTotalGoals
       },
+      marketDetail: detailFor(row, outcomeUnreliable),
       scores: { favorite: favorite?.score ?? null, draw: draw?.score ?? null }, markets
     };
   });
@@ -578,7 +591,7 @@ export function buildDashboardDocument(input: DashboardInput): DashboardDocument
   const createdAt = Date.parse(input.createdAt);
   const latestKickoff = fixtures.reduce((latest, fixture) => Math.max(latest, Date.parse(fixture.kickoff)), createdAt);
   return {
-    schemaVersion: 9,
+    schemaVersion: 10,
     meta: {
       createdAt: input.createdAt, timezone: config.timezone, sourceFile: input.sourceFile,
       totalTipicoEvents: input.totalTipicoEvents, selectedTipicoEvents: input.selectedTipicoEvents,
@@ -610,4 +623,14 @@ export async function writeDashboard(input: DashboardInput, outputDirectory = pa
   const snapshot = path.join(outputDirectory, `dashboard-${stamp}.json`);
   await Promise.all([atomicWriteJson(latest, document), atomicWriteJson(snapshot, document)]);
   return { latest, snapshot };
+}
+
+function detailFor(row: GoalLineRow, outcomeUnreliable: boolean): NonNullable<DashboardFixture["marketDetail"]> {
+  const detail = marketDetail(row.expectedHomeGoals, row.expectedAwayGoals, row.firstHalf.expectedHomeGoals, row.firstHalf.expectedAwayGoals);
+  return {
+    totalGoals: detail.totalGoals,
+    exactScores: outcomeUnreliable ? null : detail.exactScores,
+    halfTime: outcomeUnreliable ? null : detail.halfTime,
+    firstGoal: outcomeUnreliable ? null : detail.firstGoal
+  };
 }

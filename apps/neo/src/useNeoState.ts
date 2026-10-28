@@ -20,6 +20,10 @@ export interface NeoState {
   pmarkets: TipMarket[];
   pmin: number;
   pmax: number;
+  /** Torlinie der Marktchancen (Gesamttore und Über/Unter). */
+  ou: number;
+  /** „Weitere Märkte“ aufgeklappt. */
+  moreOpen: boolean;
 }
 
 export const SPLIT = { min: 0.25, max: 0.65, def: 0.4 };
@@ -27,7 +31,7 @@ const STORAGE_KEY = "neo:state:v1";
 
 const DEFAULTS: NeoState = {
   view: "fixtures", scope: null, calMonth: null, deselected: [], closedCountries: [], fixture: null, team: null, tip: null,
-  fxOrder: "kickoff", teamsByLeague: false, split: SPLIT.def, pmarkets: ["1x2", "ou", "btts"], pmin: 0, pmax: 100,
+  fxOrder: "kickoff", teamsByLeague: false, split: SPLIT.def, pmarkets: ["1x2", "ou", "btts"], pmin: 0, pmax: 100, ou: 2.5, moreOpen: false,
 };
 
 function load(): NeoState {

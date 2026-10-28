@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { buildDashboardDocument, writeDashboard, type DashboardInput } from "../src/dashboard.ts";
+import { goalLineProbabilities } from "../src/model.ts";
 
 function dashboardInput(odds = 1.75, strengthAvailable = true): DashboardInput {
   const base = { createdAt: "2026-08-11T16:00:00.000Z", dates: ["2026-08-11"], apiRequests: 0, apiRequestsRemaining: 7000 };
@@ -99,7 +100,7 @@ test("übernimmt die Tipico-Namen je Fixture und lässt die API-Namen unverände
 
 test("Dashboard-Dokument führt alle Analysen über fixtureId zusammen", () => {
   const document = buildDashboardDocument(dashboardInput());
-  assert.equal(document.schemaVersion, 9);
+  assert.equal(document.schemaVersion, 10);
   // Beide Seitenquoten gehören in den 1X2-Markt, damit sich auch die Gegenseite bewerten
   // lässt; `odds` bleibt daneben die Quote des getippten Weges.
   const oneXTwo = document.fixtures[0]!.markets.find((market) => market.key === "1x2")!;
@@ -202,7 +203,7 @@ test("Dashboard-Ausgabe schreibt latest und datierten Snapshot als JSON", async 
     assert.equal(path.basename(files.latest), "dashboard-latest.json");
     assert.match(path.basename(files.snapshot), /^dashboard-2026-08-11T16-00-00-000Z\.json$/);
     const latest = JSON.parse(await readFile(files.latest, "utf8")) as { schemaVersion: number };
-    assert.equal(latest.schemaVersion, 9);
+    assert.equal(latest.schemaVersion, 10);
   } finally {
     await rm(directory, { recursive: true, force: true });
   }
@@ -223,6 +224,11 @@ test("Cross-League ohne Ligastärke-Vergleich weist keine 1X2-Wahrscheinlichkeit
     assert.equal(market.probabilityReliable, undefined);
   }
   assert.equal(fixture.markets.find((market) => market.key === "over15")!.recommendation.level, "strong");
+  // Weitere Märkte: die Torverteilung bleibt, alles mit Richtung fällt weg.
+  assert.equal(fixture.marketDetail?.totalGoals.length, 7);
+  assert.equal(fixture.marketDetail?.halfTime, null);
+  assert.equal(fixture.marketDetail?.firstGoal, null);
+  assert.equal(fixture.marketDetail?.exactScores, null);
 });
 
 test("Mit Ligastärke-Vergleich bleibt die 1X2-Bewertung unangetastet", () => {
@@ -230,6 +236,16 @@ test("Mit Ligastärke-Vergleich bleibt die 1X2-Bewertung unangetastet", () => {
   assert.equal(outcome.probabilityReliable, undefined);
   assert.equal(outcome.recommendation.level, "strong");
   assert.ok(outcome.details.some((detail) => /Ligastärke: /.test(detail)));
+});
+
+test("Weitere Märkte kommen aus derselben Torerwartung wie die Torlinien", () => {
+  const fixture = buildDashboardDocument(dashboardInput()).fixtures[0]!;
+  const detail = fixture.marketDetail!;
+  const under25 = detail.totalGoals.slice(0, 3).reduce((sum, p) => sum + p, 0);
+  const lines = goalLineProbabilities(fixture.expectedGoals.home, fixture.expectedGoals.away);
+  assert.ok(Math.abs(under25 - lines.under25) < 1e-9);
+  assert.equal(detail.exactScores?.length, 4);
+  assert.ok(detail.halfTime && detail.firstGoal);
 });
 
 test("Klassenunterschied kommt aus dem Ligarating, sobald der Torfaktor deutlich wird", () => {

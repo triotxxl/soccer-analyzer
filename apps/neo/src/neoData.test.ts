@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  bothScore, likelyTips, overUnder, percent,
   competitionsOf, competitionTree, countryCode, datePresets, dayKey, isCup, leagueTables, modelTips, oddsTriple, oneXTwo, scopeLabel,
   seasonLabel, sortName,
 } from "./neoData";
@@ -92,6 +93,27 @@ describe("Modell-Tipps", () => {
 
   it("filtert nach dem Wahrscheinlichkeitsbereich", () => {
     expect(modelTips(DOCUMENT.fixtures, ["ou"], 70, 100, "api").map((t) => t.fixture.fixtureId)).toEqual([2]);
+  });
+});
+
+describe("Marktchancen", () => {
+  const [heim, london, pokal] = DOCUMENT.fixtures;
+  it("nimmt für „Am ehesten“ je Markt den wahrscheinlichsten Tipp", () => {
+    expect(likelyTips(london!, "api").map((t) => [t.pick, t.probability])).toEqual([["Leeds AFC gewinnt", 0.6], ["Über 2,5 Tore", 0.71], ["Ja", 0.5]]);
+    expect(likelyTips(pokal!, "api").map((t) => t.market)).toEqual(["ou", "btts"]);
+  });
+  it("liest Torlinien aus den Märkten, 0,5 und 4,5 aus der Torverteilung", () => {
+    expect(overUnder(london!, 2.5)).toEqual({ yes: 0.71, no: 0.29, oddsYes: 1.5, oddsNo: 2.6 });
+    expect(overUnder(london!, 4.5)!.yes).toBeCloseTo(0.14);
+    expect(overUnder(london!, 0.5)!.no).toBeCloseTo(0.06);
+    expect(overUnder(heim!, 4.5)).toBeNull();
+  });
+  it("führt BTTS mit beiden Quoten", () => {
+    expect(bothScore(pokal!)).toEqual({ yes: 0.4, no: 0.6, oddsYes: 2.1, oddsNo: 1.7 });
+  });
+  it("schreibt sehr kleine Chancen als „< 1 %“", () => {
+    expect(percent(0.004)).toBe("< 1 %");
+    expect(percent(0.012)).toBe("1 %");
   });
 });
 
