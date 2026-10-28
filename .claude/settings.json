@@ -5,7 +5,8 @@
       "mcp__claude-in-chrome__tabs_create_mcp",
       "ClaudeInChromeDomain(fonts.googleapis.com)",
       "mcp__claude-in-chrome__tabs_context_mcp",
-      "ClaudeInChromeDomain(localhost:5174)"
+      "ClaudeInChromeDomain(localhost:5174)",
+      "ClaudeInChromeDomain(127.0.0.1:48731)"
     ]
   },
   "hooks": {
