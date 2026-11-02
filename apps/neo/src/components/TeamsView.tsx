@@ -2,7 +2,7 @@ import type { KeyboardEvent } from "react";
 import { competitionLeague, useNames } from "../../../shared/src/names";
 import type { FormResult } from "../../../shared/src/types";
 import { scopePhrase, sortName, type Competition, type DayScope, type LeagueTable, type TeamRow } from "../neoData";
-import { EmptyState, Team } from "./ui";
+import { EloValue, EmptyState, Team } from "./ui";
 
 interface Props {
   tables: LeagueTable[];
@@ -43,6 +43,7 @@ export function TeamsView({ tables, competitions, byLeague, onByLeague, selected
         <td className="num">{r.goalsFor}:{r.goalsAgainst}</td>
         <td className="num hide-sm">{diff > 0 ? "+" : ""}{diff}</td>
         <td className="pts">{r.points}</td>
+        <td className="num"><EloValue elo={r.elo} /></td>
         <td className="l hide-xs"><FormChips form={r.form} /></td>
         <td className="go" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M6 3.5 10.5 8 6 12.5" /></svg></td>
       </tr>
@@ -53,7 +54,7 @@ export function TeamsView({ tables, competitions, byLeague, onByLeague, selected
       <thead><tr>
         <th title={withLeague ? "Platz in der eigenen Liga" : "Platz"}>{withLeague ? "Pl." : "#"}</th><th className="l">Team</th>
         {withLeague && <th className="l">Liga</th>}
-        <th>Sp</th><th className="hide-sm">S</th><th className="hide-sm">U</th><th className="hide-sm">N</th><th>Tore</th><th className="hide-sm">Diff</th><th>Pkt</th>
+        <th>Sp</th><th className="hide-sm">S</th><th className="hide-sm">U</th><th className="hide-sm">N</th><th>Tore</th><th className="hide-sm">Diff</th><th>Pkt</th><th title="Elo: Spielstärke aus allen Spielen der letzten fünf Jahre - je höher, desto stärker">Elo</th>
         <th className="l hide-xs">Form</th><th><span className="sr">Öffnen</span></th>
       </tr></thead>
       <tbody>{rows.map((r) => row(r, withLeague))}</tbody>

@@ -1,6 +1,8 @@
 import { countryFlagCode } from "../../shared/src/countryFlags";
 import { competitionCountry, competitionLeague, teamName, type NameSource } from "../../shared/src/names";
-import type { DashboardDocument, DashboardFixture, DashboardMarket, DashboardMarketKey, FormResult, InsightMatch } from "../../shared/src/types";
+import type {
+  DashboardDocument, DashboardFixture, DashboardMarket, DashboardMarketKey, FormResult, InsightMatch, TeamElo,
+} from "../../shared/src/types";
 
 /**
  * Alles, was Neo aus dem Snapshot ableitet - rein, ohne React und ohne Netz. Aufbau und Regeln
@@ -33,6 +35,16 @@ export function formatDay(day: string, style: "short" | "long" = "short"): strin
 export function formatTime(iso: string, timezone: string): string {
   return new Intl.DateTimeFormat("de-DE", { timeZone: timezone, hour: "2-digit", minute: "2-digit" }).format(new Date(iso));
 }
+
+/**
+ * Ab wann ein Spiel vorbei ist und aus Neo verschwindet (Davids Wunsch vom 29.10.2026). Der Snapshot kennt
+ * keinen Stand nach dem Anpfiff, und Neo fragt nichts live ab - maßgeblich ist deshalb die Uhr. 120 Minuten
+ * decken 2 × 45, Pause und Nachspielzeit (die Abrechnung wartet 110, `UNSETTLED_MIN_AGE_MS`); ein Pokalspiel
+ * mit Verlängerung verschwindet dabei schon während der Verlängerung.
+ */
+export const OVER_AFTER_MS = 120 * 60 * 1000;
+export const isOver = (fixture: Pick<DashboardFixture, "kickoff">, now: number) =>
+  Date.parse(fixture.kickoff) + OVER_AFTER_MS <= now;
 
 /** Zeitraum (von–bis) oder einzelne Tage, wie im Date-Picker der Referenz. */
 export type DayScope = { mode: "range"; from: string; to: string } | { mode: "days"; days: string[] };
@@ -228,6 +240,15 @@ export function modelTips(fixtures: readonly DashboardFixture[], markets: readon
   return best;
 }
 
+export type TipOrder = "chance" | "kickoff";
+
+/** Tipps nach Tagen; innerhalb eines Tages nach Chance (höchste zuerst) oder nach Anstoß. */
+export function sortTips(tips: readonly Tip[], order: TipOrder, timezone: string): Tip[] {
+  const time = (t: Tip) => Date.parse(t.fixture.kickoff);
+  return [...tips].sort((a, b) => dayKey(a.fixture.kickoff, timezone).localeCompare(dayKey(b.fixture.kickoff, timezone))
+    || (order === "kickoff" ? time(a) - time(b) || b.probability - a.probability : b.probability - a.probability || time(a) - time(b)));
+}
+
 // ===== Marktchancen (Detailansicht eines Spiels) ===============================
 
 /** „Am ehesten“ im Kopf: je Markt der wahrscheinlichste Tipp, dieselben Kandidaten wie bei den Predictions. */
@@ -283,6 +304,8 @@ export interface TeamRow {
   points: number;
   crest?: string;
   form: FormResult[] | null;
+  /** Elo aus einem Spiel des Snapshots (ab schemaVersion 12 mit Liga), null ohne Spiel im Zeitraum. */
+  elo: TeamElo | null;
 }
 
 export interface LeagueTable { competition: Competition; rows: TeamRow[]; played: number }
@@ -302,6 +325,7 @@ export function leagueTables(fixtures: readonly DashboardFixture[], competitions
     if (f.homeCrest) crests.set(f.homeTeam, f.homeCrest);
     if (f.awayCrest) crests.set(f.awayTeam, f.awayCrest);
   }
+  const elos = eloByTeamName(fixtures);
   const tables: LeagueTable[] = [];
   for (const competition of competitions) {
     const withTable = fixtures.find((f) => competitionId(f) === competition.id && f.table?.length);
@@ -310,6 +334,7 @@ export function leagueTables(fixtures: readonly DashboardFixture[], competitions
       key: `${competition.id}|${r.teamName}`, name: r.teamName, competitionId: competition.id, position: r.position,
       played: r.played, wins: r.wins, draws: r.draws, losses: r.losses, goalsFor: r.goalsFor, goalsAgainst: r.goalsAgainst,
       points: r.points, crest: crests.get(r.teamName), form: r.form?.length ? r.form : null,
+      elo: r.elo ?? elos.get(r.teamName) ?? null,
     }));
     tables.push({ competition, rows, played: Math.max(0, ...rows.map((r) => r.played)) });
   }
@@ -432,4 +457,104 @@ export const goalsFormat = (g: number) => g.toLocaleString("de-DE", { minimumFra
 export function daysWithGames(document: DashboardDocument): string[] {
   const tz = document.meta.timezone;
   return [...new Set(document.fixtures.map((f) => dayKey(f.kickoff, tz)))].sort();
+}
+
+// ===== Elo (Spielstärke) =========================================================
+
+/**
+ * Elo-Abstand zweier Teams derselben Skala, ab dem eine Seite „etwas“ bzw. „klar“ stärker heißt. Ohne
+ * Heimvorteil gerechnet. 50 Punkte sind gut eine halbe Stufe auf der Elo-Erwartung (rund 57 zu 43), 150 rund
+ * 70 zu 30. Nur Anzeige: Die Chancen kommen aus dem Modell, nie aus diesem Abstand (Davids Auftrag 28.10.2026).
+ */
+export const ELO_TEAM_STEPS = { slight: 50, clear: 150 } as const;
+/**
+ * Abstand der Liga-Niveaus (mittleres Elo der Vereine einer Liga). 75 ist ein Torfaktor von rund 1,15;
+ * 211 und 411 sind beim Teiler 1200 genau die Faktoren 1,5 und 2,2 der Markierung „Klasse“ (`classGap`).
+ */
+export const ELO_LEAGUE_STEPS = { slight: 75, clear: 211, extreme: 411 } as const;
+/** Unter so viel Vertrauen steht ein Elo-Wert auf wenig Grundlage (wie `npm run coverage`). */
+export const ELO_THIN = 30;
+
+export interface StrengthSide {
+  elo: TeamElo | null;
+  name: string;
+}
+
+export interface StrengthView {
+  home: StrengthSide;
+  away: StrengthSide;
+  /** Beide Werte auf derselben Skala - sonst gibt es keinen Vergleich (Verein gegen Nationalteam, U21 gegen A). */
+  comparable: boolean;
+  /** Die deutlich stärkere Seite (ab `ELO_TEAM_STEPS.slight`), sonst null. */
+  stronger: "home" | "away" | null;
+  /** Urteil in Worten, null ohne Vergleich. */
+  verdict: string | null;
+  /** Nur bei Spielen zwischen verschiedenen Ligen mit Liga-Niveau auf beiden Seiten. */
+  league: {
+    home: { name: string; level: number };
+    away: { name: string; level: number };
+    stronger: "home" | "away" | null;
+    /** Klassenunterschied ab `ELO_LEAGUE_STEPS.clear` bzw. `extreme` - dieselben Stufen wie „Klasse“. */
+    gap: "clear" | "extreme" | null;
+    verdict: string;
+  } | null;
+}
+
+export const eloFormat = (elo: number) => String(Math.round(elo));
+export const eloThin = (elo: TeamElo) => elo.confidence < ELO_THIN;
+
+/** Elo beider Teams eines Spiels und was ihr Abstand heißt (Spielzeile und Detailansicht). */
+export function strengthOf(fixture: DashboardFixture, source: NameSource = "api"): StrengthView {
+  const homeName = teamName(fixture, "home", source), awayName = teamName(fixture, "away", source);
+  const home = fixture.homeElo ?? null, away = fixture.awayElo ?? null;
+  const comparable = home !== null && away !== null && home.system === away.system;
+  let stronger: StrengthView["stronger"] = null, verdict: string | null = null;
+  if (comparable) {
+    const diff = home.elo - away.elo, size = Math.abs(diff), name = diff > 0 ? homeName : awayName;
+    if (size >= ELO_TEAM_STEPS.slight) stronger = diff > 0 ? "home" : "away";
+    verdict = size < ELO_TEAM_STEPS.slight ? "etwa gleich stark"
+      : size < ELO_TEAM_STEPS.clear ? `${name} etwas stärker` : `${name} klar stärker`;
+  }
+  let league: StrengthView["league"] = null;
+  const hl = home?.leagueLevel, al = away?.leagueLevel;
+  if (fixture.crossLeague && comparable && home.system === "club" && hl != null && al != null && home.league && away.league
+    && home.league !== away.league) {
+    const diff = hl - al, size = Math.abs(diff), name = diff > 0 ? homeName : awayName;
+    league = {
+      home: { name: home.league, level: hl }, away: { name: away.league, level: al },
+      stronger: size >= ELO_LEAGUE_STEPS.slight ? (diff > 0 ? "home" : "away") : null,
+      gap: size >= ELO_LEAGUE_STEPS.extreme ? "extreme" : size >= ELO_LEAGUE_STEPS.clear ? "clear" : null,
+      verdict: size < ELO_LEAGUE_STEPS.slight ? "Ligen etwa gleich stark"
+        : size < ELO_LEAGUE_STEPS.clear ? `Liga von ${name} etwas stärker`
+          : size < ELO_LEAGUE_STEPS.extreme ? `Klassenunterschied zugunsten von ${name}`
+            : `deutlicher Klassenunterschied zugunsten von ${name}`,
+    };
+  }
+  return { home: { elo: home, name: homeName }, away: { elo: away, name: awayName }, comparable, stronger, verdict, league };
+}
+
+/**
+ * Das Schild „Klasse“ einer Spielzeile. Gibt es auf beiden Seiten ein Liga-Niveau, entscheidet es - so sagen
+ * Liste und Detailansicht dasselbe. Sonst gilt die Markierung der Analyse (`classGap`: Ligastärke, Team-Elo
+ * oder Tipico-Quoten).
+ */
+export function classBadge(fixture: DashboardFixture, strength: StrengthView):
+  { level: "clear" | "extreme"; stronger: "home" | "away"; basis: string } | null {
+  if (strength.league) {
+    const { gap, stronger } = strength.league;
+    return gap && stronger ? { level: gap, stronger, basis: "laut Liga-Niveau (Elo)" } : null;
+  }
+  const g = fixture.classGap;
+  if (!g) return null;
+  return { level: g.level, stronger: g.stronger, basis: g.source === "market" ? "laut Tipico-Quoten" : g.source === "elo" ? "laut Elo" : "laut Ligastärke" };
+}
+
+/** Elo je Teamname aus den Spielen des Snapshots - für die Tabellen unter „Teams“. */
+export function eloByTeamName(fixtures: readonly DashboardFixture[]): Map<string, TeamElo> {
+  const byName = new Map<string, TeamElo>();
+  for (const f of fixtures) {
+    if (f.homeElo) byName.set(f.homeTeam, f.homeElo);
+    if (f.awayElo) byName.set(f.awayTeam, f.awayElo);
+  }
+  return byName;
 }

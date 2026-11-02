@@ -1,4 +1,4 @@
-import type { DashboardDocument, DashboardFixture, DashboardMarket, DashboardMarketKey, FormResult, FixtureInsights } from "../../shared/src/types";
+import type { DashboardDocument, DashboardFixture, DashboardMarket, DashboardMarketKey, FormResult, FixtureInsights, TeamElo } from "../../shared/src/types";
 import type { RecentMatchSummary } from "../../../src/types";
 
 /**
@@ -34,6 +34,9 @@ export const HISTORY: RecentMatchSummary[] = [
   duel(506, "2024-02-24T15:00:00Z", false, 0, 2),
 ];
 
+const elo = (value: number, extra: Partial<TeamElo> = {}): TeamElo =>
+  ({ elo: value, confidence: 80, system: "club", asOf: "2026-10-28T11:45:00.000Z", ...extra });
+
 export function fixture(id: number, extra: Partial<DashboardFixture>): DashboardFixture {
   return {
     fixtureId: id, kickoff: "2026-10-27T17:00:00.000Z", country: "Germany", league: "Bundesliga", homeTeam: "Heim FC", awayTeam: "Gast FC",
@@ -51,7 +54,7 @@ export function fixture(id: number, extra: Partial<DashboardFixture>): Dashboard
 }
 
 export const DOCUMENT: DashboardDocument = {
-  schemaVersion: 11,
+  schemaVersion: 12,
   meta: {
     createdAt: "2026-10-27T13:00:00.000Z", timezone: "Europe/Berlin", sourceFile: "data.json", totalTipicoEvents: 3, selectedTipicoEvents: 3,
     selectedCompetitions: 3, fixtureCount: 3, firstAvailableDate: "2026-10-27", lastAvailableDate: "2026-10-28", maximumDays: 2, maximumHours: 48,
@@ -61,6 +64,8 @@ export const DOCUMENT: DashboardDocument = {
     fixture(1, {
       kickoff: "2026-10-27T19:30:00.000Z", homeTeam: "Heim FC", awayTeam: "Gast FC", table: table(["Heim FC", "Gast FC", "Dritter SV"]),
       tipico: { homeTeam: "Heim (Tipico)", awayTeam: "Gast (Tipico)", country: "Deutschland", league: "Bundesliga" },
+      homeElo: elo(1872, { league: "Bundesliga", leagueLevel: 1850, leagueClubs: 18 }),
+      awayElo: elo(1840, { league: "Bundesliga", leagueLevel: 1850, leagueClubs: 18 }),
     }),
     fixture(2, {
       kickoff: "2026-10-27T17:00:00.000Z", country: "England", league: "Premier League", homeTeam: "London FC", awayTeam: "Leeds AFC",
@@ -86,6 +91,9 @@ export const DOCUMENT: DashboardDocument = {
         market("btts", 0.4, { odds: 2.1 }), market("bttsNo", 0.6, { odds: 1.7 }),
       ],
       marketDetail: { totalGoals: [0.1, 0.2, 0.25, 0.2, 0.13, 0.07, 0.05], exactScores: null, halfTime: null, firstGoal: null },
+      homeElo: elo(1402, { confidence: 22, league: "Regionalliga Nord", leagueLevel: 1430, leagueClubs: 16 }),
+      awayElo: elo(1872, { league: "Bundesliga", leagueLevel: 1850, leagueClubs: 18 }),
+      classGap: { level: "extreme", stronger: "away", source: "elo", label: "Liga-Niveau (Vereins-Elo) 1430 gegen 1850 · Torfaktor 0,45" },
     }),
   ],
 };

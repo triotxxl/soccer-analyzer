@@ -1,4 +1,4 @@
-import { useMemo, useRef, type ReactElement } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactElement } from "react";
 import { useDashboardData } from "../../shared/src/data";
 import { loadNameSource, NamesContext } from "../../shared/src/names";
 import type { DashboardDocument } from "../../shared/src/types";
@@ -10,15 +10,16 @@ import { PredictionsView } from "./components/PredictionsView";
 import { Splitter } from "./components/Splitter";
 import { TeamsView } from "./components/TeamsView";
 import {
-  competitionId, competitionsOf, competitionTree, datePresets, dayKey, daysWithGames, inScope, leagueTables, modelTips,
-  seasonLabel, sortName, type DayScope,
+  competitionId, competitionsOf, competitionTree, datePresets, dayKey, daysWithGames, inScope, isOver, leagueTables, modelTips,
+  seasonLabel, sortName, sortTips, type DayScope,
 } from "./neoData";
 import { useNeoState, type NeoState, type NeoView } from "./useNeoState";
 
 /**
  * Neo Dashboard nach der freigegebenen Referenz `docs/neo-referenz.html`: Kopfleiste mit Spiele,
  * Teams und Predictions, Zeitraum und Wettbewerben; links die Liste, rechts die Detailansicht
- * (vorerst Platzhalter). Liest nur den Snapshot der letzten Analyse (`/api/dashboard/latest`).
+ * (Spiele: Marktchancen oder H2H, Predictions: H2H, Teams: Platzhalter). Liest nur den Snapshot der
+ * letzten Analyse (`/api/dashboard/latest`).
  */
 export function App() {
   const state = useDashboardData();
@@ -45,11 +46,29 @@ const NAV: Array<[NeoView, string, ReactElement]> = [
   ["preds", "Predictions", <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" /><circle cx="12" cy="12" r="4.5" /><path d="M12 12l6.5-6.5M15.5 5.5h3v3" /></svg>],
 ];
 
-function Dashboard({ document }: { document: DashboardDocument }) {
+/** Jetzt, minütlich neu - damit beendete Spiele auch bei offener Seite verschwinden. */
+function useMinute(): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 60_000);
+    return () => clearInterval(timer);
+  }, []);
+  return now;
+}
+
+function Dashboard({ document: snapshot }: { document: DashboardDocument }) {
   const [ui, update] = useNeoState();
   const source = useMemo(loadNameSource, []);
   const mainRef = useRef<HTMLElement | null>(null);
-  const tz = document.meta.timezone ?? "Europe/Berlin";
+  const tz = snapshot.meta.timezone ?? "Europe/Berlin";
+  // Beendete Spiele fallen aus Liste, Predictions, Zeitraum und Wettbewerben; Tabellen und Detailansicht
+  // lesen weiter den ganzen Snapshot (Tabellenzeilen anderer Spiele, `tableEntryOf`).
+  const now = useMinute();
+  const overCount = snapshot.fixtures.filter((f) => isOver(f, now)).length;
+  // Neu gefiltert nur, wenn ein weiteres Spiel vorbei ist - nicht jede Minute.
+  const document = useMemo(
+    () => ({ ...snapshot, fixtures: snapshot.fixtures.filter((f) => !isOver(f, Date.now())) }),
+    [snapshot, overCount]);
 
   const base = useMemo(() => {
     const today = dayKey(new Date().toISOString(), tz);
@@ -76,11 +95,10 @@ function Dashboard({ document }: { document: DashboardDocument }) {
     const active = tree.flatMap((g) => g.competitions).filter((c) => !off.has(c.id) && (counts.get(c.id) ?? 0) > 0);
     const perDay = new Map<string, number>();
     document.fixtures.filter((f) => !off.has(competitionId(f))).forEach((f) => { const d = dayKey(f.kickoff, tz); perDay.set(d, (perDay.get(d) ?? 0) + 1); });
-    const tables = leagueTables(document.fixtures, active);
-    const tips = modelTips(visible, ui.pmarkets, ui.pmin, ui.pmax, source)
-      .sort((a, b) => dayKey(a.fixture.kickoff, tz).localeCompare(dayKey(b.fixture.kickoff, tz)) || b.probability - a.probability || Date.parse(a.fixture.kickoff) - Date.parse(b.fixture.kickoff));
+    const tables = leagueTables(snapshot.fixtures, active);
+    const tips = sortTips(modelTips(visible, ui.pmarkets, ui.pmin, ui.pmax, source), ui.tipOrder, tz);
     return { counts, visible, active, perDay, tables, tips, noCompetitions: off.size >= base.competitions.length };
-  }, [document, scope, tz, ui.deselected, ui.pmarkets, ui.pmin, ui.pmax, tree, source, base]);
+  }, [document, snapshot, scope, tz, ui.deselected, ui.pmarkets, ui.pmin, ui.pmax, ui.tipOrder, tree, source, base]);
 
   const allTeams = derived.tables.flatMap((t) => t.rows);
   const fixture = derived.visible.find((f) => f.fixtureId === ui.fixture) ?? derived.visible[0] ?? null;
@@ -118,7 +136,7 @@ function Dashboard({ document }: { document: DashboardDocument }) {
             onToggleCountry={(id) => update((s) => ({ closedCountries: s.closedCountries.includes(id) ? s.closedCountries.filter((c) => c !== id) : [...s.closedCountries, id] }))} />
           <div className="top-meta">
             <span className="season">{seasonLabel(document.meta.createdAt)}</span>
-            <span className="pill" title={`Neueste Analyse: ${document.fixtures.length} Spiele`}><i />Analyse vom {created.toLocaleString("de-DE", { timeZone: tz, day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</span>
+            <span className="pill" title={`Neueste Analyse: ${snapshot.fixtures.length} Spiele, davon ${overCount} vorbei`}><i />Analyse vom {created.toLocaleString("de-DE", { timeZone: tz, day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</span>
           </div>
         </div>
       </header>
@@ -135,13 +153,15 @@ function Dashboard({ document }: { document: DashboardDocument }) {
               selected={team?.key ?? null} onSelect={(key) => set({ team: key })} scope={scope} noCompetitions={derived.noCompetitions} />
           )}
           {ui.view === "preds" && (
-            <PredictionsView tips={derived.tips} fixtures={derived.visible} timezone={tz} markets={ui.pmarkets} onMarkets={(pmarkets) => set({ pmarkets })}
+            <PredictionsView tips={derived.tips} fixtures={derived.visible} timezone={tz} order={ui.tipOrder} onOrder={(tipOrder) => set({ tipOrder })}
+              markets={ui.pmarkets} onMarkets={(pmarkets) => set({ pmarkets })}
               pmin={ui.pmin} pmax={ui.pmax} onRange={(pmin, pmax) => set({ pmin, pmax })}
               selected={tip?.id ?? null} onSelect={(id) => set({ tip: id })} scope={scope} noCompetitions={derived.noCompetitions} />
           )}
         </section>
         <Splitter split={ui.split} onSplit={(split) => set({ split })} container={() => mainRef.current} />
-        <DetailPanel fixture={detailFixture} fixtures={document.fixtures} team={ui.view === "teams" ? team : null} timezone={tz} markets={ui.view === "fixtures"}
+        <DetailPanel fixture={detailFixture} fixtures={snapshot.fixtures} team={ui.view === "teams" ? team : null}
+          tip={ui.view === "preds" ? tip : null} timezone={tz} view={ui.view}
           ui={ui} onUi={set} />
       </main>
     </div>

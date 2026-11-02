@@ -2,10 +2,10 @@ import { leagueName, teamName, useNames } from "../../../shared/src/names";
 import type { DashboardFixture } from "../../../shared/src/types";
 import {
   competitionId, dayKey, formatDay, formatTime, goalsFormat, oddsFormat, oddsTriple, oneXTwo, percent, scopeLabel, scopePhrase,
-  type Competition, type DayScope,
+  classBadge, strengthOf, type Competition, type DayScope,
 } from "../neoData";
 import { shiftScope } from "./DatePicker";
-import { EmptyState, Team, plural } from "./ui";
+import { EloValue, EmptyState, Team, plural } from "./ui";
 
 interface Props {
   fixtures: DashboardFixture[];
@@ -30,6 +30,7 @@ function FixtureRow({ fixture, competition, withLeague, on, timezone, onSelect }
   const source = useNames();
   const home = teamName(fixture, "home", source), away = teamName(fixture, "away", source);
   const triple = oneXTwo(fixture), odds = oddsTriple(fixture), dv = fixture.dataConfidence;
+  const strength = strengthOf(fixture, source), gap = classBadge(fixture, strength);
   const parts: Array<[string, number | null]> = [["1", triple?.home ?? null], ["X", triple?.draw ?? null], ["2", triple?.away ?? null]];
   const top = triple ? Math.max(triple.home, triple.draw, triple.away) : -1;
   const dvTitle = "Datenvertrauen: wie viele und wie verlässliche Daten das Modell für dieses Spiel hatte (0 bis 100)"
@@ -42,11 +43,13 @@ function FixtureRow({ fixture, competition, withLeague, on, timezone, onSelect }
       <button className="fx" aria-pressed={on} onClick={() => onSelect(fixture.fixtureId)}>
         <span className="fx-time"><b>{formatTime(fixture.kickoff, timezone)}</b></span>
         <span className="fx-teams">
-          <Team name={home} logo={fixture.homeCrest} />
-          <Team name={away} logo={fixture.awayCrest} />
+          <Team name={home} logo={fixture.homeCrest} aside={<EloValue elo={fixture.homeElo} strong={strength.stronger === "home"} />} />
+          <Team name={away} logo={fixture.awayCrest} aside={<EloValue elo={fixture.awayElo} strong={strength.stronger === "away"} />} />
           <small className="fx-meta">
             {withLeague && <><span className="cc">{competition?.code}</span><span className="lgn">{leagueName(fixture, source)}</span><span aria-hidden="true">·</span></>}
             <span className={`dv${dv < 50 ? " low" : ""}`} title={dvTitle}>Datenlage {dv}</span>
+            {gap && <span className="tag lig" title={`${gap.level === "extreme" ? "Deutlicher " : ""}Klassenunterschied: ${gap.stronger === "home" ? home : away} spielt in der stärkeren Liga (${gap.basis}).`}>
+              Klasse {gap.stronger === "home" ? "↑" : "↓"}</span>}
           </small>
         </span>
         <span className="fx-xg"><small>Erw. Tore</small>{goalsFormat(fixture.expectedGoals.home)} : {goalsFormat(fixture.expectedGoals.away)}</span>

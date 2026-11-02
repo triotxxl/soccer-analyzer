@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   duelsOf, duelStats, phaseCounts, seasonMatches, tableEntryOf,
   bothScore, likelyTips, overUnder, percent,
-  competitionsOf, competitionTree, countryCode, datePresets, dayKey, isCup, leagueTables, modelTips, oddsTriple, oneXTwo, scopeLabel,
-  seasonLabel, sortName,
+  competitionsOf, competitionTree, countryCode, datePresets, dayKey, isCup, isOver, leagueTables, modelTips, oddsTriple, oneXTwo, scopeLabel,
+  seasonLabel, sortName, sortTips, strengthOf,
 } from "./neoData";
 import { DOCUMENT, INSIGHTS } from "./testData";
 
@@ -61,6 +61,14 @@ describe("Zeitraum", () => {
     expect(presets["Alle"]).toEqual(["2026-10-27", "2026-10-29"]);
   });
 
+  it("hält ein Spiel bis 120 Minuten nach Anpfiff für nicht vorbei", () => {
+    const kickoff = Date.parse("2026-10-27T17:00:00.000Z");
+    expect(isOver({ kickoff: "2026-10-27T17:00:00.000Z" }, kickoff + 119 * 60_000)).toBe(false);
+    expect(isOver({ kickoff: "2026-10-27T17:00:00.000Z" }, kickoff + 120 * 60_000)).toBe(true);
+    // Zeitzone im Anstoß zählt, nicht der Text (AGENTS.md: Zeitpunkte nie als Text vergleichen)
+    expect(isOver({ kickoff: "2026-10-27T19:00:00+02:00" }, kickoff + 119 * 60_000)).toBe(false);
+  });
+
   it("beschriftet Zeitraum und einzelne Tage", () => {
     expect(scopeLabel({ mode: "range", from: "2026-10-27", to: "2026-10-27" })).toBe("Di., 27.10.");
     expect(scopeLabel({ mode: "days", days: [] })).toBe("Keine Tage gewählt");
@@ -94,6 +102,14 @@ describe("Modell-Tipps", () => {
 
   it("filtert nach dem Wahrscheinlichkeitsbereich", () => {
     expect(modelTips(DOCUMENT.fixtures, ["ou"], 70, 100, "api").map((t) => t.fixture.fixtureId)).toEqual([2]);
+  });
+
+  it("ordnet je Tag nach Chance oder nach Anstoß", () => {
+    const at = (id: number, kickoff: string, probability: number) =>
+      ({ id: String(id), fixture: { ...league, fixtureId: id, kickoff }, market: "ou", marketLabel: "", pick: "", probability, odds: null }) as const;
+    const tips = [at(1, "2026-10-27T19:30:00Z", 0.7), at(2, "2026-10-27T17:00:00Z", 0.6), at(3, "2026-10-26T20:00:00Z", 0.5), at(4, "2026-10-27T17:00:00Z", 0.8)];
+    expect(sortTips(tips, "chance", "Europe/Berlin").map((t) => t.id)).toEqual(["3", "4", "1", "2"]);
+    expect(sortTips(tips, "kickoff", "Europe/Berlin").map((t) => t.id)).toEqual(["3", "4", "2", "1"]);
   });
 });
 
@@ -154,5 +170,34 @@ describe("Saison", () => {
   it("beginnt im Juli", () => {
     expect(seasonLabel("2026-10-27T13:00:00Z")).toBe("Saison 26/27");
     expect(seasonLabel("2027-03-01T13:00:00Z")).toBe("Saison 26/27");
+  });
+});
+
+describe("Elo (Spielstärke)", () => {
+  it("nennt in derselben Liga das Urteil über die Teams, ohne Liga-Niveau", () => {
+    const s = strengthOf(league);
+    expect(s.comparable).toBe(true);
+    expect(s.stronger).toBeNull();
+    expect(s.verdict).toBe("etwa gleich stark");
+    expect(s.league).toBeNull();
+  });
+  it("zeigt bei Spielen zwischen Ligen das Liga-Niveau und den Klassenunterschied", () => {
+    const s = strengthOf(cup);
+    expect(s.stronger).toBe("away");
+    expect(s.verdict).toBe("Heim FC klar stärker");
+    expect(s.league?.verdict).toBe("deutlicher Klassenunterschied zugunsten von Heim FC");
+    expect(s.league?.stronger).toBe("away");
+  });
+  it("vergleicht keine verschiedenen Skalen und nennt fehlendes Elo", () => {
+    const mixed = { ...cup, awayElo: { ...cup.awayElo!, system: "national" as const } };
+    expect(strengthOf(mixed).comparable).toBe(false);
+    expect(strengthOf(mixed).verdict).toBeNull();
+    expect(strengthOf(mixed).league).toBeNull();
+    expect(strengthOf(other).verdict).toBeNull();
+  });
+  it("hängt das Elo an die Tabellenzeilen", () => {
+    const rows = leagueTables(DOCUMENT.fixtures, competitionsOf(DOCUMENT.fixtures)).flatMap((t) => t.rows);
+    expect(rows.find((r) => r.name === "Heim FC")?.elo?.elo).toBe(1872);
+    expect(rows.find((r) => r.name === "Dritter SV")?.elo).toBeNull();
   });
 });

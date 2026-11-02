@@ -27,8 +27,8 @@ Ansichten folgen diesem System; Abweichungen werden benannt und mit David entsch
 | `--muted` | #aaa69e | #5c5953 | Nebentext (≈ 7:1) |
 | `--accent` | #7ea6f8 | #2457c5 | Auswahl, aktive Navigation, Fokus, Zähler |
 | `--accent-ink` | #0d1526 | #ffffff | Schrift auf Akzent |
-| `--home` / `--home-ink` | #49e4fd / #0f2224 | #0a758a / #fff | Heimmannschaft (Türkis) |
-| `--away` / `--away-ink` | #d784a5 / #2b1221 | #7a1544 / #fff | Gastmannschaft (Rosé, hell: Weinrot) |
+| `--home` / `--home-ink` | #f28a2e / #1f1206 | #a24f00 / #fff | Heimmannschaft (Orange, hell: Kupfer) |
+| `--away` / `--away-ink` | #a585f5 / #160c2b | #6a35b8 / #fff | Gastmannschaft (Violett) |
 | `--draw` | #77746d | #77736c | Remis |
 | `--track` | #141413 | #e7e5e0 | Schiene unter den Balken der Marktchancen |
 | `--best-bar` | #cfcbc3 | #4a4742 | Balken des wahrscheinlichsten Ausgangs ohne Seite (≥ 3:1) |
@@ -37,7 +37,7 @@ Ansichten folgen diesem System; Abweichungen werden benannt und mit David entsch
 | `--amber` | #e6a94a | #d98a1c | Hinweis (z. B. Datenlage unter 50) |
 | `--lime` | #95cc62 | #7cb342 | Zwischenstufe in Bewertungen |
 
-**Bedeutungen:** Blau steht nur für Auswahl und Bedienung. Türkis und Rosé stehen nur für Heim und Gast, Grün
+**Bedeutungen:** Blau steht nur für Auswahl und Bedienung. Orange und Violett stehen nur für Heim und Gast, Grün
 und Rot nur für Sieg und Niederlage, Bernstein nur für Hinweise. Keine Ampel auf Chancen: eine Chance ist keine
 Sicherheit.
 
@@ -54,14 +54,21 @@ auf Neo zugeschnitten. Geprüft von `apps/shared/src/colorCheck.test.ts` (Rechnu
   Blau-Schwäche): Heim/Gast ≥ 20, Heim oder Gast gegen Remis ≥ 15, Sieg/Niederlage und ihre Füllungen ≥ 15
   (im Test 19 bzw. 14 wegen der Rundung auf Hexwerte). Ohne Simulation Gast gegen Niederlage und Heim gegen
   Sieg ≥ 20. Vorher lagen Heim/Gast bei 7-14 und Sieg/Niederlage bei 9-14.
-- **Wie getrennt wird:** über **Helligkeit**, nicht über einen neuen Farbton - Rot/Grün und Türkis/Rosé fallen bei
-  Rot-Grün-Schwäche auf dieselbe Achse. Dunkel ist Heim das hellere Türkis, hell ist Gast das dunklere Weinrot;
-  Sieg und Niederlage ebenso. Die Farbtöne blieben (höchstens rund 20° verschoben).
+- **Wie getrennt wird:** Sieg/Niederlage über **Helligkeit** - Rot und Grün fallen bei Rot-Grün-Schwäche auf
+  dieselbe Achse. Heim/Gast seit 29.10.2026 über den Farbton (Davids Wunsch, Türkis/Rosé wirkte unangenehm):
+  Orange und Violett liegen auf der Gelb-Blau-Achse, die bei Rot-Grün-Schwäche erhalten bleibt (Abstand ≥ 28 in
+  allen Sehweisen, vorher rund 20). Ebenfalls geprüft: Orange/Blau verworfen (Gast fiele mit dem Akzent
+  zusammen, Abstand 3-5), Orange/Petrol (#2bb3ad / #084a50) bestand, David wählte Violett. Im hellen Modus ist Orange Kupfer, weil Orange als
+  Schrift auf Weiß 4,5:1 nicht erreicht. Bernstein (Hinweis) liegt dunkel 12 vom Heim-Orange entfernt und
+  steht deshalb nie ohne Text. **Preis:** Heim-Orange liegt nah an Niederlage-Rot - hell Kupfer gegen
+  `--loss-fill` 12, bei Rot-Grün-Schwäche 2-4 (dunkel 18-25 bzw. gegen `--loss` 11). Ein anderer Orangeton löst
+  das nicht (gesucht bis ins Braune, höchstens 14). Deshalb: Ergebnisfarben stehen nie allein neben Teamfarben,
+  Ergebniskästchen tragen immer Stand oder S/U/N, Teamnamen neben Ergebnissen in `--ink`.
 - **Nie nur Farbe:** Form- und Ergebniskästchen tragen S/U/N, Linien im Tabellenverlauf den Namen am Ende, Balken
   die feste Reihenfolge Heim - Remis - Gast. Die Stufen der Datenlage (Grün, Limette, Bernstein, Rot) sind bei
   Rot-Grün-Schwäche kaum zu trennen und stehen deshalb immer mit Zahl oder Text.
-- **Harmonie:** Neo ist neutral-warm (Graphit) mit einem Akzent (Blau, nur Bedienung) und zwei Teamtönen rund 145°
-  auseinander (Türkis rund 200°, Rosé rund 345° in OKLCH). Neue Farben kommen nicht aus einer Farbkreis-Formel
+- **Harmonie:** Neo ist neutral-warm (Graphit) mit einem Akzent (Blau, nur Bedienung) und zwei Teamtönen rund 120°
+  auseinander (Orange rund 55°, Violett rund 295° in OKLCH; Akzent 264°). Neue Farben kommen nicht aus einer Farbkreis-Formel
   (komplementär, triadisch), sondern brauchen eine Bedeutung aus der Liste oben; gesucht wird in OKLCH nahe an
   einem bestehenden Ton, danach `npm run app:test`.
 
@@ -104,7 +111,7 @@ auf Neo zugeschnitten. Geprüft von `apps/shared/src/colorCheck.test.ts` (Rechnu
 - **Kachel `.tile`:** `--surface-2` ohne Rahmen, 8px Radius, Titel `h4` in Display 17px, Untertitel 12px. Raster
   1 Spalte, ab 420px Breite 2 (Leitkachel `.wide` über die ganze Breite), ab 900px 3.
 - **Ausgang `.oc`:** Text | Prozent | Tipico-Quote („–“ ohne Quote), darunter 5px-Balken auf `--track`. Mit Seite
-  Türkis/Grau/Rosé, ohne Seite gedämpft; der wahrscheinlichste Ausgang hat fette Zahl und 7px-Balken (ohne Seite
+  Orange/Grau/Violett, ohne Seite gedämpft; der wahrscheinlichste Ausgang hat fette Zahl und 7px-Balken (ohne Seite
   `--best-bar`). Unter 1 % steht „< 1 %“, sonst ganze Prozente.
 - **H2H** (seit 28.10.2026, Referenz `renderH2H`): Kopf mit Kernzeile „In den Duellen“ (Siege, Remis, Ø Tore) statt
   „Am ehesten“. Zwei Blöcke `.h2h-block` mit Kopf `.block-h` (Display 19px, Linie darunter): **„Direkte Duelle (H2H)“**
@@ -124,6 +131,15 @@ auf Neo zugeschnitten. Geprüft von `apps/shared/src/colorCheck.test.ts` (Rechnu
   („1 Platz besser“).
 - **Form `.fv`:** Teamspalte 120–200px, „Alle Spiele“ und bei Ligaspielen „Heim / Auswärts“ (Heim zu Hause, Gast
   auswärts), Punkte als „8 von 12 Pkt.“.
+- **Elo** (seit 28.10.2026, `EloValue` in `ui.tsx`, `strengthOf`/`classBadge` in `neoData.ts`): Zahl rechts neben dem
+  Teamnamen in Mono 11px, gedämpft; die deutlich stärkere Seite (ab 50 Punkten) trägt `--ink` und 600 statt einer Farbe.
+  Unter 30 % Vertrauen gepunktet unterstrichen mit Tooltip „wenig Grundlage“ - nie blasser (Kontrast bleibt). Ohne Elo
+  „–“. In der Detailansicht Zeilen `.sh-elo` unter der Metazeile: „Elo (Spielstärke)“ mit beiden Werten und Urteil
+  („etwa gleich stark“ / „X etwas stärker“ / „X klar stärker“), bei Spielen zwischen Ligen „Liga-Niveau“ mit Ligen und
+  „Ligen etwa gleich stark“ bis „deutlicher Klassenunterschied zugunsten von X“ (75 / 211 / 411 Punkte). Beschriftungen der
+  Kopfzeilen 150px breit, damit Elo, Liga-Niveau und Am ehesten bündig stehen. Schild „Klasse ↑/↓“ (`.tag.lig`) in der
+  Metazeile der Spielzeile; mit Liga-Niveau aus diesem, sonst aus `classGap`. **Nie als Prozent** - Chancen kommen nur aus
+  dem Modell. Teamtabelle: Spalte „Elo“ nach „Pkt“.
 - **Leerzustand `.empty`:** Titel in Display-Schrift, ein Satz mit Grund und nächstem Schritt.
 - **Zustände:** Hover = 6 % Text auf Fläche, Fokus = 2px-Akzentrahmen (in Listen nach innen), gesperrt = 60 %.
 

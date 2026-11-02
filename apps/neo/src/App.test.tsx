@@ -10,10 +10,26 @@ const serve = (body: unknown, status = 200) =>
     : new Response(JSON.stringify(body), { status })));
 
 describe("Neo Dashboard", () => {
-  beforeEach(() => window.localStorage.clear());
+  // Die Spiele der Testdaten liegen am 27./28.10.2026; vorbei ist ein Spiel 120 Minuten nach Anpfiff.
+  beforeEach(() => {
+    window.localStorage.clear();
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-27T12:00:00.000Z"));
+  });
   afterEach(() => {
     cleanup();
     vi.unstubAllGlobals();
+    vi.useRealTimers();
+  });
+
+  it("zeigt Spiele nicht mehr, die vorbei sind", async () => {
+    vi.setSystemTime(new Date("2026-10-27T19:00:00.000Z"));
+    serve(DOCUMENT);
+    render(<App />);
+    expect(await screen.findByText("Dorf SV")).toBeInTheDocument();
+    expect(list().queryByText("Leeds AFC")).not.toBeInTheDocument();
+    const nav = screen.getByRole("navigation", { name: "Ansicht" });
+    expect(within(nav).getByRole("button", { name: /Spiele/ })).toHaveTextContent("2");
   });
 
   it("zeigt die Spiele des Snapshots mit Zählern in der Navigation", async () => {
@@ -33,6 +49,21 @@ describe("Neo Dashboard", () => {
     expect(row).toHaveTextContent("Die Stärke der beiden Ligen lässt sich nicht vergleichen");
     expect(row).not.toHaveTextContent("80 %");
     expect(row).toHaveTextContent("1,25");
+  });
+
+  it("zeigt das Elo neben den Teams, die Markierung „Klasse“ und rechts Elo und Liga-Niveau", async () => {
+    serve(DOCUMENT);
+    render(<App />);
+    const row = (await screen.findByText("Dorf SV")).closest("button")!;
+    expect(row).toHaveTextContent("1402");
+    expect(row.querySelector(".elo.up")).toHaveTextContent("1872");
+    expect(row.querySelector(".elo.thin")).toHaveTextContent("1402");
+    expect(row).toHaveTextContent("Klasse ↓");
+    fireEvent.click(row);
+    const head = document.querySelector(".sh-elo")!;
+    expect(head).toHaveTextContent("Heim FC klar stärker");
+    expect(head).toHaveTextContent("Regionalliga Nord 1430");
+    expect(head).toHaveTextContent("deutlicher Klassenunterschied zugunsten von Heim FC");
   });
 
   it("ordnet nach Anstoß oder nach Liga", async () => {
@@ -132,6 +163,23 @@ describe("Neo Dashboard", () => {
     fireEvent.click(detail.getByRole("button", { name: "Nur in London FC" }));
     expect(detail.getByText(/Nur 2 Duelle – die Anteile/)).toBeInTheDocument();
     expect(detail.getByText(/gilt unabhängig vom Filter oben/)).toBeInTheDocument();
+  });
+
+  it("ordnet Predictions nach Anstoß und zeigt zum Tipp das H2H", async () => {
+    serve(DOCUMENT);
+    render(<App />);
+    await screen.findAllByText("Leeds AFC");
+    fireEvent.click(screen.getByRole("button", { name: /Predictions/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Nach Anstoß" }));
+    // Anstoß je Tag: London 17:00 UTC vor Heim FC 19:30 UTC, der Pokal am nächsten Tag
+    expect([...document.querySelectorAll(".tip .fx-time")].map((e) => e.textContent)).toEqual(["18:00", "20:30", "19:45"]);
+    fireEvent.click(list().getByText("London FC").closest("button")!);
+    const detail = within(document.querySelectorAll<HTMLElement>("section.panel")[1]!);
+    expect(detail.getByRole("heading", { name: /London FC.*Leeds AFC/ })).toBeInTheDocument();
+    expect(detail.queryByRole("button", { name: "Marktchancen" })).toBeNull();
+    expect(document.querySelector(".mk-meta")).toHaveTextContent("Tipp Über 2,5 Tore 71 %");
+    expect(document.querySelector(".sh-lead")).toHaveTextContent("London FC 2 Siege");
+    expect(detail.getByRole("heading", { name: "Direkte Duelle (H2H) letzte 5" })).toBeInTheDocument();
   });
 
   it("meldet, wenn noch keine Analyse vorhanden ist", async () => {

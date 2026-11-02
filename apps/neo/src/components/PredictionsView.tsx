@@ -1,7 +1,9 @@
 import { useState, type ReactNode } from "react";
 import { leagueName, teamName, useNames } from "../../../shared/src/names";
 import type { DashboardFixture } from "../../../shared/src/types";
-import { dayKey, formatDay, formatTime, oddsFormat, percent, scopePhrase, TIP_MARKETS, tipCandidates, type DayScope, type Tip, type TipMarket } from "../neoData";
+import {
+  dayKey, formatDay, formatTime, oddsFormat, percent, scopePhrase, TIP_MARKETS, tipCandidates, type DayScope, type Tip, type TipMarket, type TipOrder,
+} from "../neoData";
 import { Chevron, EmptyState, Team, plural, usePopover } from "./ui";
 
 interface Props {
@@ -9,6 +11,8 @@ interface Props {
   /** alle Spiele im Zeitraum und in den gewählten Wettbewerben, für die Zahlen je Markt */
   fixtures: DashboardFixture[];
   timezone: string;
+  order: TipOrder;
+  onOrder: (order: TipOrder) => void;
   markets: TipMarket[];
   onMarkets: (m: TipMarket[]) => void;
   pmin: number;
@@ -35,7 +39,7 @@ function Drop({ label, value, filtered, children }: { label: string; value: stri
 }
 
 /** Linke Liste „Predictions“: Modell-Tipps je Spiel (Referenz `renderPreds`). Autoren-Tipps folgen. */
-export function PredictionsView({ tips, fixtures, timezone, markets, onMarkets, pmin, pmax, onRange, selected, onSelect, scope, noCompetitions }: Props) {
+export function PredictionsView({ tips, fixtures, timezone, order, onOrder, markets, onMarkets, pmin, pmax, onRange, selected, onSelect, scope, noCompetitions }: Props) {
   const source = useNames();
   const [draft, setDraft] = useState<[number, number] | null>(null);
   const [lo, hi] = draft ?? [pmin, pmax];
@@ -48,7 +52,15 @@ export function PredictionsView({ tips, fixtures, timezone, markets, onMarkets, 
 
   return (
     <>
-      <div className="panel-head"><div><h2 id="detail-title">Modell-Tipps</h2></div></div>
+      <div className="panel-head">
+        <div><h2 id="detail-title">Modell-Tipps</h2></div>
+        <div className="mk-tools">
+          <div className="seg" role="group" aria-label="Tipps ordnen">
+            <button aria-pressed={order === "chance"} onClick={() => onOrder("chance")}>Nach Chance</button>
+            <button aria-pressed={order === "kickoff"} onClick={() => onOrder("kickoff")}>Nach Anstoß</button>
+          </div>
+        </div>
+      </div>
       <div className="panel-body" id="detail-body">
         <div className="pred-bar" role="toolbar" aria-label="Tipps filtern">
           <Drop label="Quelle" value="Modell" filtered={false}>

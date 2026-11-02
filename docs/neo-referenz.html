@@ -12,7 +12,7 @@
 :root{
   --bg:#131312; --surface:#1b1b19; --surface-2:#232321; --ink:#ebe8e2; --muted:#aaa69e; --line:#34332f;
   --accent:#7ea6f8; --accent-soft:#272a2f; --accent-ink:#0d1526;
-  --track:#141413; --best-bar:#cfcbc3; --home:#49e4fd; --draw:#77746d; --away:#d784a5; --home-ink:#0f2224; --away-ink:#2b1221; /* Heim/Gast eigene Töne, nicht der Akzent */
+  --track:#141413; --best-bar:#cfcbc3; --home:#f28a2e; --draw:#77746d; --away:#a585f5; --home-ink:#1f1206; --away-ink:#160c2b; /* Heim/Gast eigene Töne, nicht der Akzent */
   --win:#22ae84; --loss:#e45e50; --tie:#5f5d58; --nav:#0e0e0d; --lime:#95cc62; --amber:#e6a94a;
   /* Flächen unter weißer Schrift (Form, Ergebnis, Stufen): je ≥ 4,5:1 */
   --win-fill:#3f8253; --loss-fill:#c83407; --tie-fill:#5f5d58;
@@ -26,7 +26,7 @@
   :root:not([data-theme="dark"]){
     --bg:#f0efec; --surface:#ffffff; --surface-2:#f7f6f3; --ink:#1a1917; --muted:#5c5953; --line:#dcdad5;
     --accent:#2457c5; --accent-soft:#eceef2; --accent-ink:#ffffff;
-    --track:#e7e5e0; --best-bar:#4a4742; --home:#0a758a; --draw:#77736c; --away:#7a1544; --home-ink:#ffffff; --away-ink:#ffffff;
+    --track:#e7e5e0; --best-bar:#4a4742; --home:#a24f00; --draw:#77736c; --away:#6a35b8; --home-ink:#ffffff; --away-ink:#ffffff;
     --win:#027d4e; --loss:#c21a16; --tie:#9e9a92; --nav:#e6e4df; --lime:#7cb342; --amber:#d98a1c;
     --win-fill:#3f8253; --loss-fill:#c83407; --tie-fill:#76726b;
     color-scheme:light;
@@ -35,7 +35,7 @@
 :root[data-theme="light"]{
   --bg:#f0efec; --surface:#ffffff; --surface-2:#f7f6f3; --ink:#1a1917; --muted:#5c5953; --line:#dcdad5;
   --accent:#2457c5; --accent-soft:#eceef2; --accent-ink:#ffffff;
-  --track:#e7e5e0; --best-bar:#4a4742; --home:#0a758a; --draw:#77736c; --away:#7a1544; --home-ink:#ffffff; --away-ink:#ffffff;
+  --track:#e7e5e0; --best-bar:#4a4742; --home:#a24f00; --draw:#77736c; --away:#6a35b8; --home-ink:#ffffff; --away-ink:#ffffff;
   --win:#027d4e; --loss:#c21a16; --tie:#9e9a92; --nav:#e6e4df; --lime:#7cb342; --amber:#d98a1c;
     --win-fill:#3f8253; --loss-fill:#c83407; --tie-fill:#76726b;
   color-scheme:light;
@@ -2064,7 +2064,7 @@ function bookOdds(fid, okey, p){
   return Math.min(99, Math.max(1.01, Math.round(1 / p * (.93 + r() * .05) * 100) / 100));
 }
 // Ausgänge einer Kachel; prefix + Index ergibt den Quoten-Schlüssel (z. B. "1x2:0" = Heimsieg).
-// sides (h/d/a) färbt die Balken wie in der Spielliste: Heim Türkis, Remis Grau, Gast Rosé.
+// sides (h/d/a) färbt die Balken wie in der Spielliste: Heim Orange, Remis Grau, Gast Violett.
 // Ohne Seite hebt sich der wahrscheinlichste Ausgang neutral ab - Blau bleibt der Bedienung vorbehalten.
 function outcomes(list, prefix, fid, sides){
   const max = Math.max(...list.map(o => o[1]));
