@@ -529,16 +529,6 @@
     "country": "China",
     "league": "FA Cup"
   },
-  "china|super league frauen abstiegsrunde": {
-    "leagueId": 169,
-    "country": "China",
-    "league": "Super League"
-  },
-  "china|super league frauen meisterschaftsrunde": {
-    "leagueId": 169,
-    "country": "China",
-    "league": "Super League"
-  },
   "concacaf leagues cup|endrunde": {
     "leagueId": 772,
     "country": "World",
@@ -683,6 +673,11 @@
     "leagueId": 82,
     "country": "Germany",
     "league": "Frauen Bundesliga"
+  },
+  "deutschland|dfb pokal frauen": {
+    "leagueId": 947,
+    "country": "Germany",
+    "league": "DFB Pokal - Women"
   },
   "deutschland|franz beckenbauer super cup": {
     "leagueId": 529,
@@ -999,6 +994,11 @@
     "country": "Honduras",
     "league": "Liga Nacional"
   },
+  "indien|indian league": {
+    "leagueId": 324,
+    "country": "India",
+    "league": "I-League"
+  },
   "indien|indian super league": {
     "leagueId": 323,
     "country": "India",
@@ -1249,6 +1249,11 @@
     "country": "Canada",
     "league": "Canadian Premier League"
   },
+  "kanada|canadian premier league playoff": {
+    "leagueId": 479,
+    "country": "Canada",
+    "league": "Canadian Premier League"
+  },
   "kasachstan|1 division": {
     "leagueId": 388,
     "country": "Kazakhstan",
@@ -1294,6 +1299,16 @@
     "country": "Colombia",
     "league": "Primera B"
   },
+  "kolumbien|primera b clausura promotion gruppe a": {
+    "leagueId": 240,
+    "country": "Colombia",
+    "league": "Primera B"
+  },
+  "kolumbien|primera b clausura promotion gruppe b": {
+    "leagueId": 240,
+    "country": "Colombia",
+    "league": "Primera B"
+  },
   "kroatien|croatia hnl": {
     "leagueId": 210,
     "country": "Croatia",
@@ -1333,6 +1348,11 @@
     "leagueId": 261,
     "country": "Luxembourg",
     "league": "National Division"
+  },
+  "mali|premier division": {
+    "leagueId": 598,
+    "country": "Mali",
+    "league": "Première Division"
   },
   "marokko|botola": {
     "leagueId": 200,
@@ -1734,6 +1754,11 @@
     "country": "Switzerland",
     "league": "Super League"
   },
+  "senegal|premier league": {
+    "leagueId": 403,
+    "country": "Senegal",
+    "league": "Ligue 1"
+  },
   "serbien|prva liga": {
     "leagueId": 287,
     "country": "Serbia",
@@ -1825,6 +1850,16 @@
     "league": "Premier Soccer League"
   },
   "sudkorea|k league 1": {
+    "leagueId": 292,
+    "country": "South-Korea",
+    "league": "K League 1"
+  },
+  "sudkorea|k league 1 championship round": {
+    "leagueId": 292,
+    "country": "South-Korea",
+    "league": "K League 1"
+  },
+  "sudkorea|k league 1 relegation round": {
     "leagueId": 292,
     "country": "South-Korea",
     "league": "K League 1"
@@ -2154,6 +2189,11 @@
     "country": "USA",
     "league": "US Open Cup"
   },
+  "usa|usl championship playoffs": {
+    "leagueId": 255,
+    "country": "USA",
+    "league": "USL Championship"
+  },
   "usbekistan|pfl": {
     "leagueId": 369,
     "country": "Uzbekistan",
@@ -2170,6 +2210,11 @@
     "league": "Primera División"
   },
   "venezuela|primera division clausura hauptrunde gruppe a": {
+    "leagueId": 299,
+    "country": "Venezuela",
+    "league": "Primera División"
+  },
+  "venezuela|primera division clausura hauptrunde gruppe b": {
     "leagueId": 299,
     "country": "Venezuela",
     "league": "Primera División"
