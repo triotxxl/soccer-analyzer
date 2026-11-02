@@ -56,6 +56,18 @@ export interface TeamElo {
   confidence: number;
   system: EloSystem;
   asOf: string;
+  /**
+   * Ab schemaVersion 12: bei Vereinen die Liga des letzten Ligaspiels, bei Nationalteams der
+   * Verband. Nur Anzeige.
+   */
+  league?: string | null;
+  /**
+   * Ab schemaVersion 12, nur Vereine: Liga-Niveau dieser Liga (mittleres Elo ihrer Vereine,
+   * `elo_league_levels`) und wie viele Vereine dahinterstehen. Vergleichbar nur innerhalb der
+   * Vereinsskala - nie mit Nationalteams.
+   */
+  leagueLevel?: number;
+  leagueClubs?: number;
 }
 
 export type RecommendationLevel = "none" | "recommended" | "strong";
@@ -218,6 +230,8 @@ export interface DashboardFixture {
     positions?: Array<number | null>;
     /** Dasselbe für die Vorsaison, nur für Teams, die dort in dieser Liga spielten. */
     previousPositions?: Array<number | null>;
+    /** Team-Elo der Zeile, ab schemaVersion 12 - auch für Teams ohne Spiel in der Analyse. Nur Anzeige. */
+    elo?: TeamElo;
   }>;
   expectedGoals: { home: number; away: number; total: number };
   expectedFirstHalfGoals?: { home: number; away: number; total: number };
@@ -237,7 +251,7 @@ export interface DashboardFixture {
 }
 
 export interface DashboardDocument {
-  schemaVersion: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11;
+  schemaVersion: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12;
   meta: {
     createdAt: string;
     timezone: string;
@@ -308,7 +322,8 @@ function matchingOdds(row: GoalLineRow, odds: TipicoOdds[]): TipicoOdds | undefi
     .sort((left, right) => right.score - left.score)[0]?.item;
 }
 
-// Torfaktor 1,5 entspricht rund 160 Elo-Punkten Unterschied, 2,2 rund 310.
+// Torfaktor 1,5 bzw. 2,2 entspricht beim Teiler 1200 (Liga-Rating und Liga-Niveau) rund 211 bzw.
+// 411 Elo-Punkten, beim Team-Elo der Nationalteams (1400) rund 247 bzw. 479.
 const CLASS_GAP_RATING = { clear: 1.5, extreme: 2.2 };
 // Verhältnis der beiden Quoten für 1 und 2. Ein Zehnfaches wie 1,24 zu 12,00 ist ein
 // eindeutiges Klassenbild, ein Vierfaches ein deutliches.
@@ -324,6 +339,18 @@ function classGapOf(
   const asOdd = (value: number) => value.toFixed(2).replace(".", ",");
   // Zwei Teams derselben Liga haben keinen Klassenunterschied - auch kein Quotenbild dafür.
   if (strength?.source === "sameLeague") return undefined;
+  if (strength?.source === "eloLevel") {
+    const ratio = Math.max(strength.factor, 1 / strength.factor);
+    const level = ratio >= CLASS_GAP_RATING.extreme ? "extreme" : ratio >= CLASS_GAP_RATING.clear ? "clear" : null;
+    if (!level) return undefined;
+    return {
+      level,
+      stronger: strength.factor >= 1 ? "home" : "away",
+      source: "elo",
+      label: `Liga-Niveau (Vereins-Elo) ${Math.round(strength.home.rating)} gegen ${Math.round(strength.away.rating)}`
+        + ` · Torfaktor ${asOdd(strength.factor)}`
+    };
+  }
   if (strength?.source === "teamElo") {
     // Dieselben Grenzen wie beim Liga-Rating: Faktor 1,5 bzw. 2,2 entspricht bei Teiler 1400
     // rund 247 bzw. 479 Elo-Punkten. Es gibt keine geschätzte Seite, also keinen Aufschlag.
@@ -436,7 +463,10 @@ export function buildDashboardDocument(input: DashboardInput): DashboardDocument
     // Pokalspiele zweier Teams derselben Liga den Faktor 1.
     const outcomeUnreliable = crossLeague && !row.strength;
     const classGap = classGapOf(crossLeague, row.strength, tipico?.home, tipico?.away);
-    const strengthDetail = row.strength?.source === "teamElo"
+    const strengthDetail = row.strength?.source === "eloLevel"
+      ? `Liga-Niveau aus dem Vereins-Elo: ${row.homeTeam} ${Math.round(row.strength.home.rating)} vs. ${row.awayTeam}`
+        + ` ${Math.round(row.strength.away.rating)} · Torfaktor ${row.strength.factor.toFixed(2)}`
+      : row.strength?.source === "teamElo"
       ? `Stärke aus dem Team-Elo: ${row.homeTeam} ${Math.round(row.strength.home.rating)} vs. ${row.awayTeam} ${Math.round(row.strength.away.rating)}`
         + ` · Torfaktor ${row.strength.factor.toFixed(2)}`
       : row.strength?.source === "sameLeague"
@@ -578,7 +608,8 @@ export function buildDashboardDocument(input: DashboardInput): DashboardDocument
         homePlayed: standing.homePlayed, homePoints: standing.homePoints,
         awayPlayed: standing.awayPlayed, awayPoints: standing.awayPoints, form: standing.form,
         ...(standing.positions ? { positions: standing.positions } : {}),
-        ...(standing.previousPositions ? { previousPositions: standing.previousPositions } : {})
+        ...(standing.previousPositions ? { previousPositions: standing.previousPositions } : {}),
+        ...(input.elo?.has(standing.id) ? { elo: input.elo.get(standing.id)! } : {})
       })) } : {}),
       expectedGoals: { home: row.expectedHomeGoals, away: row.expectedAwayGoals, total: row.expectedTotalGoals },
       expectedFirstHalfGoals: {
@@ -600,7 +631,7 @@ export function buildDashboardDocument(input: DashboardInput): DashboardDocument
   const createdAt = Date.parse(input.createdAt);
   const latestKickoff = fixtures.reduce((latest, fixture) => Math.max(latest, Date.parse(fixture.kickoff)), createdAt);
   return {
-    schemaVersion: 11,
+    schemaVersion: 12,
     meta: {
       createdAt: input.createdAt, timezone: config.timezone, sourceFile: input.sourceFile,
       totalTipicoEvents: input.totalTipicoEvents, selectedTipicoEvents: input.selectedTipicoEvents,

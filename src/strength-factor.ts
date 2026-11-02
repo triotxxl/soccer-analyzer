@@ -18,9 +18,10 @@ export interface StrengthComparison {
   /**
    * Woher der Faktor kommt. "league": Liga-Elo beider Heimatligen. "sameLeague": beide Teams
    * aus derselben Liga, also kein Klassenunterschied und Faktor 1. "teamElo": Team-Elo der
-   * Nationalteams; `rating` trägt dann das Team-Elo, `leagueId` ist 0.
+   * Nationalteams; `rating` trägt dann das Team-Elo, `leagueId` ist 0. "eloLevel": Liga-Niveau
+   * aus dem Vereins-Elo (seit 3.7.0); `rating` trägt das Niveau, `leagueId` die Elo-Liga.
    */
-  source: "league" | "sameLeague" | "teamElo";
+  source: "league" | "sameLeague" | "teamElo" | "eloLevel";
 }
 
 /**
@@ -123,6 +124,38 @@ export function teamEloComparison(home: TeamEloInput | null, away: TeamEloInput 
       config.strength.factorMax
     ),
     source: "teamElo"
+  };
+}
+
+/** Liga eines Vereins laut Elo und deren Niveau (`elo_league_levels`). */
+export interface EloLevelInput {
+  leagueId: number;
+  level: number;
+  clubs: number;
+}
+
+/**
+ * Torfaktor aus dem Liga-Niveau des Vereins-Elo (seit 3.7.0), oder null. Beide Ligen brauchen
+ * mindestens `eloLevelMinClubs` gezählte Vereine. Stehen beide Teams laut Elo in derselben Liga,
+ * gibt es keinen Klassenunterschied (Faktor 1, Quelle "sameLeague"). Ohne Heimvorteil - die
+ * erwarteten Tore tragen ihn schon. Begründung und Messung bei `config.strength.eloLevelDivisor`.
+ */
+export function eloLevelComparison(home: EloLevelInput | null, away: EloLevelInput | null): StrengthComparison | null {
+  if (!home || !away) return null;
+  if (home.leagueId === away.leagueId) {
+    return sameLeagueComparison(home.leagueId, { leagueId: home.leagueId, rating: home.level, reliable: true });
+  }
+  const minClubs = config.strength.eloLevelMinClubs;
+  if (home.clubs < minClubs || away.clubs < minClubs) return null;
+  return {
+    home: { leagueId: home.leagueId, rating: home.level, reliable: true },
+    away: { leagueId: away.leagueId, rating: away.level, reliable: true },
+    factor: clamp(
+      10 ** ((home.level - away.level) / config.strength.eloLevelDivisor),
+      config.strength.factorMin,
+      config.strength.factorMax
+    ),
+    source: "eloLevel"
   };
 }
 

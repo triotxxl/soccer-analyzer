@@ -10,7 +10,7 @@ const NOTABLE_BIAS = 0.05;
 const NOTABLE_STANDARD_ERRORS = 2;
 
 /** Gruppen zwischen Ligen bzw. Nationalteams: Dort entscheidet die stärkere Seite, nicht der Favorit. */
-const BETWEEN_LEAGUES = new Set<LeagueStrengthPerformanceRow["cohort"]>(["gemessen", "geschätzt", "Team-Elo", "Team-Elo U21"]);
+const BETWEEN_LEAGUES = new Set<LeagueStrengthPerformanceRow["cohort"]>(["gemessen", "geschätzt", "Liga-Niveau", "Team-Elo", "Team-Elo U21"]);
 
 /**
  * Ab welcher Fassung eine Gruppe zwischen Ligen unverändert rechnet. 3.6.0 (19.10.2026) änderte
@@ -18,9 +18,13 @@ const BETWEEN_LEAGUES = new Set<LeagueStrengthPerformanceRow["cohort"]>(["gemess
  * Team-Elo-Gruppen rechnen wie 3.5.0 und zählen deshalb zusammen (Davids Entscheidung vom
  * 19.10.2026) - die Nachmessung des Teilers 1200 beginnt so nicht neu. "geschätzt" zählt nur
  * die laufende Fassung. Wer `config.strength` oder `teamEloSystems` ändert, zieht diese Liste nach.
+ * 3.7.0 (28.10.2026) gibt Spielen ohne oder mit geschätzter Ligastärke das Liga-Niveau aus dem
+ * Vereins-Elo (eigene Gruppe "Liga-Niveau", beginnt neu). "geschätzt" bleibt, wo kein Liga-Niveau
+ * greift, und rechnet dort wie 3.6.0; "gemessen" und die Team-Elo-Gruppen bleiben unverändert.
  */
 export const STRENGTH_COMPARABLE_SINCE: Partial<Record<LeagueStrengthPerformanceRow["cohort"], string>> = {
   gemessen: "3.5.0",
+  geschätzt: "3.6.0",
   "Team-Elo": "3.5.0",
   "Team-Elo U21": "3.5.0"
 };

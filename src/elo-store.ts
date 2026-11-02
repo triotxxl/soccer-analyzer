@@ -19,6 +19,8 @@ export interface StoredElo {
   low: number;
   trend: string;
   league: string | null;
+  /** Vereine: ID der Liga des letzten Ligaspiels (seit Elo 1.4.0), sonst null. */
+  leagueId: number | null;
   country: string | null;
   /** 0-100, getrennt vom Elo. */
   confidence: number;
@@ -41,6 +43,7 @@ function toStored(row: Record<string, unknown>): StoredElo {
     low: Number(row.low),
     trend: String(row.trend),
     league: row.league === null ? null : String(row.league),
+    leagueId: row.league_id === null || row.league_id === undefined ? null : Number(row.league_id),
     country: row.country === null ? null : String(row.country),
     confidence: Number(row.confidence),
     lastPlayed: Number(row.last_played),

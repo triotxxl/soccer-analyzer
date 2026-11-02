@@ -701,3 +701,19 @@ test("rechnet richtig ab, wenn API-Football Heim und Gast nachträglich tauscht"
   );
   database.close();
 });
+
+test("Elo-Spiele: ein geänderter Stand wird übernommen und protokolliert (Elo 1.3.0)", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "football-elo-correction-"));
+  const database = new AnalyzerDatabase(path.join(directory, "test.sqlite"));
+  const match = {
+    fixtureId: 1628852, kickoff: Date.parse("2026-09-20T15:00:00Z"), leagueId: 100, leagueName: "Liga", leagueType: "League",
+    country: "Australia", season: 2026, homeId: 1, homeName: "Kingborough", awayId: 2, awayName: "Gegner", homeGoals: 3, awayGoals: 0
+  };
+  const since = new Date(Date.now() - 1000).toISOString();
+  assert.equal(database.saveEloMatches([match], "cache"), 1);
+  assert.equal(database.saveEloMatches([match], "cache"), 0);
+  assert.equal(database.eloCorrectionsSince(since), 0);
+  assert.equal(database.saveEloMatches([{ ...match, homeGoals: 5 }], "topup"), 0);
+  assert.equal(database.eloMatches()[0]!.homeGoals, 5);
+  assert.equal(database.eloCorrectionsSince(since), 1);
+});

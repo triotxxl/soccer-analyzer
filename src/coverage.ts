@@ -123,6 +123,27 @@ function strengthGap(fixture: DashboardFixture, lookup: CoverageLookup): Omit<St
       intended: false
     };
   }
+  // Seit 3.7.0 springt das Liga-Niveau aus dem Vereins-Elo ein. Fehlt auch das, liegt es an der
+  // Elo-Seite: Frauen-Vereine sind nicht freigegeben, sonst fehlt eine Liga oder sie hat zu wenige
+  // bewertete Vereine (`config.strength.eloLevelMinClubs`). Erkennbar erst ab schemaVersion 12 (`league`
+  // am Elo); ältere Snapshots bleiben bei der Ligastärke.
+  const withLevels = [fixture.homeElo, fixture.awayElo].some((elo) => elo !== undefined && "league" in elo);
+  if (withLevels && eloSystems.includes("club-women")) {
+    return {
+      cause: "Frauen-Vereine: Liga-Niveau aus dem Elo ist für den Klassenfaktor nicht freigegeben",
+      action: "Ligastärke nachladen (npm run strength) oder das Liga-Niveau der Frauen erst vom Prüfer-Agenten messen lassen",
+      intended: true
+    };
+  }
+  const lacking = [fixture.homeElo, fixture.awayElo].some((elo) => !elo || elo.leagueLevel === undefined
+    || (elo.leagueClubs ?? 0) < config.strength.eloLevelMinClubs);
+  if (withLevels && lacking) {
+    return {
+      cause: `Ligastärke und Liga-Niveau fehlen: eine Seite ohne Elo-Liga oder mit unter ${config.strength.eloLevelMinClubs} bewerteten Vereinen`,
+      action: "Ligasaisons der Teams ins Elo nachladen (npm run elo -- backfill), dann npm run elo -- build; sonst Ligastärke nachladen",
+      intended: false
+    };
+  }
   const competitionId = lookup.apiLeagueId(fixture.country, fixture.league);
   return {
     cause: "Ligabewertung einer Seite fehlt oder ist noch nicht belastbar",

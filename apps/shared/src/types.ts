@@ -5,7 +5,8 @@ export type {
   DashboardMarket,
   DashboardMarketKey,
   FormResult,
-  RecommendationLevel
+  RecommendationLevel,
+  TeamElo
 } from "../../../src/dashboard.ts";
 export type { LeagueStats, LiveTeamSnapshot } from "../../../src/types.ts";
 export type {

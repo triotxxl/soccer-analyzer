@@ -349,6 +349,26 @@ test("ein doppelt geführtes Spiel zählt einmal, ein Team gegen sich selbst gar
   assert.ok(!state.teams.has(teamKey("club", 5)));
 });
 
+test("gespiegelte und wettbewerbsübergreifende Dubletten zählen einmal (1.3.0)", () => {
+  const cup = { leagueId: 300, leagueName: "Pokal", leagueType: "Cup" };
+  const matches = [
+    match({ homeId: 1, awayId: 2, homeGoals: 3, awayGoals: 1, kickoff: NOW - 20 * DAY }),
+    // Dasselbe Spiel gespiegelt unter zweiter ID: 2 - 1 mit 1:3.
+    match({ homeId: 2, awayId: 1, homeGoals: 1, awayGoals: 3, kickoff: NOW - 20 * DAY + 60 * 60 * 1000 }),
+    // Dasselbe Spiel unter einem zweiten Wettbewerb am selben Tag (wie die U17-Spiele 2025).
+    match({ homeId: 3, awayId: 4, homeGoals: 0, awayGoals: 2, kickoff: NOW - 10 * DAY }),
+    match({ homeId: 3, awayId: 4, homeGoals: 0, awayGoals: 2, kickoff: NOW - 10 * DAY + 60 * 60 * 1000, ...cup }),
+    // Gespiegelt, aber nicht gespiegelter Stand: ein anderes Ergebnis, beide bleiben.
+    match({ homeId: 5, awayId: 6, homeGoals: 2, awayGoals: 0, kickoff: NOW - 5 * DAY }),
+    match({ homeId: 6, awayId: 5, homeGoals: 2, awayGoals: 0, kickoff: NOW - 5 * DAY })
+  ];
+  const state = calculateHistoricalElo(matches, PLAIN, { asOf: NOW });
+  assert.equal(state.counts.excludedDuplicate, 2);
+  assert.equal(state.history.length, 4);
+  assert.equal(state.teams.get(teamKey("club", 1))!.games, 1);
+  assert.equal(state.teams.get(teamKey("club", 5))!.games, 2);
+});
+
 test("zusammengeführte Team-IDs ergeben eine Geschichte, mit Land und Ausnahme", () => {
   // Wie AFC Malmö: 2023-2025 unter ID 300, seit 2026 unter 400. ID 500 teilt sich der Verein
   // mit einem tunesischen Klub - nur die schwedischen Spiele und Testspiele gehören dazu.

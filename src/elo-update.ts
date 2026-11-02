@@ -1,11 +1,15 @@
+import { createHash } from "node:crypto";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import type { ApiFootballClient } from "./api.ts";
 import { CACHE_DIR } from "./config.ts";
 import type { AnalyzerDatabase } from "./database.ts";
-import { classifyMatch, type EloMatch } from "./elo-competitions.ts";
-import { ELO_COMPETITIONS, ELO_CONFIG, ELO_NATIONAL_CATEGORY_COMPETITIONS } from "./elo-config.ts";
-import { calculateHistoricalElo, summarizeElo } from "./elo.ts";
+import { classifyMatch, CONFEDERATION_OF_COMPETITION, type EloMatch } from "./elo-competitions.ts";
+import {
+  ELO_COMPETITIONS, ELO_CONFIG, ELO_EXCLUDE_PATTERN, ELO_EXCLUDE_TEAM_PATTERN, ELO_NATIONAL_CATEGORY_COMPETITIONS,
+  ELO_SENIOR_RESERVE_TEAMS, ELO_TEAM_MERGES, ELO_WOMEN_CLUB_COMPETITIONS, ELO_YOUTH_PATTERN
+} from "./elo-config.ts";
+import { calculateHistoricalElo, leagueLevels, summarizeElo } from "./elo.ts";
 import type { ApiFixture, ApiLeague } from "./types.ts";
 
 /**
@@ -23,6 +27,8 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const KNOWN_WINDOW_MS = 400 * DAY_MS;
 /** Spiele nach dem Saisonende laut API (Nachholtermine, Relegation) noch mitnehmen. */
 const SEASON_GRACE_MS = 14 * DAY_MS;
+/** So weit zurück wird `elo_history` gespeichert - der Skill qualitative-tipps liest 730 Tage. */
+export const HISTORY_KEEP_MS = 731 * DAY_MS;
 /** Abstand der Wochenrunde. */
 export const TOP_UP_INTERVAL_MS = 7 * DAY_MS;
 /**
@@ -34,8 +40,14 @@ const IMPORT_OVERLAP_MS = 10 * 60 * 1000;
 
 export type EloClient = Pick<ApiFootballClient, "getAllLeagues" | "getSeasonFixtures" | "requestCount">;
 
-export function toEloMatch(fixture: ApiFixture, leagueTypes: Map<number, string>): EloMatch | null {
-  if (!FINISHED.has(fixture.fixture?.status?.short)) return null;
+/**
+ * Ein beendetes Spiel im kompakten Format, sonst `null`. Der Status wird ohne Rücksicht auf die
+ * Schreibweise verglichen (Projektregel). Ein Anstoß nach `now` fällt heraus, auch mit Status
+ * „FT“: Am 28.10.2026 stand Tunisia - Botswana (1545957) mit Anstoß 28.03.2027 als 2:2 im Bestand.
+ */
+export function toEloMatch(fixture: ApiFixture, leagueTypes: Map<number, string>, now = Date.now()): EloMatch | null {
+  if (!FINISHED.has(String(fixture.fixture?.status?.short ?? "").toUpperCase())) return null;
+  if (fixture.fixture.timestamp * 1000 > now) return null;
   const { home, away } = fixture.goals ?? {};
   if (typeof home !== "number" || typeof away !== "number") return null;
   return {
@@ -104,10 +116,21 @@ export function importFromCache(
   const files = readdirSync(directory).filter((file) => file.endsWith(".json"));
   let read = 0;
   let unreadable = 0;
+  // Älteste Datei zuerst: Steht ein Spiel in mehreren Antworten, gilt der zuletzt geholte Stand -
+  // seit 1.3.0 übernimmt `saveEloMatches` nachträgliche Korrekturen.
+  const dated: Array<{ full: string; mtime: number }> = [];
   for (const file of files) {
     const full = path.join(directory, file);
     try {
-      if (options.since !== undefined && statSync(full).mtimeMs < options.since) continue;
+      const mtime = statSync(full).mtimeMs;
+      if (options.since === undefined || mtime >= options.since) dated.push({ full, mtime });
+    } catch {
+      unreadable += 1;
+    }
+  }
+  dated.sort((left, right) => left.mtime - right.mtime);
+  for (const { full } of dated) {
+    try {
       read += 1;
       collectMatches((JSON.parse(readFileSync(full, "utf8")) as { value?: unknown }).value, types, collected);
     } catch {
@@ -233,16 +256,66 @@ export interface RebuildResult {
   seconds: number;
 }
 
+/**
+ * Prüfsumme aller Regeln, die das Elo bestimmen: Parameter (ohne die Versionsnummer selbst),
+ * Wettbewerbslisten, Ausschlussmuster, Zusammenführungen, Reserve-Teams, Verbände. Ändert sich
+ * eine davon, muss `ELO_CONFIG.version` steigen - das erzwingt `test/elo-version.test.ts`. Den
+ * Rechenkern in `src/elo.ts` erfasst sie nicht; eine Änderung dort erhöht die Version von Hand.
+ */
+export function eloRulesFingerprint(): string {
+  const { version: _version, ...config } = ELO_CONFIG;
+  const rules = {
+    config, competitions: ELO_COMPETITIONS, nationalCategories: ELO_NATIONAL_CATEGORY_COMPETITIONS,
+    womenClubs: ELO_WOMEN_CLUB_COMPETITIONS, merges: ELO_TEAM_MERGES, seniorReserves: [...ELO_SENIOR_RESERVE_TEAMS].sort((a, b) => a - b),
+    youth: ELO_YOUTH_PATTERN, excludeTeam: ELO_EXCLUDE_TEAM_PATTERN, exclude: ELO_EXCLUDE_PATTERN,
+    confederations: CONFEDERATION_OF_COMPETITION
+  };
+  const text = JSON.stringify(rules, (_key, value: unknown) => value instanceof RegExp ? `${value.source}/${value.flags}` : value);
+  return createHash("sha256").update(text).digest("hex").slice(0, 12);
+}
+
+/**
+ * Stempel des letzten Aufbaus in `elo_meta` (`build`): Regelversion, Prüfsumme der Regeln,
+ * Datenstand (Spiele, höchste Fixture-ID, jüngster Anstoß) und Stichtag. Damit ist jederzeit
+ * zu sagen, aus welchem Stand ein angezeigtes Rating stammt (Davids Auftrag vom 28.10.2026, §6).
+ */
+export interface EloBuildStamp {
+  version: string;
+  rules: string;
+  asOf: number;
+  matches: number;
+  used: number;
+  maxFixtureId: number;
+  latestKickoff: number;
+}
+
 /** Beide Systeme neu rechnen und Historie samt Rangliste ersetzen. Kein Aufruf. */
 export function rebuildElo(
-  database: Pick<AnalyzerDatabase, "eloMatches" | "replaceEloResults">,
+  database: Pick<AnalyzerDatabase, "eloMatches" | "replaceEloResults" | "setEloMeta">,
   now: number
 ): RebuildResult & { state: ReturnType<typeof calculateHistoricalElo> } {
   const started = Date.now();
   const matches = database.eloMatches();
   const state = calculateHistoricalElo(matches, ELO_CONFIG, { asOf: now });
   const ranking = summarizeElo(state);
-  database.replaceEloResults(state.history, ranking, ELO_CONFIG.version, now);
+  // Die Historie wird nur für `npm run elo -- team` und die qualitativen Tipps gelesen (730 Tage).
+  // Bis 1.4.0 standen alle fünf Jahre darin: 684.000 Zeilen, rund 140 MB je Datenbank und
+  // Sicherung, bei jeder Analyse neu geschrieben (Davids Entscheidung vom 28.10.2026).
+  // Gerechnet wird weiter aus allen Spielen - gekürzt ist nur, was gespeichert wird.
+  const historySince = now - HISTORY_KEEP_MS;
+  const history = state.history.filter((row) => row.kickoff >= historySince);
+  database.replaceEloResults(history, ranking, ELO_CONFIG.version, now, leagueLevels(state));
+  let maxFixtureId = 0;
+  let latestKickoff = 0;
+  for (const match of matches) {
+    if (match.kickoff >= now) continue;
+    maxFixtureId = Math.max(maxFixtureId, match.fixtureId);
+    latestKickoff = Math.max(latestKickoff, match.kickoff);
+  }
+  database.setEloMeta("build", JSON.stringify({
+    version: ELO_CONFIG.version, rules: eloRulesFingerprint(), asOf: now, matches: matches.length,
+    used: state.counts.used, maxFixtureId, latestKickoff
+  } satisfies EloBuildStamp));
   return { matches: matches.length, used: state.counts.used, teams: ranking.length, seconds: (Date.now() - started) / 1000, state };
 }
 

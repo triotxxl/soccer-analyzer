@@ -108,6 +108,14 @@ export interface EloConfig {
    */
   newTeamStart: { mode: "competitionMean" | "fixed"; minRated: number };
   /**
+   * Liga-Niveau (seit 1.4.0, 28.10.2026): mittleres Elo der Vereine, deren letztes Ligaspiel in
+   * dieser Liga war - nur Vereine mit mindestens `minWeight` gewichteten Spielen, die in den
+   * letzten `activeDays` gespielt haben. Es trägt den Klassenunterschied bei Spielen zwischen
+   * Ligen, deren Ligastärke fehlt oder nur geschätzt ist (`eloLevelComparison` in
+   * src/strength-factor.ts). Die Grenzen stammen aus der Prüfung vom 28.10.2026.
+   */
+  leagueLevel: { minWeight: number; activeDays: number };
+  /**
    * Vertrauen 0-100 %, getrennt vom Elo:
    * `100 × s(Σ Decay-Gewichte, games) × (0,5 + 0,5·s(verschiedene Gegner, opponents))
    *        × (0,6 + 0,4·s(gewichtete Spiele gegen andere Ligen, crossLeague))`,
@@ -171,11 +179,21 @@ export interface EloConfig {
 export const ELO_CONFIG: EloConfig = {
   // 1.2.0 (26.09.2026): Spiele zwischen Verein und Nationalteam und doppelt geführte Spiele
   // fallen heraus (`prepare` in src/elo.ts). 1.2.1: `ELO_TEAM_MERGES` führt Team-IDs zusammen.
-  version: "1.2.1",
+  // Bis 1.3.0 blieb die Version stehen, obwohl Skalen, Reserve-Teams, Trennungen und
+  // Zusammenführungen dazukamen (Prüfung vom 28.10.2026); seitdem erzwingt
+  // test/elo-version.test.ts die Erhöhung. 1.3.0 (28.10.2026): gespiegelte und
+  // wettbewerbsübergreifende Dubletten fallen heraus, nachträgliche Korrekturen kommen an.
+  // 1.4.0 (28.10.2026): Heimvorteil Vereine 50 statt 60, Liga-Niveau je Liga (`leagueLevel`).
+  version: "1.4.0",
   club: {
     startRating: 1500,
     k: 30,
-    homeAdvantage: 60,
+    // 50 seit 1.4.0 (Davids Entscheidung vom 28.10.2026): Wöchentlicher Neuaufbau ohne Blick in
+    // die Zukunft, gepaarter Log-Loss gegen 60: 2025 −0,0012 ± 0,0001, 2026 −0,0010 ± 0,0001
+    // (Liga −0,0009/−0,0007, Pokal −0,0052/−0,0043, international +0,0020/+0,0012). Im Mittel
+    // passend wären Liga 51-53, Pokal 29-31, international 80 - ein Wert je Wettbewerbsart ist
+    // nur ein nachträglicher Hinweis und wird erst nach eigener Prüfung eingeführt.
+    homeAdvantage: 50,
     neutralHomeAdvantage: 0,
     // Sanfter Decay seit 1.1.0 (Davids Entscheidung vom 24.09.2026 nach dem Review). Die
     // ursprüngliche Staffel (0-6 M 1,0 · 6-12 0,8 · 12-18 0,6 · 18-24 0,4 · 24-36 0,2 ·
@@ -232,6 +250,7 @@ export const ELO_CONFIG: EloConfig = {
   mov: { enabled: true, autocorrA: 2.2, autocorrB: 0.001, cap: 2 },
   provisional: { games: 10, multiplier: 1.5 },
   newTeamStart: { mode: "competitionMean", minRated: 5 },
+  leagueLevel: { minWeight: 10, activeDays: 400 },
   confidence: { games: 20, opponents: 15, crossLeague: 6, windowMonths: 24 },
   tiers: { minTeams: 10, gap: 30 },
   leaguePropagation: {

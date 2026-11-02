@@ -178,11 +178,14 @@ export function movFactor(
  *   Nationalteams bei 1500. Welcher Art ein Team ist, zeigen seine **Pflichtspiele**: mehr im
  *   Vereins- als im Nationalteam-Betrieb heißt Verein. Testspiele zählen dafür nicht - sie sind
  *   gerade das Problem. Gezählt wird nur vor `asOf`, der Backtest sieht nichts aus der Zukunft.
- * - **Doppelt geführte Spiele** fallen heraus: derselbe Wettbewerb, dieselbe Paarung und derselbe
- *   Endstand binnen 24 Stunden unter zwei Fixture-IDs (191 am 26.09.2026, 164 davon
- *   Vereins-Testspiele). Unterscheidet sich der Stand, bleiben beide - welcher stimmt, ist nicht
- *   zu sagen. Nicht zusammengelegt wird über Wettbewerbe hinweg: PSG - Marseille stand im
- *   Februar 2013 binnen drei Tagen zweimal 2:0 im Bestand, in Liga und Pokal.
+ * - **Doppelt geführte Spiele** fallen heraus: dieselbe Paarung mit demselben Endstand binnen
+ *   24 Stunden unter zwei Fixture-IDs (191 am 26.09.2026, 164 davon Vereins-Testspiele).
+ *   Seit Version 1.3.0 auch **gespiegelt** (B - A mit gespiegeltem Stand, 346 im Fenster, fast
+ *   alle Vereins-Testspiele) und **über Wettbewerbe hinweg** (74, davon 55 dieselben U17-Spiele
+ *   unter „CONCACAF U17“ und „World Cup - U17“) - Prüfung vom 28.10.2026. Zwei echte Spiele
+ *   derselben Paarung binnen 24 Stunden gibt es nicht; PSG - Marseille stand im Februar 2013
+ *   zweimal 2:0 im Bestand, aber drei Tage auseinander, und bleibt. Unterscheidet sich der Stand,
+ *   bleiben beide - welcher stimmt, ist nicht zu sagen.
  * - Ein Team gegen sich selbst (interne Testspiele) fällt heraus.
  * - **Zusammengeführte Team-IDs** (`ELO_TEAM_MERGES`) werden vorher umgehängt: Führt API-Football
  *   einen Verein unter mehreren IDs, rechnet das Elo sonst mit mehreren „Teams" (AFC Malmö begann
@@ -225,7 +228,11 @@ function prepare(matches: EloMatch[], state: EloState, merges: EloTeamMerge[]): 
       state.counts.excludedDuplicate += 1;
       continue;
     }
-    const key = `${match.leagueId}|${match.homeId}|${match.awayId}|${match.homeGoals}|${match.awayGoals}`;
+    // Ohne Ausrichtung und ohne Wettbewerb: dieselbe Paarung mit demselben Stand binnen 24 Stunden.
+    const [first, second, firstGoals, secondGoals] = match.homeId < match.awayId
+      ? [match.homeId, match.awayId, match.homeGoals, match.awayGoals]
+      : [match.awayId, match.homeId, match.awayGoals, match.homeGoals];
+    const key = `${first}|${second}|${firstGoals}|${secondGoals}`;
     const previous = lastSeen.get(key);
     if (previous !== undefined && match.kickoff - previous <= DUPLICATE_WINDOW_MS) {
       state.counts.excludedDuplicate += 1;
@@ -572,8 +579,10 @@ export interface EloRankingRow {
   peak: number;
   low: number;
   trend: "steigend" | "fallend" | "stabil";
-  /** Vereine: die Liga, in der das Team zuletzt am häufigsten spielte. Nationalteams: der Verband. */
+  /** Vereine: die Liga seines letzten Ligaspiels. Nationalteams: der Verband. */
   league: string | null;
+  /** Vereine: die ID dieser Liga, Schlüssel für das Liga-Niveau (seit 1.4.0). Sonst null. */
+  leagueId: number | null;
   country: string | null;
   confidence: number;
   lastPlayed: number;
@@ -656,10 +665,56 @@ export function summarizeElo(state: EloState): EloRankingRow[] {
       lastChange: team.lastChange, change30, change90, peak: team.peak, low: team.low,
       trend: change90 > 15 ? "steigend" : change90 < -15 ? "fallend" : "stabil",
       league: eloFamily(team.system) === "club" ? league?.name ?? null : confederation.get(key) ?? null,
+      leagueId: eloFamily(team.system) === "club" ? leagueId : null,
       country: eloFamily(team.system) === "club" ? league?.country ?? null : team.name,
       confidence,
       lastPlayed: team.log.at(-1)?.kickoff ?? 0
     });
   }
   return rows.sort((left, right) => right.elo - left.elo);
+}
+
+export interface EloLeagueLevel {
+  system: EloSystem;
+  leagueId: number;
+  league: string;
+  country: string;
+  /** Mittleres Elo der gezählten Vereine. */
+  level: number;
+  /** So viele Vereine stehen dahinter. */
+  clubs: number;
+}
+
+/**
+ * Liga-Niveau je Liga (seit 1.4.0): das mittlere Elo der Vereine, deren letztes Ligaspiel dort
+ * war - nur belastbare (`leagueLevel.minWeight` gewichtete Spiele) und aktive
+ * (`leagueLevel.activeDays`). Nur die Männer-Vereinsskala: Für Frauen-Vereine ist ein Faktor
+ * daraus ungemessen.
+ *
+ * Gemessen am 28.10.2026 (Prüfer, Zeit-Split, Teiler 1200 in beiden Richtungen gewählt): Bei
+ * Spielen zwischen Ligen trägt dieses Niveau den Klassenunterschied so gut wie die gemessene
+ * Ligastärke (−0,004 ± 0,004 Log-Loss im Nachbau, +0,003 ± 0,021 an echten Prognosen) und
+ * deutlich besser als die geschätzte (−0,048 ± 0,008 bzw. −0,183 ± 0,065). Fehlt die
+ * Ligastärke ganz, gegen „ohne Faktor“ an echten Prognosen −0,247 ± 0,041 (n = 161). Das Team-Elo
+ * selbst schnitt an echten Prognosen schlechter ab (+0,096 ± 0,026 gegen das Liga-Niveau): Die
+ * Teamform gegen die eigene Liga trägt die Teamstärke schon, das Team-Elo zählte sie doppelt.
+ */
+export function leagueLevels(state: EloState): EloLeagueLevel[] {
+  const { minWeight, activeDays } = state.config.leagueLevel;
+  const activeSince = state.asOf - activeDays * DAY_MS;
+  const sums = new Map<number, { sum: number; clubs: number }>();
+  for (const team of state.teams.values()) {
+    if (team.system !== "club" || team.weight < minWeight || team.lastPlayed < activeSince) continue;
+    let leagueId: number | null = null;
+    for (const game of team.log) if (game.isLeague) leagueId = game.leagueId;
+    if (leagueId === null) continue;
+    const entry = sums.get(leagueId) ?? { sum: 0, clubs: 0 };
+    entry.sum += team.rating;
+    entry.clubs += 1;
+    sums.set(leagueId, entry);
+  }
+  return [...sums].map(([leagueId, { sum, clubs }]) => ({
+    system: "club" as const, leagueId, league: state.leagues.get(leagueId)?.name ?? String(leagueId),
+    country: state.leagues.get(leagueId)?.country ?? "", level: sum / clubs, clubs
+  })).sort((left, right) => right.level - left.level);
 }

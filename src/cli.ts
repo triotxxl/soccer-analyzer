@@ -564,13 +564,16 @@ async function dashboard(args: ParsedArgs): Promise<void> {
     // Ergebnisse, die diese Analyse neu in den Cache legt, kommen mit der nächsten dazu.
     if (client && config.eloAutoUpdate) {
       try {
+        const updateStarted = new Date().toISOString();
         const update = await autoUpdateElo(client, database, { topUpBudget: config.eloTopUpRequestBudget });
+        const corrected = database.eloCorrectionsSince(updateStarted);
         const topUp = update.topUp
           ? `Wochenrunde ${update.topUp.loaded} von ${update.topUp.leagues} Ligen, ${update.topUp.apiRequests} Aufrufe`
             + (update.topUp.alreadyDone ? ` (${update.topUp.alreadyDone} schon bei einer früheren Analyse)` : "")
             + (update.topUp.budgetReached ? " (Budget erreicht, Rest bei der nächsten Analyse)" : "")
           : `Wochenrunde fällig ab ${new Date(update.nextTopUp ?? Date.now()).toLocaleDateString("de-DE")}`;
         console.log(`Elo: ${update.imported.inserted} neue Spiele (${update.imported.read} Cache-Dateien), ${topUp},`
+          + (corrected ? ` ${corrected} korrigierte Stände,` : "")
           + ` neu gerechnet in ${update.rebuilt.seconds.toFixed(0)} s`);
       } catch (error) {
         console.error(`Elo nicht aktualisiert, es gilt der gespeicherte Stand: ${error instanceof Error ? error.message : String(error)}`);
@@ -610,14 +613,18 @@ async function dashboard(args: ParsedArgs): Promise<void> {
         console.error(`Schüsse und Ecken übersprungen: ${error instanceof Error ? error.message : String(error)}`);
       }
     }
-    // Team-Elo nur zur Anzeige neben dem Namen.
+    // Team-Elo zur Anzeige neben dem Namen, seit schemaVersion 12 mit Liga und Liga-Niveau.
     const elo = new Map<number, TeamElo>();
+    const eloLevels = database.eloLeagueLevels();
     for (const [teamId, row] of getEloByTeam(database)) {
+      const level = row.system === "club" && row.leagueId !== null ? eloLevels.get(row.leagueId) : undefined;
       elo.set(teamId, {
         elo: row.elo,
         confidence: row.confidence,
         system: row.system,
-        asOf: new Date(row.asOf).toISOString()
+        asOf: new Date(row.asOf).toISOString(),
+        league: row.league,
+        ...(level ? { leagueLevel: level.level, leagueClubs: level.clubs } : {})
       });
     }
     // Die Analyse hat jedes Tipico-Ereignis schon seiner Fixture zugeordnet - diese Zuordnung

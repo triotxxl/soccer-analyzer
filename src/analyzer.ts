@@ -17,7 +17,10 @@ import {
   type LeagueBaseline,
   type SideBaselines
 } from "./model.ts";
-import { compareStrength, ratingFor, sameLeagueComparison, teamEloComparison, type StrengthComparison } from "./strength-factor.ts";
+import {
+  compareStrength, eloLevelComparison, ratingFor, sameLeagueComparison, teamEloComparison, type EloLevelInput,
+  type StrengthComparison
+} from "./strength-factor.ts";
 import { getTeamElo } from "./elo-store.ts";
 import { liveCoverageOf } from "./live-model.ts";
 import { eloSystemLabel, nationalCategoryOf, type EloSystem } from "./elo-config.ts";
@@ -700,6 +703,14 @@ export async function runGoalLineAnalysis(
       );
     };
 
+    // Liga-Niveau aus dem Vereins-Elo (seit 3.7.0): Liga je Verein laut Elo und ihr Niveau.
+    const eloLevels = database.eloLeagueLevels();
+    const eloLevelOf = (teamId: number): (EloLevelInput & { league: string }) | null => {
+      const leagueId = getTeamElo(database, teamId, "club")?.leagueId ?? null;
+      const level = leagueId === null ? undefined : eloLevels.get(leagueId);
+      return leagueId === null || !level ? null : { leagueId, level: level.level, clubs: level.clubs, league: level.league };
+    };
+
     const rows = fixtures.map((fixture) => {
       const competitionKey = `${fixture.league.id}:${fixture.league.season}`;
       const history = competitionHistory.get(competitionKey) ?? [];
@@ -733,13 +744,19 @@ export async function runGoalLineAnalysis(
         : undefined;
       // Ohne Liga-Vergleich trägt bei Länderspielen das Team-Elo den Klassenunterschied - bei
       // A-Teams und seit 29.09.2026 bei der U21 (`config.strength.teamEloSystems`). Welche Skala,
-      // sagen die Teamnamen. Vereine bekommen hier nichts: Deren Elo-Skala ist ungemessen.
+      // sagen die Teamnamen. Vereine bekommen seit 3.7.0 das Liga-Niveau aus dem Vereins-Elo, wo
+      // die Ligastärke fehlt oder eine Seite nur geschätzt ist - eine gemessene bleibt.
       const category = crossLeague ? nationalCategoryOf(fixture.teams.home.name, fixture.teams.away.name) : null;
       const eloSystem: EloSystem = category ? `national-${category}` : "national";
       const eloEnabled = config.strength.teamEloSystems.includes(eloSystem);
       const homeNational = crossLeague && eloEnabled ? getTeamElo(database, fixture.teams.home.id, eloSystem) : null;
       const awayNational = crossLeague && eloEnabled ? getTeamElo(database, fixture.teams.away.id, eloSystem) : null;
-      const strength = (homeRef && awayRef ? strengthFor(fixture, homeRef, awayRef) : null)
+      const leagueStrength = homeRef && awayRef ? strengthFor(fixture, homeRef, awayRef) : null;
+      const leagueEstimated = leagueStrength?.source === "league"
+        && (!leagueStrength.home.reliable || !leagueStrength.away.reliable);
+      const homeLevel = crossLeague && (!leagueStrength || leagueEstimated) ? eloLevelOf(fixture.teams.home.id) : null;
+      const awayLevel = homeLevel ? eloLevelOf(fixture.teams.away.id) : null;
+      const strength = eloLevelComparison(homeLevel, awayLevel) ?? leagueStrength
         ?? teamEloComparison(homeNational, awayNational);
       // Die eigene Torkorrektur gilt für jedes Spiel zweier Nationalteams mit Elo, auch
       // zwischen Verbänden (dort ohne Faktor) - gemessen wurde über alle. Jugendteams ohne
@@ -785,6 +802,9 @@ export async function runGoalLineAnalysis(
           warnings.push(`Stärke aus dem Team-Elo der ${eloSystemLabel(eloSystem)}, nicht aus einer Liga`);
         } else if (strength.source === "sameLeague") {
           warnings.push("Beide Teams aus derselben Liga; kein Klassenunterschied");
+        } else if (strength.source === "eloLevel") {
+          // Ordnet im Report die Gruppe "Liga-Niveau" zu (cohortOf).
+          warnings.push(`Klassenunterschied aus dem Liga-Niveau des Vereins-Elo: ${homeLevel?.league} gegen ${awayLevel?.league}`);
         } else if (!strength.home.reliable || !strength.away.reliable) {
           const estimated = strength.home.reliable ? fixture.teams.away.name : fixture.teams.home.name;
           warnings.push(`Ligastärke für ${estimated} geschätzt statt gemessen`);

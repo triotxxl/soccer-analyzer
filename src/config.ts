@@ -95,7 +95,11 @@ export const config = {
   // 3.6.0 (19.10.2026): Eine nicht belastbare Liga behält ihr eigenes Rating, nach Duellen und
   // Vereinen zum Pool-Floor gezogen (`ratingFor` in src/strength-factor.ts). Ligaspiele und
   // Spiele zwischen zwei belastbar bewerteten Ligen rechnen wie 3.5.0 (`STRENGTH_COMPARABLE_SINCE`).
-  goalLineModelVersion: "3.6.0",
+  // 3.7.0 (28.10.2026): Fehlt die Ligastärke oder ist eine Seite nur geschätzt, trägt das
+  // Liga-Niveau aus dem Vereins-Elo den Klassenunterschied (`strength.eloLevelDivisor`,
+  // `eloLevelComparison` in src/strength-factor.ts). Ligaspiele, "gemessen" und Länderspiele
+  // rechnen wie 3.6.0.
+  goalLineModelVersion: "3.7.0",
   xgEnrichmentRequestBudget: 250,
   // Torschüsse und Ecken der letzten fünf Partien. Ein Aufruf deckt zwanzig Partien ab, und
   // jede geholte wird gespeichert - ein 48-Stunden-Lauf braucht damit etwa zwanzig Aufrufe,
@@ -150,8 +154,8 @@ export const config = {
   // nach der Summenkorrektur, Summe bleibt gleich. **Ab Werk 0 = aus** (Davids Entscheidung
   // vom 10.10.2026): Eingeschaltet wird nach der vorab festgelegten BTTS-Prüfung
   // (docs/btts-pruefung.md, etwa Mitte November), weil sich BTTS dabei leicht verschiebt.
-  // Dann 0.054 setzen und goalLineModelVersion auf 3.7.0 erhöhen (3.6.0 ist seit 19.10.2026
-  // die Ligastärke geschätzter Ligen).
+  // Dann 0.054 setzen und goalLineModelVersion auf 3.8.0 erhöhen (3.6.0 ist seit 19.10.2026
+  // die Ligastärke geschätzter Ligen, 3.7.0 seit 28.10.2026 das Liga-Niveau aus dem Vereins-Elo).
   //
   // Gemessen (Prüfung vom 10.10.2026): δ über 74.033 nachgebaute Ligaspiele 0,0539 ± 0,0023,
   // live 0,059 ± 0,010. Zeit-Split, 1X2-Log-Loss gepaart: nachgebaut −0,0036 ± 0,0004 (Test)
@@ -274,7 +278,23 @@ export const config = {
     // aber nicht eingeschaltet, weil Tipico sie seit Beginn der Exporte (11.08.2026) nie führte.
     // Tauchen sie auf, gehören sie hier dazu. U20, U23 und Frauen-Nationalteams: nein (zu wenige
     // Spiele bzw. Favorit weiter deutlich unterschätzt).
-    teamEloSystems: ["national", "national-u21"] as EloSystem[]
+    teamEloSystems: ["national", "national-u21"] as EloSystem[],
+    // Liga-Niveau aus dem Vereins-Elo (seit 3.7.0, Davids Entscheidung vom 28.10.2026): mittleres
+    // Elo der Vereine einer Liga (`leagueLevels` in src/elo.ts). Es ersetzt die Ligastärke, wo
+    // sie fehlt oder eine Seite nur geschätzt ist; eine gemessene Ligastärke bleibt.
+    // Prüfung vom 28.10.2026 (vorab festgelegt: Raster 500-3000, Wahl 07/2023-12/2024, Test
+    // 2025-10/2026, Gegenprobe umgekehrt; beide Richtungen wählten 1200). 1X2-Log-Loss gepaart:
+    // - Nachbau, Ligastärke fehlt (n = 3.899): −0,110 ± 0,008 gegen „ohne Faktor“; geschätzt
+    //   (n = 1.784): −0,048 ± 0,008 gegen die Ligastärke; gemessen (n = 3.854): −0,004 ± 0,004,
+    //   also gleich gut;
+    // - echte Prognosen ab 3.2.0, fehlt (n = 161): −0,247 ± 0,041, Zeithälften −0,351 / −0,144;
+    //   die stärkere Liga gewann 62,1 %, vorhergesagt waren 36,3 %, mit Liga-Niveau 54,4 %.
+    //   Gegen Tipico fair +0,283 → +0,036 ± 0,022. Geschätzt (n = 49): −0,183 ± 0,065.
+    // Die Wahl zwischen Liga-Niveau und Team-Elo fiel erst an den echten Prognosen (n = 161) -
+    // deshalb nachmessen (Report-Gruppe „Liga-Niveau“), nach rund 300 abgerechneten Spielen.
+    // Unter `eloLevelMinClubs` Vereinen trägt ein Niveau zu wenig (nur 149 von 9.538 Spielen).
+    eloLevelDivisor: 1200,
+    eloLevelMinClubs: 5
   },
   // Detailansicht einer aufgeklappten Partie. Die Grenzen bestimmen unmittelbar die Kosten:
   // Team- und H2H-Historien liegen aus dem Lauf bereits im Cache, neu sind nur die Bündel

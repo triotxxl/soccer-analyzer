@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { config } from "../src/config.ts";
-import { compareStrength, ratingFor, sameLeagueComparison, strengthFactor, teamEloComparison } from "../src/strength-factor.ts";
+import { compareStrength, eloLevelComparison, ratingFor, sameLeagueComparison, strengthFactor, teamEloComparison } from "../src/strength-factor.ts";
 import type { LeagueStrengthSnapshot } from "../src/types.ts";
 
 function snapshotDatabase(
@@ -216,4 +216,18 @@ test("Die U21 trägt den Elo-Faktor, andere Jugend- und Frauenskalen noch nicht"
   // U19 und Frauen sind gemessen bzw. unterschätzt, aber nicht freigegeben (config.strength.teamEloSystems).
   assert.equal(teamEloComparison(team("national-u19", 1700), team("national-u19", 1400)), null);
   assert.equal(teamEloComparison(team("national-women", 1700), team("national-women", 1400)), null);
+});
+
+test("Liga-Niveau aus dem Vereins-Elo: Faktor mit Teiler 1200, Mindestzahl Vereine, gleiche Liga = 1 (3.7.0)", () => {
+  const nbI = { leagueId: 271, level: 1900, clubs: 12 };
+  const nbIII = { leagueId: 273, level: 1422, clubs: 40 };
+  const comparison = eloLevelComparison(nbIII, nbI)!;
+  assert.equal(comparison.source, "eloLevel");
+  assert.ok(Math.abs(comparison.factor - 10 ** ((1422 - 1900) / 1200)) < 1e-12);
+  assert.ok(Math.abs(comparison.factor * eloLevelComparison(nbI, nbIII)!.factor - 1) < 1e-12);
+  assert.equal(eloLevelComparison(nbI, { ...nbIII, clubs: 4 }), null);
+  assert.equal(eloLevelComparison(nbI, null), null);
+  const same = eloLevelComparison(nbI, { ...nbI })!;
+  assert.equal(same.source, "sameLeague");
+  assert.equal(same.factor, 1);
 });

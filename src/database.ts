@@ -20,7 +20,7 @@ import type { FixtureResult, FixtureResultStats } from "./fixture-result.ts";
 import type { StoredRecentStats } from "./recent-stats.ts";
 import type { InsightTeamStats } from "./fixture-insights.ts";
 import type { EloMatch } from "./elo-competitions.ts";
-import type { EloHistoryRow, EloRankingRow } from "./elo.ts";
+import type { EloHistoryRow, EloLeagueLevel, EloRankingRow } from "./elo.ts";
 
 /** Der Statistikkatalog einer Mannschaft für einen Abschnitt. */
 type TeamHalfStats = InsightTeamStats;
@@ -152,7 +152,7 @@ export interface OutcomeProbabilityPerformanceRow {
 }
 
 export interface LeagueStrengthPerformanceRow {
-  cohort: "Ligapartie" | "gemessen" | "geschätzt" | "Team-Elo" | "Team-Elo U21" | "gleiche Liga"
+  cohort: "Ligapartie" | "gemessen" | "geschätzt" | "Liga-Niveau" | "Team-Elo" | "Team-Elo U21" | "gleiche Liga"
     | "ohne Rating" | "vor Ligastärke";
   /** Spiele, nicht Zeilen: je Spiel zählt nur die neueste Modellversion. */
   total: number;
@@ -595,6 +595,17 @@ export class AnalyzerDatabase {
         source TEXT NOT NULL
       );
       CREATE INDEX IF NOT EXISTS idx_elo_matches_league_season ON elo_matches(league_id, season);
+      -- Nachträglich geänderte Stände in elo_matches (seit Elo 1.3.0, saveEloMatches).
+      CREATE TABLE IF NOT EXISTS elo_corrections (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        fixture_id INTEGER NOT NULL,
+        corrected_at TEXT NOT NULL,
+        source TEXT NOT NULL,
+        old_home_id INTEGER NOT NULL, old_away_id INTEGER NOT NULL,
+        old_home_goals INTEGER NOT NULL, old_away_goals INTEGER NOT NULL,
+        new_home_id INTEGER NOT NULL, new_away_id INTEGER NOT NULL,
+        new_home_goals INTEGER NOT NULL, new_away_goals INTEGER NOT NULL
+      );
       -- Zeitpunkte der automatischen Pflege (lastImport, lastTopUp) - src/elo-update.ts.
       CREATE TABLE IF NOT EXISTS elo_meta (
         key TEXT PRIMARY KEY,
@@ -655,6 +666,18 @@ export class AnalyzerDatabase {
         as_of INTEGER NOT NULL,
         config_version TEXT NOT NULL,
         PRIMARY KEY(system, team_id)
+      );
+      -- Liga-Niveau je Liga aus dem Vereins-Elo (seit Elo 1.4.0, leagueLevels in src/elo.ts).
+      CREATE TABLE IF NOT EXISTS elo_league_levels (
+        system TEXT NOT NULL,
+        league_id INTEGER NOT NULL,
+        league TEXT NOT NULL,
+        country TEXT NOT NULL,
+        level REAL NOT NULL,
+        clubs INTEGER NOT NULL,
+        as_of INTEGER NOT NULL,
+        config_version TEXT NOT NULL,
+        PRIMARY KEY(system, league_id)
       );
       CREATE TABLE IF NOT EXISTS tipico_imports (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -717,6 +740,11 @@ export class AnalyzerDatabase {
       if (!eloHistoryColumns.some((item) => item.name === column)) {
         this.db.exec(`ALTER TABLE elo_history ADD COLUMN ${column} REAL NOT NULL DEFAULT 0`);
       }
+    }
+    // Liga-ID je Verein seit Elo 1.4.0 - Schlüssel für das Liga-Niveau.
+    const eloRatingColumns = this.db.prepare("PRAGMA table_info(elo_ratings)").all() as Array<{ name: string }>;
+    if (!eloRatingColumns.some((item) => item.name === "league_id")) {
+      this.db.exec("ALTER TABLE elo_ratings ADD COLUMN league_id INTEGER");
     }
     const goalColumns = this.db.prepare("PRAGMA table_info(goal_line_predictions)").all() as Array<{ name: string }>;
     // strength_factor seit 05.10.2026: Ohne den Faktor lässt sich im Report nicht sagen, welche
@@ -1813,6 +1841,8 @@ export class AnalyzerDatabase {
       if (/Team-Elo der U21-Nationalteams/.test(warnings)) return "Team-Elo U21";
       if (/Team-Elo der Nationalteams/.test(warnings)) return "Team-Elo";
       if (/aus derselben Liga/.test(warnings)) return "gleiche Liga";
+      // Seit 3.7.0: Klassenunterschied aus dem Liga-Niveau des Vereins-Elo.
+      if (/Liga-Niveau des Vereins-Elo/.test(warnings)) return "Liga-Niveau";
       if (/geschätzt statt gemessen/.test(warnings)) return "geschätzt";
       if (/Cross-League/.test(warnings)) return "gemessen";
       return "Ligapartie";
@@ -1863,7 +1893,8 @@ export class AnalyzerDatabase {
       .filter((sample) => options.sinceVersion === undefined ||
         compareModelVersions(sample.modelVersion, options.sinceVersion) >= 0);
     const order: Array<LeagueStrengthPerformanceRow["cohort"]> =
-      ["Ligapartie", "gemessen", "geschätzt", "Team-Elo", "Team-Elo U21", "gleiche Liga", "ohne Rating", "vor Ligastärke"];
+      ["Ligapartie", "gemessen", "geschätzt", "Liga-Niveau", "Team-Elo", "Team-Elo U21", "gleiche Liga", "ohne Rating",
+        "vor Ligastärke"];
     return order.flatMap((cohort) => {
       const group = samples.filter((sample) => sample.cohort === cohort);
       if (group.length === 0) return [];
@@ -2512,26 +2543,59 @@ export class AnalyzerDatabase {
     }
   }
 
-  /** Legt abgeschlossene Spiele für das Team-Elo ab. Gibt die Zahl neuer Zeilen zurück. */
+  /**
+   * Legt abgeschlossene Spiele für das Team-Elo ab. Gibt die Zahl neuer Zeilen zurück.
+   *
+   * Seit Elo 1.3.0 (28.10.2026) übernimmt ein bekanntes Spiel einen **geänderten** Stand oder eine
+   * gedrehte Ausrichtung und hält die Änderung in `elo_corrections` fest. Vorher blieb der erste
+   * gespeicherte Stand für immer (`INSERT OR IGNORE`); die Prüfung fand 4 Spiele, deren Stand
+   * später anders in `fixture_results` stand. Die Aufrufer liefern den zuletzt geholten Stand
+   * (Wochenrunde frisch, Cache-Import nach Dateialter sortiert).
+   */
   saveEloMatches(matches: EloMatch[], source: string): number {
-    const statement = this.db.prepare(`INSERT OR IGNORE INTO elo_matches(
+    const existing = this.db.prepare(`SELECT home_id, away_id, home_goals, away_goals FROM elo_matches WHERE fixture_id = ?`);
+    const insert = this.db.prepare(`INSERT INTO elo_matches(
       fixture_id,kickoff,league_id,league_name,league_type,country,season,home_id,home_name,away_id,away_name,
       home_goals,away_goals,source
     ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)`);
+    const update = this.db.prepare(`UPDATE elo_matches SET kickoff = ?, home_id = ?, home_name = ?, away_id = ?,
+      away_name = ?, home_goals = ?, away_goals = ?, source = ? WHERE fixture_id = ?`);
+    const protocol = this.db.prepare(`INSERT INTO elo_corrections(
+      fixture_id, corrected_at, source, old_home_id, old_away_id, old_home_goals, old_away_goals,
+      new_home_id, new_away_id, new_home_goals, new_away_goals
+    ) VALUES(?,?,?,?,?,?,?,?,?,?,?)`);
+    const now = new Date().toISOString();
     let inserted = 0;
     this.db.exec("BEGIN IMMEDIATE");
     try {
       for (const match of matches) {
-        const result = statement.run(
-          match.fixtureId, match.kickoff, match.leagueId, match.leagueName, match.leagueType, match.country,
-          match.season, match.homeId, match.homeName, match.awayId, match.awayName, match.homeGoals,
-          match.awayGoals, source
-        );
-        inserted += Number(result.changes);
+        const old = existing.get(match.fixtureId) as
+          { home_id: number; away_id: number; home_goals: number; away_goals: number } | undefined;
+        if (!old) {
+          insert.run(
+            match.fixtureId, match.kickoff, match.leagueId, match.leagueName, match.leagueType, match.country,
+            match.season, match.homeId, match.homeName, match.awayId, match.awayName, match.homeGoals,
+            match.awayGoals, source
+          );
+          inserted += 1;
+          continue;
+        }
+        if (old.home_id === match.homeId && old.away_id === match.awayId
+          && old.home_goals === match.homeGoals && old.away_goals === match.awayGoals) continue;
+        update.run(match.kickoff, match.homeId, match.homeName, match.awayId, match.awayName,
+          match.homeGoals, match.awayGoals, source, match.fixtureId);
+        protocol.run(match.fixtureId, now, source, old.home_id, old.away_id, old.home_goals, old.away_goals,
+          match.homeId, match.awayId, match.homeGoals, match.awayGoals);
       }
       this.db.exec("COMMIT");
     } catch (error) { this.db.exec("ROLLBACK"); throw error; }
     return inserted;
+  }
+
+  /** Korrekturen an `elo_matches` seit dem Zeitpunkt (ISO), für den Bericht der Analyse. */
+  eloCorrectionsSince(since: string): number {
+    const row = this.db.prepare(`SELECT COUNT(*) AS n FROM elo_corrections WHERE corrected_at >= ?`).get(since) as { n: number };
+    return Number(row.n);
   }
 
   /** Ohne Team-ID alle Spiele, sonst nur die dieses Teams (für `npm run coverage`). */
@@ -2600,8 +2664,10 @@ export class AnalyzerDatabase {
       .run(leagueId, season, fixtures, completedAt);
   }
 
-  /** Ersetzt Historie und Ratings vollständig - beides ist aus `elo_matches` abgeleitet. */
-  replaceEloResults(history: EloHistoryRow[], ranking: EloRankingRow[], configVersion: string, asOf: number): void {
+  /** Ersetzt Historie, Ratings und Liga-Niveaus vollständig - alles ist aus `elo_matches` abgeleitet. */
+  replaceEloResults(
+    history: EloHistoryRow[], ranking: EloRankingRow[], configVersion: string, asOf: number, levels: EloLeagueLevel[] = []
+  ): void {
     const historyStatement = this.db.prepare(`INSERT INTO elo_history(
       system,fixture_id,kickoff,league_id,competition,home_id,away_id,home_goals,away_goals,home_elo_before,away_elo_before,
       home_expected,away_expected,result,home_advantage,time_decay,competition_multiplier,mov,home_k,away_k,
@@ -2609,11 +2675,14 @@ export class AnalyzerDatabase {
     ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`);
     const ratingStatement = this.db.prepare(`INSERT INTO elo_ratings(
       system,team_id,name,elo,games,last_change,change_30,change_90,peak,low,trend,league,country,confidence,
-      last_played,as_of,config_version
-    ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`);
+      last_played,as_of,config_version,league_id
+    ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`);
+    const levelStatement = this.db.prepare(`INSERT INTO elo_league_levels(
+      system,league_id,league,country,level,clubs,as_of,config_version
+    ) VALUES(?,?,?,?,?,?,?,?)`);
     this.db.exec("BEGIN IMMEDIATE");
     try {
-      this.db.exec("DELETE FROM elo_history; DELETE FROM elo_ratings;");
+      this.db.exec("DELETE FROM elo_history; DELETE FROM elo_ratings; DELETE FROM elo_league_levels;");
       for (const row of history) {
         historyStatement.run(
           row.system, row.fixtureId, row.kickoff, row.leagueId, row.competition, row.homeId, row.awayId,
@@ -2625,11 +2694,24 @@ export class AnalyzerDatabase {
       for (const row of ranking) {
         ratingStatement.run(
           row.system, row.teamId, row.name, row.elo, row.games, row.lastChange, row.change30, row.change90,
-          row.peak, row.low, row.trend, row.league, row.country, row.confidence, row.lastPlayed, asOf, configVersion
+          row.peak, row.low, row.trend, row.league, row.country, row.confidence, row.lastPlayed, asOf, configVersion,
+          row.leagueId ?? null
         );
+      }
+      for (const row of levels) {
+        levelStatement.run(row.system, row.leagueId, row.league, row.country, row.level, row.clubs, asOf, configVersion);
       }
       this.db.exec("COMMIT");
     } catch (error) { this.db.exec("ROLLBACK"); throw error; }
+  }
+
+  /** Liga-Niveaus des letzten Aufbaus je Liga-ID (Vereinsskala). */
+  eloLeagueLevels(): Map<number, { level: number; clubs: number; league: string; country: string }> {
+    const rows = this.db.prepare(`SELECT league_id, level, clubs, league, country FROM elo_league_levels WHERE system = 'club'`)
+      .all() as Array<{ league_id: number; level: number; clubs: number; league: string; country: string }>;
+    return new Map(rows.map((row) => [Number(row.league_id), {
+      level: Number(row.level), clubs: Number(row.clubs), league: String(row.league), country: String(row.country)
+    }]));
   }
 
   eloRatings(filter: { system?: string; country?: string; teamId?: number; name?: string } = {}): Array<Record<string, unknown>> {

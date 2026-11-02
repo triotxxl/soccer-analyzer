@@ -342,9 +342,10 @@ export interface LeagueStrengthComparison {
   factor: number;
   /**
    * Woher der Faktor kommt; fehlt in Läufen vor dem 28.09.2026 und heißt dann "league".
-   * Bei "teamElo" steht in `rating` das Team-Elo der Nationalteams.
+   * Bei "teamElo" steht in `rating` das Team-Elo der Nationalteams, bei "eloLevel" (seit 3.7.0)
+   * das Liga-Niveau aus dem Vereins-Elo.
    */
-  source?: "league" | "sameLeague" | "teamElo";
+  source?: "league" | "sameLeague" | "teamElo" | "eloLevel";
 }
 
 export interface GoalLineProbabilities {

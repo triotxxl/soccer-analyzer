@@ -59,7 +59,8 @@ const SEASON_MIN_MEDIAN = 40;
  * Nachladen weiter kurz ist, gehört mit Grund hierher, sonst meldet die Prüfung sie bei jedem Lauf.
  */
 export const KNOWN_SHORT_SEASONS: Array<{ leagueId: number; season: number; note: string }> = [
-  { leagueId: 333, season: 2021, note: "Ukraine Premier League 2021/22, im Februar 2022 wegen des Kriegs abgebrochen" }
+  { leagueId: 333, season: 2021, note: "Ukraine Premier League 2021/22, im Februar 2022 wegen des Kriegs abgebrochen" },
+  { leagueId: 117, season: 2022, note: "Belarus 1. Division 2022, API-Football führt nur 156 Ansetzungen (am 29.10.2026 neu geladen, 0 neue Spiele)" }
 ];
 
 export const isFriendly = (match: Pick<EloMatch, "leagueName">) => /friendlies/i.test(match.leagueName);

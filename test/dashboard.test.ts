@@ -100,7 +100,7 @@ test("übernimmt die Tipico-Namen je Fixture und lässt die API-Namen unverände
 
 test("Dashboard-Dokument führt alle Analysen über fixtureId zusammen", () => {
   const document = buildDashboardDocument(dashboardInput());
-  assert.equal(document.schemaVersion, 11);
+  assert.equal(document.schemaVersion, 12);
   // Beide Seitenquoten gehören in den 1X2-Markt, damit sich auch die Gegenseite bewerten
   // lässt; `odds` bleibt daneben die Quote des getippten Weges.
   const oneXTwo = document.fixtures[0]!.markets.find((market) => market.key === "1x2")!;
@@ -203,7 +203,7 @@ test("Dashboard-Ausgabe schreibt latest und datierten Snapshot als JSON", async 
     assert.equal(path.basename(files.latest), "dashboard-latest.json");
     assert.match(path.basename(files.snapshot), /^dashboard-2026-08-11T16-00-00-000Z\.json$/);
     const latest = JSON.parse(await readFile(files.latest, "utf8")) as { schemaVersion: number };
-    assert.equal(latest.schemaVersion, 11);
+    assert.equal(latest.schemaVersion, 12);
   } finally {
     await rm(directory, { recursive: true, force: true });
   }
@@ -396,4 +396,21 @@ test("Tipico-Quoten kommen über die Fixture-ID, nicht über den Namensvergleich
   assert.notEqual(oneXTwo(buildDashboardDocument({ ...input, tipicoOdds: [tipico] })).oddsHome, 2.1);
   const document = buildDashboardDocument({ ...input, tipicoOdds: [tipico], tipicoOddsByFixture: new Map([[1, tipico]]) });
   assert.equal(oneXTwo(document).oddsHome, 2.1);
+});
+
+test("Spiele zwischen Ligen mit Liga-Niveau aus dem Vereins-Elo zeigen 1X2 und die Markierung (3.7.0)", () => {
+  const input = dashboardInput(1.75, false);
+  input.goals.rows[0]!.strength = {
+    home: { leagueId: 273, rating: 1423, reliable: true },
+    away: { leagueId: 271, rating: 1896, reliable: true },
+    factor: 10 ** ((1423 - 1896) / 1200),
+    source: "eloLevel"
+  };
+  const fixture = buildDashboardDocument(input).fixtures[0]!;
+  const outcome = fixture.markets.find((market) => market.key === "1x2")!;
+  assert.equal(outcome.probabilityReliable, undefined);
+  assert.ok(outcome.details.some((detail) => /Liga-Niveau aus dem Vereins-Elo: .* 1423 vs\. .* 1896/.test(detail)));
+  assert.equal(fixture.classGap?.level, "extreme");
+  assert.equal(fixture.classGap?.stronger, "away");
+  assert.equal(fixture.classGap?.source, "elo");
 });
