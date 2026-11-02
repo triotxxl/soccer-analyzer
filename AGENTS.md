@@ -243,7 +243,9 @@ nur auf Davids ausdrücklichen Wunsch mit `ANALYZER_NEW_DATABASE=1`.
   der API); (3) Teams der Analyse, deren letztes Spiel über ein Jahr alt ist, mit Kandidaten für
   die zweite ID; (4) **Elo-Saisonlücken**: als vollständig markierte Ligasaisons unter 60 % des
   Medians (bekannt kurze in `KNOWN_SHORT_SEASONS`); (5) geschätzte Ligastärke mit Abstand zu
-  30 Duellen; (6) Torminuten „lückenlos“, die nicht zum Stand passen, und lange offene Prognosen.
+  30 Duellen; (6) Torminuten „lückenlos“, die nicht zum Stand passen, Spiele mit allen Toren in der
+  Ereignisliste, aber beim falschen Team (seit 02.11.2026, Eigentor-Fehler; bekannte Fehler der API in
+  `KNOWN_SWAPPED_GOALS`), und lange offene Prognosen.
   Jede Regel stammt aus einem echten Fund (Kopf von `src/data-check.ts`). Erster Lauf 20.10.2026:
   - **170 Elo-Saisons mit rund 27.000 fehlenden Spielen**, Ursache die 80-%-Abkürzung in
     `tools/elo.ts`, die am 24.09.2026 um 19:30 vor dem ersten Nachladen gegen die vollste Saison
@@ -389,6 +391,20 @@ nur auf Davids ausdrücklichen Wunsch mit `ANALYZER_NEW_DATABASE=1`.
   jedes Pokalspiel mit Tor in der Verlängerung galt als lückenhaft (AET 8 von 70, danach 62;
   PEN 182 → 189 von 225). `score.extratime` taugt dafür nicht - API-Football führt es mal als
   Gesamtstand, mal als Zuwachs.
+  **Eigentore führt API-Football unter der Mannschaft, der sie zählen**, nicht unter der des
+  Schützen (seit 02.11.2026 so in `goalEventsDetailed`, `src/fixture-insights.ts`; gemessen über
+  3.800 beendete Spiele mit Eigentor im Cache: 3.727 gehen nur so auf, 0 nur umgedreht, 68 beide,
+  5 keins). Vorher drehte der Code sie um: Jedes Spiel mit Eigentor galt als lückenhaft, das Tor
+  stand beim falschen Team, und die Torphasen der Detailansicht ließen diese Spiele weg (Al-Wasl:
+  1 statt 3 Heimspiele). Repariert: 2.664 Zeilen in `fixture_results` aus dem Cache neu gerechnet
+  (Torspalten und `goal_events_json`), lückenhaft danach 200 statt 2.800 von 38.473 Spielen mit
+  Ereignissen. `npm run data-check` meldet solche Fälle seitdem („Tore beim falschen Team“).
+  Live-Modell (Prüfer-Agent, 02.11.2026): Konstanten verschieben sich unter einem Standardfehler
+  (S(t) höchstens 0,0008, Rot 0,604 → 0,602 und 1,552 → 1,543), neu abgeleitete Werte sagen an
+  5.080 Spielen seit 30.09. nicht besser voraus - unverändert, `LIVE_MODEL_VERSION` bleibt. Die
+  Nachmessung bleibt gültig und wird genauer (98 statt 92 von 100 Spielen; vorher fielen
+  torreiche Spiele heraus). Halbzeitmodell, BTTS-Prüfung, Elo und Quickpick lesen die Torzähler
+  nicht.
   `half_stats_status` hält fest, ob die Halbzeitwerte schon geholt wurden und ob es welche
   gab; `unavailable` verhindert, dass derselbe leere Wettbewerb erneut abgefragt wird.
 - Rückwirkend nachtragen: `npm run backfill-results -- --scan` liest ausschließlich den
@@ -764,6 +780,15 @@ nachgezogen, nicht gesammelt am Ende.
   Konstanten leitet `--derive` aus `fixture_results` ab; übernommen werden sie von Hand, und
   `LIVE_MODEL_VERSION` steigt - die Nachmessung gilt je Fassung. Ohne `--since` misst das
   Werkzeug auf denselben Daten, aus denen die Konstanten stammen - das ist kein Beleg.
+  **Bestanden am 02.11.2026** (Prüfer-Agent, 5.080 Spiele seit 30.09., alle vier Kriterien, mit und
+  ohne Eigentor-Korrektur): `LIVE_MODEL_PROVISIONAL = false`, Davids Entscheidung vom selben Tag,
+  `LIVE_MODEL_VERSION` bleibt 1.0.0. **Länderspiele mit Stärke aus dem Team-Elo bekommen keine
+  Live-Chance** (Zustand `nationalTeams`, `dashboard.strength.source === "teamElo"`): Kriterium 4,
+  erst 98 Spiele und O/E 0,930 bei t = 75. Bei 200 abgerechneten Spielen dieser Gruppe neu messen
+  und mit David entscheiden. Offen: `STOPPAGE_REMAINING` (Nachspielzeit) wurde nie nachgemessen -
+  prüfbar an `data/live-snapshots/`, 0 Aufrufe; und 0:0 ohne Ereignisliste zählt in
+  `fixture_results` als lückenlos (`tools/live-model-report.ts:102` bräuchte `events_available = 1`,
+  nur mit Vermerk, weil es die Auswahl einer vorab festgelegten Prüfung berührt).
 - **Live-Tafel (`src/live-board.ts`):** trägt `live` (die Chancen), `marketStands` (Tatsachen
   aus dem Stand über `marketStandNow` in `src/market-outcome.ts`: erreicht / nicht mehr möglich /
   noch n Tore nötig / n Tore Luft), `cards` und `statisticsCoverage`. **Karten kommen aus den

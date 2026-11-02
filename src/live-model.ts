@@ -23,7 +23,11 @@
  *
  * Die Chancen gelten für 90 Minuten wie die Tipico-Märkte; Verlängerung, Elfmeterschießen und
  * Unterbrechungen bekommen keine Zahl. Bis zur Nachmessung an Spielen des laufenden Modells
- * (Kriterien in `tools/live-model-report.ts`) sind sie als vorläufig markiert.
+ * (Kriterien in `tools/live-model-report.ts`) waren sie als vorläufig markiert. Die Nachmessung
+ * vom 02.11.2026 (Prüfer-Agent, 5.080 Spiele seit 30.09.) bestand alle vier Kriterien; seitdem
+ * ohne „vorläufig“ (Davids Entscheidung). Länderspiele (Stärke aus dem Team-Elo) hatten erst 98
+ * Spiele und O/E 0,930 bei t = 75 - nach Kriterium 4 bekommen sie keine Zahl, bis ihre Gruppe 200
+ * Spiele hat (`nationalTeams`).
  */
 
 import type { LiveCoverage } from "./types.ts";
@@ -38,8 +42,8 @@ export function liveCoverageOf(coverage: Record<string, unknown> | undefined): L
 /** Steigt, sobald sich Formel oder Konstanten ändern - die Nachmessung gilt je Fassung. */
 export const LIVE_MODEL_VERSION = "1.0.0";
 
-/** Bis die Nachmessung bestanden ist und David freigibt. */
-export const LIVE_MODEL_PROVISIONAL = true;
+/** Nachmessung am 02.11.2026 bestanden, von David freigegeben. */
+export const LIVE_MODEL_PROVISIONAL = false;
 
 /**
  * Torrate je Minutenabschnitt relativ zu einer gleichmäßigen Minute (1/90), in der Reihenfolge
@@ -88,7 +92,8 @@ export type LiveChanceState =
   | "penalties"
   | "interrupted"
   | "unknown"
-  | "shortMatch";
+  | "shortMatch"
+  | "nationalTeams";
 
 export interface LiveChances {
   state: LiveChanceState;
@@ -123,6 +128,11 @@ export interface LiveChanceInput {
   sideReliable: boolean;
   /** Jugendspiel mit kürzeren Halbzeiten (`isShortMatch`) - die Uhr passt dann nicht. */
   shortMatch?: boolean;
+  /**
+   * Länderspiel mit Stärke aus dem Team-Elo - dieselbe Gruppe wie „Länderspiele (Team-Elo)“ in
+   * `tools/live-model-report.ts`. Unter 200 abgerechneten Spielen verborgen (Kriterium 4).
+   */
+  nationalTeams?: boolean;
 }
 
 /** Abschnitt von `GOAL_RATE_BY_BIN` für eine Spielminute 1-90 (45/90 samt Nachspielzeit). */
@@ -274,6 +284,7 @@ export function liveChances(input: LiveChanceInput): LiveChances {
   const base = { provisional: LIVE_MODEL_PROVISIONAL, modelVersion: LIVE_MODEL_VERSION };
   const empty = { remainingGoals: null, anotherGoal: null, nextGoal: null, result: null, lines: null };
   if (input.shortMatch) return { state: "shortMatch", ...base, ...empty };
+  if (input.nationalTeams) return { state: "nationalTeams", ...base, ...empty };
   if (input.clock.phase !== "running") return { state: input.clock.phase, ...base, ...empty };
   if (!Number.isFinite(input.lambdaHome) || !Number.isFinite(input.lambdaAway)) {
     return { state: "unknown", ...base, ...empty };

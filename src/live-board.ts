@@ -258,7 +258,8 @@ export function toBoardMatch(
     redHome: cards?.home.red ?? home.redCards ?? 0,
     redAway: cards?.away.red ?? away.redCards ?? 0,
     sideReliable: oneXTwo?.probabilityReliable !== false,
-    shortMatch: isShortMatch(dashboard.homeTeam, dashboard.awayTeam)
+    shortMatch: isShortMatch(dashboard.homeTeam, dashboard.awayTeam),
+    nationalTeams: dashboard.strength?.source === "teamElo"
   });
   const marketStands: LiveBoardMatch["marketStands"] = {};
   if (goals.home !== null && goals.away !== null) {

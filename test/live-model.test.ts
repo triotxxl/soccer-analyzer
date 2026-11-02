@@ -93,7 +93,15 @@ test("Verlängerung, Schießen, Unterbrechung und Jugendspiele bekommen keine Za
   const youth = liveChances(input({ shortMatch: true, clock: { phase: "running", minutesPlayed: 30 } }));
   assert.equal(youth.state, "shortMatch");
   assert.equal(youth.remainingGoals, null);
-  assert.equal(youth.provisional, true);
+  assert.equal(youth.provisional, false);
+});
+
+test("Länderspiele mit Stärke aus dem Team-Elo bekommen keine Zahl (Nachmessung: unter 200 Spielen)", () => {
+  const national = liveChances(input({ nationalTeams: true, clock: { phase: "running", minutesPlayed: 30 } }));
+  assert.equal(national.state, "nationalTeams");
+  assert.equal(national.anotherGoal, null);
+  assert.equal(national.lines, null);
+  assert.equal(national.result, null);
 });
 
 test("erkennt Jugendspiele mit kürzeren Halbzeiten an den Teamnamen", () => {

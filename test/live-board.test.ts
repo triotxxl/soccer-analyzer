@@ -178,13 +178,27 @@ test("dreht die API Heim und Gast, wird die Live-Antwort in die Ausrichtung des 
   assert.deepEqual(withoutIds.goals, { home: 2, away: 0 });
 });
 
+test("ein Länderspiel mit Stärke aus dem Team-Elo bekommt keine Live-Chance, die Stand-Tatsachen bleiben", () => {
+  const live = fixture({ id: 84, timestamp: NOW / 1000, homeId: 1, awayId: 2, homeGoals: 1, awayGoals: 0, status: "2H" });
+  live.fixture.status = { long: "Second Half", short: "2H", elapsed: 60 };
+  const rating = { leagueId: 0, rating: 1700, reliable: true };
+  const dashboard: DashboardFixture = {
+    ...dashboardFixture(84, new Date(NOW - 3_600_000).toISOString()),
+    strength: { home: rating, away: { ...rating, rating: 1600 }, factor: 1.18, source: "teamElo" }
+  };
+  const match = toBoardMatch(live, dashboard);
+  assert.equal(match.live.state, "nationalTeams");
+  assert.equal(match.live.anotherGoal, null);
+  assert.deepEqual(match.marketStands.over25, { status: "needs", goalsNeeded: 2 });
+});
+
 test("trägt Live-Chancen, Stand-Tatsachen und keine Chance in der Verlängerung", () => {
   const live = fixture({ id: 83, timestamp: NOW / 1000, homeId: 1, awayId: 2, homeGoals: 1, awayGoals: 1, status: "2H" });
   live.fixture.status = { long: "Second Half", short: "2H", elapsed: 75 };
   const dashboard = dashboardFixture(83, new Date(NOW - 4_800_000).toISOString());
   const match = toBoardMatch(live, dashboard);
   assert.equal(match.live.state, "ok");
-  assert.equal(match.live.provisional, true);
+  assert.equal(match.live.provisional, false);
   assert.ok(match.live.anotherGoal! > 0.3 && match.live.anotherGoal! < 0.7);
   assert.deepEqual(match.marketStands.over25, { status: "needs", goalsNeeded: 1 });
   assert.deepEqual(match.marketStands.btts, { status: "won" });
