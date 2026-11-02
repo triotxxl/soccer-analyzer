@@ -7,7 +7,12 @@ Saudi-Arabien, Ecuador, Malta, Copa Libertadores, Kolumbien, Mexiko). Rechnung i
 ## Grundlinie
 
 Je Team-Spiel ein Poisson-Modell auf der Elo-Differenz vor dem Spiel (`elo_history`, Vereine, ohne
-Testspiele, letzte zwei Jahre):
+Testspiele, letzte zwei Jahre - seit Elo 1.4.0 hält `elo_history` genau 731 Tage):
+
+**Vorbehalt (Prüfung 28.10.2026):** `elo_history` ist rückblickend gerechnet - Gewichte zum heutigen
+Stichtag, später nachgeladene Spiele, spätere Zusammenführungen. „Elo vor dem Spiel“ ist dort also nicht
+der damalige Stand. Für die Gewichtung der letzten Gegner genügt das; als Beleg für eine Messung nicht -
+dafür den wöchentlichen Neuaufbau ohne Blick in die Zukunft nehmen (`src/elo-backtest.ts`).
 
     log μ = a + b · ΔElo/400 + h · Ort        (Ort: +1 Heim, −1 Gast, 0 neutral)
 

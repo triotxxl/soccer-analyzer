@@ -22,6 +22,11 @@ Kleine Abfrage-Skripte als `.cjs` ins Temp-Verzeichnis legen und aus dem Reposit
   letzte Saison 2024 → API führt sie nicht mehr; Neuseeland Northern/Central: letzte Saison 2025).
 - „keine API-Liga“ → bleibt draußen, gelegentlich neu prüfen: Der Ligabestand wächst
   (Mexiko „Primera Premier“ kam als 1242 nach).
+- **Frauenwettbewerb auf Männerliga:** Die Analyse lernt Liga-Aliase selbst und legte am 29.10.2026
+  „DFB-Pokal Frauen“ auf den DFB-Pokal (81) statt auf „DFB Pokal - Women“ (947); China „Super League,
+  Frauen“ (Meister- und Abstiegsrunde) stand auf der Männer-Super-League (169), API-Football führt dort
+  keine Frauenliga - Aliase entfernt. Nach jeder Analyse im Diff von `data/league-aliases.json` neue
+  Einträge mit „Frauen“ gegen das Ziel prüfen.
 
 **Behebung:** Alias korrigieren (`npm run aliases`), Team-Aliase setzen, oder bewusst draußen
 lassen. Ein falscher Alias, der aus der Datei gelöscht wurde, kann in `tipico_competitions` stehen
@@ -87,7 +92,9 @@ Guerdane gehörten nicht dazu).
 **Heißt:** Ein Team der Analyse hat sein letztes Spiel im Bestand vor über einem Jahr. Ein
 Erstligist mit Elo-Vertrauen nahe 0 % ist fast immer eine zweite ID (Kenya Police: letztes Spiel
 2022, Vertrauen 0 %, die Spiele seitdem unter 8560). Ein Aufsteiger mit wenigen Spielen ist dagegen
-normal (Halaba Ketema, Kataka am 20.10.2026).
+normal (Halaba Ketema, Kataka am 20.10.2026). **Kein Kandidat trotz Namensähnlichkeit:** Wanderers
+Durazno (22229, Pokalgast aus der uruguayischen Provinz) ist nicht Montevideo Wanderers (2360) - zwei
+Vereine, nicht zusammenführen (29.10.2026).
 
 **Belegen:** Die Kandidaten aus der Prüfung (gleiches Land, ähnlicher Name, aktiv, kein gemeinsamer
 Spieltag) mit Spielplan prüfen: Endet die eine ID, wo die andere beginnt, in derselben Liga gegen

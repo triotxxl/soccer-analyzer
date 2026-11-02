@@ -88,6 +88,12 @@ nur auf Davids ausdrücklichen Wunsch mit `ANALYZER_NEW_DATABASE=1`.
    Team-Elo (Abschnitt „Team-Elo“). Versteckt bleiben Länderspiele zwischen Verbänden, übrige Jugend-Nationalteams
    ohne Elo und Vereinsspiele verschiedener Ligen ohne Liga-Rating. Im Lauf vom 28.09.2026
    wären so 47 der 51 versteckten 1X2-Märkte sichtbar geworden.
+   **Seit 28.10.2026 (`goalLineModelVersion` 3.7.0, Davids Entscheidung) trägt bei Vereinsspielen
+   zwischen Ligen das Liga-Niveau aus dem Vereins-Elo den Faktor, wo die Ligastärke fehlt oder eine
+   Seite nur geschätzt ist** (`source: "eloLevel"`, `eloLevelComparison`, Teiler 1200, je Liga mindestens
+   5 bewertete Vereine; Report-Gruppe „Liga-Niveau“). Gemessene Ligastärke bleibt. Im Lauf vom
+   28.10.2026 bekämen so 56 der 60 versteckten 1X2-Märkte eine Chance; offen bleiben Frauen-Vereine und
+   Teams ohne Elo-Liga. Messung und Regeln: `docs/team-elo.md`, Abschnitt 6.
    **Frauenwettbewerbe haben seit 29.09.2026 eigene Pools** (`uefa:women`, `country:x:women`,
    `isWomenFixture` in `src/league-strength.ts`) und gelten ab **3 Vereinen** als belastbar
    statt 5 (`config.strength.reliableMinClubsWomen`). Grund (Prüfung vom 29.09.2026): Im
@@ -112,7 +118,9 @@ nur auf Davids ausdrücklichen Wunsch mit `ANALYZER_NEW_DATABASE=1`.
    (`clear` oder `extreme`) und in der App ein Kürzel „Klasse“ mit Pfeil zur stärkeren
    Seite. Quelle ist bevorzugt das Ligarating (Torfaktor ab 1,5 beziehungsweise 2,2, eine
    nur geschätzte Seite genügt für die untere Stufe), bei Länderspielen das Team-Elo
-   (`source: "elo"`, derselbe Faktor, rund 247 bzw. 479 Elo-Punkte); fehlt beides, das
+   (`source: "elo"`, derselbe Faktor, rund 247 bzw. 479 Elo-Punkte), seit 3.7.0 auch das Liga-Niveau
+   aus dem Vereins-Elo (`source: "elo"`, rund 211 bzw. 411 Punkte; Neo nimmt dann das Liga-Niveau des
+   Snapshots, damit Liste und Detailansicht dasselbe sagen); fehlt alles, das
    Verhältnis der Tipico-Quoten für 1 und 2 (ab 4 beziehungsweise 8). Zwei Teams derselben
    Liga bekommen nie eine Markierung, auch nicht aus dem Quotenbild. Die Quelle steht im Feld und im
    Tooltip. Eine Markierung aus dem Quotenbild bleibt eine nachgelagerte Kennzeichnung
@@ -437,7 +445,7 @@ nur auf Davids ausdrücklichen Wunsch mit `ANALYZER_NEW_DATABASE=1`.
   stärkeren Seite der laufenden Fassung, sonst am Favoriten; „vor Ligastärke“ nie.
 - Modellgüte anzeigen: `npm run report`. Der Abschnitt „Ligastärke bei Cross-League-Partien“
   schlüsselt die 1X2-Kalibrierung danach auf, wie gut die Ligastärke bekannt war (Ligapartie,
-  gemessen, geschätzt, Team-Elo, Team-Elo U21, gleiche Liga, ohne Rating, vor Ligastärke; die
+  gemessen, geschätzt, Liga-Niveau (seit 3.7.0), Team-Elo, Team-Elo U21, gleiche Liga, ohne Rating, vor Ligastärke; die
   Gruppe steht in den Warnungen der Prognose, `cohortOf` in `src/database.ts`), darunter die
   Tabelle **„Stärkere Seite je Modellversion“** (`strongerSideByVersion`) - nur sie misst einen
   bestimmten Teiler. **Seit 05.10.2026** (Prüfung des Prüfer-Agenten):
@@ -554,12 +562,17 @@ alte App `apps/analyzer/` (Abschnitt „Pflege“):
   `schemaVersion: 9` je Tabellenzeile `form` aus `tableForm` in `src/draw-criteria.ts` - dieselben Saisonpartien und
   dieselbe Eingrenzung wie `buildTable`, 0 Aufrufe; nicht `form.home`/`form.away` der Spiele, die nur am Spielort
   zählen. Zonen gibt es nicht), Predictions (je Spiel der wahrscheinlichste Tipp aus 1X2, Über/Unter 2,5, BTTS; Quelle „Autoren“
-  gesperrt mit „folgt“, Davids Entscheidung - Autoren-Tipps kommen später), Zeitraum- und Wettbewerbsauswahl
-  (Pokal heuristisch, `isCup` in `apps/neo/src/neoData.ts`). **Detailansicht bei „Spiele“ seit 27.10.2026 die Marktchancen**
+  gesperrt mit „folgt“, Davids Entscheidung - Autoren-Tipps kommen später; seit 28.10.2026 je Tag „Nach Chance“ oder
+  „Nach Anstoß“ geordnet, `sortTips`, und rechts das H2H zum Spiel des gewählten Tipps, ohne Reiter, mit dem Tipp im
+  Kopf - Davids Wunsch), Zeitraum- und Wettbewerbsauswahl
+  (Pokal heuristisch, `isCup` in `apps/neo/src/neoData.ts`). **Vorbei ist vorbei** (seit 29.10.2026, Davids Wunsch):
+  Ein Spiel verschwindet 120 Minuten nach Anpfiff aus Liste, Predictions, Zeitraum und Wettbewerben (`isOver`,
+  `OVER_AFTER_MS`, minütlich neu geprüft); Tabellen und Detailansicht lesen weiter den ganzen Snapshot. Maßgeblich
+  ist die Uhr, weil Neo keinen Live-Stand kennt - ein Pokalspiel mit Verlängerung fällt schon währenddessen heraus. **Detailansicht bei „Spiele“ seit 27.10.2026 die Marktchancen**
   (`apps/neo/src/components/MarketsPanel.tsx`, Davids Freigabe der Referenz): „Am ehesten“ (1X2, Über/Unter 2,5, BTTS),
   „Wer gewinnt“ (Endergebnis, 1. Halbzeit, Erstes Tor), „Wie viele Tore“ (Gesamttore mit Linien 0,5-4,5, Über/Unter,
-  BTTS), „Weitere Märkte“ (Doppelte Chance, exakte Ergebnisse); H2H gesperrt mit „folgt“, Teams und Predictions zeigen
-  weiter einen Platzhalter. Die neuen Märkte trägt der Snapshot ab `schemaVersion: 10` als `marketDetail`
+  BTTS), „Weitere Märkte“ (Doppelte Chance, exakte Ergebnisse); H2H gesperrt mit „folgt“ (seit 28.10.2026 gebaut, siehe
+  unten), Teams zeigen weiter einen Platzhalter. Die neuen Märkte trägt der Snapshot ab `schemaVersion: 10` als `marketDetail`
   (`marketDetail` in `src/model.ts`, 0 Aufrufe): aus **denselben** λH/λA wie 1X2, Torlinien und BTTS (Torverteilung
   0-5, 6+; vier wahrscheinlichste Endstände aus der Poisson-Matrix; Pausenstand aus den Halbzeit-λ; erstes Tor =
   λ-Anteil × P(mindestens ein Tor)). Bei `probabilityReliable: false` fehlen Halbzeit, erstes Tor und Endstände. Halbzeit-1X2,
@@ -780,10 +793,10 @@ nachgezogen, nicht gesammelt am Ende.
   Korrektur `shiftHomeAway` (`src/model.ts`) **nach** `recalibrateGoals`, Summe fest, nur
   Ligaspiele (`!crossLeague` im Analyzer), Stärke `config.goalLineHomeShift`. **Ab Werk 0 =
   aus.** Einschalten nach der BTTS-Prüfung (`docs/btts-pruefung.md`, rund Mitte November):
-  0,054 setzen, `goalLineModelVersion` **3.7.0** (3.6.0 ist seit 19.10.2026 die Ligastärke
-  geschätzter Ligen), dann beginnen die modellgebundenen Quickpick-Messungen neu
-  (`MODEL_BOUND_SINCE.modell1x2` auf 3.7.0 setzen), und in `STRENGTH_COMPARABLE_SINCE` darf
-  „geschätzt“ ab 3.6.0 zählen (Spiele zwischen Ligen rechnen identisch). Gemessen: 1X2-Log-Loss −0,0035 ± 0,0013 an 4.038 echten Ligaprognosen, an 74.033
+  0,054 setzen, `goalLineModelVersion` **3.8.0** (3.6.0 ist seit 19.10.2026 die Ligastärke
+  geschätzter Ligen, 3.7.0 seit 28.10.2026 das Liga-Niveau aus dem Vereins-Elo), dann beginnen die
+  modellgebundenen Quickpick-Messungen neu (`MODEL_BOUND_SINCE.modell1x2` auf 3.8.0 setzen);
+  `STRENGTH_COMPARABLE_SINCE` bleibt (Spiele zwischen Ligen rechnen identisch). Gemessen: 1X2-Log-Loss −0,0035 ± 0,0013 an 4.038 echten Ligaprognosen, an 74.033
   nachgebauten Ligaspielen −0,0036 / −0,0023 ± 0,0004 im Zeit-Split; Über/Unter unverändert,
   BTTS praktisch gleich; gegen Tipico fair nur ein Zehntel näher. Die Behebung an der Wurzel
   maß etwas schlechter und bewegte Spiele zwischen Ligen und Länderspiele ungemessen mit.
@@ -995,10 +1008,25 @@ nachgezogen, nicht gesammelt am Ende.
 
 ## Team-Elo
 
+- **Zentrale Beschreibung seit 28.10.2026: `docs/team-elo.md`** (Formel, Startwerte, Heimvorteil,
+  K je Kategorie, Tordifferenz und Elfmeterschießen, Skalen, Auf-/Abstieg, neue und korrigierte
+  Ergebnisse, Historie, Stempel, Validierung, Quellen). Davids Auftrag und Prüfung vom selben Tag,
+  seine Entscheidungen danach: **Elo 1.4.0** - gespiegelte und wettbewerbsübergreifende Dubletten
+  heraus, nachträgliche Korrekturen kommen an (`elo_corrections`), kein Spiel mit Zukunftsdatum,
+  Build-Stempel `elo_meta.build` und Versionspflicht (`test/elo-version.test.ts`), Heimvorteil Vereine
+  50, Liga-Niveau je Liga (`elo_league_levels`), `elo_history` nur 731 Tage. Das Liga-Niveau trägt seit
+  3.7.0 den Klassenfaktor zwischen Ligen ohne gemessene Ligastärke (Punkt 5 oben). Neo zeigt das Elo
+  bei jedem Team (Spielzeile, Detailansicht, Teamtabelle; Snapshot `schemaVersion` 12 mit Liga und
+  Liga-Niveau je Team und Elo je Tabellenzeile) und bei Spielen zwischen Ligen das Liga-Niveau mit
+  „etwa gleich stark / Klassenunterschied“ - **nie als Prozent**. Offen, nur nach eigener vorab
+  festgelegter Prüfung: Startwert neuer Teams (starten zu hoch), Heimvorteil je Wettbewerbsart,
+  Pokalgewicht 1,0, Elo als Eingang bei Ligaspielen (Hinweis −0,007 ± 0,002, D = 4000).
+  **`elo_history` ist rückblickend gerechnet** - für „Elo vor dem Spiel“ in Messungen den wöchentlichen
+  Neuaufbau nehmen (gilt auch für den Skill `qualitative-tipps`).
 - Davids Auftrag vom 24.09.2026: ein eigenes Elo je **Mannschaft**, chronologisch aus
   historischen API-Football-Spielen, Vereine und Nationalteams auf **getrennten** Skalen.
-  Bei **Vereinen** berührt es weder Tipps noch Wahrscheinlichkeiten noch Filter, bis ein
-  Backtest-Befund und David etwas anderes entscheiden.
+  Bei **Vereinen** wirkt es seit 3.7.0 nur über das Liga-Niveau auf den Klassenfaktor zwischen Ligen;
+  Ligaspiele, Tipps und Filter bleiben unberührt.
 - **Seit 28.09.2026 trägt es bei Länderspielen den Klassenunterschied** (Davids Entscheidung
   nach der Prüfung vom selben Tag). Nationalteams haben keine Heimatliga und damit kein
   Liga-Rating; ohne Faktor gab das Modell dem Favoriten 46 %, er gewann 54 %. Jetzt entsteht
@@ -1207,7 +1235,7 @@ nachgezogen, nicht gesammelt am Ende.
   Wettbewerbe unter `World` (sie könnten Nationalteams tragen). „Friendlies" (10) sind
   Länderspiele, „Friendlies Clubs" (667) Vereins-Testspiele - die IDs stammen aus
   `getAllLeagues()`, nicht aus dem Gedächtnis.
-- **Stand 24.09.2026, nach dem Nachladen** (2.562 Liga-Saisons, 2.533 Aufrufe, 413.432 neue
+- **Historisch - Stand 24.09.2026, nach dem Nachladen** (aktuelle Zahlen in `docs/team-elo.md`; 2.562 Liga-Saisons, 2.533 Aufrufe, 413.432 neue
   Spiele): 674.512 Spiele, je Jahr 2021-2025 zwischen 78.000 und 126.000; 572.895 gewertet,
   81.013 älter als fünf Jahre, 20.574 ausgeschlossen; 16.359 Vereine, 234 Nationalteams.
   Aufbau rund 35 s, ein Backtest über ein Jahr rund 5 Minuten.
