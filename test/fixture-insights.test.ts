@@ -37,10 +37,12 @@ test("ordnet Torminuten der richtigen Viertelstunde zu", () => {
   assert.equal(scoringPeriodIndex(0), 0);
 });
 
-test("schreibt ein Eigentor dem Gegner gut und lässt verschossene Elfmeter aus", () => {
+test("ein Eigentor zählt für die Mannschaft, unter der API-Football es führt; verschossene Elfmeter fallen weg", () => {
+  // API-Football führt das Eigentor unter der begünstigten Mannschaft (Al-Wasl - Dubai United
+  // 5:1, Eigentor B. Nagoro unter Al-Wasl FC).
   const events = [
     goal(12, 10),
-    goal(33, 10, "Own Goal"),
+    goal(33, 20, "Own Goal"),
     goal(60, 20, "Penalty"),
     goal(75, 20, "Missed Penalty")
   ];
@@ -182,7 +184,7 @@ test("goalEventsDetailed liefert dieselben Tore wie goalEvents, nur mit mehr Ang
   const events: ApiFixtureEvent[] = [
     { time: { elapsed: 70, extra: null }, team: { id: 2, name: "B" },
       type: "Goal", detail: "Normal Goal" },
-    { time: { elapsed: 45, extra: 2 }, team: { id: 1, name: "A" },
+    { time: { elapsed: 45, extra: 2 }, team: { id: 2, name: "B" },
       type: "Goal", detail: "Own Goal", player: { id: 7, name: "Eigentor-Schütze" } },
     { time: { elapsed: 30, extra: null }, team: { id: 1, name: "A" },
       type: "Goal", detail: "Missed Penalty" }

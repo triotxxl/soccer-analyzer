@@ -39,10 +39,11 @@ test("die Nachspielzeit der zweiten Halbzeit zählt nicht zur Verlängerung", ()
   assert.equal(result.goalsEtAway, 0);
 });
 
-test("ein Eigentor zählt für den Gegner des Schützen", () => {
+test("ein Eigentor zählt für die Mannschaft, unter der API-Football es führt", () => {
+  // Die API führt das Eigentor unter der begünstigten Mannschaft; der Schütze ist der Gegner.
   const result = toFixtureResult(match({
     homeGoals: 0, awayGoals: 1, halfTimeHomeGoals: 0, halfTimeAwayGoals: 1,
-    events: [event({ type: "Goal", minute: 20, teamId: HOME, detail: "Own Goal" })]
+    events: [event({ type: "Goal", minute: 20, teamId: AWAY, detail: "Own Goal" })]
   }));
   assert.ok(result);
   assert.equal(result.goalsHt1Away, 1);
@@ -50,6 +51,7 @@ test("ein Eigentor zählt für den Gegner des Schützen", () => {
   assert.equal(result.goals[0]?.ownGoal, true);
   assert.equal(result.goals[0]?.scorerTeamId, HOME);
   assert.equal(result.goals[0]?.teamId, AWAY);
+  assert.equal(result.goalsComplete, true);
 });
 
 test("ein verschossener Elfmeter zählt nirgends", () => {

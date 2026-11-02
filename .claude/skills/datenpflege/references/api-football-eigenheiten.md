@@ -41,7 +41,11 @@ Fällen belegt; die Fundstelle steht dabei.
   zwischen „Alianza FC II“ und „Alianza FC“ ist hoch - Reserve und erste Mannschaft nie über den
   Namen allein verbinden.
 - **Heim und Gast werden nachträglich gedreht** (Senegal - Mosambik, PSG - Rennes); Abrechnung und
-  Live spiegeln das über Team-IDs bzw. Namen.
+  Live spiegeln das über Team-IDs bzw. Namen. Selten stehen nur die Tor-Ereignisse vertauscht
+  (Coppa-Italia-Finale Milan - Bologna 2025, `KNOWN_SWAPPED_GOALS`).
+- **Eigentore stehen unter der Mannschaft, der sie zählen**, nicht unter der des Schützen
+  (`team` im Ereignis = begünstigtes Team, `player` = Schütze des Gegners). Über 3.800 Spiele im
+  Cache ohne Ausnahme; bis 02.11.2026 drehte `goalEventsDetailed` sie fälschlich um.
 
 ## Termine und Spiele
 

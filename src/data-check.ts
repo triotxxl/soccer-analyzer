@@ -24,6 +24,14 @@ import { teamNameSimilarity } from "./team-resolver.ts";
  *   von 300 Spielen als vollständig.
  * - **Ligastärke geschätzt** (`strengthGaps`): Bei Etar fehlten 24 von 31 Duellen (19.10.2026).
  *   Die Regel zeigt, wie weit eine geschätzte Liga von der Belastbarkeit entfernt ist.
+ * - **Tore beim falschen Team** (`goalSideMismatches`): Bis 02.11.2026 schrieb `goalEventsDetailed`
+ *   jedes Eigentor dem falschen Team gut - API-Football führt es schon unter der begünstigten
+ *   Mannschaft. 2.615 der 2.800 „lückenhaften“ Spiele in `fixture_results` waren solche, und die
+ *   Prüfung „Torminuten unstimmig“ sah nur die Gegenrichtung (lückenlos markiert, Stand passt
+ *   nicht). Ein regulär beendetes Spiel, dessen Ereignisse genau so viele Tore tragen wie der
+ *   Stand, nur anders verteilt, ist kein lückenhaftes Spiel, sondern eine falsche Zuordnung: Vor
+ *   der Korrektur 2.567 Treffer, davon 2.565 mit Eigentor; danach blieben 2 mit vertauschtem Heim
+ *   und Gast der API (`KNOWN_SWAPPED_GOALS`).
  */
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -61,6 +69,15 @@ const SEASON_MIN_MEDIAN = 40;
 export const KNOWN_SHORT_SEASONS: Array<{ leagueId: number; season: number; note: string }> = [
   { leagueId: 333, season: 2021, note: "Ukraine Premier League 2021/22, im Februar 2022 wegen des Kriegs abgebrochen" },
   { leagueId: 117, season: 2022, note: "Belarus 1. Division 2022, API-Football führt nur 156 Ansetzungen (am 29.10.2026 neu geladen, 0 neue Spiele)" }
+];
+
+/**
+ * Spiele, deren Tore API-Football selbst beim falschen Team führt - nachgeprüft, nicht vermutet.
+ * Sie bleiben lückenhaft und zählen nicht in die Torphasen; gemeldet werden sie nicht mehr.
+ */
+export const KNOWN_SWAPPED_GOALS: Array<{ fixtureId: number; note: string }> = [
+  { fixtureId: 1373026, note: "Coppa-Italia-Finale Milan - Bologna 0:1 (14.05.2025): Ndoyes Tor für Bologna steht unter Milan" },
+  { fixtureId: 1375502, note: "Mauritanien - Zentralafrika 2:1 (06.06.2025): Ereignisse 1:2, Heim und Gast in den Ereignissen vertauscht" }
 ];
 
 export const isFriendly = (match: Pick<EloMatch, "leagueName">) => /friendlies/i.test(match.leagueName);
@@ -327,4 +344,31 @@ export function strengthGaps(
     }
   }
   return gaps;
+}
+
+// ---------------------------------------------------------------- Abrechnung
+
+export interface GoalSideRow {
+  fixtureId: number;
+  status: string;
+  home: string;
+  away: string;
+  finalHome: number;
+  finalAway: number;
+  /** Tore der Ereignisliste in den Abschnitten 1-2 je Team, null ohne Ereignisse. */
+  eventsHome: number | null;
+  eventsAway: number | null;
+}
+
+/**
+ * Regulär beendete Spiele, deren Ereignisse so viele Tore tragen wie der Stand, aber anders auf die
+ * Teams verteilt. Eine fehlende Torminute erklärt das nicht - es ist eine falsche Zuordnung (bis
+ * 02.11.2026 jedes Eigentor) oder vertauschtes Heim und Gast in den Ereignissen der API.
+ */
+export function goalSideMismatches(rows: GoalSideRow[]): GoalSideRow[] {
+  const known = new Set(KNOWN_SWAPPED_GOALS.map((item) => item.fixtureId));
+  return rows.filter((row) => row.status.toUpperCase() === "FT" && !known.has(row.fixtureId)
+    && row.eventsHome !== null && row.eventsAway !== null
+    && row.eventsHome + row.eventsAway === row.finalHome + row.finalAway
+    && row.eventsHome !== row.finalHome);
 }

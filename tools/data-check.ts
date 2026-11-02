@@ -18,7 +18,8 @@ import { DB_FILE, ROOT_DIR } from "../src/config.ts";
 import { teamIdOf } from "../src/coverage.ts";
 import type { DashboardDocument } from "../src/dashboard.ts";
 import {
-  DATA_CHECK_WINDOW_MS, eloSeasonGaps, mappingIssues, sharedTeamIds, staleTeams, strengthGaps,
+  DATA_CHECK_WINDOW_MS, eloSeasonGaps, goalSideMismatches, mappingIssues, sharedTeamIds, staleTeams, strengthGaps,
+  type GoalSideRow,
   type LeagueSeasonCount, type TipicoCompetitionStats
 } from "../src/data-check.ts";
 import type { EloMatch } from "../src/elo-competitions.ts";
@@ -112,6 +113,11 @@ try {
     FROM fixture_results WHERE goals_complete = 1 AND (
       goals_ht1_home + goals_ht2_home <> COALESCE(ft_home_goals, final_home_goals)
       OR goals_ht1_away + goals_ht2_away <> COALESCE(ft_away_goals, final_away_goals))`).all() as Array<{ fixtureId: number; status: string; home: string; away: string }>;
+  // Die Gegenrichtung: als lückenhaft markiert, obwohl die Ereignisse jedes Tor tragen.
+  const goalSides = goalSideMismatches(db.prepare(`SELECT fixture_id AS fixtureId, status, home_team AS home, away_team AS away,
+      final_home_goals AS finalHome, final_away_goals AS finalAway,
+      goals_ht1_home + goals_ht2_home AS eventsHome, goals_ht1_away + goals_ht2_away AS eventsAway
+    FROM fixture_results WHERE goals_complete = 0 AND events_available = 1`).all() as unknown as GoalSideRow[]);
   // Zurückgestellte Spiele (`settle_deferrals`) sind erklärt und zählen getrennt.
   const overdue = db.prepare(`SELECT COUNT(DISTINCT fixture_id) AS n, MIN(kickoff) AS oldest FROM goal_line_predictions p
     WHERE settled_at IS NULL AND julianday(kickoff) < julianday(?)
@@ -124,7 +130,7 @@ try {
   const report = {
     createdAt: document.meta.createdAt, fixtures: document.fixtures.length,
     mapping, shared, stale, seasonGaps, strength,
-    results: { goalsCompleteMismatch: goalsMismatch, overdueUnsettled: overdue.n, oldestUnsettled: overdue.oldest, deferred: deferredRows }
+    results: { goalsCompleteMismatch: goalsMismatch, goalSides, overdueUnsettled: overdue.n, oldestUnsettled: overdue.oldest, deferred: deferredRows }
   };
   if (asJson) {
     console.log(JSON.stringify(report, null, 2));
@@ -141,6 +147,7 @@ function print(report: {
   seasonGaps: ReturnType<typeof eloSeasonGaps>; strength: ReturnType<typeof strengthGaps>;
   results: {
     goalsCompleteMismatch: Array<{ fixtureId: number; status: string; home: string; away: string }>;
+    goalSides: GoalSideRow[];
     overdueUnsettled: number; oldestUnsettled: string | null; deferred: Array<{ status: string; n: number }>;
   };
 }): void {
@@ -156,7 +163,8 @@ function print(report: {
   console.log(`Zuordnung verdächtig: ${suspicious.length} · geteilte Team-IDs: ${report.shared.length} (${sharedInAnalysis} in der Analyse)`
     + ` · abgerissene Geschichte: ${report.stale.length} · Elo-Saisonlücken: ${report.seasonGaps.length} (${gapsInAnalysis} in der Analyse, rund ${missingMatches} Spiele)`
     + ` · Ligastärke geschätzt: ${report.strength.length}`
-    + ` · Torminuten unstimmig: ${report.results.goalsCompleteMismatch.length} · lange offen: ${report.results.overdueUnsettled}`);
+    + ` · Torminuten unstimmig: ${report.results.goalsCompleteMismatch.length} · Tore beim falschen Team: ${report.results.goalSides.length}`
+    + ` · lange offen: ${report.results.overdueUnsettled}`);
 
   if (report.mapping.length > 0) {
     console.log("\n== 1. Zuordnung: Tipico-Wettbewerbe der letzten 60 Tage, bei denen unter der Hälfte ankam");
@@ -207,13 +215,20 @@ function print(report: {
     console.log("    Maßnahme: ältere Saisons der Pokale dieses Landes nachladen (npm run strength -- --competition <id> --seasons 3);"
       + " reichen die Duelle auch dann nicht, ist es strukturell");
   }
-  const { goalsCompleteMismatch, overdueUnsettled, oldestUnsettled } = report.results;
-  if (goalsCompleteMismatch.length > 0 || overdueUnsettled > 0) {
+  const { goalsCompleteMismatch, goalSides, overdueUnsettled, oldestUnsettled } = report.results;
+  if (goalsCompleteMismatch.length > 0 || goalSides.length > 0 || overdueUnsettled > 0) {
     console.log("\n== 6. Abrechnung");
     if (goalsCompleteMismatch.length > 0) {
       console.log(`- ${goalsCompleteMismatch.length} Spiele mit „Torminuten lückenlos“, deren Halbzeittore nicht zum Stand passen:`
         + ` ${goalsCompleteMismatch.slice(0, 4).map((row) => `${row.home} – ${row.away} (${row.status}, ${row.fixtureId})`).join(", ")}`);
       console.log("    Maßnahme: Ableitung in src/fixture-result.ts für diese Fälle prüfen; bis dahin zählen sie in Torphasen falsch mit");
+    }
+    if (goalSides.length > 0) {
+      console.log(`- ${goalSides.length} Spiele als lückenhaft markiert, obwohl die Ereignisse jedes Tor tragen - nur beim anderen Team:`
+        + ` ${goalSides.slice(0, 4).map((row) => `${row.home} – ${row.away} ${row.finalHome}:${row.finalAway}, Ereignisse`
+          + ` ${row.eventsHome}:${row.eventsAway} (${row.fixtureId})`).join(", ")}`);
+      console.log("    Maßnahme: Tor-Ereignisse in der Cache-Antwort ansehen; liegt es an der Ableitung (goalEventsDetailed in"
+        + " src/fixture-insights.ts), dort beheben und die Zeilen neu schreiben; ist es ein Fehler der API, in KNOWN_SWAPPED_GOALS");
     }
     if (overdueUnsettled > 0) {
       console.log(`- ${overdueUnsettled} Spiele über einen Tag nach Anpfiff nicht abgerechnet und nicht zurückgestellt (ältestes ${oldestUnsettled?.slice(0, 10)})`);

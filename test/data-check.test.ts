@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-  eloSeasonGaps, mappingIssues, sharedTeamIds, staleTeams, strengthGaps, type LeagueSeasonCount
+  eloSeasonGaps, goalSideMismatches, mappingIssues, sharedTeamIds, staleTeams, strengthGaps, type GoalSideRow,
+  type LeagueSeasonCount
 } from "../src/data-check.ts";
 import type { EloMatch } from "../src/elo-competitions.ts";
 import type { EloTeamMerge } from "../src/elo-config.ts";
@@ -126,4 +127,23 @@ test("geteilte ID: bekannte, nicht trennbare Fälle meldet die Prüfung nicht", 
     match({ homeId, homeName: "Wichita", awayId, kickoff: at(day), leagueId: 256, leagueName: "USL League Two", country: "USA" });
   const matches = [usl(9064, 1, "2022-05-22"), usl(9064, 2, "2022-05-22"), usl(9064, 3, "2022-06-19"), usl(9064, 4, "2022-06-19")];
   assert.deepEqual(sharedTeamIds(matches, [], new Set()), []);
+});
+
+test("Tore beim falschen Team: Ereignisse tragen jedes Tor, nur anders verteilt", () => {
+  const row = (partial: Partial<GoalSideRow> & Pick<GoalSideRow, "fixtureId">): GoalSideRow => ({
+    status: "FT", home: "Al-Wasl FC", away: "Dubai United", finalHome: 5, finalAway: 1, eventsHome: 4, eventsAway: 2, ...partial
+  });
+  const found = goalSideMismatches([
+    // Al-Wasl - Dubai United 5:1 (15.08.2026): das Eigentor stand beim Gegner.
+    row({ fixtureId: 1 }),
+    // Ein Tor fehlt in der Liste: wirklich lückenhaft, keine falsche Zuordnung.
+    row({ fixtureId: 2, eventsHome: 4, eventsAway: 1 }),
+    // Verlängerung: die Abschnitte 1-2 gehen nicht gegen den Endstand.
+    row({ fixtureId: 3, status: "AET" }),
+    // Ohne Ereignisse gibt es nichts zu vergleichen.
+    row({ fixtureId: 4, eventsHome: null, eventsAway: null }),
+    // Nachgeprüfter Fehler der API (Coppa-Italia-Finale 2025).
+    row({ fixtureId: 1373026, finalHome: 0, finalAway: 1, eventsHome: 1, eventsAway: 0 })
+  ]);
+  assert.deepEqual(found.map((item) => item.fixtureId), [1]);
 });

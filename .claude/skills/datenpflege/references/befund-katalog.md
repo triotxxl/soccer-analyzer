@@ -141,6 +141,17 @@ Die Analyse lädt vor der Rechnung selbst nach (300 Aufrufe, `strengthOnDemandRe
   Zeilen aus der Fassung vor dem 29.09. (alle Tore gegen den 90-Minuten-Stand). Dann nur das
   Kennzeichen dieser Zeilen gezielt auf 0 setzen, nicht den ganzen Bestand neu schreiben. Stuft
   auch die heutige Ableitung falsch ein, ist es ein Fehler im Code.
+- **„Tore beim falschen Team“:** ein regulär beendetes Spiel gilt als lückenhaft, obwohl die
+  Ereignisse genau so viele Tore tragen wie der Stand, nur anders verteilt. Das ist keine fehlende
+  Minute, sondern eine falsche Zuordnung. Erster Fund 02.11.2026: `goalEventsDetailed` drehte jedes
+  Eigentor um, obwohl API-Football es schon unter der begünstigten Mannschaft führt (2.565 von 2.567
+  Treffern). Belegen: Tor-Ereignisse der Cache-Antwort ansehen. Liegt es an der Ableitung, im Code
+  beheben und die betroffenen Zeilen aus dem Cache neu rechnen - nur die Torspalten
+  (`goal_events_json`, `goals_ht1/ht2/et_*`, `goals_complete`), weil `saveFixtureResults` eine
+  ärmere Cache-Kopie nicht über eine reichere Zeile schreibt und `backfill-results` deshalb nicht
+  jede Zeile erreicht; Kopien aus den 20er-Bündeln findet nur ein Durchgang über den ganzen Cache.
+  Ist es ein Fehler der API (Heim und Gast in den Ereignissen vertauscht, Coppa-Italia-Finale 2025),
+  in `KNOWN_SWAPPED_GOALS` (`src/data-check.ts`) mit Grund eintragen.
 - **Prognosen über einen Tag nach Anpfiff offen:** `npm run settle`. Die Abrechnung stellt seit
   20.10.2026 selbst zurück (`settlementDeferral` in `src/settle.ts`, Tabelle `settle_deferrals`):
   verlegt (neuer Termin in der Zukunft) bis 110 Minuten nach dem neuen Anpfiff, PST/SUSP/INT/ABD

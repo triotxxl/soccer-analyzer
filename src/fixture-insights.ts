@@ -117,9 +117,9 @@ export function scoringPeriodIndex(minute: number): number {
 }
 
 /**
- * Tore aus den Ereignissen einer Partie. Ein Eigentor führt API-Football unter der
- * Mannschaft des Schützen; gutgeschrieben wird es dem Gegner. Verschossene Elfmeter
- * stehen ebenfalls als `Goal`-Ereignis und zählen nicht.
+ * Tore aus den Ereignissen einer Partie. Ein Eigentor führt API-Football schon unter der
+ * Mannschaft, der es zählt; der Schütze gehört zum Gegner. Verschossene Elfmeter stehen
+ * ebenfalls als `Goal`-Ereignis und zählen nicht.
  */
 export function goalEvents(
   events: ApiFixtureEvent[] | undefined,
@@ -162,10 +162,14 @@ export function goalEventsDetailed(
     .filter((event) => !/missed/i.test(event.detail ?? ""))
     .map((event) => {
       const ownGoal = /own goal/i.test(event.detail ?? "");
-      const scorerTeamId = event.team.id;
-      const teamId = !ownGoal
-        ? scorerTeamId
-        : scorerTeamId === homeTeamId ? awayTeamId : homeTeamId;
+      // API-Football führt ein Eigentor unter der Mannschaft, der es zählt, nicht unter der des
+      // Schützen. Gemessen am 02.11.2026 über 3.800 beendete Spiele mit Eigentor im Cache: 3.727
+      // gehen nur so auf den Endstand auf, keins nur umgedreht (68 beide, 5 keins). Bis dahin
+      // wurde umgedreht, und jedes Spiel mit Eigentor galt als lückenhaft (Al-Wasl - Dubai United).
+      const teamId = event.team.id;
+      const scorerTeamId = !ownGoal
+        ? teamId
+        : teamId === homeTeamId ? awayTeamId : homeTeamId;
       return {
         teamId,
         scorerTeamId,
