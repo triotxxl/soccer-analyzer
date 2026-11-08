@@ -629,6 +629,11 @@
     "country": "Costa-Rica",
     "league": "Liga de Ascenso"
   },
+  "costa rica|liga de ascenso apertura playoffs": {
+    "leagueId": 163,
+    "country": "Costa-Rica",
+    "league": "Liga de Ascenso"
+  },
   "costa rica|primera division apertura": {
     "leagueId": 162,
     "country": "Costa-Rica",
@@ -989,6 +994,11 @@
     "country": "Guatemala",
     "league": "Primera Division"
   },
+  "guatemala|primera division apertura playoffs": {
+    "leagueId": 338,
+    "country": "Guatemala",
+    "league": "Primera Division"
+  },
   "honduras|liga nacional apertura": {
     "leagueId": 234,
     "country": "Honduras",
@@ -1145,9 +1155,9 @@
     "league": "Premier Division"
   },
   "irland|premier division relegation promotion": {
-    "leagueId": 358,
+    "leagueId": 357,
     "country": "Ireland",
-    "league": "First Division"
+    "league": "Premier Division"
   },
   "island|1 deild": {
     "leagueId": 165,
@@ -1354,6 +1364,11 @@
     "country": "Mali",
     "league": "Première Division"
   },
+  "malta|premier league vorrunde top 6": {
+    "leagueId": 393,
+    "country": "Malta",
+    "league": "Premier League"
+  },
   "marokko|botola": {
     "leagueId": 200,
     "country": "Morocco",
@@ -1365,6 +1380,11 @@
     "league": "Botola 2"
   },
   "mexiko|liga de expansion mx apertura": {
+    "leagueId": 263,
+    "country": "Mexico",
+    "league": "Liga de Expansión MX"
+  },
+  "mexiko|liga de expansion mx apertura playoff": {
     "leagueId": 263,
     "country": "Mexico",
     "league": "Liga de Expansión MX"
@@ -1673,6 +1693,16 @@
     "leagueId": 283,
     "country": "Romania",
     "league": "Liga I"
+  },
+  "sambia|super league gruppe a": {
+    "leagueId": 400,
+    "country": "Zambia",
+    "league": "Super League"
+  },
+  "sambia|super league gruppe b": {
+    "leagueId": 400,
+    "country": "Zambia",
+    "league": "Super League"
   },
   "saudi arabien|division 1": {
     "leagueId": 308,
@@ -2184,6 +2214,11 @@
     "country": "USA",
     "league": "NWSL Women"
   },
+  "usa|national league frauen playoffs": {
+    "leagueId": 254,
+    "country": "USA",
+    "league": "NWSL Women"
+  },
   "usa|u s open cup": {
     "leagueId": 257,
     "country": "USA",
@@ -2193,6 +2228,11 @@
     "leagueId": 255,
     "country": "USA",
     "league": "USL Championship"
+  },
+  "usa|usl league one playoffs": {
+    "leagueId": 489,
+    "country": "USA",
+    "league": "USL League One"
   },
   "usbekistan|pfl": {
     "leagueId": 369,
@@ -2218,6 +2258,11 @@
     "leagueId": 299,
     "country": "Venezuela",
     "league": "Primera División"
+  },
+  "venezuela|segunda division playoffs": {
+    "leagueId": 300,
+    "country": "Venezuela",
+    "league": "Segunda División"
   },
   "venezuela|segunda division zentral ost": {
     "leagueId": 300,

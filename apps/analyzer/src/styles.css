@@ -1,0 +1,1260 @@
+.app-shell {
+  width: calc(100vw - 32px);
+  height: calc(100vh - 32px);
+  min-height: 650px;
+  margin: 16px;
+  display: grid;
+  grid-template-columns: 84px minmax(0, 1fr);
+  overflow: hidden;
+  border: 1px solid #333333;
+  border-radius: 22px;
+  background: linear-gradient(180deg, #202020, #181818);
+  box-shadow: 0 30px 80px rgba(0,0,0,.55);
+}
+
+/* Markenzeichen, auch im Lade- und Leerbildschirm. Gruen ist Davids Wahl nach der Vorlage,
+   obwohl Gruen sonst "Empfehlung" heisst - deshalb nur hier und am aktiven Leisteneintrag,
+   nie in Datenzellen. */
+.brand-mark { display: grid; place-items: center; width: 48px; height: 48px; flex: 0 0 auto; border-radius: 12px; background: var(--green); color: var(--bg); }
+
+/* Linke Navigationsleiste: nur Ansichten, keine Filter. */
+.nav-rail { display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow-y: auto; border-right: 1px solid var(--line-soft); background: var(--bg); }
+.nav-rail .brand-mark { width: 100%; height: 84px; border-radius: 0; }
+.nav-rail-items { display: grid; gap: 2px; padding: 10px 0; }
+.nav-rail button { position: relative; display: flex; flex-direction: column; align-items: center; gap: 5px; width: 100%; padding: 12px 4px 10px; border: 0; background: transparent; color: var(--muted); }
+/* Der Rahmen der App schneidet nach aussen versetzte Fokusringe ab. */
+.nav-rail button:focus-visible { outline-offset: -2px; }
+.nav-rail button:hover:not([aria-current]) { background: rgba(255,255,255,.04); color: var(--text); }
+.nav-rail button[aria-current="page"] { background: var(--surface); color: var(--text); font-weight: 600; }
+.nav-rail button[aria-current="page"]::before { content: ""; position: absolute; top: 8px; bottom: 8px; left: 0; width: 3px; border-radius: 0 3px 3px 0; background: var(--green); }
+.nav-rail button[aria-current="page"] svg { color: var(--green); }
+/* Live aktiv bleibt rot. Die Beschriftung bleibt hell: Rot auf --surface reicht fuer 11 px nicht. */
+.nav-rail button.live[aria-current="page"]::before { background: var(--red); }
+.nav-rail button.live[aria-current="page"] svg { color: var(--red); }
+.nav-rail-label { font-size: 11px; line-height: 1.2; white-space: nowrap; }
+.nav-rail-nav { display: flex; flex-direction: column; }
+/* Einstellungen: unten ueber dem Datenstand, ueber dem abgedunkelten Hintergrund wie Filter und
+   Wettschein (z-index 41). Offen wie der offene Filter-Knopf, ohne gruenen Balken - offen ist
+   keine Wahl, und Einstellungen sind keine Ansicht. */
+.nav-rail-settings { position: relative; z-index: 41; margin-top: auto; background: var(--bg); }
+.nav-rail button[aria-expanded="true"] { background: #37373d; color: var(--text); font-weight: 600; }
+/* Fest gesetzt, weil die Leiste scrollt und ein Fenster darin abschnitte; Stil wie das Filtermenue. */
+.settings-window { position: fixed; z-index: 40; display: flex; flex-direction: column; width: 320px; max-width: calc(100vw - 24px); border: 1px solid #4a4a4a; border-radius: 14px; background: var(--bg); box-shadow: 0 18px 42px rgba(0,0,0,.62); color: var(--text); font-size: 12px; text-align: left; }
+.settings-body { position: relative; padding: 14px 16px 16px; }
+.nav-rail-foot { display: grid; justify-items: center; gap: 2px; margin: 0; padding: 12px 4px; border-top: 1px solid var(--line-soft); color: var(--dim); font-family: var(--mono); font-size: 10px; line-height: 1.3; }
+.nav-rail-foot svg { margin-bottom: 3px; }
+
+/* Filtermenue: nicht-modales Fenster ueber der Tabelle, im Stil der Leiste (Davids Wahl vom
+   28.09.2026, Variante "Leistenstil"). Karten auf --surface mit Rand --line und hellem Titel;
+   Mulden und nicht gewaehlte Kacheln auf --bg, also TIEFER als die Karte - heller als die Karte ist
+   nur die Wahl (#37373d, dieselbe Wahl-Farbe wie .segmented button.active), mit heller fetter
+   Schrift und einem 3-px-Balken unten, eingezogen und abgerundet wie der Leistenbalken. Ueberfahren
+   (#222) bleibt unter der Karte und sieht nie wie gewaehlt aus - vorher bekamen beide --surface-2.
+   Farbregel (Davids Entscheidung vom 27.09.2026): Gruen heisst im Menue "gewaehlt", aber nur als
+   Balken an der Wahl und als Bahn eines eingeschalteten Schalters. Nie als Flaeche hinter Text oder
+   Zahl, nie als Textfarbe, nie als Haekchen: In der Tabelle heisst Gruen mit ✓ "Empfehlenswert".
+   Blau (--accent) ist hier nur Tastaturfokus, damit "gewaehlt" und "hier bin ich" unterscheidbar
+   bleiben. */
+.filter-anchor { position: relative; }
+/* Knoepfe der Werkzeugleiste (Filter, Quickpick, Kelly) in derselben Sprache wie Leiste und Menue:
+   ruhend auf --bg, ueberfahren #222, offen oder aktiv #37373d mit heller fetter Schrift. */
+.filter-trigger, .kelly-trigger { position: relative; display: flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--muted); font-size: 12px; font-weight: 600; white-space: nowrap; }
+.filter-trigger:hover, .kelly-trigger:hover { border-color: var(--muted); background: #222222; color: var(--text); }
+/* Offen ist keine Wahl - deshalb ohne gruenen Balken. */
+.filter-trigger.open { background: #37373d; color: var(--text); }
+.filter-count { display: grid; place-items: center; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 6px; background: var(--text); color: var(--bg); font-family: var(--mono); font-size: 10px; font-weight: 700; }
+.filter-menu { position: absolute; top: calc(100% + 8px); left: 0; z-index: 40; display: flex; flex-direction: column; width: min(760px, calc(100vw - 140px)); max-height: calc(100vh - 128px); overflow: hidden; border: 1px solid #4a4a4a; border-radius: 14px; background: var(--bg); box-shadow: 0 18px 42px rgba(0,0,0,.62); color: var(--text); font-size: 12px; text-align: left; }
+.filter-menu.single { width: 420px; }
+.filter-menu-head { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--line); }
+.filter-menu-head h2 { flex: 0 0 auto; margin: 0; color: var(--text); font-size: 14px; font-weight: 600; }
+.filter-menu-head h2:focus { outline: none; }
+.filter-menu-count { flex: 1; min-width: 0; margin: 0; overflow: hidden; color: var(--muted); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.filter-menu-count strong { color: var(--text); font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.filter-menu-close { display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: var(--muted); }
+.filter-menu-close:hover { border-color: var(--muted); color: var(--text); }
+/* Zwei Spalten, unter rund 880 px Fensterbreite von selbst eine. position: relative haelt die
+   versteckten Radios und Schalter an ihrer Zeile - sonst hingen sie am Menuerahmen, und beim
+   Fokussieren scrollte der Browser das ganze Menue samt Kopf weg. */
+.filter-menu-body { position: relative; display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; align-items: start; flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 14px 16px 16px; }
+.filter-column { display: grid; gap: 16px; align-content: start; min-width: 0; }
+.filter-group { display: grid; gap: 8px; min-width: 0; }
+.filter-group-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; padding: 0 2px; }
+.filter-group-head h3 { margin: 0; color: var(--muted); font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; }
+.filter-group-head span { color: var(--dim); font-size: 11px; }
+/* Rang der Ueberschriften: Gruppe leise in Grossbuchstaben, Kartentitel hell, Hinweis grau. */
+.filter-card { display: grid; gap: 12px; min-width: 0; padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+.filter-card-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; min-width: 0; }
+.filter-card-head h4 { margin: 0; color: var(--text); font-size: 12px; font-weight: 600; }
+.filter-card-aside { min-width: 0; overflow: hidden; color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; text-overflow: ellipsis; white-space: nowrap; }
+/* Durchgezogen wie die Linien der Leiste - gestrichelt heisst in der App "nicht verfuegbar". */
+.filter-card-rule { display: grid; gap: 8px; padding-top: 12px; border-top: 1px solid var(--line); }
+/* Auf --surface reicht --dim fuer 11 px nicht - Hinweise und Warnung stehen in --muted. */
+.filter-note { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.45; }
+.filter-note.warning { display: flex; align-items: flex-start; gap: 6px; }
+.filter-note.warning svg { flex: 0 0 auto; margin-top: 1px; }
+
+/* Bewertung als drei Kacheln wie die Kennzahlen der Vorlage: Wort klein, Zahl gross. ✓ und ★
+   stehen mit ihrer Datenbedeutung neben der Zahl, die Wahl traegt den gruenen Balken. */
+.filter-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; min-width: 0; margin: 0; padding: 0; border: 0; }
+.filter-tile { position: relative; display: grid; gap: 4px; min-width: 0; padding: 8px 10px 9px; border-radius: 8px; background: var(--bg); color: var(--muted); cursor: pointer; }
+.filter-tile:hover:not(.checked) { background: #222222; color: var(--text); }
+.filter-tile.checked { background: #37373d; color: var(--text); }
+.filter-tile:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: -2px; }
+.filter-tile-label { overflow: hidden; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.filter-tile.checked .filter-tile-label { font-weight: 600; }
+.filter-tile-value { display: flex; align-items: baseline; justify-content: space-between; gap: 4px; }
+.filter-tile-value strong { color: var(--text); font-size: 20px; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.filter-tile-marks { display: flex; gap: 3px; font-size: 12px; }
+.filter-tile-marks .green { color: var(--green); }
+.filter-tile-marks .gold { color: var(--gold); }
+
+.filter-field { display: grid; gap: 6px; min-width: 0; margin: 0; }
+.filter-field > span, .filter-field > legend { padding: 0; color: var(--muted); font-size: 11px; font-weight: 500; }
+fieldset.filter-field { min-width: 0; margin-inline: 0; padding: 0; border: 0; }
+.filter-field > legend { margin-bottom: 6px; }
+.filter-field > legend + .segmented { margin-top: 0; }
+
+/* Segmentschalter: 2-4 feste Werte, die sich ausschliessen, als Pillenreihe in einer Mulde. */
+.segmented.filter-seg { gap: 2px; padding: 2px; border: 1px solid transparent; border-radius: 8px; background: var(--bg); }
+.segmented.filter-seg label { position: relative; display: grid; flex: 1 1 0; place-items: center; min-width: 0; height: 28px; padding: 0 6px; border-radius: 6px; color: var(--muted); font-size: 12px; white-space: nowrap; cursor: pointer; }
+.segmented.filter-seg label:hover:not(:has(input:checked)):not(:has(input:disabled)) { background: #222222; color: var(--text); }
+.segmented.filter-seg label:has(input:checked) { background: #37373d; color: var(--text); font-weight: 600; }
+/* Der Balken der Wahl, wie am aktiven Leisteneintrag (.nav-rail ... ::before), nur unten statt links: Links saehe er
+   in einer waagrechten Reihe wie ein Trennstrich zwischen zwei Segmenten aus. Ein Pseudo-Element
+   statt Inhalt, damit label.textContent unveraendert bleibt (App.test.tsx prueft ihn). */
+.segmented.filter-seg label:has(input:checked)::after,
+.filter-tile.checked::after, .quick-range.active::after
+  { content: ""; position: absolute; left: 8px; right: 8px; bottom: 0; height: 3px; border-radius: 3px 3px 0 0; background: var(--green); }
+.segmented.filter-seg label:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: -2px; }
+.segmented.filter-seg label:has(input:disabled) { cursor: default; opacity: .45; }
+
+/* Schalter wie der Kippschalter der Vorlage: an heisst ueberall "Filter aktiv" oder "Anzeige an".
+   Die ganze Zeile ist das label. */
+.filter-switch-row { display: grid; gap: 2px; margin: 0; }
+.filter-switch { position: relative; display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: center; gap: 12px; min-height: 28px; color: var(--text); font-size: 12px; line-height: 1.4; cursor: pointer; }
+.filter-switch-track { position: relative; width: 32px; height: 18px; border-radius: 9px; background: #4a4a4a; }
+.filter-switch-track::after { content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: var(--muted); }
+.filter-switch:hover .filter-switch-track::after { background: var(--text); }
+.filter-switch:has(input:checked) .filter-switch-track { background: var(--green); }
+.filter-switch:has(input:checked) .filter-switch-track::after { background: var(--bg); transform: translateX(14px); }
+.filter-switch:has(input:focus-visible) .filter-switch-track { outline: 2px solid var(--accent); outline-offset: 2px; }
+@media (prefers-reduced-motion: no-preference) {
+  .filter-switch-track, .filter-switch-track::after { transition: background .15s ease, transform .15s ease; }
+}
+.filter-display { display: grid; gap: 10px; min-width: 0; }
+/* Linie und Richtung nebeneinander, nur bei "Tore" / "Tore 1. HZ". */
+.filter-display-line { display: grid; grid-template-columns: minmax(0,3fr) minmax(0,2fr); gap: 8px; }
+
+/* Wettbewerbe als ein Feld: links suchen, rechts angesetzt die ganze Liste. Treffer erst beim
+   Tippen, hoechstens acht. */
+.league-quick { display: grid; gap: 4px; min-width: 0; }
+.league-field { display: flex; align-items: center; height: 34px; min-width: 0; overflow: hidden; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--muted); }
+.league-field:hover { border-color: var(--muted); }
+.league-field > svg { flex: 0 0 auto; margin-left: 10px; }
+.league-quick-input { flex: 1; min-width: 0; height: 100%; padding: 0 8px; border: 0; background: transparent; color: var(--text); font-size: 12px; }
+.league-quick-input::placeholder { color: var(--muted); }
+.league-quick-input:focus-visible { outline-offset: -2px; }
+.league-filter-trigger { display: flex; flex: 0 0 auto; align-items: center; gap: 6px; height: 100%; padding: 0 10px; border: 0; border-left: 1px solid var(--line); background: transparent; color: var(--muted); font-family: var(--mono); font-size: 12px; white-space: nowrap; }
+.league-filter-trigger:hover { background: rgba(255,255,255,.05); color: var(--text); }
+.league-filter-trigger:focus-visible { outline-offset: -2px; }
+/* Ohne Farbe: Dass nicht alle gewaehlt sind, meldet ohnehin das Schildchen. */
+.league-filter-trigger.active { color: var(--text); font-weight: 600; }
+.league-filter-trigger svg { color: var(--dim); }
+.league-quick-hits { display: grid; gap: 1px; margin: 0; padding: 0; list-style: none; }
+.league-quick-hits li { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.league-quick-hits label.check-row { flex: 1; min-width: 0; }
+.league-quick-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.league-quick-only { flex: 0 0 auto; height: 24px; padding: 0 8px; border: 1px solid var(--line); border-radius: 7px; background: transparent; color: var(--muted); font-size: 11px; font-weight: 600; }
+.league-quick-only:hover { background: rgba(255,255,255,.06); color: var(--text); }
+.filter-menu label.check-row { display: flex; align-items: center; gap: 9px; padding: 5px 0; color: var(--text); font-size: 12px; line-height: 1.4; cursor: pointer; }
+/* Neutral statt farbig: Ein gruenes Haekchen neben einem Liganamen saehe aus wie ✓ "Empfehlenswert". */
+.filter-menu input[type="checkbox"] { width: 15px; height: 15px; margin: 0; flex: 0 0 auto; accent-color: var(--muted); }
+/* Knopfform wie das ✕ daneben; ohne Filter lesbar in --dim statt ausgegraut auf 2:1. */
+.filter-reset { height: 28px; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: var(--text); font-size: 12px; font-weight: 600; }
+.filter-reset:hover:not(:disabled) { border-color: var(--muted); }
+.filter-reset:disabled { border-color: transparent; color: var(--dim); cursor: default; }
+
+/* Zweite Zeile der Werkzeugleiste: was die Filterung uebrig laesst und welche Filter aktiv
+   sind. Immer vorhanden, damit die Tabelle beim ersten Schildchen nicht springt. */
+.filter-status-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; min-height: 26px; }
+.filter-status { margin: 0 6px 0 0; color: var(--muted); font-size: 11px; }
+.filter-status strong { color: var(--text); font-family: var(--mono); font-weight: 700; }
+/* Nur im Modus "Vorteil & Kelly": was die Auswahl setzt, und darunter immer die Warnung. */
+/* Seit 15.10.2026 ein leise gerahmter Kasten (Davids Entscheidung): Kelly-Zeile und Warnung lesen
+   sich als Einheit. Kein Gruen, kein farbiger Balken - die Warnung bleibt Wort fuer Wort. */
+.kelly-status { display: grid; gap: 4px; padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+.kelly-status-line { margin: 0; color: var(--muted); font-size: 11px; }
+.kelly-status-line strong { color: var(--text); font-family: var(--mono); font-weight: 700; }
+/* Der Segmentschalter in der Leiste: dieselbe Wahl-Sprache wie im Menü, aber so hoch wie die
+   Auswahllisten daneben und mit der Beschriftung der Leiste. */
+.toolbar-segment { gap: 4px; }
+.toolbar-segment > legend { margin-bottom: 4px; color: var(--muted); font-size: 10px; font-weight: 400; letter-spacing: .06em; text-transform: uppercase; }
+/* 26 px + 2 x 2 px Mulde + 2 px Rand = 32 px, so hoch wie Knoepfe und Auswahllisten daneben. */
+.toolbar-segment .segmented.filter-seg { border-color: var(--line); }
+/* Breite nach Inhalt statt gleich verteilt - sonst stoesst "Vorteil & Kelly" an den Rand. */
+.toolbar-segment .segmented.filter-seg label { flex: 0 0 auto; height: 26px; padding: 0 12px; font-size: 12px; }
+.filter-chip { display: inline-flex; align-items: center; height: 26px; overflow: hidden; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+.filter-chip-label { height: 100%; padding: 0 6px 0 10px; border: 0; background: transparent; color: var(--text); font-size: 11px; font-weight: 600; white-space: nowrap; }
+.filter-chip-clear { display: grid; place-items: center; width: 24px; height: 100%; padding: 0; border: 0; border-left: 1px solid var(--line); background: transparent; color: var(--muted); }
+.filter-chip-label:hover, .filter-chip-clear:hover { background: rgba(255,255,255,.06); color: var(--text); }
+
+/* Zeitraum als Kalender (seit 30.09.2026): oben links die Kachel "Naechste 48 Std.", daneben die
+   Felder Von und Bis, darunter ueber die volle Breite die Monatsansicht Mo-So. Der gewaehlte
+   Zeitraum liegt als Flaeche #37373d, Anfang und Ende tragen den gruenen Balken wie jede Wahl im
+   Menue. Kein Uebernehmen. */
+.day-range { display: grid; grid-template-columns: 76px minmax(0, 1fr); gap: 8px; align-items: start; min-width: 0; }
+.quick-range { position: relative; display: grid; place-content: center; gap: 1px; height: 44px; min-width: 0; padding: 0 6px; border: 0; border-radius: 8px; background: var(--bg); color: var(--muted); font-size: 11px; font-weight: 600; line-height: 1.25; text-align: center; }
+.quick-range:hover:not(.active) { background: #222222; color: var(--text); }
+.quick-range.active { background: #37373d; color: var(--text); }
+.quick-range:focus-visible { outline-offset: -2px; }
+.date-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; min-width: 0; }
+.date-field { display: grid; gap: 2px; min-width: 0; height: 44px; padding: 5px 8px; border-radius: 8px; background: var(--bg); color: var(--muted); font-size: 10px; line-height: 1.2; }
+.date-field:focus-within { outline: 2px solid var(--accent); outline-offset: -2px; }
+.date-field input { width: 100%; min-width: 0; padding: 0; border: 0; background: transparent; color: var(--text); color-scheme: dark; font-family: var(--mono); font-size: 12px; font-variant-numeric: tabular-nums; }
+.date-field input:focus { outline: 0; }
+.date-field input::-webkit-calendar-picker-indicator { cursor: pointer; opacity: .7; }
+.calendar { grid-column: 1 / -1; display: grid; gap: 6px; min-width: 0; padding: 8px; border-radius: 8px; background: var(--bg); }
+.calendar-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.calendar-head strong { color: var(--text); font-size: 12px; font-weight: 600; }
+.calendar-nav { display: grid; place-items: center; width: 26px; height: 26px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: var(--muted); }
+.calendar-nav:hover:not(:disabled) { background: #222222; color: var(--text); }
+.calendar-nav:disabled { opacity: .3; cursor: default; }
+.calendar-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; }
+.calendar-weekday { padding: 2px 0 4px; color: var(--dim); font-size: 10px; font-weight: 600; text-align: center; }
+.calendar-day { position: relative; display: grid; place-items: center; height: 32px; min-width: 0; padding: 0; border: 0; border-radius: 6px; background: transparent; color: var(--text); font-family: var(--mono); font-size: 12px; font-variant-numeric: tabular-nums; }
+.calendar-day:hover:not(:disabled):not(.in-range) { background: #222222; }
+.calendar-day:disabled { color: var(--dim); opacity: .45; cursor: default; }
+.calendar-day.in-range { background: #37373d; }
+.calendar-day.preview { background: #2c2c30; }
+.calendar-day.edge { font-weight: 700; }
+.calendar-day.edge::after { content: ""; position: absolute; left: 6px; right: 6px; bottom: 0; height: 3px; border-radius: 3px 3px 0 0; background: var(--green); }
+.calendar-day:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.day-range-hint { grid-column: 1 / -1; }
+.league-filter-modal { position: fixed; top: 50%; left: 50%; z-index: 61; width: min(940px, calc(100vw - 32px)); max-height: min(680px, calc(100vh - 48px)); display: flex; flex-direction: column; overflow: hidden; border: 1px solid #4a4a4a; border-radius: 14px; background: #1e1e1e; box-shadow: 0 24px 60px rgba(0,0,0,.55); transform: translate(-50%,-50%); }
+.league-modal-toolbar { flex: 0 0 auto; display: flex; gap: 8px; padding: 14px 16px 0; }
+.league-search { flex: 1; min-width: 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: #1a1a1a; color: var(--text); font-size: 12px; }
+.league-table-scroll { flex: 1; min-height: 0; margin-top: 10px; padding: 0 16px 14px; overflow: auto; }
+.league-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+.league-table thead { position: sticky; top: 0; z-index: 1; background: #1e1e1e; }
+.league-table th { padding: 6px 8px; color: #8a8a8a; font-size: 8px; font-weight: 700; letter-spacing: .04em; text-align: left; text-transform: uppercase; }
+.league-table th button { padding: 0; border: 0; background: transparent; color: inherit; font: inherit; letter-spacing: inherit; text-transform: inherit; white-space: nowrap; }
+.league-table th button:hover { color: var(--accent); }
+.league-table th:nth-child(n+4), .league-table td:nth-child(n+4) { text-align: right; }
+.league-table td { padding: 6px 8px; color: #c8c8c8; border-top: 1px solid var(--line-soft); white-space: nowrap; }
+.league-table td:nth-child(2), .league-table td:nth-child(3) { overflow: hidden; max-width: 0; text-overflow: ellipsis; cursor: pointer; }
+.league-table td:nth-child(2):hover, .league-table td:nth-child(3):hover { color: #ffffff; }
+.league-table tr.off td { color: #6a6a6a; opacity: .6; }
+.league-table input[type="checkbox"] { width: 16px; height: 16px; margin: 0; accent-color: var(--accent); }
+.league-empty { padding: 20px 8px; color: #737373; font-size: 10px; text-align: center; }
+
+.kelly-dialog { position: fixed; top: 50%; left: 50%; z-index: 61; width: min(960px, calc(100vw - 32px)); max-height: min(720px, calc(100vh - 48px)); display: flex; flex-direction: column; overflow: hidden; border: 1px solid #4a4a4a; border-radius: 14px; background: #1e1e1e; box-shadow: 0 24px 60px rgba(0,0,0,.55); transform: translate(-50%,-50%); }
+.kelly-head strong { font-size: 15px; }
+.kelly-head-market { margin-left: 8px; color: #8f8f8f; font-weight: 400; }
+.kelly-body { flex: 1; min-height: 0; padding: 0 16px 18px; overflow-y: auto; }
+
+/* Ergebnis zuerst: die drei Zahlen, wegen derer der Dialog geoeffnet wird. */
+.kelly-metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-top: 12px; }
+.kelly-metric { display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; border: 1px solid #383838; border-radius: 10px; background: #232324; }
+.kelly-metric-label { color: #8f8f8f; font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+.kelly-metric-value { color: var(--text); font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.kelly-metric-good { color: #89d185; }
+.kelly-metric-bad { color: #f14c4c; }
+.kelly-metric-note { color: #8f8f8f; font-size: 11px; }
+
+.kelly-notices { margin: 12px 0 0; padding-left: 18px; }
+.kelly-notices li { margin-top: 4px; color: #d9a05b; font-size: 12px; line-height: 1.5; }
+
+.kelly-disclosure { padding: 0; border: 0; background: transparent; color: var(--accent); font: inherit; font-size: 12px; text-align: left; }
+.kelly-disclosure:hover { text-decoration: underline; }
+
+.kelly-panel { margin-top: 12px; }
+.kelly-panel-head { display: flex; width: 100%; gap: 8px; align-items: center; padding: 9px 12px; border: 1px solid #383838; border-radius: 10px; background: #232324; color: var(--text); font: inherit; text-align: left; }
+.kelly-panel-head:hover { border-color: #4a4a4a; }
+.kelly-panel-head strong { font-size: 13px; }
+.kelly-panel-summary { margin-left: auto; color: #8f8f8f; font-size: 11px; }
+.kelly-settings-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; padding: 14px 2px 4px; }
+.kelly-setting-field { display: flex; flex-direction: column; gap: 5px; color: #9c9c9c; font-size: 11px; }
+.kelly-setting-field input, .kelly-setting-field select { padding: 8px 9px; border: 1px solid var(--line); border-radius: 8px; background: #1a1a1a; color: var(--text); font-size: 13px; }
+.kelly-setting-field input[type="checkbox"] { width: 16px; height: 16px; margin: 6px 0; padding: 0; accent-color: var(--accent); }
+.kelly-setting-field abbr { border: 0; color: #6a6a6a; cursor: help; text-decoration: none; }
+.kelly-market-toggles { display: flex; flex-wrap: wrap; gap: 6px 14px; }
+.kelly-market-toggles label { display: flex; align-items: center; gap: 5px; color: var(--text); font-size: 12px; }
+.kelly-market-toggles input[type="checkbox"] { width: 14px; height: 14px; margin: 0; }
+.kelly-settings-grid > .kelly-setting-field:has(.kelly-market-toggles) { grid-column: 1 / -1; }
+
+/* Die Liste der Wetten steht im Dialog, nicht in der Übersicht (Davids Entscheidung vom 29.09.2026). */
+.kelly-table-wrap { margin-top: 14px; overflow: hidden; border: 1px solid #383838; border-radius: 10px; }
+.kelly-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.kelly-table thead th { position: sticky; top: 0; z-index: 1; padding: 9px 10px; background: #232324; color: #8f8f8f; font-size: 10px; font-weight: 700; letter-spacing: .06em; text-align: left; text-transform: uppercase; }
+.kelly-table th button { padding: 0; border: 0; background: transparent; color: inherit; font: inherit; letter-spacing: inherit; text-transform: inherit; white-space: nowrap; }
+.kelly-table th button:hover { color: var(--accent); }
+.kelly-table th:nth-child(n+3), .kelly-table td:nth-child(n+3) { text-align: right; font-variant-numeric: tabular-nums; }
+.kelly-table td { padding: 9px 10px; color: #d0d0d0; border-top: 1px solid var(--line-soft); vertical-align: top; white-space: nowrap; }
+.kelly-table tbody tr:nth-child(even) td { background: rgba(255,255,255,.022); }
+.kelly-table td strong { display: block; font-size: 12px; font-weight: 700; }
+.kelly-table td small { display: block; margin-top: 3px; color: #8f8f8f; font-size: 11px; }
+/* Der Vorteil grau, nicht grün - Grün heißt in der App „Empfehlenswert“. */
+.kelly-table td.kelly-edge strong { color: var(--muted); }
+.kelly-table td.kelly-calibrated small { color: var(--gold); }
+.kelly-table td.kelly-stake strong { color: #f0f0f0; font-size: 15px; font-weight: 800; }
+.kelly-table td.kelly-stake small { color: #d9a05b; }
+.kelly-empty { padding: 22px 10px; color: #8f8f8f; font-size: 12px; text-align: center; }
+
+.kelly-glossary { margin: 10px 0 0; padding: 12px 14px; border: 1px solid #333; border-radius: 10px; background: #1a1a1a; }
+.kelly-glossary div { margin-top: 8px; font-size: 12px; line-height: 1.6; }
+.kelly-glossary div:first-child { margin-top: 0; }
+.kelly-glossary dt { display: inline; color: var(--text); font-weight: 700; }
+.kelly-glossary dt::after { content: " — "; color: #8f8f8f; font-weight: 400; }
+.kelly-glossary dd { display: inline; margin: 0; color: #9c9c9c; }
+
+/* Quickpicker im Leistenstil (seit 10.10.2026, Davids Entscheidungen nach zwei Entwuerfen des
+   UX-Agenten): ein nicht-modales Fenster wie das Filtermenue, links Filter und Stufe, rechts die
+   gefundenen Spiele, unten immer der Haken und der Wettschein. Farbregel wie im Menue: Gruen nur
+   als Balken an der Wahl und als Bahn des Schalters, Blau nur Tastaturfokus, keine Farbe in
+   Datenzellen. */
+/* Aktiv ist eine Wahl: helle Flaeche und der gruene Balken unten wie im Filtermenue. Offen ohne
+   Balken wie der Filter-Knopf. */
+.quickpick-trigger.open, .quickpick-trigger.active { background: #37373d; color: var(--text); }
+.quickpick-trigger.active::after { content: ""; position: absolute; left: 8px; right: 8px; bottom: 0; height: 3px; border-radius: 3px 3px 0 0; background: var(--green); }
+/* Das Fenster richtet sich an der Knopfgruppe aus, nicht am Quickpick-Knopf: So geht es an
+   derselben Stelle auf wie das Filtermenue und passt in dieselbe Breitenrechnung. */
+/* Nur die Gruppe mit Filter und Quickpick liegt ueber dem abgedunkelten Hintergrund. */
+.toolbar-filters { position: relative; z-index: 41; }
+
+/* Wettschein (seit 11.10.2026): Knopf rechts in der Leiste, Fenster rechts darunter verankert. Der
+   Anker liegt wie .toolbar-filters ueber dem abgedunkelten Hintergrund, damit man direkt zwischen
+   Filter, Quickpick und Wettschein wechseln kann. Farbregeln wie im Filtermenue: Gruen nur als
+   Balken an einer Wahl (Kombi-Groesse mit Anzahl), nie an Quoten - auch nicht an der Kombi-Quote. */
+.cart-anchor { z-index: 41; margin-left: auto; }
+/* Seit 14.10.2026 so breit wie die Werkzeugleiste bis zum Knopf (--cart-width misst BetCartUI);
+   ohne Messung (jsdom) die alte feste Breite. */
+.filter-menu.cart-window { left: auto; right: 0; width: var(--cart-width, min(900px, calc(100vw - 140px))); max-height: calc(100vh - var(--cart-top, 128px) - 16px); }
+/* Streifen „Kombis bauen“: steht fest über den Listen, statt die Kombis nach unten zu schieben. */
+/* Der Streifen gibt im Zweifel nach, nie die Kombis: Er schrumpft und scrollt, die Listen behalten
+   ihre Mindesthoehe und der Fuss mit „Kombis mischen“ bleibt im Fenster. */
+.filter-card.cart-setup { flex: 0 0 auto; max-height: 30vh; overflow-y: auto; gap: 8px; margin: 14px 16px 0; padding: 10px 14px; }
+.cart-other-size { display: flex; align-items: center; gap: 4px; margin: 0 0 0 4px; }
+.cart-other-size input { width: 64px; height: 26px; padding: 0 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--text); font-size: 12px; font-variant-numeric: tabular-nums; }
+.cart-other-size .filter-reset { display: inline-flex; align-items: center; gap: 4px; height: 26px; font-size: 11px; }
+.cart-setup-row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px 20px; }
+.cart-setup-row .cart-summary { flex: 1 1 220px; align-self: center; text-align: right; }
+.cart-body { position: relative; display: grid; grid-template-columns: minmax(320px, 2fr) minmax(0, 3fr); gap: 16px; flex: 1 1 auto; min-height: 180px; padding: 12px 16px 14px; }
+.cart-column { position: relative; display: grid; gap: 12px; align-content: start; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+@media (max-width: 900px) {
+  .cart-body { grid-template-columns: minmax(0, 1fr); overflow-y: auto; }
+  .cart-column { overflow: visible; }
+}
+.cart-tips .filter-card-head h4:focus { outline: none; }
+.cart-status { margin: 0; padding: 6px 10px; border-radius: 6px; background: var(--bg); color: var(--text); font-size: 11px; }
+.cart-link { padding: 0; border: 0; background: transparent; color: var(--text); font-size: inherit; font-weight: 600; text-decoration: underline; text-underline-offset: 2px; }
+.cart-link:hover { color: #ffffff; }
+.cart-games { display: grid; gap: 6px; }
+/* Je Spiel zwei Zeilen: Anstoss, Spiel und Liga, darunter die Tipps unter dem Spielnamen. */
+.cart-game { display: grid; grid-template-columns: 56px minmax(0, 1fr) auto; column-gap: 8px; row-gap: 2px; align-items: baseline; }
+.cart-game + .cart-game { padding-top: 6px; border-top: 1px solid var(--line); }
+.cart-game-head { display: contents; }
+.cart-game-when { color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.cart-game-head strong { min-width: 0; color: var(--text); font-size: 12px; font-weight: 600; overflow-wrap: break-word; }
+/* Tipico-Ligen sind lang („Primera Division, Apertura, Gruppe A“) - nur die Liga wird gekuerzt. */
+.cart-game-league { max-width: 160px; overflow: hidden; color: var(--muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.cart-game.started .cart-game-head strong, .cart-game.started .cart-game-when, .cart-game.started .cart-game-league { color: var(--dim); }
+.cart-game > .cart-tip-list, .cart-game > .filter-note { grid-column: 2 / -1; }
+.cart-tip-list { display: grid; gap: 0; margin: 0; padding: 0; list-style: none; }
+.cart-tip { display: grid; grid-template-columns: minmax(0, 1fr) 14px 40px 22px; align-items: center; gap: 6px; min-height: 26px; color: var(--muted); font-size: 12px; }
+.cart-tip-label { display: grid; min-width: 0; overflow-wrap: break-word; }
+.cart-tip-label small { color: var(--dim); font-size: 10px; }
+.cart-tip.muted { color: var(--dim); }
+.cart-tip .level-glyph { width: auto; text-align: center; }
+.cart-tip-odds { color: var(--text); font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; }
+.cart-tip.muted .cart-tip-odds { color: var(--dim); }
+.cart-remove { display: grid; place-items: center; width: 22px; height: 22px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: var(--muted); }
+.cart-remove:hover { background: #222222; color: var(--text); }
+.cart-started { grid-template-columns: minmax(0, 1fr) auto; align-items: center; }
+/* Groessen nebeneinander; der gruene Balken sitzt unten wie bei Segment und Tageskachel. */
+.cart-sizes { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.cart-size { position: relative; display: grid; grid-template-columns: auto 22px 34px 22px; align-items: center; gap: 4px; min-height: 32px; padding: 0 6px 0 10px; border-radius: 6px; background: var(--bg); color: var(--muted); font-size: 12px; }
+.cart-size.active { background: #37373d; color: var(--text); font-weight: 600; }
+.cart-size.active::before { content: ""; position: absolute; right: 8px; bottom: 0; left: 8px; height: 3px; border-radius: 3px 3px 0 0; background: var(--green); }
+.cart-size input { height: 24px; padding: 0 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--text); font-size: 12px; font-variant-numeric: tabular-nums; text-align: right; }
+/* Die Pfeile des Browsers fallen weg - dafuer gibt es − und +, und im schmalen Feld verdeckten sie die Zahl. */
+.cart-size input, .cart-other-size input { appearance: textfield; -moz-appearance: textfield; }
+.cart-size input::-webkit-inner-spin-button, .cart-size input::-webkit-outer-spin-button,
+.cart-other-size input::-webkit-inner-spin-button, .cart-other-size input::-webkit-outer-spin-button { margin: 0; -webkit-appearance: none; }
+.cart-step { display: grid; place-items: center; width: 22px; height: 24px; padding: 0; border: 1px solid var(--line); border-radius: 6px; background: transparent; color: var(--muted); }
+.cart-step:hover:not(:disabled) { border-color: var(--muted); color: var(--text); }
+.cart-step:disabled { color: var(--dim); opacity: .5; cursor: default; }
+.cart-summary { color: var(--text); }
+.cart-combos { gap: 10px; }
+.cart-combo { display: grid; gap: 6px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); }
+.cart-combo.transferred { opacity: .55; }
+.cart-combo-head { display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto 22px; align-items: center; gap: 10px; }
+.cart-combo-head strong { overflow: hidden; font-size: 12px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.cart-combo-head .filter-reset { height: 24px; font-size: 11px; }
+.cart-combo-odds { color: var(--text); font-family: var(--mono); font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.cart-combo-state { color: var(--muted); font-size: 11px; white-space: nowrap; }
+.cart-combo-started { margin: 0; color: var(--muted); font-size: 11px; }
+.cart-copy { display: inline-flex; align-items: center; gap: 5px; height: 24px; font-size: 11px; }
+.cart-copy-fallback { display: grid; gap: 6px; }
+.cart-copy-fallback .filter-note { align-items: center; }
+.cart-copy-fallback .filter-note span { flex: 1; }
+.cart-copy-fallback textarea { width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--text); font-family: var(--mono); font-size: 11px; line-height: 1.5; resize: vertical; }
+/* Eine Zeile je Tipp, nichts gekuerzt: Spiel und Tipp brechen bei Bedarf um. Der Tipp ist das,
+   was uebertragen wird, und steht deshalb hell wie das Spiel. */
+.cart-combo-list { display: grid; gap: 0; margin: 0; padding: 0; list-style: none; }
+.cart-combo-list li { display: grid; grid-template-columns: 64px minmax(0, 1.1fr) minmax(0, 1fr) 44px; gap: 12px; align-items: baseline; padding: 4px 0; border-top: 1px solid var(--line); font-size: 12px; }
+.cart-combo-when { color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.cart-combo-game, .cart-combo-tip { min-width: 0; color: var(--text); overflow-wrap: break-word; }
+.quickpick-anchor { position: static; }
+.filter-menu.quickpick-menu { width: min(940px, calc(100vw - 140px)); height: min(720px, calc(100vh - var(--quickpick-top, 128px) - 16px)); min-height: 320px; max-height: none; }
+.quickpick-menu .filter-menu-head .filter-switch-row { flex: 0 0 auto; }
+.quickpick-menu .filter-menu-head .filter-switch { gap: 8px; color: var(--muted); }
+/* Kopf und Fuss stehen, links und die Liste scrollen je fuer sich - sonst wanderte die Liste mit,
+   wenn links "Werte anpassen" aufgeht. */
+.quickpick-body { position: relative; display: grid; grid-template-columns: minmax(300px, 340px) minmax(0, 1fr); gap: 16px; flex: 1 1 auto; min-height: 0; padding: 14px 16px; }
+.quickpick-left { position: relative; display: grid; gap: 12px; align-content: start; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.quickpick-results { position: relative; grid-template-rows: auto minmax(0, 1fr) auto; align-content: stretch; min-height: 0; }
+.quickpick-results .filter-card-aside { overflow: visible; }
+.quickpick-results-tools { display: inline-flex; align-items: center; gap: 10px; }
+.quickpick-limit { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 11px; white-space: nowrap; }
+.quickpick-limit input { width: 60px; height: 24px; padding: 0 6px; border: 1px solid var(--line); border-radius: 7px; background: var(--bg); color: var(--text); font-size: 11px; font-variant-numeric: tabular-nums; text-align: right; }
+.quickpick-flagged li { align-items: baseline; }
+/* Die Modellchance der Kombi-Tipps: aufgeklappt, aber grau - sie zählt dort nicht. */
+.quickpick-fact-quiet > span { color: var(--muted); }
+.quickpick-flagged-when { min-width: 52px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.quickpick-flagged strong { color: var(--text); font-weight: 600; }
+@media (max-width: 900px) {
+  .quickpick-body { grid-template-columns: minmax(0, 1fr); overflow-y: auto; }
+  .quickpick-left { overflow: visible; }
+  .quickpick-results { min-height: 360px; }
+}
+
+/* Filter- und Stufenzeilen wie die Eintraege der Marktliste: Wahl #37373d, fett, gruener Balken
+   links; Zahlen rechts in der Mono-Schrift. */
+.quickpick-options { display: grid; gap: 2px; min-width: 0; margin: 0; padding: 0; border: 0; }
+.quickpick-options + .quickpick-options { margin-top: 6px; }
+.quickpick-options > legend { margin-bottom: 4px; padding: 0 2px; color: var(--muted); font-size: 10px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
+.quickpick-option { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px; min-height: 30px; padding: 0 10px 0 14px; border-radius: 6px; background: var(--bg); color: var(--muted); font-size: 12px; cursor: pointer; }
+.quickpick-option:hover:not(.checked) { background: #222222; color: var(--text); }
+.quickpick-option.checked { background: #37373d; color: var(--text); font-weight: 600; }
+.quickpick-option.checked::before { content: ""; position: absolute; top: 6px; bottom: 6px; left: 0; width: 3px; border-radius: 0 3px 3px 0; background: var(--green); }
+.quickpick-option:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: -2px; }
+.quickpick-option-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.quickpick-option-value { color: var(--text); font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.quickpick-option-value.zero { color: var(--dim); }
+.quickpick-level, .quickpick-level-head { grid-template-columns: minmax(0, 1fr) 96px 52px; }
+.quickpick-level-head { display: grid; gap: 8px; padding: 0 10px 2px 14px; color: var(--muted); font-size: 10px; }
+.quickpick-level-head span, .quickpick-level-value { text-align: right; }
+.quickpick-level-value { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+.quickpick-disclosures { display: flex; flex-wrap: wrap; gap: 4px 16px; }
+.quickpick-disclosure { display: inline-flex; align-items: center; gap: 6px; justify-self: start; height: 24px; padding: 0; border: 0; background: transparent; color: var(--muted); font-size: 11px; font-weight: 600; }
+.quickpick-disclosure:hover, .quickpick-disclosure.open { color: var(--text); }
+.quickpick-disclosure svg { transition: transform .15s; }
+.quickpick-disclosure.open svg { transform: rotate(90deg); }
+.quickpick-info { display: grid; gap: 8px; }
+.quickpick-info > p:first-child { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.55; }
+.quickpick-criteria { margin: 0; padding-left: 16px; color: var(--muted); font-size: 11px; }
+.quickpick-criteria li { margin-top: 3px; line-height: 1.5; }
+
+.quickpick-setup { display: grid; gap: 8px; }
+.quickpick-setup-head { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 11px; }
+.quickpick-setup-head span { flex: 1; min-width: 0; }
+.quickpick-params { display: grid; gap: 2px; }
+.quickpick-param { display: grid; grid-template-columns: minmax(0, 1fr) 70px 60px; align-items: center; gap: 4px 8px; padding: 3px 0; }
+.quickpick-param label { color: var(--text); font-size: 11px; line-height: 1.35; }
+.quickpick-param input[type="range"] { width: 100%; height: 18px; margin: 0; accent-color: var(--muted); background: transparent; }
+.quickpick-param input[type="number"] { height: 26px; padding: 0 7px; border: 1px solid var(--line); border-radius: 7px; background: var(--bg); color: var(--text); font-size: 11px; font-variant-numeric: tabular-nums; text-align: right; }
+.quickpick-param input[type="number"].changed { border-color: var(--text); font-weight: 700; }
+.quickpick-param-base { grid-column: 2 / -1; color: var(--muted); font-size: 10px; text-align: right; }
+.quickpick-toggles { display: grid; gap: 6px; padding-top: 6px; }
+
+.quickpick-kombis { display: grid; gap: 8px; }
+.quickpick-kombis > strong { color: var(--text); font-size: 11px; font-weight: 600; }
+.quickpick-kombis table { width: 100%; border-collapse: collapse; font-size: 11px; font-variant-numeric: tabular-nums; }
+.quickpick-kombis th { padding: 3px 4px; color: var(--muted); font-size: 10px; font-weight: 600; text-align: right; }
+.quickpick-kombis th:first-child, .quickpick-kombis td:first-child { text-align: left; }
+.quickpick-kombis td { padding: 3px 4px; border-top: 1px solid var(--line); color: var(--text); text-align: right; }
+/* Die einzige belastbare Spalte - fett statt farbig. Gewinn bleibt neutral: ab vier Spielen sagt er nichts. */
+.quickpick-kombis td.durch { font-weight: 700; }
+.quickpick-kombis td.erwartet { color: var(--muted); }
+.quickpick-kombis > small { color: var(--muted); font-size: 10px; line-height: 1.55; }
+
+/* Sortierung als kleines Segment im Kopf der Liste; die Legende steht nur fuer Screenreader. */
+.quickpick-sort > legend { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.quickpick-sort .segmented.filter-seg label { flex: 0 0 auto; height: 24px; padding: 0 10px; font-size: 11px; }
+.quickpick-list { position: relative; min-height: 0; margin: 0 -14px; overflow-y: auto; overscroll-behavior: contain; border-top: 1px solid var(--line); }
+.quickpick-row { display: grid; grid-template-columns: 74px minmax(0, 1fr) auto 50px 12px; gap: 12px; align-items: center; width: 100%; padding: 9px 14px; border: 0; border-bottom: 1px solid var(--line); background: transparent; color: var(--text); text-align: left; }
+.quickpick-row:hover { background: #222222; }
+/* Wettschein-Knopf je Treffer links neben der Zeile (seit 19.10.2026) - gebaut wie das „+“ der
+   Tabelle: im Wettschein mit gruenem Balken, nie als Haekchen. Der Trennstrich wandert dafuer
+   von der Zeile an den Eintrag. */
+.quickpick-entry { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; border-bottom: 1px solid var(--line); }
+.quickpick-entry > .quickpick-row { border-bottom: 0; padding-left: 10px; }
+.quickpick-entry > .quickpick-facts { grid-column: 1 / -1; border-bottom: 0; }
+.quickpick-entry.open { background: #37373d; }
+.quickpick-add { --hub-size: 24px; margin-left: 14px; }
+.quickpick-show { align-self: end; justify-self: start; font-size: 11px; }
+.quickpick-show-hidden { color: var(--dim); }
+/* Der Tipp des Quickpick-Filters unter den Teams der Tabelle: grau, neutral, eine Zeile. */
+.quickpick-table-tip { justify-self: start; max-width: 100%; overflow: hidden; color: var(--muted); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.quickpick-row:focus-visible { outline-offset: -2px; }
+/* Die aufgeklappte Zeile wie in der Tabelle: Wahl-Flaeche und heller Balken, kein Blau. */
+.quickpick-row.open { background: #37373d; box-shadow: inset 3px 0 0 var(--text); }
+.quickpick-when { display: grid; gap: 2px; min-width: 0; }
+.quickpick-when small { overflow: hidden; color: var(--muted); font-size: 10px; font-variant-numeric: tabular-nums; text-overflow: ellipsis; white-space: nowrap; }
+.quickpick-league { overflow: hidden; color: var(--dim); text-overflow: ellipsis; white-space: nowrap; }
+.quickpick-match { display: grid; gap: 4px; min-width: 0; }
+.quickpick-match strong { overflow: hidden; color: var(--text); font-size: 12px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+/* Neutral statt gruen: Gruen heisst in der Tabelle "Empfehlenswert". */
+.quickpick-pick { justify-self: start; max-width: 100%; overflow: hidden; padding: 2px 8px; border-radius: 6px; background: var(--bg); color: var(--text); font-size: 11px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.quickpick-row.open .quickpick-pick { background: var(--surface); }
+.quickpick-pick-note { color: var(--muted); font-size: 10px; }
+.quickpick-strength { color: var(--muted); font-size: 10px; font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+.quickpick-odds { color: var(--text); font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; text-align: right; }
+.quickpick-chevron { color: var(--dim); transition: transform .15s; }
+.quickpick-row.open .quickpick-chevron { transform: rotate(90deg); }
+.quickpick-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; padding: 10px 14px 12px; border-bottom: 1px solid var(--line); background: var(--bg); }
+.quickpick-fact { display: grid; gap: 3px; align-content: start; }
+.quickpick-fact > small:first-child { color: var(--muted); font-size: 10px; font-weight: 600; }
+.quickpick-fact > span { color: var(--text); font-size: 12px; font-variant-numeric: tabular-nums; }
+.quickpick-fact-note { color: var(--muted); font-size: 10px; line-height: 1.4; }
+/* Grau wie im Add-Menue; die Warnung steht im Tooltip. */
+.quickpick-badge { display: inline-block; margin-top: 4px; padding: 1px 6px; border: 1px solid var(--line); border-radius: 5px; color: var(--muted); font-weight: 600; }
+.quickpick-empty { display: grid; gap: 8px; justify-items: center; padding: 28px 14px; color: var(--muted); font-size: 12px; text-align: center; }
+.quickpick-empty p { margin: 0; }
+.quickpick-empty small { font-size: 11px; }
+.quickpick-rejections { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.quickpick-empty .quickpick-rejections { justify-items: start; }
+.quickpick-rejections li { display: flex; gap: 8px; align-items: baseline; color: var(--muted); font-size: 11px; }
+.quickpick-rejection-count { min-width: 28px; color: var(--text); font-family: var(--mono); font-weight: 700; font-variant-numeric: tabular-nums; text-align: right; }
+.quickpick-results > .filter-card-rule { padding-top: 8px; }
+
+/* Fuss: links immer der Haken, rechts der einzige gefuellte Knopf - hell auf dunkel, ohne Blau
+   und ohne Gruen. */
+.quickpick-footer { display: flex; flex-wrap: wrap; gap: 8px 12px; flex: 0 0 auto; align-items: center; padding: 10px 16px; border-top: 1px solid var(--line); }
+.quickpick-warning { flex: 1 1 320px; min-width: 0; }
+.quickpick-cart-note { color: var(--muted); font-size: 11px; white-space: nowrap; }
+/* Eigene Zeile ganz oben im Fuss, damit Warnung und Knopf an ihrem Platz bleiben. */
+.quickpick-cart-feedback { order: -1; flex: 1 0 100%; margin: 0; color: var(--muted); font-size: 11px; }
+.quickpick-cart-feedback strong { color: var(--text); font-variant-numeric: tabular-nums; }
+/* Der Stand des Wettscheins steht immer ganz oben im Fuss, die letzte Aktion darunter. */
+.quickpick-cart-state { order: -2; flex: 1 0 100%; margin: 0; color: var(--muted); font-size: 11px; }
+.quickpick-cart-state strong { color: var(--text); font-variant-numeric: tabular-nums; }
+.quickpick-show-table { height: 32px; }
+.quickpick-cart { display: flex; gap: 7px; align-items: center; height: 32px; padding: 0 14px; border: 1px solid var(--text); border-radius: 8px; background: var(--text); color: var(--bg); font-size: 12px; font-weight: 700; white-space: nowrap; }
+.quickpick-cart:hover:not(:disabled) { border-color: #ffffff; background: #ffffff; }
+.quickpick-cart:disabled { border-color: var(--line); background: transparent; color: var(--dim); cursor: default; }
+@media (prefers-reduced-motion: reduce) {
+  .quickpick-disclosure svg, .quickpick-chevron { transition: none; }
+}
+.empty-state-action { margin-top: 4px; height: 30px; padding: 0 14px; border: 1px solid var(--line); border-radius: 9px; background: #1e1e1e; color: #b8b8b8; font-size: 11px; font-weight: 700; }
+.empty-state-action:hover { border-color: var(--accent); color: var(--accent); }
+.market-edge { font-size: 9px; font-weight: 700; white-space: nowrap; }
+/* Grau in beide Richtungen: Grün heißt in der Tabelle „Empfehlenswert“, und ein großer Vorteil
+   ist meist ein Fehler des Modells, keine Empfehlung. */
+.market-edge.pos, .market-edge.neg { color: var(--muted); font-weight: 600; }
+
+.content { display: flex; min-width: 0; min-height: 0; flex-direction: column; padding: 26px 16px 0; }
+.banner { display: flex; align-items: center; gap: 15px; margin-bottom: 12px; padding: 14px 16px; border: 1px solid #3c3c3c; border-radius: 14px; background: linear-gradient(90deg, rgba(255,255,255,.045), rgba(255,255,255,.015)); }
+.banner > span { display: grid; place-items: center; width: 36px; height: 36px; flex: 0 0 auto; border-radius: 10px; background: var(--accent-soft); color: var(--accent); }
+.banner p { flex: 1; margin: 0; color: #cccccc; font-size: 12px; line-height: 1.55; }
+.banner p strong { color: var(--green); }
+.banner p strong.gold { color: var(--gold); }
+.banner button { display: grid; place-items: center; width: 32px; height: 32px; border: 1px solid var(--line); border-radius: 50%; background: transparent; color: #a0a0a0; }
+/* Zwei feste Zeilen: oben die Bedienelemente, unten Stand und Schildchen. Die Schildchen
+   brechen nur in ihrer eigenen Zeile um - die Knoepfe darueber wandern nicht. */
+/* Seit 15.10.2026 ohne Abstand nach oben (der Hinweiskasten bringt seinen mit). In Tabelle und
+   Heatmap ohne eigene Unterkante: Der Tabellenrahmen ist die Grenze, die Zaehlzeile sitzt dicht
+   darueber wie eine Ueberschrift. Live hat keinen eigenen Rahmen und behaelt die Linie. */
+.view-toolbar { display: flex; flex-direction: column; gap: 8px; padding: 0 0 12px; border-bottom: 1px solid var(--line-soft); color: #858585; font-size: 12px; }
+.view-toolbar.prematch-toolbar { padding-bottom: 8px; border-bottom: 0; }
+.toolbar-row { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; }
+/* Ueberschriften ueber Markt, Sortierung und Anzeige nur fuer Screenreader (Davids Entscheidung vom
+   15.10.2026): Sichtbar trugen sie nur drei der Bedienelemente, die Leiste wirkte zweistoeckig. Die
+   Namen stehen zusaetzlich im Tooltip. Nur die direkten Kinder der Leiste - der Wettschein darin
+   traegt eigene Segmentschalter mit sichtbarer Ueberschrift. */
+.toolbar-row > .toolbar-field > span,
+.toolbar-row > .toolbar-field > label,
+.toolbar-row > .toolbar-group > .toolbar-segment > legend { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+/* Reihenfolge seit 28.09.2026: [Filter] [Quickpick] | Markt, Sortierung, Anzeige [Kelly-Auswahl].
+   Was ausblendet, steht links beisammen; Kelly direkt neben dem Umschalter, der ihn einblendet. */
+.toolbar-group { display: flex; align-items: center; gap: 8px; }
+.toolbar-divider { flex: 0 0 auto; width: 1px; height: 32px; background: var(--line); }
+/* Die Suche: Feld im Stil der Auswahllisten, Lupe links, eigenes ✕ statt des Browser-Kreuzes. */
+/* Gehoert zu Filter und Quickpick (blendet aus): derselbe Abstand wie in deren Gruppe. Sie gibt bei
+   knapper Breite als Erste nach, bevor der Wettschein in eine zweite Zeile rutscht. Grundbreite 170
+   mit Wachsen bis 230 statt Schrumpfen von 230: Eine umbrechende Flex-Zeile bricht nach der
+   Grundbreite um und schrumpft erst danach (im Browser nachgemessen). */
+.toolbar-search { position: relative; display: flex; flex: 1 1 170px; align-items: center; max-width: 230px; margin-left: -6px; }
+.toolbar-search > svg { position: absolute; left: 10px; color: var(--muted); pointer-events: none; }
+.toolbar-search input { width: 100%; height: 32px; padding: 0 30px 0 30px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--text); font-size: 12px; }
+.toolbar-search input::placeholder { color: var(--muted); }
+.toolbar-search input:hover { border-color: var(--muted); }
+/* Gefuellt sieht das Feld aus wie ein aktiver Knopf - ohne gruenen Balken, ein Suchtext ist keine
+   Wahl. Ersetzt das Schildchen, das die Suche bewusst nicht hat. */
+.toolbar-search input:not(:placeholder-shown) { border-color: var(--muted); background: #37373d; font-weight: 600; }
+.toolbar-search input::-webkit-search-cancel-button { display: none; }
+.toolbar-search-clear { position: absolute; right: 6px; display: grid; place-items: center; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: var(--muted); }
+.toolbar-search-clear:hover { background: #2a2a2a; color: var(--text); }
+.toolbar-field { display: grid; gap: 4px; }
+.toolbar-field > span, .toolbar-field > label { color: var(--muted); font-size: 10px; letter-spacing: .06em; text-transform: uppercase; }
+/* Auswahlliste und Richtung als ein Baustein. */
+.sort-control { display: flex; }
+.view-toolbar .sort-control select { border-radius: 8px 0 0 8px; }
+.sort-direction { width: 32px; height: 32px; padding: 0; border: 1px solid var(--line); border-left: 0; border-radius: 0 8px 8px 0; background: var(--bg); color: var(--text); font-size: 13px; font-weight: 700; }
+.sort-direction:hover { background: #222222; }
+.segmented { display: flex; padding: 3px; border: 1px solid var(--line); border-radius: 10px; background: #1e1e1e; }
+.segmented button { padding: 8px 12px; border: 0; border-radius: 7px; background: transparent; color: #a0a0a0; font-size: 11px; }
+.segmented button.active { background: #37373d; color: #ffffff; font-weight: 700; }
+.view-toolbar select { height: 32px; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--text); font-size: 12px; }
+.view-toolbar select:hover:not(:disabled) { border-color: var(--muted); background: #222222; }
+.view-toolbar select:disabled { opacity: .35; }
+
+/* Auswahllisten im Leistenstil (seit 28.09.2026): das eingebaute <select> bleibt - Tastatur,
+   Tippsuche und Screenreader kommen vom Browser, die Liste liegt in der obersten Ebene und wird
+   von .app-shell nicht abgeschnitten -, Chromium gestaltet es ueber appearance: base-select.
+   Andere Browser zeigen die gewohnte Liste. Farbregel wie im Filtermenue: Die Wahl traegt
+   #37373d, fette Schrift und den gruenen Balken LINKS wie der aktive Leisteneintrag (die Liste
+   ist senkrecht); kein Haekchen, denn ✓ heisst in der Tabelle "Empfehlenswert". Blau nur Fokus. */
+@supports (appearance: base-select) {
+  .view-toolbar select, .view-toolbar select::picker(select) { appearance: base-select; }
+  .view-toolbar select { display: flex; align-items: center; gap: 8px; }
+  .view-toolbar select:open { background: #37373d; font-weight: 600; }
+  .view-toolbar select::picker-icon { color: var(--muted); }
+  .view-toolbar select::picker(select) { max-height: min(460px, 70vh); margin-block: 6px; padding: 4px; overflow-y: auto; border: 1px solid #4a4a4a; border-radius: 10px; background: var(--bg); box-shadow: 0 18px 42px rgba(0,0,0,.62); color: var(--text); }
+  .view-toolbar option { position: relative; display: flex; align-items: center; min-height: 28px; padding: 0 12px 0 14px; border-radius: 6px; color: var(--muted); font-size: 12px; font-weight: 400; letter-spacing: 0; text-transform: none; white-space: nowrap; }
+  .view-toolbar option::checkmark { display: none; }
+  .view-toolbar option:hover:not(:checked):not(:disabled) { background: #222222; color: var(--text); }
+  .view-toolbar option:checked { background: #37373d; color: var(--text); font-weight: 600; }
+  .view-toolbar option:checked::before { content: ""; position: absolute; top: 6px; bottom: 6px; left: 0; width: 3px; border-radius: 0 3px 3px 0; background: var(--green); }
+  .view-toolbar option:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+  .view-toolbar option:disabled { color: var(--dim); }
+  /* Gruppenueberschrift leise wie die Gruppen im Filtermenue; die Eintraege setzen die Schrift zurueck. */
+  .view-toolbar optgroup { padding: 8px 0 0; color: var(--muted); font-size: 10px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
+  .view-toolbar optgroup + optgroup, .view-toolbar option + optgroup { margin-top: 4px; border-top: 1px solid var(--line); }
+  .view-toolbar optgroup option { margin-top: 2px; }
+}
+
+.table-with-detail { display: flex; min-height: 0; flex: 1; }
+/* Rahmen wie die Karten des Filtermenüs: Rand --line, Radius 10. */
+.table-scroll { min-width: 0; min-height: 0; flex: 1; margin: 0 0 16px; padding: 0; border: 1px solid var(--line); border-radius: 10px; background: var(--shell); overflow: auto; }
+/* Die Spaltenliste samt Minima steht in tableColumns.ts; das Raster kommt inline aus derselben
+   Liste wie die Mindestbreite, damit beide nicht mehr auseinanderlaufen koennen. */
+.fixture-grid { display: grid; gap: 10px; width: 100%; min-width: max(100%,var(--table-min-width, 1100px)); align-items: center; }
+/* Schuesse und Ecken: zwei Zeilen wie die Formspalte, oben Heim, unten Gast. */
+.recent-stat-cell { display: grid; gap: 4px; justify-items: center; font-variant-numeric: tabular-nums; }
+.recent-stat-cell strong { font-size: 12px; font-weight: 600; color: #d4d4d4; }
+.recent-stat-cell strong.missing { color: #6a6a6a; font-weight: 400; }
+.table-head button.icon-head { display: flex; align-items: center; justify-content: center; gap: 3px; }
+.table-head { position: sticky; top: 0; z-index: 5; margin: 0; padding: 11px 10px 9px 40px; border-bottom: 1px solid var(--line); background: var(--surface); }
+.table-head button { padding: 4px 0; border: 0; background: transparent; color: var(--muted); font-size: 11px; font-weight: 600; letter-spacing: .08em; text-align: left; text-transform: uppercase; white-space: nowrap; }
+.table-head button:hover { color: var(--text); }
+.table-head > *:nth-child(n+2) { width: 100%; text-align: center; }
+.table-head button.sorted { color: var(--text); font-weight: 700; }
+/* Nicht sortierbare Köpfe (Tipp, Vorteil, Korrigiert, Empfohlene Märkte): gleiche Schrift, Erklärung im Tooltip. */
+.table-head .head-label { padding: 4px 0; color: var(--muted); font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; white-space: nowrap; cursor: help; }
+.fixture-summary-head { display: grid; gap: 4px; min-width: 0; }
+.fixture-summary-head button:last-child { color: var(--dim); font-size: 10px; }
+.sort-mode-badge { display: inline-grid; place-items: center; width: 18px; height: 18px; margin-left: 4px; border-radius: 50%; color: #1e1e1e; font-size: 8px; font-weight: 900; letter-spacing: 0; vertical-align: middle; }
+.sort-mode-badge.win { background: var(--home); }
+.sort-mode-badge.draw { background: #858585; }
+.sort-mode-badge.loss { background: var(--away); }
+.sort-mode-badge.secondary { background: transparent; border: 1px solid #6a6a6a; color: #a0a0a0; }
+.fixture-wrap { min-width: max(100%,var(--table-min-width, 1440px)); border-bottom: 1px solid var(--line-soft); background: transparent; }
+.fixture-row-wrap { position: relative; }
+/* Kein Zebra: Trennlinien reichen, und das Muster verschob sich mit jeder Trennzeile.
+   Die aufgeklappte Zeile trägt die Wahl-Fläche von Leiste und Menü; der Balken ist hell statt
+   blau (Blau ist nur Tastaturfokus) und nicht grün (Grün heißt in der Tabelle „Empfehlenswert“). */
+.fixture-wrap.open { background: #37373d; box-shadow: inset 3px 0 0 var(--text); }
+.fixture-row { width: 100%; min-height: 56px; padding: 6px 10px 6px 40px; border: 0; background: transparent; text-align: left; }
+/* Der "Add"-Knopf im Leistenstil (seit 30.09.2026 statt der gestrichelten Nabe mit Ring):
+   Ruhe --bg, Ueberfahren #222, offen #37373d. Liegt aus dem Spiel etwas im Wettschein, steht
+   dort die Zahl mit dem gruenen Balken unten wie an gewaehlten Kacheln im Filtermenue.
+   Keine Daueranimation - das "Atmen" der Punkte lief in jeder ueberfahrenen Zeile.
+   Die Nabe traegt weder transform noch z-index: Ein transformierter Vorfahre wuerde zum
+   Bezugsrahmen fuer die feste Liste, ein z-index oeffnete einen Stapelkontext, in dem die Liste
+   unter dem Tabellenkopf verschwaende. Deshalb wird ueber margin zentriert. */
+.cart-add-hub { --hub-size: 26px; position: absolute; left: 8px; top: 50%; margin-top: calc(var(--hub-size) / -2); }
+.cart-add { position: relative; display: grid; place-items: center; width: var(--hub-size); height: var(--hub-size); padding: 0; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--muted); font-size: 8px; font-weight: 700; letter-spacing: .06em; line-height: 1; text-transform: uppercase; transition: background .1s ease, color .1s ease; }
+.cart-add:hover { background: #222222; color: var(--text); }
+.cart-add-hub.open .cart-add { background: #37373d; color: var(--text); }
+.cart-add.has-entries { color: var(--text); font-family: var(--mono); font-size: 12px; letter-spacing: 0; }
+.cart-add.has-entries::after { content: ""; position: absolute; left: 4px; right: 4px; bottom: 0; height: 2px; border-radius: 2px 2px 0 0; background: var(--green); }
+.cart-add:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* Die Marktliste: gebaut wie die geoeffnete Marktliste der Werkzeugleiste
+   (.view-toolbar select::picker(select)). Fest im Fenster, damit das seitliche Scrollen der
+   Tabelle nichts abschneidet; die Stelle misst menuPlacement in BetCartUI.tsx. Im Wettschein
+   heisst gewaehlt: Flaeche #37373d, fett, gruener Balken links - kein Haekchen, denn ✓ heisst in
+   der Tabelle "Empfehlenswert". Einzige Animation: 120 ms Einblenden. */
+.cart-menu { position: fixed; z-index: 46; display: flex; flex-direction: column; width: 260px; max-height: min(460px, calc(100vh - 16px)); padding: 4px; overflow-y: auto; border: 1px solid #4a4a4a; border-radius: 10px; background: var(--bg); box-shadow: 0 18px 42px rgba(0,0,0,.62); color: var(--text); font-size: 12px; text-align: left; animation: cart-menu-in .12s ease-out; }
+@keyframes cart-menu-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+.cart-menu-head { display: grid; gap: 2px; padding: 6px 10px 8px; border-bottom: 1px solid var(--line); }
+.cart-menu-head strong { font-size: 12px; font-weight: 600; }
+.cart-menu-head span { overflow: hidden; color: var(--muted); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.cart-menu-group + .cart-menu-group { margin-top: 4px; border-top: 1px solid var(--line); }
+.cart-menu-group-title { padding: 8px 10px 2px; color: var(--muted); font-size: 10px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
+.cart-menu-item { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) 14px 40px; align-items: center; gap: 6px; width: 100%; min-height: 30px; margin-top: 2px; padding: 0 10px 0 14px; border: 0; border-radius: 6px; background: transparent; color: var(--muted); font-size: 12px; text-align: left; }
+.cart-menu-item:hover:not([aria-checked="true"]) { background: #222222; color: var(--text); }
+.cart-menu-item[aria-checked="true"] { background: #37373d; color: var(--text); font-weight: 600; }
+.cart-menu-item[aria-checked="true"]::before { content: ""; position: absolute; top: 6px; bottom: 6px; left: 0; width: 3px; border-radius: 0 3px 3px 0; background: var(--green); }
+.cart-menu-item:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.cart-menu-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cart-menu-hint { margin-left: 6px; color: var(--muted); font-size: 10px; font-weight: 400; }
+.cart-menu-item .level-glyph { width: auto; text-align: center; }
+.cart-menu-odds { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; }
+.cart-menu-foot { margin-top: 4px; padding: 8px 10px 4px; border-top: 1px solid var(--line); color: var(--muted); font-size: 11px; }
+.cart-menu-foot:empty { display: none; }
+.cart-menu-item[aria-disabled="true"] { color: var(--dim); cursor: default; }
+.cart-menu-item[aria-disabled="true"]:hover { background: transparent; color: var(--dim); }
+@media (prefers-reduced-motion: reduce) {
+  .cart-add, .cart-menu { transition: none; animation: none; }
+  .insight-loading i { animation: none; }
+}
+.fixture-row:hover { background: #222222; }
+.fixture-wrap.open .fixture-row:hover { background: transparent; }
+.fixture-row > span { min-width: 0; }
+.fixture-summary-cell { display: grid; gap: 8px; }
+.teams-cell { display: grid; gap: 6px; }
+
+.team-name { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.team-name .team-crest { width: 18px; height: 18px; }
+.team-name .team-crest.fallback { font-size: 8px; }
+.team-name strong { overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+/* Team-Elo neben dem Namen: klein und grau, damit es nicht wie ein Tipp aussieht. */
+.elo-tag { flex: 0 0 auto; color: #8a8a8a; font-size: 10px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.elo-tag.unsicher { color: #5f5f5f; }
+.team-name:first-child strong { color: var(--home); }
+.team-name:last-child strong { color: var(--away); }
+.defense-shield { display: inline-grid; place-items: center; flex: 0 0 auto; color: #73c991; }
+.defense-shield.verified { filter: drop-shadow(0 0 5px rgba(115,201,145,.28)); }
+.defense-shield.fallback { color: #9aa0a6; }
+.country-flag { width: 1.2em; margin-bottom: -.1em; border-radius: 2px; vertical-align: middle; }
+.form-cell { display: grid; grid-template-columns: 43px 1fr; align-items: center; gap: 9px; }
+.form-labels { display: grid; min-width: 43px; gap: 6px; }
+.form-labels small { display: flex; height: 18px; align-items: center; justify-content: flex-end; color: var(--muted); font-size: 9px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+.form-cell > span:last-child { display: grid; justify-items: start; gap: 6px; }
+/* Form und H2H als schmale Striche (seit 11.10.2026 statt Kreisen). 18 px Höhe und 6 px
+   Reihenabstand entsprechen den Teamzeilen, die Heimreihe steht also auf Höhe des Heimnamens.
+   Remis #6a6a6a ist dunkler als Rot: So bleiben beide auch bei Rot-Grün-Schwäche trennbar. */
+.form-bars-line { display: flex; align-items: center; gap: 8px; }
+.form-bars { display: flex; gap: 3px; }
+.form-bar { position: relative; width: 6px; height: 18px; flex: none; border-radius: 3px; background: #6a6a6a; font-style: normal; }
+.form-bar.win, .form-bar.hit { background: var(--green); }
+.form-bar.loss, .form-bar.miss { background: var(--red); }
+.form-bar.draw { background: #6a6a6a; }
+.h2h-cell .form-bar.win { background: var(--home); }
+.h2h-cell .form-bar.loss { background: var(--away); }
+.form-bar.missing { background: transparent; box-shadow: inset 0 0 0 1px var(--line); }
+.fixture-row[aria-expanded="true"] .form-bar.missing { box-shadow: inset 0 0 0 1px var(--dim); }
+/* Jüngstes Spiel: kleiner Strich darunter, 1 px Luft zum eigenen, 3 px zur nächsten Reihe. */
+.form-bar.latest::after { content: ""; position: absolute; left: 0; right: 0; bottom: -3px; height: 2px; border-radius: 1px; background: var(--dim); }
+/* Torzahl im Strich (Tore, Tore 1. HZ); min-width statt fester Breite, damit 10+ Tore passen. */
+.form-bar.count { display: grid; place-items: center; width: auto; min-width: 10px; padding: 0 2px; border-radius: 5px; color: #1e1e1e; font-size: 9px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
+.form-total { min-width: 2ch; color: var(--text); font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; text-align: right; cursor: help; }
+.form-total.missing { color: var(--dim); font-weight: 400; }
+.h2h-cell { display: grid; justify-items: center; gap: 4px; }
+.h2h-notice { color: var(--muted); font-size: 10px; cursor: help; }
+/* Anstoß als eigene Spalte: Uhrzeit (und Klassenunterschied), darunter Land und Liga. */
+.kickoff-cell { display: grid; gap: 4px; min-width: 0; }
+.kickoff-line { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.kickoff-cell strong { flex: none; color: var(--text); font-size: 12px; }
+.kickoff-cell strong em { color: var(--muted); font-size: 9px; font-style: normal; letter-spacing: .06em; text-transform: uppercase; }
+.kickoff-cell small { overflow: hidden; color: var(--muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+/* Bei Torlinien die Summe gross, Heim : Auswärts klein darunter. */
+.expected-cell.total { display: grid; justify-items: center; gap: 3px; }
+.expected-cell.total strong { font-size: 13px; }
+.expected-cell.total small { color: var(--muted); font-size: 10px; }
+.data-cell { display: grid; justify-items: center; gap: 3px; font-variant-numeric: tabular-nums; cursor: help; }
+.data-cell strong { color: var(--muted); font-size: 12px; font-weight: 600; }
+.data-cell small { display: flex; align-items: center; gap: 3px; color: var(--muted); font-size: 10px; white-space: nowrap; }
+/* Empfohlene Märkte: Stufenfarbe nur am Rand, wie die Marktkarte - kein grüner Text. */
+.recommended-cell { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; min-width: 0; }
+.recommended-cell.empty { justify-content: center; color: var(--dim); }
+.rec-chip { display: inline-flex; align-items: center; gap: 4px; padding: 3px 7px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); color: var(--text); font-size: 11px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.rec-chip.recommended { border-color: rgba(95,191,139,.56); }
+.rec-chip.strong { border-color: rgba(217,180,95,.65); }
+.rec-chip .level-glyph { width: auto; }
+.rec-more { color: var(--muted); font-size: 11px; cursor: help; }
+.market-card.missing { display: grid; place-items: center; color: var(--dim); }
+/* Tages-Trennzeile bei Sortierung nach Anstoss: leise wie die Gruppenköpfe des Filtermenüs. */
+.day-divider { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; min-width: max(100%,var(--table-min-width, 1100px)); padding: 12px 10px 6px 40px; border-bottom: 1px solid var(--line-soft); }
+.day-divider h3 { margin: 0; color: var(--muted); font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; }
+.day-divider span { color: var(--dim); font-size: 11px; }
+.detail-recent { color: var(--muted); }
+.expected-cell { display: flex; align-items: center; justify-content: center; gap: 7px; font-size: 12px; white-space: nowrap; }
+.expected-cell i { color: #737373; font-style: normal; }
+.score-cell { display: grid; justify-items: center; gap: 5px; }
+.score-cell span { display: flex; align-items: center; justify-content: center; gap: 6px; }
+.score-cell small { color: var(--dim); font-size: 9px; }
+.score-cell strong { color: var(--text); font-size: 12px; }
+/* Ohne Stufe grau statt durchscheinend: Die Deckkraft senkte den Kontrast der Zahlen, die man lesen will. */
+.market-card { min-width: 0; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: var(--muted); }
+.market-card.recommended { border-color: rgba(95,191,139,.56); background: rgba(95,191,139,.07); color: var(--text); }
+.market-card.strong { border-color: rgba(217,180,95,.65); background: rgba(217,180,95,.07); color: var(--text); }
+/* Cross-League ohne Ligastärke-Vergleich: Der Markt bleibt sichtbar, aber ohne Zahl,
+   damit keine Wahrscheinlichkeit gelesen wird, die den Klassenunterschied nicht kennt. */
+.market-card.unreliable { border-style: dashed; border-color: #4a4a4a; opacity: .55; }
+/* Klassenunterschied: "clear" bleibt dezent, "extreme" tritt hervor. Eine Einstufung aus
+   dem Quotenbild statt aus dem Ligarating wird gestrichelt unterlegt. */
+.class-gap { font-style: normal; padding: 1px 5px; border-radius: 6px; font-size: 8px; letter-spacing: .04em;
+  border: 1px solid rgba(214,148,86,.45); background: rgba(214,148,86,.1); color: #d69456; white-space: nowrap; }
+.class-gap.extreme { border-color: rgba(214,148,86,.85); background: rgba(214,148,86,.2); color: #eaa869; font-weight: 600; }
+.class-gap.market { border-style: dashed; }
+.probability-note { flex: 1; font-style: italic; color: #6f6f6f; overflow: hidden; text-overflow: ellipsis; }
+.market-line { display: flex; align-items: center; gap: 6px; }
+.level-glyph { width: 12px; color: #737373; font-size: 11px; }
+.recommended .level-glyph { color: var(--green); }
+.strong .level-glyph { color: var(--gold); }
+.pick { font-size: 12px; }
+.pick.home { color: var(--home); }
+.pick.away { color: var(--away); }
+.odd { margin-left: auto; font-size: 12px; }
+.probability-line { display: flex; align-items: center; gap: 6px; margin-top: 6px; color: inherit; font-size: 12px; white-space: nowrap; }
+.probability-track { height: 3px; flex: 1; overflow: hidden; border-radius: 3px; background: #3c3c3c; }
+.probability-track span { display: block; height: 100%; border-radius: 3px; background: #858585; }
+.recommended .probability-track span { background: var(--green); }
+.strong .probability-track span { background: var(--gold); }
+.fixture-detail-panel { display: grid; gap: 12px; width: min(430px, 44%); min-width: 300px; min-height: 0; flex: 0 0 auto; align-content: start; padding: 18px 28px 24px 20px; border-left: 1px solid var(--line); background: var(--bg); overflow-y: auto; }
+.fixture-detail-head { display: flex; align-items: flex-start; gap: 10px; }
+.fixture-detail-teams { display: grid; gap: 2px; min-width: 0; flex: 1; }
+.fixture-detail-teams strong { overflow: hidden; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.fixture-detail-teams strong.home { color: var(--home); }
+.fixture-detail-teams strong.away { color: var(--away); }
+.fixture-detail-teams small { display: flex; align-items: center; gap: 4px; margin-top: 3px; color: #8a8a8a; font-size: 9px; }
+.fixture-detail-close { display: grid; place-items: center; width: 26px; height: 26px; flex: 0 0 auto; border: 1px solid var(--line); border-radius: 50%; background: transparent; color: #a0a0a0; }
+.fixture-detail-close:hover { color: var(--text); }
+.insight-panel { min-width: 0; padding: 13px 14px 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+.insight-scope { margin-left: 8px; color: var(--dim); font-size: 8px; font-weight: 400; letter-spacing: .04em; text-transform: none; }
+.insight-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; min-width: 0; margin-bottom: 10px; }
+/* Drei Steuerelemente passen nur umbrechend und linksbündig in die Breite der Detailspalte. */
+.insight-controls.stats { gap: 6px 8px; }
+.insight-controls.stats .segmented.mini { margin-left: 0; }
+.insight-toggle { display: inline-flex; align-items: center; gap: 6px; color: #b3b3b3; font-size: 9px; cursor: pointer; }
+.insight-toggle input { width: 13px; height: 13px; flex: 0 0 auto; accent-color: var(--accent); cursor: pointer; }
+.insight-toggle:has(input:disabled) { cursor: default; opacity: .4; }
+.insight-select { height: 24px; padding: 0 6px; border: 1px solid var(--line); border-radius: 7px; background: #1b1b1b; color: var(--text); font-size: 9px; }
+.fixture-detail-panel .insight-notice { margin: 0 0 8px; color: var(--dim); }
+.fixture-detail-panel .insight-notice.error { color: var(--gold); }
+.insight-loading { display: grid; place-items: center; align-content: center; gap: 14px; min-height: 240px; padding: 40px 0; color: var(--dim); font-size: 9px; text-align: center; }
+.insight-loading i { width: 38px; height: 38px; border: 3px solid var(--line); border-top-color: var(--accent); border-radius: 50%; animation: insight-spin .8s linear infinite; }
+@keyframes insight-spin { to { transform: rotate(360deg); } }
+
+.period-grid { display: grid; gap: 12px; }
+.period-side { display: grid; gap: 3px; min-width: 0; }
+.period-side + .period-side { padding-top: 10px; border-top: 1px dashed var(--line); }
+.period-head { display: flex; align-items: baseline; gap: 8px; min-width: 0; margin-bottom: 3px; }
+.period-head strong { overflow: hidden; color: #cccccc; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.period-head small { flex: 0 0 auto; color: var(--dim); font-size: 8px; }
+.period-row, .period-axis { display: grid; grid-template-columns: 16px 40px 19px repeat(6, minmax(0, 1fr)); align-items: center; gap: 3px; }
+.period-label { color: var(--dim); font-size: 8px; }
+.period-total { font-size: 12px; font-weight: 800; text-align: right; }
+.period-row.scored .period-total { color: var(--green); }
+.period-row.conceded .period-total { color: var(--red); }
+.period-cell { display: grid; place-items: center; height: 20px; border-radius: 5px; background: rgba(255,255,255,.05); color: #ffffff; font-size: 9px; font-weight: 700; }
+.period-cell.empty { color: #6b6b6b; font-weight: 400; }
+.period-axis { margin: 5px 0 1px; color: #6b6b6b; font-size: 8px; }
+.period-axis span { text-align: right; }
+
+.h2h-summary { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 10px; }
+.h2h-tally { padding: 3px 8px; border-radius: 999px; font-size: 9px; font-weight: 700; }
+.h2h-tally.win { background: rgba(137,209,133,.16); color: var(--green); }
+.h2h-tally.draw { background: rgba(255,255,255,.07); color: #b3b3b3; }
+.h2h-tally.loss { background: rgba(241,76,76,.16); color: var(--red); }
+.h2h-rate { padding: 3px 8px; border-radius: 999px; background: rgba(255,255,255,.05); color: #b3b3b3; font-size: 9px; }
+.kelly-preset { margin-left: 8px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 8px; background: #1b1b1b; color: #b3b3b3; font-size: 9px; }
+.kelly-preset:hover:not(:disabled) { border-color: var(--accent); color: var(--text); }
+.kelly-preset:disabled { border-style: dashed; color: var(--green); }
+.segmented.mini { margin-left: auto; padding: 2px; }
+.segmented.mini button { padding: 4px 8px; font-size: 8px; }
+.h2h-group + .h2h-group { margin-top: 9px; }
+.h2h-group-head, .h2h-row { display: grid; grid-template-columns: 44px minmax(0, 1fr) 20px 20px 16px; align-items: center; gap: 8px; }
+.h2h-group-head { padding: 0 6px 4px; color: #8a8a8a; font-size: 8px; letter-spacing: .04em; text-transform: uppercase; }
+.h2h-group-head strong { grid-column: 1 / 3; overflow: hidden; color: var(--accent); font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.h2h-group-head span { text-align: center; }
+.h2h-rows { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.h2h-row { padding: 5px 6px; border-radius: 7px; background: rgba(255,255,255,.035); }
+.h2h-row-date { color: #969696; font-size: 8px; }
+.h2h-row-teams { display: grid; gap: 2px; min-width: 0; }
+.h2h-row-teams span { overflow: hidden; color: #a6a6a6; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.h2h-row-teams .winner { color: #ffffff; font-weight: 700; }
+.h2h-row-score { display: grid; gap: 2px; color: #8a8a8a; font-size: 9px; text-align: center; }
+.h2h-row-score.full { color: var(--text); font-size: 10px; font-weight: 800; }
+.h2h-row-badge { display: grid; place-items: center; width: 16px; height: 16px; border-radius: 50%; color: #1e1e1e; font-size: 7px; font-weight: 800; }
+.h2h-row-badge.win { background: var(--green); }
+.h2h-row-badge.draw { background: #858585; }
+.h2h-row-badge.loss { background: var(--red); }
+
+.trend-table { width: 100%; border-collapse: collapse; font-size: 9px; table-layout: fixed; }
+.trend-table thead th { overflow: hidden; padding: 3px 6px; color: #8a8a8a; font-size: 8px; font-weight: 700; text-align: center; text-overflow: ellipsis; white-space: nowrap; }
+.trend-table thead th.home { color: var(--home); }
+.trend-table thead th.away { color: var(--away); }
+.trend-table tbody th { padding: 5px 6px; border-top: 1px solid var(--line-soft); color: #969696; font-size: 9px; font-weight: 400; text-align: left; }
+.trend-table td { padding: 5px 6px; border-top: 1px solid var(--line-soft); color: #cccccc; text-align: center; }
+.trend-better { display: inline-block; padding: 2px 8px; border-radius: 6px; color: #10151b; font-weight: 800; }
+.trend-better.home { background: var(--home); }
+.trend-better.away { background: var(--away); }
+.trend-basis th, .trend-basis td { color: #6b6b6b; font-size: 8px; }
+
+.match-stat-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-bottom: 10px; }
+.match-stat-key { display: inline-flex; align-items: baseline; gap: 6px; min-width: 0; font-size: 9px; font-weight: 700; }
+.match-stat-key::before { width: 9px; height: 9px; flex: 0 0 auto; border-radius: 3px; content: ""; }
+.match-stat-key.home { color: var(--home); }
+.match-stat-key.home::before { background: var(--home); }
+.match-stat-key.away { color: var(--away); }
+.match-stat-key.away::before { background: var(--away); }
+.match-stat-key small { color: var(--dim); font-size: 8px; font-weight: 400; }
+.fixture-detail-panel .match-stat-hint { margin: -4px 0 9px; color: #7d7d7d; font-size: 8px; line-height: 1.45; }
+.match-stat-rings { display: flex; flex-wrap: wrap; gap: 10px 20px; margin-bottom: 12px; }
+.stat-ring-group { display: grid; justify-items: center; gap: 5px; margin: 0; }
+.stat-ring-group figcaption { color: #969696; font-size: 9px; }
+.stat-ring-pair { display: flex; gap: 10px; }
+.stat-ring-split { display: flex; align-items: center; gap: 9px; }
+.stat-ring { position: relative; display: grid; place-items: center; }
+.stat-ring-track { fill: none; stroke: rgba(255,255,255,.07); stroke-width: 6; }
+.stat-ring-fill { fill: none; stroke-width: 6; stroke-linecap: butt; transition: stroke-dasharray .18s ease; }
+.stat-ring-fill.home { stroke: var(--home); }
+.stat-ring-fill.away { stroke: var(--away); }
+.stat-ring-number { position: absolute; font-size: 10px; font-variant-numeric: tabular-nums; font-weight: 700; }
+.stat-ring-value { font-size: 11px; font-variant-numeric: tabular-nums; font-weight: 700; }
+.stat-ring-number.home, .stat-ring-value.home { color: var(--home); }
+.stat-ring-number.away, .stat-ring-value.away { color: var(--away); }
+.match-stats { display: grid; gap: 12px; }
+.match-stat-group { display: grid; gap: 8px; min-width: 0; }
+.match-stat-group h4 { margin: 0; color: #8a8a8a; font-size: 9.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.match-stat { display: grid; gap: 3px; min-width: 0; }
+.match-stat-head { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.match-stat-label { overflow: hidden; flex: 1; color: #969696; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.match-stat-basis { flex: 0 0 auto; color: #6b6b6b; font-size: 8px; font-variant-numeric: tabular-nums; }
+.match-stat-bar { display: grid; grid-template-columns: minmax(0, 1fr) 42px; align-items: center; gap: 8px; }
+.match-stat-track { height: 7px; border-radius: 999px; background: rgba(255,255,255,.05); }
+.match-stat-fill { display: block; height: 100%; border-radius: 999px; transition: width .18s ease, margin-left .18s ease; }
+.match-stat-bar.home .match-stat-fill { background: var(--home); }
+.match-stat-bar.away .match-stat-fill { background: var(--away); }
+.match-stat-bar.strong .match-stat-track { height: 9px; }
+.match-stat-bar.dim .match-stat-fill { opacity: .5; }
+/* Die Nulllinie des Abweichungsmodus liegt im Hintergrund der Spur, nicht als eigenes Element. */
+.match-stats.dev .match-stat-track {
+  background:
+    linear-gradient(to right, transparent calc(50% - 1px), rgba(255,255,255,.28) calc(50% - 1px),
+    rgba(255,255,255,.28) calc(50% + 1px), transparent calc(50% + 1px)), rgba(255,255,255,.05);
+}
+/* Deckend statt gedimmt: bei 11px fiele die Teamfarbe mit opacity unter 4,5:1 Kontrast. */
+.match-stat-number { font-size: 11px; font-variant-numeric: tabular-nums; text-align: right; }
+.match-stat-number.home { color: #a9d1f2; }
+.match-stat-number.away { color: #dfb49f; }
+.match-stat-number.lead { font-weight: 800; }
+.match-stat-number.home.lead { color: var(--home); }
+.match-stat-number.away.lead { color: var(--away); }
+.standings-table { width: 100%; border-collapse: collapse; font-size: 9px; }
+.standings-table th { padding: 3px 6px; color: #8a8a8a; font-size: 8px; font-weight: 700; letter-spacing: .04em; text-align: left; text-transform: uppercase; }
+.standings-table th:nth-child(1), .standings-table td:nth-child(1) { text-align: center; }
+.standings-table th:nth-child(3), .standings-table td:nth-child(3), .standings-table th:nth-child(4), .standings-table td:nth-child(4), .standings-table th:nth-child(5), .standings-table td:nth-child(5) { text-align: right; }
+.standings-table td { padding: 4px 6px; color: #b3b3b3; border-top: 1px solid var(--line-soft); }
+.standings-table td:nth-child(2) { overflow: hidden; max-width: 0; text-overflow: ellipsis; white-space: nowrap; }
+.standings-table tr.home td { color: var(--home); font-weight: 700; }
+.standings-table tr.away td { color: var(--away); font-weight: 700; }
+.standings-table tr.home td:nth-child(1), .standings-table tr.away td:nth-child(1) { color: inherit; }
+.standings-gap td { padding: 2px 6px; color: #616161; text-align: center; }
+.fixture-detail-panel h3 { margin: 0 0 9px; color: var(--text); font-size: 12px; font-weight: 600; }
+.fixture-detail-panel p { margin: 4px 0; color: #b3b3b3; font-size: 9px; line-height: 1.5; }
+.h2h-match-list { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.h2h-match-row { display: grid; grid-template-columns: 72px 1fr 20px 46px; align-items: center; gap: 10px; padding: 7px 9px; border-radius: 7px; background: rgba(255,255,255,.035); }
+.h2h-match-date { overflow: hidden; color: #969696; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.h2h-match-teams { display: flex; align-items: center; justify-content: center; gap: 9px; min-width: 0; }
+.h2h-match-teams .home, .h2h-match-teams .away { overflow: hidden; flex: 1 1 0; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.h2h-match-teams .home { color: var(--home); text-align: right; }
+.h2h-match-teams .away { color: var(--away); text-align: left; }
+.h2h-match-score { display: flex; align-items: center; gap: 3px; flex: 0 0 auto; color: var(--text); font-size: 13px; font-weight: 800; }
+.h2h-match-score i { color: #616161; font-style: normal; font-weight: 400; font-size: 11px; }
+.h2h-match-score .home { color: var(--home); }
+.h2h-match-score .away { color: var(--away); }
+.h2h-match-score .lose { color: #6b6b6b; font-weight: 600; }
+.h2h-match-venue { display: grid; place-items: center; width: 18px; height: 18px; flex: 0 0 auto; border-radius: 4px; background: rgba(255,255,255,.06); color: #8a8a8a; font-size: 8px; font-weight: 700; }
+.h2h-match-half { flex: 0 0 auto; color: #808080; font-size: 8px; white-space: nowrap; text-align: right; }
+.market-details { display: grid; gap: 8px; max-height: 270px; padding-right: 6px; overflow-y: auto; }
+.market-details > div { display: flex; align-items: flex-start; gap: 7px; color: #a6a6a6; font-size: 8px; line-height: 1.55; }
+.market-details i { width: 7px; height: 7px; flex: 0 0 auto; margin-top: 3px; border-radius: 50%; background: #737373; }
+.market-details .recommended i { background: var(--green); }
+.market-details .strong i { background: var(--gold); }
+.market-details strong { display: block; color: #cccccc; }
+.empty-state { display: grid; place-items: center; gap: 9px; min-height: 230px; padding: 35px; color: #969696; text-align: center; }
+.empty-state svg { color: var(--accent); }
+.empty-state strong { color: var(--text); font-size: 13px; }
+.empty-state span { max-width: 620px; font-size: 10px; line-height: 1.6; }
+.status-screen { display: grid; place-items: center; align-content: center; gap: 18px; min-height: 100vh; }
+.connection-warning { position: fixed; right: 18px; bottom: 18px; z-index: 20; display: flex; align-items: center; gap: 8px; max-width: 460px; padding: 10px 14px; border: 1px solid #6a4423; border-radius: 10px; background: #332415; color: #e2984a; font-size: 10px; box-shadow: 0 12px 35px rgba(0,0,0,.45); }
+.connection-warning svg { flex: 0 0 auto; }
+
+.overlay-backdrop { position: fixed; inset: 0; z-index: 60; background: rgba(4,4,10,.72); }
+/* Abgedunkelter, leicht weichgezeichneter Hintergrund unter Filtermenue und Quickpicker (Davids
+   Wunsch vom 10.10.2026). Er liegt unter der Knopfgruppe .toolbar-filters (z-index 41), damit Filter und Quickpick
+   hell und anklickbar bleiben und man direkt zwischen beiden wechseln kann. Ein Klick auf den
+   Hintergrund schliesst ueber "Klick daneben" und trifft keine Tabellenzeile darunter. Kein
+   Fokus-Gefaengnis: Tab fuehrt weiter aus dem Fenster und schliesst es. */
+.menu-backdrop, .overlay-backdrop { -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px); }
+.menu-backdrop { position: fixed; inset: 0; z-index: 39; background: rgba(4,4,10,.55); }
+@media (prefers-reduced-motion: no-preference) {
+  .menu-backdrop, .overlay-backdrop { animation: backdrop-in .14s ease-out; }
+}
+@keyframes backdrop-in { from { opacity: 0; } to { opacity: 1; } }
+.overlay-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 14px 16px; border-bottom: 1px solid var(--line-soft); }
+.overlay-head strong { font-size: 13px; color: var(--text); }
+.overlay-head button { display: grid; place-items: center; width: 28px; height: 28px; border: 1px solid var(--line); border-radius: 50%; background: transparent; color: #a0a0a0; }
+.overlay-head button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.overlay-head-actions { display: flex; align-items: center; gap: 8px; }
+.overlay-head-actions button:disabled { opacity: .4; }
+
+.density-compact .market-card { padding: 6px 8px; }
+
+/* Live */
+
+.live-status { display: flex; align-items: center; gap: 9px; padding: 40px 0; color: #969696; font-size: 12px; }
+.live-status svg { color: var(--accent); }
+.live-status.error { color: #e2984a; }
+.live-status.error svg { color: #e2984a; }
+.live-notice { display: flex; align-items: center; gap: 8px; margin-top: 14px; padding: 9px 12px; border: 1px solid #6a4423; border-radius: 10px; background: #332415; color: #e2984a; font-size: 10px; }
+.live-notice svg { flex: 0 0 auto; }
+
+.live-warning { margin: 12px 0 0; }
+.live-list { min-height: 0; flex: 1; margin: 0 -28px; padding: 14px 28px 24px; overflow: auto; }
+/* Sechs Spalten statt fünf plus bis zu vierzehn Marktkästchen (seit 29.09.2026): Die Zeile
+   beantwortet eine gewählte Frage, Quote und Stufe vor dem Anpfiff stehen im Fenster. Keine
+   Streifen - wie die Tabelle seit 28.09. */
+.live-row { display: grid; grid-template-columns: 64px minmax(170px,1.3fr) 40px minmax(200px,1.5fr) 64px 84px 84px 112px; gap: 14px; align-items: center; min-width: 900px; min-height: 76px; padding: 10px 12px; border-bottom: 1px solid var(--line-soft); cursor: pointer; }
+.live-row:hover, .live-row:focus-visible { background: rgba(255,255,255,.05); }
+.live-row.open { background: rgba(255,255,255,.08); }
+.live-row > span { min-width: 0; }
+
+.live-minute { display: grid; place-items: center; padding: 5px 4px; border: 1px solid rgba(241,76,76,.45); border-radius: 8px; background: rgba(241,76,76,.12); color: #ff8a8a; font-size: 11px; font-weight: 700; white-space: nowrap; }
+.live-minute.live::before { display: inline-block; width: 5px; height: 5px; margin-right: 5px; border-radius: 50%; background: var(--red); content: ""; animation: live-pulse 1.6s ease-in-out infinite; vertical-align: middle; }
+@keyframes live-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .25; } }
+@media (prefers-reduced-motion: reduce) { .live-minute.live::before { animation: none; } }
+
+.live-teams { display: grid; gap: 5px; }
+.live-team { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.live-team strong { overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.live-team:first-child strong { color: var(--home); }
+.live-team:nth-child(2) strong { color: var(--away); }
+.live-league { overflow: hidden; color: #969696; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.live-red { flex: 0 0 auto; padding: 1px 5px; border-radius: 4px; background: var(--red); color: #ffffff; font-size: 10px; font-style: normal; font-weight: 700; }
+.live-score { display: grid; gap: 6px; text-align: center; }
+.live-score strong { font-size: 14px; font-variant-numeric: tabular-nums; }
+
+.live-value { display: grid; gap: 3px; }
+.live-value-label { color: #969696; font-size: 10px; }
+.live-value-line { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+.live-chance { font-size: 16px; font-variant-numeric: tabular-nums; }
+.live-fact { color: var(--text); font-size: 12px; }
+.live-fact.muted { color: #969696; }
+/* Grau statt Grün oder Gold: Grün heißt „Empfehlenswert“, Gold „Sehr empfehlenswert“. */
+.live-provisional { padding: 0 5px; border: 1px solid #555555; border-radius: 4px; color: #b9b9b9; font-size: 10px; font-weight: 400; }
+.live-second { display: grid; gap: 4px; color: #969696; font-size: 10px; }
+.live-second small { font-size: 10px; }
+.live-prematch-hint { color: #8a8a8a; }
+/* Kopfzeile wie in der Tabelle: bleibt beim Scrollen stehen, blendet nichts aus. */
+.live-head { position: sticky; top: -14px; z-index: 2; min-height: 0; padding-block: 8px; background: var(--bg); color: #969696; font-size: 10px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; cursor: default; }
+.live-head:hover { background: var(--bg); }
+.live-head > span:nth-child(n+5) { text-align: center; }
+/* Heim oben, Gast unten - auf Höhe der Teamnamen und des Stands. */
+.live-stat { display: grid; gap: 6px; text-align: center; font-size: 12px; font-variant-numeric: tabular-nums; }
+.live-stat .home, .live-stat .away { display: flex; justify-content: center; align-items: center; gap: 6px; min-height: 17px; white-space: nowrap; }
+.live-card { display: inline-flex; align-items: center; gap: 3px; }
+/* Als Karte gezeichnet (hochkant), nicht in Gold: Gold heißt „Sehr empfehlenswert“. */
+.live-card i { display: inline-block; width: 8px; height: 11px; border-radius: 2px; background: #e8c93a; }
+.live-card.red i { background: var(--red); }
+
+.live-metric-bar { display: flex; overflow: hidden; height: 5px; border-radius: 3px; background: #333333; }
+.live-metric-bar i { display: block; height: 100%; }
+.live-metric-bar i.home { background: var(--home); }
+.live-metric-bar i.middle { background: #5a5a5a; }
+.live-metric-bar i.away { background: var(--away); }
+.live-metric-bar i.empty { width: 100%; background: repeating-linear-gradient(90deg, #3a3a3a 0 4px, transparent 4px 8px); }
+
+.live-panel { position: fixed; z-index: 45; max-height: min(88vh, 720px); padding: 14px 16px; border: 1px solid #4a4a4a; border-radius: 13px; background: #252526; box-shadow: 0 22px 55px rgba(0,0,0,.65); overflow-y: auto; }
+.live-panel-head { display: grid; gap: 5px; padding-bottom: 10px; }
+.live-panel-head .live-minute { justify-self: start; padding-inline: 8px; }
+.live-panel-head strong { font-size: 13px; }
+.live-panel-head small { color: #969696; font-size: 10px; }
+.live-section { padding: 9px 0; border-top: 1px solid var(--line-soft); }
+.live-section:last-child { padding-bottom: 0; }
+.live-section h4 { margin: 0 0 7px; color: #969696; font-size: 10px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
+.live-section h4 .live-provisional { letter-spacing: 0; text-transform: none; }
+.live-panel-empty { margin: 0; color: #969696; font-size: 11px; line-height: 1.5; }
+.live-panel-note { margin: 6px 0 0; color: #969696; font-size: 10px; line-height: 1.5; }
+.live-chances { display: grid; gap: 4px; margin: 0; }
+.live-chances div { display: grid; grid-template-columns: 128px minmax(0,1fr); gap: 8px; font-size: 11px; }
+.live-chances dt { color: #969696; }
+.live-chances dd { margin: 0; color: var(--text); font-variant-numeric: tabular-nums; }
+.live-cards { margin: 0; color: #b9b9b9; font-size: 11px; }
+.live-cards strong { color: var(--text); font-variant-numeric: tabular-nums; }
+.live-metric-list { display: grid; gap: 7px; }
+.live-metric-row { display: grid; grid-template-columns: 40px minmax(0,1fr) 40px; align-items: center; gap: 9px; }
+.live-metric-home, .live-metric-away { font-size: 11px; font-variant-numeric: tabular-nums; }
+.live-metric-home { color: var(--home); text-align: right; }
+.live-metric-away { color: var(--away); }
+.live-metric-body { display: grid; gap: 3px; min-width: 0; }
+.live-metric-body small { color: #969696; font-size: 10px; text-align: center; }
+.live-context { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 2px 0 0; color: #969696; font-size: 10px; }
+.live-context strong { color: #b9b9b9; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+.live-events ul, .live-prematch ul { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.live-events li { display: grid; grid-template-columns: 38px 22px minmax(0,1fr); align-items: center; gap: 7px; font-size: 11px; }
+.live-events li.home .live-event-text { color: var(--home); }
+.live-events li.away .live-event-text { color: var(--away); }
+.live-event-minute { color: #969696; font-variant-numeric: tabular-nums; }
+.live-event-glyph { font-size: 10px; text-align: center; }
+.live-event-text { overflow: hidden; color: #b9b9b9; text-overflow: ellipsis; white-space: nowrap; }
+.live-prematch p { margin: 0 0 7px; color: #969696; font-size: 10px; }
+.live-prematch li { display: grid; grid-template-columns: minmax(0,1fr) auto 42px; gap: 10px; padding: 3px 6px; border-radius: 6px; color: #b9b9b9; font-size: 11px; }
+.live-prematch li.recommended { background: rgba(95,191,139,.1); color: #cfe9d8; }
+.live-prematch li.strong { background: rgba(217,180,95,.1); color: #ecdcb4; }
+.live-prematch li span:nth-child(2) { text-align: right; }
+.live-prematch li strong { text-align: right; font-variant-numeric: tabular-nums; }
+
+@media (max-width: 1100px) {
+  .content { padding-inline: 12px; }
+  .fixture-detail-panel { padding-inline: 18px 14px; }
+  .live-list { margin-inline: -18px; padding-inline: 18px; }
+}
+
+@media (max-width: 700px) {
+  .app-shell { width: 100vw; height: 100vh; min-height: 560px; margin: 0; border: 0; border-radius: 0; }
+  .app-shell { grid-template-columns: 56px minmax(0, 1fr); }
+  .nav-rail .brand-mark { height: 56px; }
+  .nav-rail button { padding-inline: 0; }
+  .nav-rail-label { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+  .nav-rail-foot { font-size: 8px; }
+  /* Die Werkzeugleiste scrollt hier seitlich und schnitte ein absolut gesetztes Menue ab. */
+  .filter-menu, .filter-menu.single { position: fixed; top: 64px; right: 8px; left: 64px; width: auto; }
+  .filter-menu.cart-window { left: 64px; width: auto; }
+  .day-range { grid-template-columns: minmax(0, 1fr); }
+  .quick-range { justify-self: start; min-width: 120px; }
+  .toolbar-row { gap: 8px; }
+  .content { padding-top: 14px; }
+  .banner { padding: 10px; }
+  .banner p { font-size: 9px; }
+  .live-panel { left: 12px !important; width: calc(100vw - 24px) !important; }
+  .view-toolbar { gap: 8px; overflow-x: auto; }
+  .league-filter-modal { width: 100vw; height: 100vh; max-height: 100vh; border-radius: 0; }
+  .kelly-dialog { width: 100vw; height: 100vh; max-height: 100vh; border-radius: 0; }
+  .table-with-detail { flex-direction: column; }
+  .table-scroll { margin: 0 0 12px; }
+  .fixture-detail-panel { width: auto; min-width: 0; flex: 0 0 auto; border-left: 0; border-top: 1px solid var(--line); }
+  .period-row, .period-axis { grid-template-columns: 16px 36px 17px repeat(6, minmax(0, 1fr)); }
+}
+
+/* Marktprofil: was die eigenen abgerechneten Partien über die Märkte sagen. */
+.profile-view { max-width: 1080px; margin: 0 auto; padding: 4px 0 32px; }
+.profile-notice { padding: 32px 16px; color: var(--muted); font-size: 12px; text-align: center; }
+.profile-notice-error { color: var(--gold); }
+.profile-head h2 { margin: 0 0 6px; font-size: 15px; font-weight: 700; }
+.profile-head p { max-width: 76ch; margin: 0; color: var(--muted); font-size: 11px; line-height: 1.6; }
+.profile-overall { max-width: 76ch; margin: 14px 0 16px; padding: 10px 12px; border-left: 2px solid var(--accent); border-radius: 0 6px 6px 0; background: var(--surface); font-size: 11px; line-height: 1.7; }
+.profile-overall strong { color: var(--text); }
+.profile-table-scroll { overflow-x: auto; border: 1px solid var(--line-soft); border-radius: 8px; }
+.profile-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+.profile-table thead { background: var(--surface); }
+.profile-table th { padding: 8px; color: var(--dim); font-size: 8px; font-weight: 700; letter-spacing: .04em; text-align: left; text-transform: uppercase; white-space: nowrap; }
+.profile-table th:nth-child(n+2) { text-align: right; }
+.profile-table th:last-child { text-align: left; }
+.profile-table td { padding: 7px 8px; color: #c8c8c8; border-top: 1px solid var(--line-soft); text-align: right; white-space: nowrap; }
+.profile-table td:first-child, .profile-table td:last-child { text-align: left; }
+.profile-market td { font-weight: 600; }
+.profile-expand { display: inline-flex; gap: 6px; align-items: center; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; }
+.profile-expand:hover { color: var(--accent); }
+.profile-band td { color: var(--dim); background: rgba(255,255,255,.015); font-size: 10px; }
+.profile-band-label { padding-left: 17px; }
+.profile-bias { color: var(--gold); }
+.profile-bias-bad { color: var(--red); font-weight: 700; }
+.profile-roi-good { color: var(--green); }
+.profile-roi-bad { color: var(--red); }
+.profile-verdict { display: inline-block; padding: 2px 7px; border-radius: 10px; font-size: 9px; font-weight: 700; }
+.verdict-good { background: rgba(137,209,133,.16); color: var(--green); }
+.verdict-watch { background: rgba(204,167,0,.16); color: var(--gold); }
+.verdict-bad { background: rgba(241,76,76,.14); color: var(--red); }
+.verdict-thin { background: var(--surface-2); color: var(--dim); }
+.profile-footer { max-width: 76ch; margin-top: 14px; }
+.profile-footer p { margin: 0 0 8px; color: var(--muted); font-size: 10px; line-height: 1.7; }
+.profile-caveat { color: var(--dim); }
+
+/* Kelly: Umschalter und Automatik-Kopf. */
+.kelly-mode { display: flex; gap: 10px; align-items: center; margin-top: 14px; }
+.kelly-mode-switch { display: inline-flex; overflow: hidden; border: 1px solid var(--line); border-radius: 7px; }
+.kelly-mode-switch button { padding: 6px 14px; border: 0; background: transparent; color: var(--muted); font: inherit; font-size: 12px; }
+.kelly-mode-switch button.active { background: var(--accent-soft); color: #cfe6ff; font-weight: 700; }
+.kelly-mode-switch button:disabled { color: #5a5a5a; }
+.kelly-mode-note { color: var(--gold); font-size: 11px; }
+
+.kelly-auto { margin-top: 12px; padding: 12px 14px; border: 1px solid #33404f; border-radius: 10px; background: rgba(55,148,255,.06); }
+.kelly-auto p { margin: 0 0 8px; font-size: 12px; line-height: 1.6; }
+.kelly-auto-lead { color: var(--muted); }
+.kelly-auto-chips { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
+.kelly-auto-label { margin-right: 4px; color: #8f8f8f; font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+.kelly-auto-chip { display: inline-block; padding: 3px 9px; border-radius: 11px; background: rgba(137,209,133,.16); color: #a8ddA4; font-size: 12px; }
+.kelly-auto-chip small { color: #86b883; font-size: 11px; }
+.kelly-auto-chip-idle { background: #2d2d30; color: #8f8f8f; }
+.kelly-auto-detail { margin: 8px 0 0 !important; color: #9c9c9c; }
+
+.profile-expand:disabled { color: inherit; }
+.profile-expand-spacer { display: inline-block; width: 11px; }
+
+/* Heatmap: eine Zeile je Spiel, 34 px. Die Spaltenbreiten muessen zur Mindestbreite passen,
+   die HeatmapTable.tsx ausrechnet - sonst klemmen die Zellen oder die Tabelle scrollt ohne Not. */
+.heatmap-area { display: flex; flex: 1; flex-direction: column; min-width: 0; min-height: 0; }
+.heatmap-area .table-scroll { flex: 0 1 auto; margin-bottom: 8px; }
+.heatmap-grid { --heatmap-markets: 3; display: grid; grid-template-columns: 88px minmax(260px,1fr) repeat(5,84px) 76px repeat(var(--heatmap-markets),100px); gap: 6px; align-items: center; width: 100%; min-width: max(100%,var(--heatmap-min-width, 1200px)); }
+.heatmap-head { position: sticky; top: 0; z-index: 5; padding: 10px 10px 8px 38px; border-bottom: 1px solid var(--line); background: #252526; }
+.heatmap-head button { display: flex; align-items: center; justify-content: center; gap: 4px; min-width: 0; padding: 2px 0; border: 0; background: transparent; color: #969696; font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; white-space: nowrap; }
+.heatmap-head button:nth-child(-n+2) { justify-content: flex-start; }
+.heatmap-head button.active { color: #d4d4d4; }
+.heatmap-arrow { font-style: normal; opacity: 0; }
+.heatmap-head button:hover .heatmap-arrow, .heatmap-head button:focus-visible .heatmap-arrow, .heatmap-head button.active .heatmap-arrow { opacity: 1; }
+.heatmap-row-wrap { min-width: max(100%,var(--heatmap-min-width, 1200px)); border-bottom: 1px solid var(--line-soft); }
+.heatmap-row-wrap:last-of-type { border-bottom: 0; }
+.heatmap-row-wrap:hover { background: rgba(255,255,255,.025); }
+.heatmap-row-wrap.open { background: #252526; box-shadow: inset 3px 0 0 var(--accent); }
+.heatmap-row { height: 34px; padding: 0 10px 0 38px; border: 0; background: transparent; text-align: left; }
+.heatmap-row-wrap .cart-add-hub { --hub-size: 22px; }
+.cart-add:not(.has-entries) { font-size: 14px; font-weight: 500; letter-spacing: 0; }
+.cart-add:disabled { opacity: .35; cursor: default; }
+.cart-add:disabled:hover { background: var(--bg); color: var(--muted); }
+.heatmap-time { display: flex; align-items: baseline; gap: 6px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.heatmap-time small { color: #6f6f6f; font-size: 10px; }
+.heatmap-time strong { color: #e0e0e0; font-size: 13px; font-weight: 700; }
+.heatmap-time.started strong { color: #8a8a8a; }
+.heatmap-teams { display: flex; align-items: center; gap: 6px; min-width: 0; white-space: nowrap; }
+.heatmap-teams strong { flex: 0 1 auto; min-width: 0; overflow: hidden; font-size: 13px; font-weight: 600; text-overflow: ellipsis; }
+.heatmap-teams strong.home { color: var(--home); }
+.heatmap-teams strong.away { color: var(--away); }
+.heatmap-teams > i { color: #5a5a5a; font-style: normal; }
+.heatmap-teams .class-gap { flex: none; }
+/* Die Liga bekommt nur den Platz, der neben den Teamnamen uebrig bleibt (Basis 0), und kuerzt
+   sich darin. Mit Basis auto schrumpften auch die Namen um Bruchteile eines Pixels mit - und
+   schon das loest die Ellipse aus ("Austral..."). */
+.heatmap-league { flex: 1 1 0; min-width: 0; padding-left: 8px; overflow: hidden; color: #7a7a7a; font-size: 10px; text-align: right; text-overflow: ellipsis; }
+/* Vorsprung: blau = Heim vorn, orange = Auswaerts vorn, --heat (0-1) steuert die Deckkraft. */
+.heat-cell, .odds-cell, .heatmap-draw-score { display: flex; align-items: center; justify-content: center; gap: 6px; height: 26px; border-radius: 5px; background: #232323; color: #d4d4d4; font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.heat-cell.home { background: rgba(117,190,255,calc(.08 + var(--heat, 0) * .5)); color: #eef6ff; }
+.heat-cell.away { background: rgba(206,145,120,calc(.08 + var(--heat, 0) * .5)); color: #fff3ee; }
+.heat-cell.even { color: #a0a0a0; }
+/* Wenig Vertrauen: schwaechere Farbe und gestrichelter Rand statt Deckkraft - die Zahl bleibt lesbar. */
+.heat-cell.faint { outline: 1px dashed rgba(255,255,255,.22); outline-offset: -1px; }
+.heat-cell.faint.home { background: rgba(117,190,255,calc(.05 + var(--heat, 0) * .22)); color: #c4d6e6; }
+.heat-cell.faint.away { background: rgba(206,145,120,calc(.05 + var(--heat, 0) * .22)); color: #e6d2c9; }
+.heat-cell.missing, .odds-cell.missing, .heatmap-draw-score.missing { color: #5a5a5a; font-weight: 400; }
+.heatmap-draw-score { background: transparent; font-size: 13px; }
+.heatmap-draw-score.zero { color: #5f5f5f; font-weight: 400; }
+.heatmap-draw-score.s50 { color: #a9cfa6; }
+.heatmap-draw-score.s60 { color: var(--green); font-weight: 700; }
+.heatmap-draw-score.s70 { background: rgba(137,209,133,.16); color: var(--green); font-weight: 800; }
+.odds-cell strong { font-weight: 700; }
+.odds-cell.value { background: rgba(137,209,133,calc(.1 + var(--heat, 0) * .35)); color: #f2fff1; }
+.heatmap-pick { font-size: 10px; font-weight: 700; }
+.heatmap-pick.home { color: var(--home); }
+.heatmap-pick.away { color: var(--away); }
+.heatmap-legend { display: flex; flex-wrap: wrap; gap: 6px 24px; margin: 0 0 16px; padding: 0 6px; color: #7a7a7a; font-size: 11px; }
+.heatmap-legend b { font-weight: 600; }
+.heatmap-legend b.home { color: var(--home); }
+.heatmap-legend b.away { color: var(--away); }
+.heatmap-legend b.value { color: var(--green); }
