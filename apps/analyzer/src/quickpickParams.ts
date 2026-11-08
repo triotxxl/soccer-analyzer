@@ -205,7 +205,34 @@ const KOMBI: QuickpickParam[] = [
   }
 ];
 
+const DAVES_TABLE: QuickpickParam[] = [
+  {
+    id: "minRise5", label: "Plätze in 5 Spieltagen", min: 1, max: 6, step: 1,
+    title: "So viele Plätze muss eine Mannschaft in den letzten 5 Spieltagen gewonnen (bzw. die andere"
+      + " verloren) haben, damit es als Trend zählt."
+  },
+  {
+    id: "minRise10", label: "Plätze in 10 Spieltagen", min: 1, max: 10, step: 1,
+    title: "Dasselbe über die letzten 10 Spieltage. Es reicht, wenn einer der beiden Zeiträume zutrifft und"
+      + " der andere nicht in die Gegenrichtung zeigt."
+  },
+  {
+    id: "minMatchdays", label: "Spieltage mindestens", min: 3, max: 15, step: 1,
+    title: "Vorher ist ein Trend über 5 bis 10 Spieltage nicht prüfbar."
+  },
+  {
+    id: "minOdds", label: "Quote ab", min: 1, max: 3, step: 0.05,
+    title: "Mindestquote auf die Mannschaft im Hoch – Daves Vorgabe 1,60."
+  },
+  {
+    id: "maxOdds", label: "Quote bis", min: 1.2, max: 99, step: 0.05, sliderMax: 6,
+    title: "Höchstquote. 99 heißt: keine Grenze. Eine hohe Quote heißt: Tipico sieht die Mannschaft im Hoch"
+      + " trotzdem als Außenseiter."
+  }
+];
+
 export const QUICKPICK_PARAMS: Record<QuickpickPresetId, QuickpickParam[]> = {
+  davesTable: DAVES_TABLE,
   daves1x2: DAVES,
   dominanz: DOMINANZ,
   hz15: HZ15,
@@ -226,6 +253,11 @@ export interface QuickpickToggle {
 }
 
 export const QUICKPICK_TOGGLES: Record<QuickpickPresetId, QuickpickToggle[]> = {
+  davesTable: [{
+    id: "allowConstant", label: "Auch konstant gut gegen abrutschend",
+    title: "Zählt auch Spiele, in denen eine Mannschaft ihren Platz hält und vor einer abrutschenden steht."
+      + " Aus, wenn nur „klettert gegen rutscht ab“ zählen soll."
+  }],
   daves1x2: [{
     id: "requireStreak", label: "Nur mit Siegesserie",
     title: "Verlangt mindestens zwei gewonnene direkte Duelle in Folge. Bringt geprüft nichts,"

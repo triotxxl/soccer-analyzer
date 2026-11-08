@@ -10,7 +10,8 @@ import { PredictionsView } from "./components/PredictionsView";
 import { Splitter } from "./components/Splitter";
 import { TeamsView } from "./components/TeamsView";
 import {
-  competitionId, competitionsOf, competitionTree, datePresets, dayKey, daysWithGames, inScope, isOver, leagueTables, modelTips,
+  AUTHOR_FILTERS, authorTips, competitionId, competitionsOf, competitionTree, datePresets, dayKey, daysWithGames, inScope, isOver, leagueTables, modelTips,
+  type AuthorFilter,
   seasonLabel, sortName, sortTips, type DayScope,
 } from "./neoData";
 import { useNeoState, type NeoState, type NeoView } from "./useNeoState";
@@ -96,9 +97,13 @@ function Dashboard({ document: snapshot }: { document: DashboardDocument }) {
     const perDay = new Map<string, number>();
     document.fixtures.filter((f) => !off.has(competitionId(f))).forEach((f) => { const d = dayKey(f.kickoff, tz); perDay.set(d, (perDay.get(d) ?? 0) + 1); });
     const tables = leagueTables(snapshot.fixtures, active);
-    const tips = sortTips(modelTips(visible, ui.pmarkets, ui.pmin, ui.pmax, source), ui.tipOrder, tz);
-    return { counts, visible, active, perDay, tables, tips, noCompetitions: off.size >= base.competitions.length };
-  }, [document, snapshot, scope, tz, ui.deselected, ui.pmarkets, ui.pmin, ui.pmax, ui.tipOrder, tree, source, base]);
+    const authors = authorTips(visible, AUTHOR_FILTERS, source);
+    const tips = sortTips(ui.tipSource === "authors"
+      ? authors.filter((t) => ui.authorFilters.includes(t.author!.filter))
+      : modelTips(visible, ui.pmarkets, ui.pmin, ui.pmax, source), ui.tipOrder, tz);
+    const authorCounts = Object.fromEntries(AUTHOR_FILTERS.map((f) => [f, authors.filter((t) => t.author!.filter === f).length])) as Record<AuthorFilter, number>;
+    return { counts, visible, active, perDay, tables, tips, authorCounts, noCompetitions: off.size >= base.competitions.length };
+  }, [document, snapshot, scope, tz, ui.deselected, ui.pmarkets, ui.pmin, ui.pmax, ui.tipOrder, ui.tipSource, ui.authorFilters, tree, source, base]);
 
   const allTeams = derived.tables.flatMap((t) => t.rows);
   const fixture = derived.visible.find((f) => f.fixtureId === ui.fixture) ?? derived.visible[0] ?? null;
@@ -154,6 +159,8 @@ function Dashboard({ document: snapshot }: { document: DashboardDocument }) {
           )}
           {ui.view === "preds" && (
             <PredictionsView tips={derived.tips} fixtures={derived.visible} timezone={tz} order={ui.tipOrder} onOrder={(tipOrder) => set({ tipOrder })}
+              tipSource={ui.tipSource} onTipSource={(tipSource) => set({ tipSource })}
+              authorFilters={ui.authorFilters} onAuthorFilters={(authorFilters) => set({ authorFilters, tipSource: "authors" })} authorCounts={derived.authorCounts}
               markets={ui.pmarkets} onMarkets={(pmarkets) => set({ pmarkets })}
               pmin={ui.pmin} pmax={ui.pmax} onRange={(pmin, pmax) => set({ pmin, pmax })}
               selected={tip?.id ?? null} onSelect={(id) => set({ tip: id })} scope={scope} noCompetitions={derived.noCompetitions} />

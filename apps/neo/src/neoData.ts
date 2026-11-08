@@ -1,3 +1,4 @@
+import { evaluateFixture, QUICKPICK_PRESETS, type QuickpickPresetId } from "../../../src/quickpick.ts";
 import { countryFlagCode } from "../../shared/src/countryFlags";
 import { competitionCountry, competitionLeague, teamName, type NameSource } from "../../shared/src/names";
 import type {
@@ -203,8 +204,62 @@ export interface Tip {
   market: TipMarket;
   marketLabel: string;
   pick: string;
-  probability: number;
+  /** Chance laut Modell; bei Autoren-Tipps null, wenn das Modell für das Spiel keine belastbare 1X2-Chance hat. */
+  probability: number | null;
   odds: number | null;
+  /** Nur bei Autoren-Tipps: welcher Filter den Tipp ausgesucht hat. */
+  author?: AuthorTipInfo;
+}
+
+/** Die Daves-Filter, deren Treffer unter „Autoren“ stehen (Davids Wahl vom 02.11.2026: alle drei, Vorgabe-Stufe). */
+export const AUTHOR_FILTERS = ["daves1x2", "dominanz", "remisScore"] as const satisfies readonly QuickpickPresetId[];
+export type AuthorFilter = (typeof AUTHOR_FILTERS)[number];
+
+export interface AuthorTipInfo {
+  filter: AuthorFilter;
+  label: string;
+  /** Dominanz: Das Modell tippt die andere Seite. */
+  modelAgainst: boolean;
+  /** Remis-Score: erreichte Punkte von höchstens möglichen. */
+  score: { value: number; max: number } | null;
+}
+
+export const authorFilterLabel = (filter: AuthorFilter) => QUICKPICK_PRESETS[filter].label;
+export const authorFilterWarning = (filter: AuthorFilter) => QUICKPICK_PRESETS[filter].warnung;
+
+/**
+ * Tipps der gewählten Daves-Filter, jeder mit seiner Vorgabe-Stufe - dieselbe Regel (`evaluateFixture`), die
+ * Quickpicker und Rückrechnung (`npm run quickpick-report`) benutzen; eine zweite Fassung gibt es nicht. Ein Spiel,
+ * das mehrere Filter finden, steht je Filter einmal da. Die Chance ist die des Modells für die gewählte Seite.
+ */
+export function authorTips(fixtures: readonly DashboardFixture[], filters: readonly AuthorFilter[], source: NameSource): Tip[] {
+  const tips: Tip[] = [];
+  for (const filter of AUTHOR_FILTERS.filter((f) => filters.includes(f))) {
+    const preset = QUICKPICK_PRESETS[filter];
+    for (const fixture of fixtures) {
+      const evaluation = evaluateFixture(fixture, preset.defaults);
+      if (!evaluation.passes) continue;
+      const triple = oneXTwo(fixture);
+      const draw = evaluation.market === "draw";
+      const side = draw ? null : evaluation.side;
+      if (!draw && !side) continue;
+      tips.push({
+        id: `${fixture.fixtureId}:author:${filter}`,
+        fixture,
+        market: "1x2",
+        marketLabel: "Endergebnis",
+        pick: draw ? "Unentschieden" : `${teamName(fixture, side === "1" ? "home" : "away", source)} gewinnt`,
+        probability: !triple ? null : draw ? triple.draw : side === "1" ? triple.home : triple.away,
+        odds: evaluation.odds,
+        author: {
+          filter, label: preset.label,
+          modelAgainst: evaluation.dominanz ? !evaluation.dominanz.modelAgrees : false,
+          score: evaluation.remisScore ? { value: evaluation.remisScore.score, max: evaluation.remisScore.max } : null,
+        },
+      });
+    }
+  }
+  return tips;
 }
 
 /** Alle Kandidaten eines Spiels; ohne Chance (nicht belastbar) kein Kandidat. */
@@ -230,11 +285,11 @@ export function tipCandidates(fixture: DashboardFixture, source: NameSource): Ti
 
 /** Modell: je Spiel der wahrscheinlichste Tipp aus den gewählten Märkten, im Wahrscheinlichkeitsbereich. */
 export function modelTips(fixtures: readonly DashboardFixture[], markets: readonly TipMarket[], min: number, max: number, source: NameSource): Tip[] {
-  const inRange = (t: Tip) => t.probability * 100 >= min - 1e-9 && t.probability * 100 <= max + 1e-9;
+  const inRange = (t: Tip) => (t.probability ?? 0) * 100 >= min - 1e-9 && (t.probability ?? 0) * 100 <= max + 1e-9;
   const best: Tip[] = [];
   for (const fixture of fixtures) {
     const pool = tipCandidates(fixture, source).filter((t) => markets.includes(t.market));
-    const top = pool.sort((a, b) => b.probability - a.probability)[0];
+    const top = pool.sort((a, b) => (b.probability ?? 0) - (a.probability ?? 0))[0];
     if (top && inRange(top)) best.push(top);
   }
   return best;
@@ -242,11 +297,12 @@ export function modelTips(fixtures: readonly DashboardFixture[], markets: readon
 
 export type TipOrder = "chance" | "kickoff";
 
-/** Tipps nach Tagen; innerhalb eines Tages nach Chance (höchste zuerst) oder nach Anstoß. */
+/** Tipps nach Tagen; innerhalb eines Tages nach Chance (höchste zuerst, ohne Chance zuletzt) oder nach Anstoß. */
 export function sortTips(tips: readonly Tip[], order: TipOrder, timezone: string): Tip[] {
   const time = (t: Tip) => Date.parse(t.fixture.kickoff);
+  const chance = (t: Tip) => t.probability ?? -1;
   return [...tips].sort((a, b) => dayKey(a.fixture.kickoff, timezone).localeCompare(dayKey(b.fixture.kickoff, timezone))
-    || (order === "kickoff" ? time(a) - time(b) || b.probability - a.probability : b.probability - a.probability || time(a) - time(b)));
+    || (order === "kickoff" ? time(a) - time(b) || chance(b) - chance(a) : chance(b) - chance(a) || time(a) - time(b)));
 }
 
 // ===== Marktchancen (Detailansicht eines Spiels) ===============================
@@ -255,7 +311,7 @@ export function sortTips(tips: readonly Tip[], order: TipOrder, timezone: string
 export function likelyTips(fixture: DashboardFixture, source: NameSource): Tip[] {
   const candidates = tipCandidates(fixture, source);
   return TIP_MARKETS.flatMap(([market]) =>
-    candidates.filter((t) => t.market === market).sort((a, b) => b.probability - a.probability).slice(0, 1));
+    candidates.filter((t) => t.market === market).sort((a, b) => (b.probability ?? 0) - (a.probability ?? 0)).slice(0, 1));
 }
 
 export const OU_LINES = [0.5, 1.5, 2.5, 3.5, 4.5] as const;
@@ -343,70 +399,11 @@ export function leagueTables(fixtures: readonly DashboardFixture[], competitions
 
 // ===== H2H (direkte Duelle) =====================================================
 
-/** Unter so vielen Duellen bzw. Spielen steht „kann auch Zufall sein“ (Davids Entscheidung 28.10.2026). */
-export const H2H_FEW = 5;
+/** Seit 03.11.2026 in apps/shared/src/duels.ts, weil auch die Live-Ansicht der alten App die Duelle zeigt. */
+export { duelsOf, duelStats, H2H_FEW, type Duel, type DuelStats } from "../../shared/src/duels";
 
-export interface Duel {
-  id: number;
-  date: string;
-  league: string | null;
-  /** War das heutige Heimteam in diesem Duell zu Hause? */
-  ourHome: boolean;
-  homeGoals: number;
-  awayGoals: number;
-  /** Tore aus Sicht des heutigen Heim- bzw. Gastteams. */
-  gh: number;
-  ga: number;
-  res: FormResult;
-}
-
-/**
- * Die direkten Duelle eines Spiels, neueste zuerst, ohne Testspiele (`h2hSummary` zählt sie mit, für
- * eine Bilanz taugen sie nicht). Ab schemaVersion 11 bis zu 10 Duelle mit Wettbewerb (`h2h.history`),
- * davor die fünf aus `h2h.matches` ohne Wettbewerb.
- */
-export function duelsOf(fixture: Pick<DashboardFixture, "h2h">): Duel[] {
-  const list = fixture.h2h.history ?? fixture.h2h.matches;
-  return list.filter((m) => m.friendly !== true).map((m) => {
-    const gh = m.teamWasHome ? m.homeGoals : m.awayGoals, ga = m.teamWasHome ? m.awayGoals : m.homeGoals;
-    return {
-      id: m.fixtureId, date: m.date, league: m.league ?? null, ourHome: m.teamWasHome,
-      homeGoals: m.homeGoals, awayGoals: m.awayGoals, gh, ga, res: gh > ga ? "win" : gh < ga ? "loss" : "draw",
-    };
-  });
-}
-
-export interface DuelStats {
-  n: number; wH: number; dr: number; wA: number; gH: number; gA: number;
-  bestH: Duel | null; bestA: Duel | null;
-}
-
-export function duelStats(duels: readonly Duel[]): DuelStats {
-  const best = (res: FormResult) => duels.filter((d) => d.res === res)
-    .reduce<Duel | null>((top, d) => (!top || Math.abs(d.gh - d.ga) > Math.abs(top.gh - top.ga) ? d : top), null);
-  return {
-    n: duels.length,
-    wH: duels.filter((d) => d.res === "win").length, dr: duels.filter((d) => d.res === "draw").length,
-    wA: duels.filter((d) => d.res === "loss").length,
-    gH: duels.reduce((s, d) => s + d.gh, 0), gA: duels.reduce((s, d) => s + d.ga, 0),
-    bestH: best("win"), bestA: best("loss"),
-  };
-}
-
-type TableEntry = NonNullable<DashboardFixture["table"]>[number];
-
-/**
- * Die Tabellenzeile eines Teams: zuerst aus der Tabelle des Spiels, sonst - bei Pokalspielen, die keine
- * Tabelle tragen - aus der Tabelle eines anderen Spiels im Snapshot („jeweils in der eigenen Liga“).
- */
-export function tableEntryOf(fixtures: readonly DashboardFixture[], fixture: DashboardFixture, teamName: string):
-  { row: TableEntry; size: number; competition: string } | null {
-  for (const f of [fixture, ...fixtures]) {
-    const row = f.table?.find((r) => r.teamName === teamName);
-    if (row) return { row, size: f.table!.length, competition: competitionId(f) };
-  }
-  return null;
-}
+/** Seit 02.11.2026 in apps/shared/src/perf.ts, weil auch die alte App den Tabellenverlauf zeigt. */
+export { tableEntryOf } from "../../shared/src/perf";
 
 /** Die Viertelstunde eines Tors (wie `scoringPeriodIndex` in src/fixture-insights.ts). */
 export const periodOf = (minute: number) => Math.min(Math.max(Math.ceil(Math.max(minute, 1) / 15), 1), 6) - 1;
@@ -422,21 +419,7 @@ export function phaseCounts(matches: readonly InsightMatch[], teamId: number): P
   return { games: complete.length, scored, conceded };
 }
 
-/**
- * Ligaspiele der laufenden Saison eines Teams aus den Detailkennzahlen. Die Liga ist das häufigste
- * Paar aus Wettbewerb und Saison in seinen letzten Spielen - bei einem Pokalspiel ist `insights.league`
- * der Pokal, die Torphasen sollen aber aus der eigenen Liga kommen.
- */
-export function seasonMatches(matches: readonly InsightMatch[], teamId: number, venue: "home" | "away" | null): InsightMatch[] {
-  // Erst die jüngste Saison, darin der häufigste Wettbewerb: Früh in der Saison stehen unter den letzten
-  // 20 Spielen mehr aus der Vorsaison - das häufigste Paar insgesamt wäre dann die Vorsaison.
-  const latest = Math.max(...matches.map((m) => m.season));
-  const count = new Map<number, number>();
-  for (const m of matches) if (m.season === latest) count.set(m.leagueId, (count.get(m.leagueId) ?? 0) + 1);
-  const main = [...count.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
-  return matches.filter((m) => m.season === latest && m.leagueId === main
-    && (venue === null || (venue === "home" ? m.home.id === teamId : m.away.id === teamId)));
-}
+export { seasonMatches } from "../../shared/src/seasonView";
 
 /** Formpunkte: Sieg 3, Remis 1. */
 export const formPoints = (list: readonly FormResult[]) => list.reduce((s, r) => s + (r === "win" ? 3 : r === "draw" ? 1 : 0), 0);

@@ -289,6 +289,18 @@ describe("QuickpickDialog", () => {
     expect(onShowInTable).toHaveBeenLastCalledWith(null);
   });
 
+  it("zeigt zum aufgeklappten Treffer rechts eine eigene Spalte und schließt sie mit dem Zuklappen", async () => {
+    render(<QuickpickDialog fixtures={[fixture(1, "Alpha", "Beta", 75)]} store={DEFAULT_QUICKPICK_STORE} active={false}
+      timezone="Europe/Berlin" now={BEFORE_KICKOFF} onSettingsChange={() => undefined} onPresetChange={() => undefined}
+      onActiveChange={() => undefined} onAddAll={() => undefined} onClose={() => undefined}
+      renderDetail={(f) => <p>Duelle von {f.homeTeam}</p>} />);
+    expect(screen.queryByRole("complementary", { name: /Direkte Duelle/ })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByText("Alpha – Beta"));
+    expect(screen.getByRole("complementary", { name: /Direkte Duelle/ })).toHaveTextContent("Duelle von Alpha");
+    await userEvent.click(screen.getByText("Alpha – Beta"));
+    expect(screen.queryByRole("complementary", { name: /Direkte Duelle/ })).not.toBeInTheDocument();
+  });
+
   it("sperrt den Wettschein-Knopf ohne Treffer", () => {
     render(<Harness fixtures={[balanced(1)]} />);
     expect(screen.getByRole("button", { name: /Kein Spiel gefunden/ })).toBeDisabled();
@@ -458,12 +470,12 @@ describe("Vier Voreinstellungen", () => {
     expect(screen.getByText(/rechnet es in die Quote ein/)).toBeInTheDocument();
   });
 
-  /** Alle sieben Filter stehen in einer Liste, unter drei Überschriften. */
+  /** Alle acht Filter stehen in einer Liste, unter drei Überschriften. */
   it("teilt die Filter auf Daves, Modell und Tipico auf", () => {
     render(<Harness fixtures={[fixture(1, "Alpha", "Beta", 75)]} />);
     const werte = (gruppe: string) => within(screen.getByRole("group", { name: gruppe }))
       .getAllByRole("radio").map((radio) => radio.getAttribute("value"));
-    expect(werte("Daves Filter")).toEqual(["daves1x2", "dominanz", "remisScore"]);
+    expect(werte("Daves Filter")).toEqual(["daves1x2", "dominanz", "remisScore", "davesTable"]);
     expect(werte("Modell-Filter")).toEqual(["modell1x2", "hz15", "remis"]);
     expect(werte("Tipico-Filter")).toEqual(["kombi"]);
   });

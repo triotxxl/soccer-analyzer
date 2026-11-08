@@ -99,7 +99,10 @@ export const config = {
   // Liga-Niveau aus dem Vereins-Elo den Klassenunterschied (`strength.eloLevelDivisor`,
   // `eloLevelComparison` in src/strength-factor.ts). Ligaspiele, "gemessen" und Länderspiele
   // rechnen wie 3.6.0.
-  goalLineModelVersion: "3.7.0",
+  // 3.8.0 (04.11.2026): Heim-/Gast-Aufteilung bei Ligaspielen eingeschaltet (`goalLineHomeShift`,
+  // Davids Entscheidung nach der abgeschlossenen BTTS-Prüfung). Spiele zwischen Ligen und
+  // Länderspiele rechnen wie 3.7.0 (`STRENGTH_COMPARABLE_SINCE`).
+  goalLineModelVersion: "3.8.0",
   xgEnrichmentRequestBudget: 250,
   // Torschüsse und Ecken der letzten fünf Partien. Ein Aufruf deckt zwanzig Partien ab, und
   // jede geholte wird gespeichert - ein 48-Stunden-Lauf braucht damit etwa zwanzig Aufrufe,
@@ -151,11 +154,9 @@ export const config = {
     slope: 0.553
   },
   // Verschiebung der Heim-/Gast-Aufteilung bei Ligaspielen (`shiftHomeAway` in src/model.ts),
-  // nach der Summenkorrektur, Summe bleibt gleich. **Ab Werk 0 = aus** (Davids Entscheidung
-  // vom 10.10.2026): Eingeschaltet wird nach der vorab festgelegten BTTS-Prüfung
-  // (docs/btts-pruefung.md, etwa Mitte November), weil sich BTTS dabei leicht verschiebt.
-  // Dann 0.054 setzen und goalLineModelVersion auf 3.8.0 erhöhen (3.6.0 ist seit 19.10.2026
-  // die Ligastärke geschätzter Ligen, 3.7.0 seit 28.10.2026 das Liga-Niveau aus dem Vereins-Elo).
+  // nach der Summenkorrektur, Summe bleibt gleich. **Eingeschaltet am 04.11.2026, Modell 3.8.0**
+  // (Davids Entscheidung): Es wartete auf den Abschluss der vorab festgelegten BTTS-Prüfung
+  // (docs/btts-pruefung.md), weil sich BTTS dabei leicht verschiebt. 0 schaltet es ab.
   //
   // Gemessen (Prüfung vom 10.10.2026): δ über 74.033 nachgebaute Ligaspiele 0,0539 ± 0,0023,
   // live 0,059 ± 0,010. Zeit-Split, 1X2-Log-Loss gepaart: nachgebaut −0,0036 ± 0,0004 (Test)
@@ -163,8 +164,10 @@ export const config = {
   // Ligaspiele; Über/Unter unverändert, BTTS −0,0002 ± 0,0001. Gegen Tipico fair schrumpft der
   // Abstand nur um ein Zehntel (+0,039 -> +0,035). Spiele zwischen Ligen wurden schlechter
   // (+0,0086 ± 0,0054, dort fehlt der stärkeren Seite etwas anderes), Länderspiele sind nicht
-  // belegt - beide bleiben außen vor. Je Ligaspiel: P(Heim) +3,3, P(Gast) −3,1 Punkte.
-  goalLineHomeShift: 0,
+  // belegt - beide bleiben außen vor. Für Spiele zwischen Ligen läuft eine eigene, vorab
+  // festgelegte Prüfung (docs/heimvorteil-zwischen-ligen.md). Je Ligaspiel: P(Heim) +3,3,
+  // P(Gast) −3,1 Punkte.
+  goalLineHomeShift: 0.054,
   // Abrechnung fälliger Prognosen am Ende jedes Dashboard-Laufs. Klein gehalten, weil im
   // laufenden Betrieb pro Tag nur Dutzende Partien anfallen; ein Rückstand wird über
   // mehrere Läufe abgetragen. 0 schaltet die automatische Abrechnung ab.

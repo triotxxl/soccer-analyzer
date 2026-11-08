@@ -73,62 +73,65 @@ export const REMIS_SCORE_LEVELS: Array<QuickpickLevel<RemisScoreLevelValues>> = 
   {
     id: "streng", label: "Streng",
     measured: {
-      n: 25, proTag: 0.6, trefferquote: 0.32, roi: -0.036,
+      n: 71, proTag: 0.9, trefferquote: 0.225, roi: -0.338,
       kombis: [
-        { beine: 2, n: 280, trefferquote: 0.029, quote: 9.12, roi: -0.707, erwartung: -0.071 },
-        { beine: 3, n: 120, trefferquote: 0, quote: 29.33, roi: -1, erwartung: -0.104 },
-        { beine: 4, n: 40, trefferquote: 0, quote: 93.83, roi: -1, erwartung: -0.136 }
+        { beine: 2, n: 1120, trefferquote: 0.021, quote: 9.11, roi: -0.8, erwartung: -0.562 },
+        { beine: 3, n: 480, trefferquote: 0, quote: 28.07, roi: -1, erwartung: -0.71 },
+        { beine: 4, n: 280, trefferquote: 0, quote: 87.91, roi: -1, erwartung: -0.808 },
+        { beine: 5, n: 160, trefferquote: 0, quote: 249.63, roi: -1, erwartung: -0.873 },
+        { beine: 6, n: 80, trefferquote: 0, quote: 1026.52, roi: -1, erwartung: -0.916 },
+        { beine: 7, n: 40, trefferquote: 0, quote: 4500.24, roi: -1, erwartung: -0.944 }
       ]
     },
-    hint: "Remis-Score ab 16 von 25. Gut 3 von 10 Tipps stimmten, bei nur 25 alten Spielen –"
-      + " nicht besser als die Vorgabe. Weniger als ein Spiel am Tag.",
+    hint: "Remis-Score ab 16 von 25. Nur gut 2 von 10 Tipps stimmten – nicht mehr als ganz"
+      + " ohne Filter. Weniger als ein Spiel am Tag.",
     values: LEVELS.streng
   },
   {
     id: "ausgewogen", label: "Ausgewogen",
     measured: {
-      n: 77, proTag: 1.9, trefferquote: 0.312, roi: -0.077,
+      n: 260, proTag: 3.4, trefferquote: 0.281, roi: -0.145,
       kombis: [
-        { beine: 2, n: 1280, trefferquote: 0.088, quote: 9.09, roi: -0.198, erwartung: -0.149 },
-        { beine: 3, n: 840, trefferquote: 0.037, quote: 27.45, roi: -0.035, erwartung: -0.214 },
-        { beine: 4, n: 440, trefferquote: 0.018, quote: 80.03, roi: 0.348, erwartung: -0.275 },
-        { beine: 5, n: 400, trefferquote: 0.003, quote: 239.98, roi: -0.508, erwartung: -0.331 },
-        { beine: 6, n: 280, trefferquote: 0, quote: 745.69, roi: -1, erwartung: -0.383 },
-        { beine: 7, n: 160, trefferquote: 0, quote: 2037.74, roi: -1, erwartung: -0.43 }
+        { beine: 2, n: 4920, trefferquote: 0.08, quote: 9.76, roi: -0.259, erwartung: -0.268 },
+        { beine: 3, n: 3000, trefferquote: 0.023, quote: 30.53, roi: -0.333, erwartung: -0.374 },
+        { beine: 4, n: 2120, trefferquote: 0.008, quote: 96.87, roi: -0.276, erwartung: -0.465 },
+        { beine: 5, n: 1480, trefferquote: 0.002, quote: 301.69, roi: -0.624, erwartung: -0.542 },
+        { beine: 6, n: 1200, trefferquote: 0.001, quote: 940.01, roi: -0.435, erwartung: -0.608 },
+        { beine: 7, n: 840, trefferquote: 0, quote: 3007.25, roi: -1, erwartung: -0.665 }
       ]
     },
-    hint: "Remis-Score ab 14 von 25. Knapp jedes dritte Spiel endete unentschieden, etwa zwei"
+    hint: "Remis-Score ab 14 von 25. Knapp 3 von 10 Spielen endeten unentschieden, etwa drei"
       + " Spiele am Tag. Zuletzt seltener als am Anfang.",
     values: LEVELS.ausgewogen
   },
   {
     id: "locker", label: "Locker",
     measured: {
-      n: 249, proTag: 6.2, trefferquote: 0.301, roi: -0.089,
+      n: 749, proTag: 9.7, trefferquote: 0.292, roi: -0.083,
       kombis: [
-        { beine: 2, n: 4800, trefferquote: 0.083, quote: 9.43, roi: -0.239, erwartung: -0.17 },
-        { beine: 3, n: 3000, trefferquote: 0.023, quote: 28.83, roi: -0.37, erwartung: -0.243 },
-        { beine: 4, n: 2200, trefferquote: 0.004, quote: 90.15, roi: -0.658, erwartung: -0.31 },
-        { beine: 5, n: 1680, trefferquote: 0.001, quote: 268.2, roi: -0.612, erwartung: -0.372 },
-        { beine: 6, n: 1360, trefferquote: 0, quote: 839.57, roi: -1, erwartung: -0.427 },
-        { beine: 7, n: 1040, trefferquote: 0, quote: 2617.96, roi: -1, erwartung: -0.478 }
+        { beine: 2, n: 14520, trefferquote: 0.082, quote: 10.25, roi: -0.196, erwartung: -0.159 },
+        { beine: 3, n: 9400, trefferquote: 0.024, quote: 32.92, roi: -0.248, erwartung: -0.229 },
+        { beine: 4, n: 6840, trefferquote: 0.006, quote: 105.83, roi: -0.386, erwartung: -0.293 },
+        { beine: 5, n: 5320, trefferquote: 0.001, quote: 339.87, roi: -0.708, erwartung: -0.352 },
+        { beine: 6, n: 4280, trefferquote: 0, quote: 1102.09, roi: -0.673, erwartung: -0.406 },
+        { beine: 7, n: 3640, trefferquote: 0, quote: 3515.07, roi: -1, erwartung: -0.455 }
       ]
     },
-    hint: "Remis-Score ab 12 von 25. Knapp jedes dritte Spiel endete unentschieden – nur wenig"
+    hint: "Remis-Score ab 12 von 25. Knapp 3 von 10 Spielen endeten unentschieden – nur wenig"
       + " mehr als ohne Filter. Unterm Strich ein Verlust.",
     values: LEVELS.locker
   },
   {
     id: "weit", label: "Weit",
     measured: {
-      n: 599, proTag: 14.9, trefferquote: 0.277, roi: -0.122,
+      n: 1651, proTag: 21.4, trefferquote: 0.274, roi: -0.12,
       kombis: [
-        { beine: 2, n: 11800, trefferquote: 0.074, quote: 10.13, roi: -0.269, erwartung: -0.229 },
-        { beine: 3, n: 7680, trefferquote: 0.02, quote: 32.39, roi: -0.348, erwartung: -0.323 },
-        { beine: 4, n: 5720, trefferquote: 0.005, quote: 103.21, roi: -0.486, erwartung: -0.406 },
-        { beine: 5, n: 4480, trefferquote: 0.001, quote: 330.63, roi: -0.566, erwartung: -0.478 },
-        { beine: 6, n: 3640, trefferquote: 0, quote: 1060.73, roi: -0.836, erwartung: -0.542 },
-        { beine: 7, n: 3000, trefferquote: 0, quote: 3331.63, roi: 0.158, erwartung: -0.598 }
+        { beine: 2, n: 32600, trefferquote: 0.073, quote: 10.73, roi: -0.244, erwartung: -0.226 },
+        { beine: 3, n: 21400, trefferquote: 0.022, quote: 35.18, roi: -0.257, erwartung: -0.319 },
+        { beine: 4, n: 15920, trefferquote: 0.005, quote: 115.62, roi: -0.466, erwartung: -0.401 },
+        { beine: 5, n: 12600, trefferquote: 0.002, quote: 379.39, roi: -0.437, erwartung: -0.473 },
+        { beine: 6, n: 10320, trefferquote: 0, quote: 1251.42, roi: -0.448, erwartung: -0.536 },
+        { beine: 7, n: 8720, trefferquote: 0, quote: 4132.85, roi: -0.787, erwartung: -0.592 }
       ]
     },
     hint: "Remis-Score ab 10 von 25. Nur zum Überblick: kaum mehr Unentschieden als ohne Filter,"
@@ -204,12 +207,13 @@ export const REMIS_SCORE_PRESET: QuickpickPreset<RemisScoreQuickpickSettings> = 
       : `So oft endete das Spiel wirklich unentschieden: ${(measured.trefferquote * 100).toFixed(1).replace(".", ",")} %`
         + ` (an ${measured.n} alten Wetten geprüft). Ohne Filter ist es jedes vierte Spiel.`
   }),
-  honesty: "An alten Spielen geprüft endete in der Vorgabe knapp jedes dritte Spiel"
-    + " unentschieden. Die Punkte je Hinweis sind gesetzt, und es waren erst wenige Spiele: Das"
-    + " kann auch Zufall sein. Ein Schein mit vier Spielen ging so gut wie nie durch. Rechne nicht"
-    + " mit Gewinn.",
-  warnung: "Die Punkte je Hinweis sind gesetzt, nicht gemessen, und geprüft ist erst wenig – das"
-    + " kann auch Zufall sein. Rechne nicht mit Gewinn.",
+  honesty: "An alten Spielen geprüft endeten in der Vorgabe knapp 3 von 10 Spielen"
+    + " unentschieden – kaum mehr als ganz ohne Filter, wo es 1 von 4 sind. Zuletzt waren es"
+    + " weniger als am Anfang, und die Punkte je Hinweis sind gesetzt, nicht gemessen. Das kann"
+    + " auch Zufall sein. Ein Schein"
+    + " mit vier Spielen ging so gut wie nie durch. Rechne nicht mit Gewinn.",
+  warnung: "Es stimmen kaum mehr Tipps als ganz ohne Filter, und die Punkte je Hinweis sind"
+    + " gesetzt, nicht gemessen. Rechne nicht mit Gewinn.",
   wettschein: {
     hinweis: "Legt jedes gefundene Spiel als „Unentschieden“ in den Wettschein. Ein Sieger-Tipp"
       + " zum selben Spiel wird dabei ersetzt – beides zugleich verliert sicher."

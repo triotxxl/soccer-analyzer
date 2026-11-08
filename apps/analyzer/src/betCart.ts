@@ -3,6 +3,7 @@ import { decideMarket, marketsExcludeEachOther } from "../../../src/market-outco
 import { teamName, type NameSource } from "../../shared/src/names";
 import type { DashboardFixture, DashboardMarket, DashboardMarketKey, RecommendationLevel } from "../../shared/src/types";
 import type { QuickpickEvaluation, QuickpickPresetId } from "./quickpick";
+import { dateFormat } from "./dateFormat";
 
 const STORAGE_KEY = "football-analyzer:bet-cart";
 const SETUP_STORAGE_KEY = "football-analyzer:combo-setup";
@@ -495,9 +496,9 @@ export function tipicoEventUrl(
 /** „Mi 14.10. 21:00“ - mit Datum, weil die Kopie später und außerhalb der App gelesen wird. */
 function copyKickoff(value: string, timezone: string): string {
   const date = new Date(value);
-  const weekday = new Intl.DateTimeFormat("de-DE", { timeZone: timezone, weekday: "short" }).format(date);
-  const day = new Intl.DateTimeFormat("de-DE", { timeZone: timezone, day: "2-digit", month: "2-digit" }).format(date);
-  const clock = new Intl.DateTimeFormat("de-DE", { timeZone: timezone, hour: "2-digit", minute: "2-digit" }).format(date);
+  const weekday = dateFormat("de-DE", { timeZone: timezone, weekday: "short" }).format(date);
+  const day = dateFormat("de-DE", { timeZone: timezone, day: "2-digit", month: "2-digit" }).format(date);
+  const clock = dateFormat("de-DE", { timeZone: timezone, hour: "2-digit", minute: "2-digit" }).format(date);
   return `${weekday} ${day} ${clock}`;
 }
 

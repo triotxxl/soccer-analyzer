@@ -50,6 +50,9 @@ export const BLOCKED_SCRIPTS: Readonly<Record<string, string>> = {
   "add-tipico-names": "schreibt in die Dashboard-Snapshots unter output/",
   backup: "schreibt eine Sicherung der Datenbank, lädt sie zu MEGA hoch und löscht ältere",
   restore: "ersetzt die Datenbank durch eine Sicherung",
+  app: "startet den Server der alten App",
+  "app:build": "schreibt den Build der alten App",
+  "app:preview": "startet einen Server",
   neo: "startet den Server des Neo Dashboards",
   "neo:build": "schreibt den Build des Neo Dashboards",
   "neo:preview": "startet einen Server",
@@ -58,8 +61,8 @@ export const BLOCKED_SCRIPTS: Readonly<Record<string, string>> = {
 
 /**
  * Ohne API-Kosten und ohne Schreibzugriff. Sonderfälle (elo, --write, --json) prüft `checkScript`.
- * `btts-check` und `live-model-report` sind die vorab festgelegten Nachmessungen, die der Prüfer
- * ungefragt laufen lässt; beide lesen nur Snapshots und die Datenbank (`readOnly`). `coverage`
+ * `btts-check`, `aufteilung-check` und `live-model-report` sind die vorab festgelegten Nachmessungen, die
+ * der Prüfer ungefragt laufen lässt; sie lesen nur Snapshots und die Datenbank (`readOnly`). `coverage`
  * öffnet die Datenbank wie `report` über `AnalyzerDatabase`, schreibt aber nichts. `kombi-tipps`
  * liest den Snapshot und die Datenbank (`readOnly`) und druckt nur. `data-check` ebenso (Snapshot,
  * Datenbank `readOnly`, kein API-Client).
@@ -67,7 +70,7 @@ export const BLOCKED_SCRIPTS: Readonly<Record<string, string>> = {
 export const ALLOWED_SCRIPTS = new Set([
   "test", "typecheck", "app:test", "report", "edge-report",
   "quickpick-report", "draw-signals-report", "elo-backtest", "elo", "snapshot-history",
-  "btts-check", "live-model-report", "coverage", "kombi-tipps", "data-check"
+  "btts-check", "aufteilung-check", "live-model-report", "coverage", "kombi-tipps", "data-check"
 ]);
 
 /** `npm run elo -- <befehl>`: nur diese beiden lesen bloß. */

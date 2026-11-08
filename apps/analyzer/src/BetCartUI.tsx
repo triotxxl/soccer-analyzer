@@ -12,6 +12,7 @@ import { FilterCard, FilterSegment, type SegmentOption } from "./FilterMenu";
 import { QUICKPICK_PRESETS } from "./quickpick";
 import { leagueName, selectionText, teamName, useNames, type NameSource } from "../../shared/src/names";
 import type { DashboardFixture, DashboardMarket } from "../../shared/src/types";
+import { dateFormat } from "./dateFormat";
 
 /**
  * Schreibt die kopierten Kombis zusätzlich nach `data/tmp/kombis.md` (Endpunkt in
@@ -450,8 +451,8 @@ export function BetSlipWindow({
 
   const time = (value: string) => {
     const date = new Date(value);
-    const weekday = new Intl.DateTimeFormat("de-DE", { timeZone: timezone, weekday: "short" }).format(date);
-    const clock = new Intl.DateTimeFormat("de-DE", { timeZone: timezone, hour: "2-digit", minute: "2-digit" }).format(date);
+    const weekday = dateFormat("de-DE", { timeZone: timezone, weekday: "short" }).format(date);
+    const clock = dateFormat("de-DE", { timeZone: timezone, hour: "2-digit", minute: "2-digit" }).format(date);
     return `${weekday} ${clock}`;
   };
   const isStarted = (entry: CartEntry) => Date.parse(entry.kickoff) <= now;

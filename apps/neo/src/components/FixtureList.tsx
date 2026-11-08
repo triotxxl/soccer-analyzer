@@ -1,4 +1,5 @@
 import { leagueName, teamName, useNames } from "../../../shared/src/names";
+import { eloAgainstOf, eloAgainstText } from "../../../shared/src/eloAgainst";
 import type { DashboardFixture } from "../../../shared/src/types";
 import {
   competitionId, dayKey, formatDay, formatTime, goalsFormat, oddsFormat, oddsTriple, oneXTwo, percent, scopeLabel, scopePhrase,
@@ -30,7 +31,7 @@ function FixtureRow({ fixture, competition, withLeague, on, timezone, onSelect }
   const source = useNames();
   const home = teamName(fixture, "home", source), away = teamName(fixture, "away", source);
   const triple = oneXTwo(fixture), odds = oddsTriple(fixture), dv = fixture.dataConfidence;
-  const strength = strengthOf(fixture, source), gap = classBadge(fixture, strength);
+  const strength = strengthOf(fixture, source), gap = classBadge(fixture, strength), eloAgainst = eloAgainstOf(fixture);
   const parts: Array<[string, number | null]> = [["1", triple?.home ?? null], ["X", triple?.draw ?? null], ["2", triple?.away ?? null]];
   const top = triple ? Math.max(triple.home, triple.draw, triple.away) : -1;
   const dvTitle = "Datenvertrauen: wie viele und wie verlässliche Daten das Modell für dieses Spiel hatte (0 bis 100)"
@@ -50,6 +51,7 @@ function FixtureRow({ fixture, competition, withLeague, on, timezone, onSelect }
             <span className={`dv${dv < 50 ? " low" : ""}`} title={dvTitle}>Datenlage {dv}</span>
             {gap && <span className="tag lig" title={`${gap.level === "extreme" ? "Deutlicher " : ""}Klassenunterschied: ${gap.stronger === "home" ? home : away} spielt in der stärkeren Liga (${gap.basis}).`}>
               Klasse {gap.stronger === "home" ? "↑" : "↓"}</span>}
+            {eloAgainst && <span className="tag" title={eloAgainstText(eloAgainst, home, away)}>Elo dagegen</span>}
           </small>
         </span>
         <span className="fx-xg"><small>Erw. Tore</small>{goalsFormat(fixture.expectedGoals.home)} : {goalsFormat(fixture.expectedGoals.away)}</span>

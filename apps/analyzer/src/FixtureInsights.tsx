@@ -20,6 +20,8 @@ import {
 } from "./insights";
 import { TeamCrest } from "../../shared/src/TeamCrest";
 import type { FixtureInsights as FixtureInsightsData, InsightMatch } from "../../shared/src/types";
+import { minuteCover, NO_GOAL_MINUTES, seasonMatches, type MinuteCover } from "../../shared/src/seasonView";
+import { dateFormat } from "./dateFormat";
 
 /** Tore je Viertelstunde, ab denen eine Zelle voll ausgefärbt ist. */
 const PERIOD_COLOUR_FLOOR = 4;
@@ -32,11 +34,17 @@ function matchLabel(count: number): string {
   return count === 1 ? "1 Partie" : `${count} Partien`;
 }
 
+/** Zählt die Heatmap nicht alle Spiele, steht das im Kopf: lieber „2 von 5 Spielen“ als eine stille Lücke. */
+function coverLabel(cover: MinuteCover): string {
+  return cover.counted < cover.total ? `${cover.counted} von ${cover.total} Spielen` : matchLabel(cover.counted);
+}
+
 interface PeriodTeam { id: number; name: string; logo?: string }
 
 interface PeriodSide {
   team: PeriodTeam;
   periods: ScoringPeriods;
+  cover: MinuteCover;
   /** Spielort, auf den die Zeile gefiltert ist, solange der Heim-/Auswärts-Schalter greift. */
   venue: string;
 }
@@ -78,28 +86,30 @@ function PeriodRow({ team, label, values, total, tone, peak, matches, venue }: {
   </div>;
 }
 
-function ScoringPeriodsPanel({ insights, scope }: { insights: FixtureInsightsData; scope: LeagueScope }) {
+function ScoringPeriodsPanel({ insights }: { insights: FixtureInsightsData }) {
   const [venueOnly, setVenueOnly] = useState(true);
 
-  const { home, away, scoped } = useMemo(() => {
-    const build = (active: LeagueScope | null) => ({
-      home: scoringPeriods(insights.homeMatches, insights.home.id, {
-        scope: active, ...(venueOnly ? { venue: "home" as const } : {})
-      }),
-      away: scoringPeriods(insights.awayMatches, insights.away.id, {
-        scope: active, ...(venueOnly ? { venue: "away" as const } : {})
-      })
-    });
-    const inScope = build(scope);
-    // Eine Pokalpartie hat keine gemeinsame Liga. Statt eine leere Verteilung zu zeigen,
-    // fällt die Ansicht auf alle Wettbewerbe zurück und schreibt das in die Überschrift.
-    if (inScope.home.matches > 0 || inScope.away.matches > 0) return { ...inScope, scoped: true };
-    return { ...build(null), scoped: false };
-  }, [insights, scope, venueOnly]);
+  const { home, away, homeCover, awayCover } = useMemo(() => {
+    // Nur die laufende Saison: die des Wettbewerbs, ohne Spiel dort die eigene Liga. Bis 04.11.2026 fiel ein
+    // Pokalspiel hier auf alle Wettbewerbe aus mehreren Saisons zurück (Davids Vorgabe: nichts mischen).
+    const homeSeason = seasonMatches(insights.homeMatches, insights.home.id, null, insights.league);
+    const awaySeason = seasonMatches(insights.awayMatches, insights.away.id, null, insights.league);
+    const homeShown = seasonMatches(homeSeason, insights.home.id, venueOnly ? "home" : null);
+    const awayShown = seasonMatches(awaySeason, insights.away.id, venueOnly ? "away" : null);
+    return {
+      home: scoringPeriods(homeSeason, insights.home.id, venueOnly ? { venue: "home" } : {}),
+      away: scoringPeriods(awaySeason, insights.away.id, venueOnly ? { venue: "away" } : {}),
+      homeCover: minuteCover(homeSeason, homeShown),
+      awayCover: minuteCover(awaySeason, awayShown)
+    };
+  }, [insights, venueOnly]);
+  const inCompetition = [...insights.homeMatches, ...insights.awayMatches]
+    .some((match) => match.leagueId === insights.league.id && match.season === insights.league.season);
+  const label = inCompetition ? `${insights.league.name} ${insights.league.season}` : "eigene Liga, diese Saison";
 
   const peak = Math.max(PERIOD_COLOUR_FLOOR, ...home.scored, ...home.conceded, ...away.scored, ...away.conceded);
-  const homeSide: PeriodSide = { team: insights.home, periods: home, venue: "Heimspiele" };
-  const awaySide: PeriodSide = { team: insights.away, periods: away, venue: "Auswärtsspiele" };
+  const homeSide: PeriodSide = { team: insights.home, periods: home, venue: "Heimspiele", cover: homeCover };
+  const awaySide: PeriodSide = { team: insights.away, periods: away, venue: "Auswärtsspiele", cover: awayCover };
   // Ein Block stellt die Tore der einen Mannschaft den Gegentoren der anderen gegenüber:
   // So steht die Angriffsphase direkt über der Phase, in der die Abwehr des Gegners nachgibt.
   const duels: Array<{ attack: PeriodSide; defence: PeriodSide }> = [
@@ -108,22 +118,20 @@ function ScoringPeriodsPanel({ insights, scope }: { insights: FixtureInsightsDat
   ];
 
   return <section className="insight-panel" aria-label="Torphasen">
-    <h3>Torphasen <span className="insight-scope">{scoped
-      ? `${insights.league.name} ${insights.league.season}`
-      : "alle Wettbewerbe"}</span></h3>
+    <h3>Torphasen <span className="insight-scope">{label}</span></h3>
     <div className="insight-controls">
       <label className="insight-toggle">
         <input type="checkbox" checked={venueOnly} onChange={(event) => setVenueOnly(event.target.checked)} />
         Heim / Auswärts
       </label>
     </div>
-    <div className="period-grid">
+    {homeCover.none && awayCover.none ? <p className="insight-notice">{NO_GOAL_MINUTES}</p> : <div className="period-grid">
       {duels.map((duel, index) => <div className="period-side" key={duel.attack.team.id}>
         <div className="period-head">
           <strong>{duel.attack.team.name}</strong>
-          <small>{matchLabel(duel.attack.periods.matches)}{venueOnly ? ` · nur ${duel.attack.venue}` : ""}</small>
+          <small>{duel.attack.cover.none ? "" : coverLabel(duel.attack.cover)}{!duel.attack.cover.none && venueOnly ? ` · nur ${duel.attack.venue}` : ""}</small>
         </div>
-        <PeriodRow
+        {duel.attack.cover.none ? <p className="insight-notice">{NO_GOAL_MINUTES}</p> : <PeriodRow
           team={duel.attack.team}
           label="erzielt"
           values={duel.attack.periods.scored}
@@ -132,8 +140,8 @@ function ScoringPeriodsPanel({ insights, scope }: { insights: FixtureInsightsDat
           peak={peak}
           matches={duel.attack.periods.matches}
           venue={venueOnly ? duel.attack.venue : null}
-        />
-        <PeriodRow
+        />}
+        {!duel.defence.cover.none && <PeriodRow
           team={duel.defence.team}
           label="kassiert"
           values={duel.defence.periods.conceded}
@@ -142,15 +150,15 @@ function ScoringPeriodsPanel({ insights, scope }: { insights: FixtureInsightsDat
           peak={peak}
           matches={duel.defence.periods.matches}
           venue={venueOnly ? duel.defence.venue : null}
-        />
+        />}
         {index === 0 && <div className="period-axis" aria-hidden>
           <span />
           <span />
           {SCORING_PERIOD_LABELS.map((label) => <span key={label}>{label}</span>)}
         </div>}
       </div>)}
-    </div>
-    {home.matches === 0 && away.matches === 0
+    </div>}
+    {!homeCover.none && !awayCover.none && home.matches === 0 && away.matches === 0
       && <p>Keine Partie mit vollständiger Ereignisliste – Torminuten liegen für diese Teams nicht vor.</p>}
   </section>;
 }
@@ -160,7 +168,7 @@ function H2hRow({ match, homeTeamId, timezone }: { match: InsightMatch; homeTeam
   const hasHalfTime = match.halfTimeHomeGoals !== null && match.halfTimeAwayGoals !== null;
   const winner = match.homeGoals === match.awayGoals ? null : match.homeGoals > match.awayGoals ? "home" : "away";
   return <li className="h2h-row">
-    <span className="h2h-row-date">{new Intl.DateTimeFormat("de-DE", {
+    <span className="h2h-row-date">{dateFormat("de-DE", {
       timeZone: timezone, day: "2-digit", month: "2-digit", year: "2-digit"
     }).format(new Date(match.date))}</span>
     <span className="h2h-row-teams">
@@ -682,9 +690,11 @@ function TrendsPanel({ insights, scope }: { insights: FixtureInsightsData; scope
  * keinen weiteren Aufruf aus. Bis die Daten stehen - und wenn sie ausbleiben - zeigt die
  * App weiter die direkten Duelle aus dem Dashboard-Lauf.
  */
-export function FixtureInsightPanels({ insights: loaded, timezone, homeName, awayName, leagueName }: {
+export function FixtureInsightPanels({ insights: loaded, timezone, homeName, awayName, leagueName, afterH2h }: {
   insights: FixtureInsightsData;
   timezone: string;
+  /** Steht direkt unter den direkten Duellen (seit 02.11.2026 der Tabellenverlauf). */
+  afterH2h?: ReactNode;
   /**
    * Die Namen der beiden Mannschaften und der Liga nach Einstellung (`names.ts`). Ersetzt werden
    * nur diese beiden Teams, erkannt an der Team-ID; alle übrigen kennt nur API-Football. Die Panels
@@ -704,11 +714,33 @@ export function FixtureInsightPanels({ insights: loaded, timezone, homeName, awa
     [insights.league.id, insights.league.season]
   );
   return <>
-    <ScoringPeriodsPanel insights={insights} scope={scope} />
+    <ScoringPeriodsPanel insights={insights} />
     <H2hPanel insights={insights} scope={scope} timezone={timezone} />
+    {afterH2h}
     <MatchStatsPanel insights={insights} scope={scope} />
     <TrendsPanel insights={insights} scope={scope} />
   </>;
+}
+
+/**
+ * Nur die Torphasen (Tore je Viertelstunde) - für die rechte Spalte im Quickpicker (seit 02.11.2026). Dieselbe
+ * Tafel wie in der Detailansicht, mit den Namen nach Einstellung.
+ */
+export function GoalPhasesPanel({ insights: loaded, homeName, awayName, leagueName }: {
+  insights: FixtureInsightsData;
+  homeName?: string;
+  awayName?: string;
+  leagueName?: string;
+}) {
+  const insights = useMemo(
+    () => renamedInsights(loaded, homeName, awayName, leagueName),
+    [loaded, homeName, awayName, leagueName]
+  );
+  const scope: LeagueScope = useMemo(
+    () => ({ id: insights.league.id, season: insights.league.season }),
+    [insights.league.id, insights.league.season]
+  );
+  return <ScoringPeriodsPanel insights={insights} />;
 }
 
 function renamedInsights(

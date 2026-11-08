@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { evaluateFixture, QUICKPICK_PRESETS } from "../../../src/quickpick.ts";
 import {
+  AUTHOR_FILTERS, authorTips,
   duelsOf, duelStats, phaseCounts, seasonMatches, tableEntryOf,
   bothScore, likelyTips, overUnder, percent,
   competitionsOf, competitionTree, countryCode, datePresets, dayKey, isCup, isOver, leagueTables, modelTips, oddsTriple, oneXTwo, scopeLabel,
@@ -199,5 +201,35 @@ describe("Elo (Spielstärke)", () => {
     const rows = leagueTables(DOCUMENT.fixtures, competitionsOf(DOCUMENT.fixtures)).flatMap((t) => t.rows);
     expect(rows.find((r) => r.name === "Heim FC")?.elo?.elo).toBe(1872);
     expect(rows.find((r) => r.name === "Dritter SV")?.elo).toBeNull();
+  });
+});
+
+describe("Autoren-Tipps (Daves Filter)", () => {
+  it("nimmt genau die Spiele, die die Regel des Quickpickers mit der Vorgabe-Stufe findet", () => {
+    for (const filter of AUTHOR_FILTERS) {
+      const expected = DOCUMENT.fixtures.filter((f) => evaluateFixture(f, QUICKPICK_PRESETS[filter].defaults).passes).map((f) => f.fixtureId);
+      const tips = authorTips(DOCUMENT.fixtures, [filter], "api");
+      expect(tips.map((t) => t.fixture.fixtureId)).toEqual(expected);
+      for (const tip of tips) {
+        expect(tip.author?.filter).toBe(filter);
+        const triple = oneXTwo(tip.fixture);
+        const chance = tip.pick === "Unentschieden" ? triple?.draw : tip.pick.startsWith(tip.fixture.homeTeam) ? triple?.home : triple?.away;
+        expect(tip.probability).toBe(chance ?? null);
+      }
+    }
+  });
+
+  it("lässt abgewählte Filter weg und führt ein Spiel je Filter einmal", () => {
+    expect(authorTips(DOCUMENT.fixtures, [], "api")).toEqual([]);
+    const all = authorTips(DOCUMENT.fixtures, AUTHOR_FILTERS, "api");
+    expect(new Set(all.map((t) => t.id)).size).toBe(all.length);
+  });
+
+  it("ordnet Tipps ohne Chance des Modells ans Ende ihres Tages", () => {
+    const [a, b] = DOCUMENT.fixtures;
+    const tip = (fixture: typeof a, probability: number | null) =>
+      ({ id: `${fixture!.fixtureId}:${probability}`, fixture: fixture!, market: "1x2", marketLabel: "", pick: "", probability, odds: null }) as const;
+    const sameDay = { ...b!, kickoff: a!.kickoff };
+    expect(sortTips([tip(a, null), tip(sameDay, 0.4)], "chance", DOCUMENT.meta.timezone).map((t) => t.probability)).toEqual([0.4, null]);
   });
 });

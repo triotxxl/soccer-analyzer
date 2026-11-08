@@ -137,14 +137,34 @@ describe("Torphasen", () => {
     expect(screen.getByText("Bundesliga 2026")).toBeInTheDocument();
   });
 
-  it("fällt ohne Partie in dieser Liga auf alle Wettbewerbe zurück", () => {
+  it("zeigt ohne Partie in diesem Wettbewerb die eigene Liga der laufenden Saison, nie alle Wettbewerbe", () => {
     const data = insights();
     panels({
       ...data,
       homeMatches: data.homeMatches.map((item) => ({ ...item, leagueId: 81, league: "DFB-Pokal" })),
       awayMatches: data.awayMatches.map((item) => ({ ...item, leagueId: 81, league: "DFB-Pokal" }))
     });
-    expect(screen.getByText("alle Wettbewerbe")).toBeInTheDocument();
+    expect(screen.getByText("eigene Liga, diese Saison")).toBeInTheDocument();
+    expect(screen.queryByText("alle Wettbewerbe")).not.toBeInTheDocument();
+  });
+
+  it("zeigt in einer Liga ohne Torminuten den Hinweis statt lauter Nullen, auch wenn ein 0:0 zählt", () => {
+    const noMinutes = [
+      match({ fixtureId: 11, homeGoals: 0, awayGoals: 0, minutesComplete: true }),
+      match({ fixtureId: 12, homeGoals: 3, awayGoals: 0, minutesComplete: false })
+    ];
+    panels(insights({ homeMatches: noMinutes, awayMatches: noMinutes }));
+    expect(screen.getByText(/Für diese Liga gibt es keine Torminuten/)).toBeInTheDocument();
+    expect(globalThis.document.querySelector(".period-grid")).toBeNull();
+  });
+
+  it("nennt bei einer Teillücke, wie viele Spiele zählen", () => {
+    const some = [
+      match({ fixtureId: 11, homeGoals: 1, awayGoals: 0, minutesComplete: true, goals: [{ teamId: HOME.id, minute: 9 }] }),
+      match({ fixtureId: 12, homeGoals: 3, awayGoals: 0, minutesComplete: false })
+    ];
+    panels(insights({ homeMatches: some, awayMatches: some }));
+    expect(screen.getAllByText(/1 von 2 Spielen/).length).toBeGreaterThan(0);
   });
 });
 

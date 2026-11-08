@@ -6,19 +6,27 @@ import { countryName, leagueName, teamName, useNames, type NameSource } from "..
 import {
   blockedText,
   chanceOf,
+  eventSummary,
   eventText,
   isDecided,
+  isGoalEvent,
+  isRedCardEvent,
   liveQuestionLabel,
   marketKeyOf,
+  matchClock,
+  prematchTips,
   questionHasChance,
   SIDE_UNRELIABLE_TEXT,
   standText,
   totalCards,
-  type LiveQuestion
+  type LiveQuestion,
+  type LiveTip
 } from "./liveQuestions";
-import type { DashboardMarket, LiveBoardEvent, LiveBoardMatch, LiveTeamSnapshot } from "../../shared/src/types";
+import { duelsOf, duelStats, H2H_FEW, type Duel } from "../../shared/src/duels";
+import type { DashboardFixture, DashboardMarket, FormResult, LiveBoardEvent, LiveBoardMatch, LiveTeamSnapshot } from "../../shared/src/types";
 
-const PANEL_WIDTH = 440;
+/** Seit 03.11.2026 breiter (vorher 440): Kacheln der Chancen und die Tipp-Tabelle brauchen den Platz. */
+const PANEL_WIDTH = 540;
 const PANEL_MARGIN = 12;
 
 /** Ganze Prozent: Eine Nachkommastelle täte genauer, als eine Live-Schätzung ist. */
@@ -185,17 +193,52 @@ function RedChip({ count }: { count: number }) {
   return <i className="live-red" title={count === 1 ? "Rote Karte" : `${count} Rote Karten`}>{count}</i>;
 }
 
-function StatCell({ home, away, title }: { home: string; away: string; title?: string }) {
+/**
+ * Schüsse aufs Tor je Team, darunter der Ballbesitz als schmaler Balken (seit 03.11.2026; vorher je eine
+ * eigene Spalte für Ballbesitz und Pässe). Die Statistik ist nur zum Einordnen da - sie fließt nicht in die
+ * Chancen ein.
+ */
+function PressureCell({ match, title }: { match: LiveBoardMatch; title?: string }) {
+  const { home, away } = match.metrics;
+  const ratio = share(home.possession, away.possession);
   return <span className="live-stat" title={title}>
-    <span className="home">{home}</span>
-    <span className="away">{away}</span>
+    <span className="home">{metricText(home.shotsOnGoal)}</span>
+    <span className="away">{metricText(away.shotsOnGoal)}</span>
+    {ratio !== null && <span className="live-metric-bar live-possession" title={`Ballbesitz ${home.possession} : ${away.possession} %`}>
+      <i className="home" style={{ width: `${ratio * 100}%` }} /><i className="away" style={{ width: `${(1 - ratio) * 100}%` }} />
+    </span>}
   </span>;
 }
 
-/** Pässe mit Quote dahinter („412 · 84 %“); fehlt eine Zahl, bleibt „–“. */
-function passText(team: LiveTeamSnapshot): string {
-  if (team.totalPasses === null) return "–";
-  return team.passAccuracy === null ? `${team.totalPasses}` : `${team.totalPasses} · ${team.passAccuracy} %`;
+function tipTitle(tip: LiveTip): string {
+  return `${tip.label} · ${tip.level === "strong" ? "stark empfohlen" : "empfohlen"} · vor dem Anpfiff ${pct(tip.before)}`
+    + `${tip.odds ? ` · Quote ${formatOdd(tip.odds)}` : ""} · jetzt: ${tip.stand}${tip.now !== null ? ` · Live-Chance ${pct(tip.now)}` : ""}`;
+}
+
+/**
+ * „Dein Tipp · jetzt“: die zwei stärksten Empfehlungen von vor dem Anpfiff mit ihrem Stand (seit
+ * 03.11.2026, Davids Wunsch). Gold-Rand ★, Grün-Rand ✓ - dieselben Zeichen wie in der Tabelle.
+ */
+function TipChips({ tips }: { tips: LiveTip[] }) {
+  if (tips.length === 0) return <span className="live-tips"><small>keine Empfehlung vor dem Anpfiff</small></span>;
+  const rest = tips.length - 2;
+  return <span className="live-tips">
+    {tips.slice(0, 2).map((tip) => <span key={tip.key} className={`live-tip ${tip.level}`} title={tipTitle(tip)}>
+      <span className="level-glyph" aria-hidden>{tip.level === "strong" ? "★" : "✓"}</span>
+      <span className="live-tip-label">{tip.label}</span>
+      <span className={`live-tip-stand ${tip.tone}`}>{tip.stand}{tip.now !== null && ` · ${pct(tip.now)}`}</span>
+    </span>)}
+    {rest > 0 && <small>+ {rest} {rest === 1 ? "weiterer" : "weitere"}</small>}
+  </span>;
+}
+
+/** Die Minute, darunter ein schmaler Balken: wie weit das Spiel ist (Strich bei der Pause). */
+function MinuteCell({ match }: { match: LiveBoardMatch }) {
+  const clock = matchClock(match);
+  return <span className="live-minute-cell">
+    <span className="live-minute live">{minuteLabel(match)}</span>
+    {clock !== null && <span className="live-clock" aria-hidden><i style={{ width: `${Math.round(clock * 1000) / 10}%` }} /></span>}
+  </span>;
 }
 
 /** Eine Karte steht nur beim Team, das sie hat - eine gelbe „0“ las sich wie eine Karte. */
@@ -229,10 +272,9 @@ function LiveHead({ question }: { question: LiveQuestion }) {
     <span>Spiel</span>
     <span>Stand</span>
     <span>{liveQuestionLabel(question === "overview" ? "anotherGoal" : question)}</span>
-    <span>Aufs Tor</span>
+    <span title="Die Empfehlungen von vor dem Anpfiff (★ stark, ✓ empfohlen) und wie sie jetzt stehen">Dein Tipp · jetzt</span>
+    <span title="Schüsse aufs Tor, darunter der Ballbesitz">Aufs Tor</span>
     <span>Karten</span>
-    <span>Ballbesitz</span>
-    <span>Pässe</span>
   </div>;
 }
 
@@ -250,7 +292,7 @@ function LiveRow({ match, question, open, onToggle }: {
   const awayName = teamName(match, "away", names);
   const [main, secondary] = questionCells(match, question, names);
   const missing = match.metricsAvailable ? undefined : statisticsMissingText(match);
-  const { home, away } = match.metrics;
+  const summary = eventSummary(match, names);
   // Seit 29.09.2026 per Klick statt beim Überfahren (Davids Wunsch): Das Fenster ging sonst
   // schon beim Weg über die Liste auf und verdeckte die Zeilen darunter.
   return <article
@@ -270,22 +312,22 @@ function LiveRow({ match, question, open, onToggle }: {
       onToggle(match.fixtureId, { x: rect.right, y: rect.top });
     }}
   >
-    <span className="live-minute live">{minuteLabel(match)}</span>
+    <MinuteCell match={match} />
     <span className="live-teams">
       <span className="live-team"><strong>{homeName}</strong><RedChip count={match.cards?.home.red ?? 0} /></span>
       <span className="live-team"><strong>{awayName}</strong><RedChip count={match.cards?.away.red ?? 0} /></span>
       <small className="live-league"><CountryFlag country={match.country} /> {countryName(match, names)} · {leagueName(match, names)}</small>
+      {summary && <small className="live-league live-event-line" title={summary}>{summary}</small>}
     </span>
     <span className="live-score">
       <strong>{match.goals.home ?? 0}</strong>
       <strong>{match.goals.away ?? 0}</strong>
     </span>
     <span className="live-value">{main}{secondary && <span className="live-second">{secondary}</span>}</span>
-    {/* Je Kennzahl eine Spalte, Heim oben und Gast unten - auf Höhe der Teamnamen. */}
-    <StatCell title={missing} home={metricText(home.shotsOnGoal)} away={metricText(away.shotsOnGoal)} />
+    <TipChips tips={prematchTips(match, names)} />
+    {/* Heim oben und Gast unten - auf Höhe der Teamnamen. */}
+    <PressureCell match={match} title={missing} />
     <CardsCell match={match} />
-    <StatCell title={missing} home={metricText(home.possession, " %")} away={metricText(away.possession, " %")} />
-    <StatCell title={missing} home={passText(home)} away={passText(away)} />
   </article>;
 }
 
@@ -328,33 +370,227 @@ function lineText(match: LiveBoardMatch, key: "over15" | "over25" | "over35", la
   return value === undefined ? `${label} –` : `${label} ${pct(value)}`;
 }
 
+/** Eine Kachel der Live-Chancen: Frage, große Zahl, darunter Balken oder Erklärung. */
+function ChanceTile({ label, value, tone, children }: { label: string; value: string; tone?: "home" | "away"; children?: ReactNode }) {
+  return <div className="live-chance-tile">
+    <small>{label}</small>
+    <strong className={tone}>{value}</strong>
+    {children}
+  </div>;
+}
+
 function LiveChancesSection({ match }: { match: LiveBoardMatch }) {
   const live = match.live;
   const blocked = blockedText(match);
+  const next = live.nextGoal;
+  const result = live.result;
+  const nextSide = next ? (next.home >= next.away ? "home" : "away") : undefined;
+  const outcome = result ? (result.home >= result.draw && result.home >= result.away ? "1" : result.draw >= result.away ? "X" : "2") : null;
   return <section className="live-section">
     <h4>Chancen live{live.provisional && <> · <span className="live-provisional" title={PROVISIONAL_TITLE}>vorläufig</span></>}</h4>
     {blocked ? <p className="live-panel-empty">{blocked}</p> : <>
-      <dl className="live-chances">
-        <div><dt>Noch ein Tor</dt><dd>{pct(live.anotherGoal!)}</dd></div>
-        <div><dt>Erwartete Resttore</dt><dd>{decimal(live.remainingGoals!)}</dd></div>
-        <div><dt>Nächstes Tor</dt><dd>{live.nextGoal ? nextGoalText(live.nextGoal) : SIDE_UNRELIABLE_TEXT}</dd></div>
-        <div><dt>Sieger nach 90 Min.</dt><dd>{live.result ? resultText(live.result) : SIDE_UNRELIABLE_TEXT}</dd></div>
-        <div><dt>Tore am Ende</dt><dd>{[lineText(match, "over15", "Ü1,5"), lineText(match, "over25", "Ü2,5"), lineText(match, "over35", "Ü3,5")].join(" · ")}</dd></div>
-      </dl>
-      {(!live.nextGoal || !live.result) && <p className="live-panel-note">Ohne Ligastärke-Vergleich keine belastbare Chance auf Sieger und nächstes Tor.</p>}
+      <div className="live-chance-tiles">
+        <ChanceTile label="Noch ein Tor" value={pct(live.anotherGoal!)}>
+          <small>Ø noch {decimal(live.remainingGoals!)} Tore</small>
+        </ChanceTile>
+        <ChanceTile label="Nächstes Tor" value={next ? `${nextSide === "home" ? "Heim" : "Gast"} ${pct(Math.max(next.home, next.away))}` : "–"} tone={nextSide}>
+          {next ? <><ThreeWayBar home={next.home} middle={next.none} away={next.away} /><small>{nextGoalText(next)}</small></> : <small>{SIDE_UNRELIABLE_TEXT}</small>}
+        </ChanceTile>
+        <ChanceTile label="Sieger nach 90 Min." value={result && outcome ? `${outcome} · ${pct(Math.max(result.home, result.draw, result.away))}` : "–"}
+          tone={outcome === "1" ? "home" : outcome === "2" ? "away" : undefined}>
+          {result ? <><ThreeWayBar home={result.home} middle={result.draw} away={result.away} /><small>{resultText(result)}</small></> : <small>{SIDE_UNRELIABLE_TEXT}</small>}
+        </ChanceTile>
+      </div>
+      <p className="live-goal-lines">Tore am Ende: {[lineText(match, "over15", "Ü1,5"), lineText(match, "over25", "Ü2,5"), lineText(match, "over35", "Ü3,5")].join(" · ")}</p>
+      {(!next || !result) && <p className="live-panel-note">Ohne Ligastärke-Vergleich keine belastbare Chance auf Sieger und nächstes Tor.</p>}
       <p className="live-panel-note">{match.prematch.crossLeague ? CUP_NOTE : "Gilt für 90 Minuten."} Rechne nicht mit Gewinn.</p>
     </>}
   </section>;
 }
 
-export function LiveMetricsPanel({ match, question, anchor, panelRef }: {
+/**
+ * Spielverlauf von 0 bis 90 (mit Verlängerung bis 120): Tore als Punkt, Karten als Kärtchen, oben das
+ * Heimteam, unten das Gastteam, dazu die gespielte Zeit und „jetzt“. Wechsel und VAR bleiben weg.
+ */
+function Timeline({ match }: { match: LiveBoardMatch }) {
+  const names = useNames();
+  const events = match.events.filter((event) => isGoalEvent(event) || event.type.toLocaleLowerCase() === "card");
+  const extraTime = ["ET", "BT", "P"].includes(match.status.short) || match.events.some((event) => event.minute > 90);
+  const span = extraTime ? 120 : 90;
+  const at = (minute: number) => `${(Math.min(minute, span) / span) * 100}%`;
+  const clock = matchClock(match);
+  const now = clock === null ? null : extraTime ? Math.min(match.elapsed ?? 90, 120) / 120 : clock;
+  return <section className="live-section">
+    <h4>Spielverlauf</h4>
+    <div className="live-timeline">
+      <span className="live-timeline-track" />
+      {now !== null && <span className="live-timeline-played" style={{ width: `${now * 100}%` }} />}
+      <span className="live-timeline-tick" style={{ left: at(45) }} />
+      {extraTime && <span className="live-timeline-tick" style={{ left: at(90) }} />}
+      {now !== null && <span className="live-timeline-now" style={{ left: `${now * 100}%` }} />}
+      {events.map((event, index) => {
+        const kind = isGoalEvent(event) ? "goal" : isRedCardEvent(event) ? "red" : "yellow";
+        const minute = `${event.minute}${event.extra ? `+${event.extra}` : ""}′`;
+        return <span key={`${event.minute}-${index}`} className={`live-timeline-event ${event.side ?? "neutral"} ${kind}`} style={{ left: at(event.minute) }}
+          title={`${minute} ${eventText(event.type, event.detail)}${event.player ? ` · ${event.player}` : ""}`}>
+          {kind === "goal" && <small>{minute}</small>}
+        </span>;
+      })}
+      <small className="live-timeline-axis" style={{ left: 0 }}>0′</small>
+      <small className="live-timeline-axis center" style={{ left: at(45) }}>HZ</small>
+      <small className="live-timeline-axis end" style={{ right: 0 }}>{span}′</small>
+    </div>
+    <p className="live-panel-note">Oben {teamName(match, "home", names)}, unten {teamName(match, "away", names)}{events.length === 0 ? " · noch keine Tore und Karten" : ""}.</p>
+  </section>;
+}
+
+/** Die Empfehlungen von vor dem Anpfiff: Quote, Chance vorher, Live-Chance jetzt und Stand. */
+function TipsSection({ match }: { match: LiveBoardMatch }) {
+  const names = useNames();
+  const tips = prematchTips(match, names);
+  return <section className="live-section live-prematch">
+    <h4>Deine Tipps vor dem Anpfiff · jetzt</h4>
+    <p>Erwartete Tore {decimal(match.prematch.expectedGoals.home)} : {decimal(match.prematch.expectedGoals.away)} · Datenvertrauen {match.prematch.dataConfidence} %</p>
+    {tips.length === 0
+      ? <p className="live-panel-empty">Vor dem Anpfiff gab es für dieses Spiel keine Empfehlung.</p>
+      : <div className="live-tip-table">
+        <div className="live-tip-row head"><span>Tipp</span><span>Quote</span><span>vorher</span><span>jetzt</span><span>Stand</span></div>
+        {tips.map((tip) => <div key={tip.key} className={`live-tip-row ${tip.level}`}>
+          <span>{tip.level === "strong" ? "★ " : "✓ "}{tip.label}</span>
+          <strong>{formatOdd(tip.odds)}</strong>
+          <span>{pct(tip.before)}</span>
+          <strong>{tip.now === null ? "–" : pct(tip.now)}</strong>
+          <span className={`live-tip-stand ${tip.tone}`}>{tip.stand}</span>
+        </div>)}
+      </div>}
+  </section>;
+}
+
+const shortDate = (iso: string) => `${iso.slice(8, 10)}.${iso.slice(5, 7)}.${iso.slice(2, 4)}`;
+const YEAR_MS = 365.25 * 24 * 60 * 60 * 1000;
+
+/** Eine Häufigkeit in den Duellen: je Duell ein Strich, neueste links. null = unbekannt (ohne Pausenstand). */
+interface DuelFrequency { label: string; hit: (duel: Duel) => boolean | null; tone: "hit" | "home" | "away" }
+
+/**
+ * H2H im Live-Fenster (seit 03.11.2026, Davids Wunsch: „die H2H-Stats sind nicht gut präsentiert“). Dieselben
+ * Duelle wie in Neo (`duelsOf`, ohne Testspiele), im Stil der alten App: Bilanz, Häufigkeiten mit einem Strich
+ * je Duell, letzte Duelle mit Pausenstand, Form. Häufigkeiten sind keine Chancen - das steht darunter.
+ */
+function LiveH2H({ match, fixture }: { match: LiveBoardMatch; fixture: DashboardFixture | undefined }) {
+  const names = useNames();
+  const [venue, setVenue] = useState<"all" | "home">("all");
+  const home = teamName(match, "home", names);
+  const away = teamName(match, "away", names);
+  if (!fixture) return <section className="live-section"><p className="live-panel-empty">Für dieses Spiel stehen keine Duelle in der Analyse.</p></section>;
+  const all = duelsOf(fixture);
+  const duels = venue === "home" ? all.filter((duel) => duel.ourHome) : all;
+  const stats = duelStats(duels);
+  const ourHalfTimeLead = (duel: Duel) => duel.halfTime === null ? null
+    : (duel.ourHome ? duel.halfTime.home - duel.halfTime.away : duel.halfTime.away - duel.halfTime.home) > 0;
+  const frequencies: DuelFrequency[] = [
+    { label: "Über 2,5 Tore", hit: (duel) => duel.homeGoals + duel.awayGoals > 2, tone: "hit" },
+    { label: "Beide treffen", hit: (duel) => duel.homeGoals > 0 && duel.awayGoals > 0, tone: "hit" },
+    { label: "Tor vor der Pause", hit: (duel) => duel.halfTime === null ? null : duel.halfTime.home + duel.halfTime.away > 0, tone: "hit" },
+    { label: `${home} zur Pause vorn`, hit: ourHalfTimeLead, tone: "home" },
+    { label: `${home} zu null`, hit: (duel) => duel.ga === 0, tone: "home" },
+    { label: `${away} zu null`, hit: (duel) => duel.gh === 0, tone: "away" }
+  ];
+  const best = (duel: Duel | null, team: string) => duel
+    ? `${team} ${Math.max(duel.gh, duel.ga)}:${Math.min(duel.gh, duel.ga)} (${shortDate(duel.date)})` : null;
+  const bests = [best(stats.bestH, home), best(stats.bestA, away)].filter(Boolean);
+  const years = duels.length ? (Date.now() - Date.parse(duels[0]!.date)) / YEAR_MS : 0;
+  const widthOf = (count: number) => `${stats.n ? (count / stats.n) * 100 : 0}%`;
+  const formOf = (results: FormResult[]) => results.slice(0, 5);
+  const points = (results: FormResult[]) => results.reduce((sum, result) => sum + (result === "win" ? 3 : result === "draw" ? 1 : 0), 0);
+  const words: Record<FormResult, string> = { win: "Sieg", draw: "Unentschieden", loss: "Niederlage" };
+  const letter: Record<FormResult, string> = { win: "S", draw: "U", loss: "N" };
+
+  return <>
+    <section className="live-section">
+      <div className="live-h2h-head">
+        <h4>Direkte Duelle · {stats.n} {stats.n === 1 ? "Spiel" : "Spiele"}</h4>
+        <div className="segmented live-tabs" role="group" aria-label="Duelle filtern">
+          <button className={venue === "all" ? "active" : ""} aria-pressed={venue === "all"} onClick={() => setVenue("all")}>Alle</button>
+          <button className={venue === "home" ? "active" : ""} aria-pressed={venue === "home"} onClick={() => setVenue("home")}>Nur in {home}</button>
+        </div>
+      </div>
+      {stats.n === 0 ? <p className="live-panel-empty">Keine direkten Duelle {venue === "home" ? `in ${home} ` : ""}in der Analyse (Testspiele zählen nicht).</p> : <>
+        <div className="live-duel">
+          <span className="home"><strong>{stats.wH}</strong><small>{stats.wH === 1 ? "Sieg" : "Siege"} {home}</small></span>
+          <span className="draw"><strong>{stats.dr}</strong><small>Remis</small></span>
+          <span className="away"><strong>{stats.wA}</strong><small>{stats.wA === 1 ? "Sieg" : "Siege"} {away}</small></span>
+          <span className="live-metric-bar live-duel-bar" aria-hidden>
+            <i className="home" style={{ width: widthOf(stats.wH) }} /><i className="middle" style={{ width: widthOf(stats.dr) }} /><i className="away" style={{ width: widthOf(stats.wA) }} />
+          </span>
+          <small className="live-duel-foot">
+            <span>Tore <b className="home">{stats.gH}</b> : <b className="away">{stats.gA}</b> · Ø {(((stats.gH + stats.gA) / stats.n)).toFixed(1).replace(".", ",")} je Spiel</span>
+            {bests.length > 0 && <span>Höchster Sieg: {bests.join(" · ")}</span>}
+          </small>
+        </div>
+        {stats.n < H2H_FEW && <p className="live-notice live-h2h-notice"><WarningCircle size={14} weight="duotone" aria-hidden />Nur {stats.n} {stats.n === 1 ? "Duell" : "Duelle"} – kann auch Zufall sein.</p>}
+        {years >= 2 && <p className="live-notice live-h2h-notice"><WarningCircle size={14} weight="duotone" aria-hidden />Letztes Duell vor rund {Math.round(years)} Jahren – die Teams von damals sind nicht die von heute.</p>}
+      </>}
+    </section>
+
+    {stats.n > 0 && <section className="live-section">
+      <h4>Wie oft war es so? · neuestes Duell links</h4>
+      <div className="live-freq-list">
+        {frequencies.map((frequency) => {
+          const marks = duels.map((duel) => frequency.hit(duel));
+          const known = marks.filter((mark) => mark !== null).length;
+          const hits = marks.filter((mark) => mark === true).length;
+          return <div className="live-freq" key={frequency.label}>
+            <span className="live-freq-label">{frequency.label}</span>
+            <span className="live-freq-marks">{marks.map((mark, index) => <i key={duels[index]!.id}
+              className={mark === null ? "unknown" : mark ? frequency.tone : "miss"}
+              title={`${shortDate(duels[index]!.date)} · ${duels[index]!.homeTeam} ${duels[index]!.homeGoals}:${duels[index]!.awayGoals} ${duels[index]!.awayTeam}${mark === null ? " · ohne Pausenstand" : ""}`} />)}</span>
+            <span className="live-freq-count"><strong>{hits}</strong> von {known}</span>
+          </div>;
+        })}
+      </div>
+      <p className="live-panel-note">So oft war es in den Duellen – keine Chance für das nächste Spiel.</p>
+    </section>}
+
+    {stats.n > 0 && <section className="live-section">
+      <h4>Letzte Duelle</h4>
+      <ul className="live-duel-list">{duels.map((duel) => <li key={duel.id}>
+        <span className="live-duel-date">{shortDate(duel.date)}</span>
+        <span className="live-duel-teams">
+          <span className={duel.ourHome ? "home" : "away"}>{duel.homeTeam}</span> – <span className={duel.ourHome ? "away" : "home"}>{duel.awayTeam}</span>
+          {duel.league && <small> {duel.league}</small>}
+        </span>
+        <strong>{duel.homeGoals}:{duel.awayGoals}</strong>
+        <span className="live-duel-ht" title="Pausenstand">{duel.halfTime ? `${duel.halfTime.home}:${duel.halfTime.away}` : "–"}</span>
+        <span className={`live-duel-result ${duel.res}`} title={`${words[duel.res]} für ${home}`}>{letter[duel.res]}</span>
+      </li>)}</ul>
+      <p className="live-panel-note">Rechts Pausenstand und Ergebnis aus Sicht von {home}.</p>
+    </section>}
+
+    <section className="live-section">
+      <h4>Aktuelle Form · letzte 5, neueste links</h4>
+      {([["home", home, fixture.form.home], ["away", away, fixture.form.away]] as const).map(([side, team, results]) => <div className="live-form" key={side}>
+        <strong className={side}>{team}</strong>
+        <span className="form-bars">{formOf(results).map((result, index) => <i key={index} className={`form-bar ${result}`} title={words[result]} />)}</span>
+        <span>{points(formOf(results))} von {formOf(results).length * 3} Pkt.</span>
+      </div>)}
+      <p className="live-panel-note">{fixture.form.scope === "overall" ? "Alle Spiele, zu Hause und auswärts zusammen." : `${home} zu Hause, ${away} auswärts.`}</p>
+    </section>
+  </>;
+}
+
+export function LiveMetricsPanel({ match, fixture, anchor, panelRef }: {
   match: LiveBoardMatch;
-  question: LiveQuestion;
+  /** Das Spiel im Snapshot - für H2H und Form. Fehlt es, sagt der Reiter das. */
+  fixture?: DashboardFixture;
+  /** Bis 03.11.2026 für „Vor dem Anpfiff“; die Tipps stehen jetzt in eigener Tabelle. */
+  question?: LiveQuestion;
   anchor: PanelAnchor;
   panelRef: RefObject<HTMLDivElement | null>;
 }) {
   const names = useNames();
   const [height, setHeight] = useState(0);
+  const [tab, setTab] = useState<"live" | "h2h">("live");
   // Die Höhe hängt am Inhalt (Ereignisse, Statistik); gemessen vor dem Zeichnen, damit das
   // Fenster nicht sichtbar springt. Neu gemessen bei jedem Abruf, der den Inhalt ändert.
   useLayoutEffect(() => {
@@ -363,9 +599,6 @@ export function LiveMetricsPanel({ match, question, anchor, panelRef }: {
   });
   // Tore und Karten zuerst: Wechsel verdrängten sie früher aus den letzten acht Einträgen.
   const events = match.events.filter((event) => event.type.toLocaleLowerCase() !== "subst").slice(-8);
-  const selectedKey = marketKeyOf(question);
-  const prematchMarkets = match.prematch.markets.filter((market) =>
-    market.key === selectedKey || market.recommendation.level !== "none");
   const context = CONTEXT_METRICS
     .filter(({ key }) => match.metrics.home[key] !== null || match.metrics.away[key] !== null)
     .map(({ key, label, unit }) => <span key={key}>{label} <strong>{metricText(match.metrics.home[key], unit)}</strong> : <strong>{metricText(match.metrics.away[key], unit)}</strong></span>);
@@ -377,8 +610,15 @@ export function LiveMetricsPanel({ match, question, anchor, panelRef }: {
       <strong>{home} {match.goals.home ?? 0}:{match.goals.away ?? 0} {away}</strong>
       <small><CountryFlag country={match.country} /> {countryName(match, names)} · {leagueName(match, names)}
         {match.halfTime.home !== null && <> · HZ {match.halfTime.home}:{match.halfTime.away ?? 0}</>}</small>
+      <div className="segmented live-tabs" role="tablist" aria-label="Ansicht im Fenster">
+        <button role="tab" className={tab === "live" ? "active" : ""} aria-selected={tab === "live"} onClick={() => setTab("live")}>Live</button>
+        <button role="tab" className={tab === "h2h" ? "active" : ""} aria-selected={tab === "h2h"} onClick={() => setTab("h2h")}>H2H</button>
+      </div>
     </div>
+    {tab === "h2h" ? <LiveH2H match={match} fixture={fixture} /> : <>
+    <Timeline match={match} />
     <LiveChancesSection match={match} />
+    <TipsSection match={match} />
     <section className="live-section">
       <h4>Karten</h4>
       {match.cards
@@ -402,22 +642,16 @@ export function LiveMetricsPanel({ match, question, anchor, panelRef }: {
             {context.length > 0 && <p className="live-context">{context}</p>}
           </div>
         : <p className="live-panel-empty">{statisticsMissingText(match)}</p>}
+      <p className="live-panel-note">Nur zum Einordnen – die Live-Statistik fließt nicht in die Chancen ein.</p>
     </section>
-    <section className="live-section live-prematch">
-      <h4>Vor dem Anpfiff</h4>
-      <p>Erwartete Tore {decimal(match.prematch.expectedGoals.home)} : {decimal(match.prematch.expectedGoals.away)} · Datenvertrauen {match.prematch.dataConfidence} %</p>
-      {prematchMarkets.length > 0 && <ul>{prematchMarkets.map((market) => <li className={market.recommendation.level} key={market.key}>
-        <span>{market.recommendation.level === "strong" ? "★ " : market.recommendation.level === "recommended" ? "✓ " : ""}{market.label}</span>
-        {/* Ohne Ligastärke-Vergleich bleibt die Wahrscheinlichkeit verborgen (AGENTS.md Punkt 5). */}
-        <span>{market.probabilityReliable === false ? SIDE_UNRELIABLE_TEXT : pct(market.probability)}</span>
-        <strong>{formatOdd(market.odds)}</strong>
-      </li>)}</ul>}
-    </section>
+    </>}
   </div>;
 }
 
-export function LiveView({ state, matches, runningCount, question, onResetFilters }: {
+export function LiveView({ state, matches, fixtures, runningCount, question, onResetFilters }: {
   state: LiveLoadState;
+  /** Die Spiele des Snapshots nach ID - für H2H und Form im Fenster. */
+  fixtures?: ReadonlyMap<number, DashboardFixture>;
   /** Die laufenden Spiele nach Wettbewerben und Anzeige-Filtern, fertig sortiert. */
   matches: LiveBoardMatch[];
   /** Laufende Spiele vor den Anzeige-Filtern - trennt „läuft keins“ von „Filter blenden alles aus“. */
@@ -490,6 +724,6 @@ export function LiveView({ state, matches, runningCount, question, onResetFilter
             <button className="empty-state-action" onClick={onResetFilters}>Filter zurücksetzen</button>
           </div>)}
     </div>
-    {active && <LiveMetricsPanel match={active} question={question} anchor={opened!.anchor} panelRef={panelRef} />}
+    {active && <LiveMetricsPanel match={active} fixture={fixtures?.get(active.fixtureId)} anchor={opened!.anchor} panelRef={panelRef} />}
   </>;
 }

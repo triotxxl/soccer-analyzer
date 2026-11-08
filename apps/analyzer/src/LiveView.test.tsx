@@ -167,9 +167,15 @@ describe("Live-Ansicht", () => {
     expect(row).toHaveTextContent("67 %");
     expect(within(row).getByText("vorläufig")).toBeInTheDocument();
     expect(row).toHaveTextContent("Erwartete Resttore 1,10");
-    // Quote und Stufe vor dem Anpfiff stehen nicht mehr in der Zeile - sie sind im Spiel veraltet.
+    // Die Quote von vor dem Anpfiff steht nicht in der Zeile - sie ist im Spiel veraltet. Seit
+    // 03.11.2026 steht dort aber die Empfehlung mit ihrem Stand jetzt (Davids Freigabe des Entwurfs).
     expect(row).not.toHaveTextContent("1,85");
-    expect(row).not.toHaveTextContent("✓");
+    const tip = row.querySelector(".live-tip");
+    expect(tip).toHaveTextContent("✓Über 2,5noch 2 Tore · 30 %");
+    expect(tip).toHaveAttribute("title", expect.stringContaining("vor dem Anpfiff 64 % · Quote 1,85"));
+    // Tore und Rote Karten stehen in der Kleinzeile unter den Teams, die Spieluhr unter der Minute.
+    expect(row.querySelector(".live-event-line")).toHaveTextContent("Tor 40′ Spieler A");
+    expect((row.querySelector(".live-clock i") as HTMLElement).style.width).toBe("70%");
     const status = globalThis.document.querySelector(".live-status");
     expect(status).toHaveTextContent("1 laufendes Spiel");
     // Die Technik steht im Tooltip.
@@ -247,9 +253,17 @@ describe("Live-Ansicht", () => {
     expect(within(panel).getByText("Tor · Spieler A")).toBeInTheDocument();
     expect(panel).not.toHaveTextContent("Substitution");
     expect(panel.querySelector(".live-cards")).toHaveTextContent("Gelb 1 : 2 · Rot 0 : 0");
-    // Quote und Stufe vor dem Anpfiff stehen hier, ausdrücklich zeitlich eingeordnet.
-    expect(within(panel).getByText("Vor dem Anpfiff")).toBeInTheDocument();
-    expect(panel).toHaveTextContent("1,85");
+    // Quote und Stufe vor dem Anpfiff stehen hier, ausdrücklich zeitlich eingeordnet - neben der Chance jetzt.
+    expect(within(panel).getByText("Deine Tipps vor dem Anpfiff · jetzt")).toBeInTheDocument();
+    const tipRow = panel.querySelector(".live-tip-row.recommended");
+    expect(tipRow).toHaveTextContent("✓ Über 2,5");
+    expect(tipRow).toHaveTextContent("1,85");
+    expect(tipRow).toHaveTextContent("64 %");
+    expect(tipRow).toHaveTextContent("30 %");
+    expect(tipRow).toHaveTextContent("noch 2 Tore");
+    // Spielverlauf: das Tor als Punkt beim Heimteam, Wechsel nicht.
+    expect(within(panel).getByTitle("40′ Tor · Spieler A")).toHaveClass("live-timeline-event", "home", "goal");
+    expect(panel.querySelectorAll(".live-timeline-event")).toHaveLength(1);
     expect(panel).not.toHaveTextContent("Aktivitätsbild");
     // Das Fenster geht an der Klickstelle auf, rechts neben der Maus.
     expect(panel.style.left).toBe("312px");
@@ -358,27 +372,59 @@ describe("Live-Fragen und Anzeige-Filter", () => {
     expect(window.localStorage.getItem("football-analyzer:live-question")).toBe("over25");
   });
 
-  /** Davids Wunsch vom 29.09.2026: die Statistik übersichtlich als Spalten direkt in der Liste. */
-  it("zeigt Schüsse aufs Tor, Karten, Ballbesitz und Pässe als Spalten, Heim oben und Gast unten", async () => {
+  /**
+   * Davids Wunsch vom 29.09.2026: die Statistik übersichtlich direkt in der Liste. Seit 03.11.2026 (Entwurf
+   * „Live-Ansicht“) Schüsse aufs Tor mit dem Ballbesitz als Balken darunter und Karten; Ballbesitz und Pässe
+   * haben keine eigene Spalte mehr - an ihrer Stelle steht „Dein Tipp · jetzt“.
+   */
+  it("zeigt Schüsse aufs Tor mit Ballbesitz und Karten, Heim oben und Gast unten", async () => {
     const match = liveMatch();
     match.cards = { home: { yellow: 1, red: 1 }, away: { yellow: 0, red: 0 } };
+    match.metrics.home.shotsOnGoal = null;
     stubFetch(() => new Response(JSON.stringify(board([match])), { status: 200 }));
     render(<App />);
     const row = await screen.findByRole("article");
 
     const head = globalThis.document.querySelector(".live-head");
-    for (const label of ["Aufs Tor", "Karten", "Ballbesitz", "Pässe"]) expect(head).toHaveTextContent(label);
-    const [shots, cards, possession, passes] = [...row.querySelectorAll(".live-stat")];
-    expect(shots!.querySelector(".home")).toHaveTextContent("7");
+    for (const label of ["Dein Tipp · jetzt", "Aufs Tor", "Karten"]) expect(head).toHaveTextContent(label);
+    expect(head).not.toHaveTextContent("Pässe");
+    const [shots, cards] = [...row.querySelectorAll(".live-stat")];
+    // Fehlt eine Zahl, bleibt ein Strich statt einer Null.
+    expect(shots!.querySelector(".home")).toHaveTextContent("–");
     expect(shots!.querySelector(".away")).toHaveTextContent("4");
+    expect(within(shots as HTMLElement).getByTitle("Ballbesitz 58 : 42 %")).toBeInTheDocument();
     expect(cards!.querySelector(".home")).toHaveTextContent("1 Gelb1 Rot");
     // Eine Karte steht nur beim Team, das sie hat - keine gelbe „0“ beim Gast.
     expect(cards!.querySelector(".away")).toBeEmptyDOMElement();
-    expect(possession!.querySelector(".home")).toHaveTextContent("58 %");
-    expect(possession!.querySelector(".away")).toHaveTextContent("42 %");
-    expect(passes!.querySelector(".home")).toHaveTextContent("412 · 84 %");
-    // Fehlt eine Zahl, bleibt ein Strich statt einer Null.
-    expect(passes!.querySelector(".away")).toHaveTextContent("–");
+  });
+
+  it("zeigt den Stand der Tipps von vor dem Anpfiff: erreicht, noch nötig, Luft und Führung", async () => {
+    const match = liveMatch();
+    const market = (key: DashboardMarket["key"], probability: number, level: "strong" | "recommended", pick: DashboardMarket["pick"] = null): DashboardMarket => ({
+      ...markets()[0]!, key, label: key, pick, probability, recommendation: { level, label: level }
+    });
+    match.marketStands.over15 = { status: "won" };
+    match.prematch = { ...match.prematch, markets: [
+      market("over15", 0.85, "recommended"), market("under35", 0.7, "strong"), market("1x2", 0.6, "strong", "1"),
+      market("firstHalfOver05", 0.75, "recommended")
+    ] };
+    stubFetch(() => new Response(JSON.stringify(board([match])), { status: 200 }));
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(<App />);
+    const row = await screen.findByRole("article");
+
+    // In der Zeile die zwei stärksten (★ vor ✓, dann nach Chance), der Rest als Zahl.
+    const chips = [...row.querySelectorAll(".live-tip")];
+    expect(chips.map((chip) => chip.textContent)).toEqual(["★Unter 3,52 Tore Luft · 90 %", "★Sieg Alpha FCführt · 70 %"]);
+    expect(row.querySelector(".live-tips")).toHaveTextContent("+ 2 weitere");
+
+    await user.click(row);
+    const panel = await screen.findByRole("dialog", { name: /Live-Kennzahlen/ });
+    const rows = [...panel.querySelectorAll(".live-tip-row:not(.head)")];
+    expect(rows).toHaveLength(4);
+    // Entschieden: erreicht, ohne Live-Chance. Die 1. Halbzeit ist nach der Pause entschieden (HZ 1:0).
+    expect(rows.find((tipRow) => tipRow.textContent!.includes("Über 1,5"))).toHaveTextContent("85 %–erreicht");
+    expect(rows.find((tipRow) => tipRow.textContent!.includes("1. HZ Über 0,5"))).toHaveTextContent("erreicht");
   });
 
   it("zeigt bei BTTS nur den Stand, weil es dafür keine gemessene Live-Chance gibt", async () => {
@@ -426,8 +472,10 @@ describe("Live-Fragen und Anzeige-Filter", () => {
 
     const row = await screen.findByRole("article");
     expect(within(row).getByTitle("Rote Karte")).toHaveTextContent("1");
-    // Aufs Tor, Ballbesitz und Pässe: je ein Strich mit der Begründung im Tooltip.
-    expect(within(row).getAllByTitle("Diese Liga liefert keine Live-Statistik.")).toHaveLength(3);
+    // Aufs Tor: ein Strich mit der Begründung im Tooltip, ohne Ballbesitz-Balken.
+    const shots = within(row).getByTitle("Diese Liga liefert keine Live-Statistik.");
+    expect(shots.querySelector(".home")).toHaveTextContent("–");
+    expect(shots.querySelector(".live-possession")).toBeNull();
     await user.click(row);
     const panel = await screen.findByRole("dialog", { name: /Live-Kennzahlen/ });
     expect(within(panel).getByText("Diese Liga liefert keine Live-Statistik.")).toBeInTheDocument();
@@ -448,7 +496,7 @@ describe("Live-Fragen und Anzeige-Filter", () => {
     expect(panel).toHaveTextContent("Keine Kartendaten – in dieser Liga fehlen Karten in den Ereignissen.");
   });
 
-  it("versteckt im Fenster die 1X2-Wahrscheinlichkeit ohne Ligastärke-Vergleich", async () => {
+  it("zeigt einen 1X2-Tipp ohne Ligastärke-Vergleich weder in der Zeile noch im Fenster", async () => {
     const match = liveMatch();
     match.prematch = {
       ...match.prematch,
@@ -462,11 +510,59 @@ describe("Live-Fragen und Anzeige-Filter", () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     render(<App />);
 
+    // Ohne belastbare Wahrscheinlichkeit ist ein Markt nie eine Empfehlung (AGENTS.md Punkt 5).
+    const row = await screen.findByRole("article");
+    expect(row.querySelector(".live-tips")).not.toHaveTextContent("Sieg Alpha FC");
+    await user.click(row);
+    const panel = await screen.findByRole("dialog", { name: /Live-Kennzahlen/ });
+    expect(panel.querySelector(".live-tip-table")).not.toHaveTextContent("Sieg Alpha FC");
+    expect(panel.querySelector(".live-tip-table")).not.toHaveTextContent("55 %");
+  });
+
+  /** Davids Wunsch vom 03.11.2026: H2H im Live-Fenster, übersichtlicher als die Striche der Tabelle. */
+  it("zeigt im Fenster unter H2H die Duelle aus der Analyse, ohne Testspiele und ohne Abruf", async () => {
+    const duel = (fixtureId: number, date: string, home: string, away: string, homeGoals: number, awayGoals: number,
+      halfTime: [number, number] | null, friendly = false) => ({
+      fixtureId, teamWasHome: home === "Alpha FC", date, homeTeam: home, awayTeam: away, homeGoals, awayGoals,
+      halfTimeHomeGoals: halfTime?.[0] ?? null, halfTimeAwayGoals: halfTime?.[1] ?? null, friendly, league: "Bundesliga"
+    });
+    const doc = dashboard();
+    doc.fixtures[0]!.h2h.history = [
+      duel(11, "2025-04-12T15:30:00+00:00", "Gast FC", "Alpha FC", 1, 3, [0, 1]),
+      duel(12, "2024-11-02T15:30:00+00:00", "Alpha FC", "Gast FC", 2, 2, [0, 1]),
+      duel(13, "2024-07-20T15:30:00+00:00", "Alpha FC", "Gast FC", 5, 0, null, true)
+    ];
+    doc.fixtures[0]!.form = { ...doc.fixtures[0]!.form, home: ["win", "win", "draw"], away: ["loss"] };
+    const calls = stubFetch(() => new Response(JSON.stringify(board()), { status: 200 }),
+      () => new Response(JSON.stringify(doc), { status: 200 }));
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(<App />);
+
     await user.click(await screen.findByRole("article"));
     const panel = await screen.findByRole("dialog", { name: /Live-Kennzahlen/ });
-    const oneXTwo = within(panel).getByText(/1X2/).closest("li");
-    expect(oneXTwo).toHaveTextContent("Ligastärke unbekannt");
-    expect(oneXTwo).not.toHaveTextContent("55");
+    const otherCalls = () => calls.filter((url) => !url.startsWith("/api/live/board")).length;
+    const before = otherCalls();
+    await user.click(within(panel).getByRole("tab", { name: "H2H" }));
+
+    // Das Testspiel vom Juli zählt nicht mit.
+    expect(within(panel).getByText("Direkte Duelle · 2 Spiele")).toBeInTheDocument();
+    const duelBox = panel.querySelector(".live-duel")!;
+    expect(duelBox.querySelector(".home")).toHaveTextContent("1Sieg Alpha FC");
+    expect(duelBox.querySelector(".draw")).toHaveTextContent("1Remis");
+    expect(duelBox).toHaveTextContent("Tore 5 : 3");
+    expect(duelBox).toHaveTextContent("Höchster Sieg: Alpha FC 3:1 (12.04.25)");
+    expect(panel).toHaveTextContent("Nur 2 Duelle – kann auch Zufall sein.");
+    const frequency = (label: string) => [...panel.querySelectorAll(".live-freq")].find((row) => row.textContent!.startsWith(label))!;
+    expect(frequency("Über 2,5 Tore")).toHaveTextContent("2 von 2");
+    expect(frequency("Alpha FC zur Pause vorn")).toHaveTextContent("1 von 2");
+    expect(frequency("Gast FC zu null").querySelectorAll("i.miss")).toHaveLength(2);
+    expect(panel.querySelector(".live-duel-list")).toHaveTextContent("12.04.25Gast FC – Alpha FC Bundesliga1:30:1S");
+    expect(panel.querySelector(".live-form")).toHaveTextContent("Alpha FC7 von 9 Pkt.");
+
+    await user.click(within(panel).getByRole("button", { name: "Nur in Alpha FC" }));
+    expect(within(panel).getByText("Direkte Duelle · 1 Spiel")).toBeInTheDocument();
+    // H2H kommt aus der geladenen Analyse - kein Aufruf.
+    expect(otherCalls()).toBe(before);
   });
 
   it("filtert nach Chance und Roter Karte, zeigt Schildchen und setzt beides zurück", async () => {

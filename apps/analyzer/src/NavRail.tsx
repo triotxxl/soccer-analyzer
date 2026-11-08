@@ -1,5 +1,6 @@
 import { Broadcast, ChartBar, ClockCounterClockwise, GridFour, SoccerBall, Table, type Icon } from "@phosphor-icons/react";
 import type { ReactNode } from "react";
+import { dateFormat } from "./dateFormat";
 
 /**
  * Die vier Ansichten der linken Leiste. Tabelle und Heatmap sind intern dieselbe Ansicht
@@ -25,8 +26,8 @@ export function BrandMark() {
 function dataTimestampParts(value: string, timezone: string): [string, string] {
   const date = new Date(value);
   return [
-    new Intl.DateTimeFormat("de-DE", { timeZone: timezone, day: "2-digit", month: "2-digit", year: "2-digit" }).format(date),
-    new Intl.DateTimeFormat("de-DE", { timeZone: timezone, hour: "2-digit", minute: "2-digit" }).format(date)
+    dateFormat("de-DE", { timeZone: timezone, day: "2-digit", month: "2-digit", year: "2-digit" }).format(date),
+    dateFormat("de-DE", { timeZone: timezone, hour: "2-digit", minute: "2-digit" }).format(date)
   ];
 }
 

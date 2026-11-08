@@ -1,5 +1,5 @@
 import { CaretRight, Funnel, Info, Ticket, X } from "@phosphor-icons/react";
-import { useEffect, useId, useLayoutEffect, useRef, useState, type Ref } from "react";
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode, type Ref } from "react";
 import { FilterCard, FilterChip, FilterSegment, FilterSwitch, type SegmentOption } from "./FilterMenu";
 import {
   QUICKPICK_GROUPS,
@@ -37,6 +37,7 @@ import {
 import { fixtureCount, hasTip, quickpickCartEntry, selectionLabel, shortTipLabel, type CartEntry } from "./betCart";
 import { leagueName, teamName, useNames, type NameSource } from "../../shared/src/names";
 import type { DashboardFixture } from "../../shared/src/types";
+import { dateFormat } from "./dateFormat";
 
 /** Was „Alle n in den Wettschein“ getan hat; der Fuß meldet es, statt den Wettschein zu öffnen. */
 export interface QuickpickCartFeedback {
@@ -207,7 +208,7 @@ export function QuickpickDialog({
   fixtures, store, active, timezone, now = Date.now(), shownInTable,
   onSettingsChange, onPresetChange, onActiveChange, onAddAll, onClose,
   cartFeedback = null, canUndoCart = false, onUndoCart, onOpenCart,
-  cart = [], comboPlaces = 0, onRemoveEntry, onShowInTable, tableFixtureIds
+  cart = [], comboPlaces = 0, onRemoveEntry, onShowInTable, tableFixtureIds, renderDetail
 }: {
   fixtures: DashboardFixture[];
   store: QuickpickStore;
@@ -236,6 +237,11 @@ export function QuickpickDialog({
   /** Schließt den Quickpicker und zeigt die Tabelle; mit Spiel klappt es dort auf. */
   onShowInTable?(fixtureId: number | null): void;
   /**
+   * Rechte Spalte zum aufgeklappten Spiel (seit 02.11.2026: direkte Duelle und Tabellenverlauf, Davids
+   * Wunsch). Ohne aufgeklapptes Spiel bleibt das Fenster zweispaltig.
+   */
+  renderDetail?(fixture: DashboardFixture): ReactNode;
+  /**
    * Welche Spiele die Tabelle zeigt. Suche und Bewertung grenzen sie weiter ein als den Umfang
    * des Quickpickers - „In der Tabelle zeigen“ gibt es nur für Spiele, die dort auch stehen.
    */
@@ -260,6 +266,7 @@ export function QuickpickDialog({
 
   const [info, setInfo] = useState(false);
   const [openRow, setOpenRow] = useState<number | null>(null);
+  const detailFixture = renderDetail && openRow !== null ? fixtures.find((f) => f.fixtureId === openRow) ?? null : null;
   const [kombiOpen, setKombiOpen] = useState(false);
   const [rejectionsOpen, setRejectionsOpen] = useState(false);
   // Beim Öffnen und beim Wechsel die Sortierung des Filters: bei „Kombi-Tipps“ nach der Chance,
@@ -321,14 +328,16 @@ export function QuickpickDialog({
   const setParam = (param: QuickpickParam, next: number) =>
     activate({ ...settings, [param.id]: next } as QuickpickSettings);
 
-  // Wie im Kelly-Dialog: bei jedem Render neu gerechnet, kein Zwischenspeicher. Die Liste
-  // kann dadurch nicht von dem abweichen, was die Tabelle zeigt.
-  const { evaluations, report } = applyQuickpick(fixtures, settings);
+  // Neu gerechnet, sobald sich Spiele oder Regler ändern - aus denselben Eingaben wie die Tabelle,
+  // die Liste kann also nicht von ihr abweichen. Vorher lief die Rechnung bei jedem Rendern, die
+  // Zahlen hinter den Filtern alle acht Filter über alle Spiele (Messung vom 03.11.2026).
+  const { evaluations, report } = useMemo(() => applyQuickpick(fixtures, settings), [fixtures, settings]);
   const names = useNames();
   // Die Zahl hinter jedem Filter: wie viele Spiele er mit **seinen** Einstellungen findet,
   // damit der Wechsel nicht blind geschieht.
-  const passedOf = (id: QuickpickPresetId) =>
-    id === preset.id ? report.passed : applyQuickpick(fixtures, store[id]).report.passed;
+  const passedCounts = useMemo(() => new Map(QUICKPICK_PRESET_LIST.map((entry) => [entry.id,
+    entry.id === preset.id ? report.passed : applyQuickpick(fixtures, store[entry.id]).report.passed])), [fixtures, store, preset.id, report]);
+  const passedOf = (id: QuickpickPresetId) => passedCounts.get(id) ?? 0;
 
   const rows: QuickpickRow[] = fixtures
     .map((fixture) => ({ fixture, evaluation: evaluations.get(fixture.fixtureId)!, names }))
@@ -393,8 +402,8 @@ export function QuickpickDialog({
 
   const kickoff = (value: string) => {
     const date = new Date(value);
-    const weekday = new Intl.DateTimeFormat("de-DE", { timeZone: timezone, weekday: "short" }).format(date);
-    const clock = new Intl.DateTimeFormat("de-DE", { timeZone: timezone, hour: "2-digit", minute: "2-digit" }).format(date);
+    const weekday = dateFormat("de-DE", { timeZone: timezone, weekday: "short" }).format(date);
+    const clock = dateFormat("de-DE", { timeZone: timezone, hour: "2-digit", minute: "2-digit" }).format(date);
     return `${weekday} ${clock}`;
   };
 
@@ -428,7 +437,7 @@ export function QuickpickDialog({
         title="Quickpicker schließen" onClick={onClose}><X size={14} weight="bold" aria-hidden /></button>
     </div>
 
-    <div className="quickpick-body">
+    <div className={detailFixture ? "quickpick-body with-detail" : "quickpick-body"}>
       <div className="quickpick-left">
         <FilterCard title="Filter">
           {QUICKPICK_GROUPS.map((group) => <fieldset key={group.id} className="quickpick-options">
@@ -680,6 +689,9 @@ export function QuickpickDialog({
           {rejectionsOpen && rejectionList()}
         </div>}
       </FilterCard>
+      {detailFixture && <aside className="quickpick-detail" aria-label="Direkte Duelle des gewählten Spiels">
+        {renderDetail!(detailFixture)}
+      </aside>}
     </div>
 
     <div className="quickpick-footer">

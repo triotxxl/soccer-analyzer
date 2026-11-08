@@ -1,0 +1,721 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tabelle Entwurf</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Narrow:wght@400;500;600;700&family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&display=swap" rel="stylesheet">
+<style>
+/* =========================================================================
+   Entwurf: Haupttabelle der alten App (apps/analyzer), zwei Varianten.
+   A = im Neo-Design-System (.interface-design/system.md), B = freie Richtung „Tippschein“.
+   Daten: echte Spiele aus output/dashboard-latest.json (Stand siehe Kopf), 0 Aufrufe.
+   ========================================================================= */
+
+/* ---------- Entwurfsrahmen (nicht Teil der App) ---------- */
+:root {
+  --frame-bg: #0b0b0a; --frame-ink: #d9d5cc; --frame-mute: #8f8b83; --frame-line: #2a2926; --frame-on: #7ea6f8;
+}
+@media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) {
+  --frame-bg: #dedbd4; --frame-ink: #1a1917; --frame-mute: #5c5953; --frame-line: #c9c6bf; --frame-on: #2457c5;
+} }
+:root[data-theme="light"] { --frame-bg: #dedbd4; --frame-ink: #1a1917; --frame-mute: #5c5953; --frame-line: #c9c6bf; --frame-on: #2457c5; }
+:root[data-theme="dark"] { --frame-bg: #0b0b0a; --frame-ink: #d9d5cc; --frame-mute: #8f8b83; --frame-line: #2a2926; --frame-on: #7ea6f8; }
+
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--frame-bg); color: var(--frame-ink); font: 13px/1.4 "IBM Plex Sans", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+.frame { display: flex; flex-wrap: wrap; gap: 10px 20px; align-items: center; padding: 10px 16px; border-bottom: 1px solid var(--frame-line); }
+.frame h1 { font: 600 13px/1 "IBM Plex Sans"; margin: 0 8px 0 0; letter-spacing: .02em; }
+.frame .grp { display: flex; gap: 2px; align-items: center; }
+.frame .grp > span { color: var(--frame-mute); margin-right: 6px; }
+.frame button { font: inherit; color: var(--frame-mute); background: none; border: 1px solid var(--frame-line); padding: 5px 10px; border-radius: 6px; cursor: pointer; }
+.frame button[aria-pressed="true"] { color: var(--frame-ink); border-color: var(--frame-on); box-shadow: inset 0 0 0 1px var(--frame-on); }
+.frame .stand { margin-left: auto; color: var(--frame-mute); }
+.stage { padding: 16px; }
+.notes { max-width: 1100px; margin: 18px auto 8px; color: var(--frame-mute); font-size: 13px; }
+.notes h2 { font: 600 13px "IBM Plex Sans"; color: var(--frame-ink); margin: 0 0 6px; }
+.notes ul { margin: 0; padding-left: 18px; columns: 2; column-gap: 32px; }
+.notes li { margin: 0 0 5px; break-inside: avoid; }
+.notes b { color: var(--frame-ink); font-weight: 600; }
+[hidden] { display: none !important; }
+
+/* =========================================================================
+   VARIANTE A - Neo-System
+   ========================================================================= */
+.A {
+  --bg: #131312; --surface: #1b1b19; --surface-2: #232321; --nav: #0e0e0d; --line: #34332f; --line-soft: rgba(235,232,226,.06);
+  --ink: #ebe8e2; --muted: #aaa69e; --accent: #7ea6f8; --accent-ink: #0d1526;
+  --home: #f28a2e; --home-ink: #1f1206; --away: #a585f5; --away-ink: #160c2b; --draw: #77746d;
+  --track: #141413; --best-bar: #cfcbc3; --win-fill: #3f8253; --loss-fill: #c83407; --tie-fill: #5f5d58; --amber: #e6a94a;
+  --f-display: "Barlow Condensed", sans-serif; --f-body: "IBM Plex Sans", sans-serif; --f-mono: "IBM Plex Mono", monospace;
+  --l: 20px; /* Teamzeile */ --m: 17px; /* Metazeile */
+}
+@media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) .A {
+  --bg: #f0efec; --surface: #ffffff; --surface-2: #f7f6f3; --nav: #e6e4df; --line: #dcdad5; --line-soft: rgba(26,25,23,.06);
+  --ink: #1a1917; --muted: #5c5953; --accent: #2457c5; --accent-ink: #ffffff;
+  --home: #a24f00; --home-ink: #ffffff; --away: #6a35b8; --away-ink: #ffffff; --draw: #77736c;
+  --track: #e7e5e0; --best-bar: #4a4742; --tie-fill: #76726b; --amber: #d98a1c;
+} }
+:root[data-theme="light"] .A {
+  --bg: #f0efec; --surface: #ffffff; --surface-2: #f7f6f3; --nav: #e6e4df; --line: #dcdad5; --line-soft: rgba(26,25,23,.06);
+  --ink: #1a1917; --muted: #5c5953; --accent: #2457c5; --accent-ink: #ffffff;
+  --home: #a24f00; --home-ink: #ffffff; --away: #6a35b8; --away-ink: #ffffff; --draw: #77736c;
+  --track: #e7e5e0; --best-bar: #4a4742; --tie-fill: #76726b; --amber: #d98a1c;
+}
+
+.A { background: var(--bg); color: var(--ink); font: 14px/1.45 var(--f-body); border-radius: 12px; overflow: hidden;
+  display: grid; grid-template-columns: 76px minmax(0,1fr); min-height: 760px; }
+.A .rail { background: var(--nav); border-right: 1px solid var(--line); display: flex; flex-direction: column; padding: 10px 0; gap: 2px; }
+.A .rail button { all: unset; cursor: pointer; display: grid; justify-items: center; gap: 4px; padding: 10px 0; color: var(--muted); font: 500 11px var(--f-body); position: relative; }
+.A .rail button svg { width: 20px; height: 20px; }
+.A .rail button[aria-current="page"] { color: var(--ink); }
+.A .rail button[aria-current="page"]::before { content: ""; position: absolute; left: 0; top: 8px; bottom: 8px; width: 3px; border-radius: 0 3px 3px 0; background: var(--accent); }
+.A .rail button:hover { color: var(--ink); }
+.A .rail button:focus-visible { outline: 2px solid var(--accent); outline-offset: -4px; }
+
+.A .main { min-width: 0; display: flex; flex-direction: column; }
+.A .bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 12px 18px; border-bottom: 1px solid var(--line); }
+.A .btn { font: 500 13px var(--f-body); color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 8px; height: 34px; padding: 0 12px; display: inline-flex; align-items: center; gap: 7px; cursor: pointer; }
+.A .btn:hover { background: color-mix(in srgb, var(--ink) 6%, var(--surface)); }
+.A .btn:focus-visible, .A select:focus-visible, .A .search:focus-within { outline: 2px solid var(--accent); outline-offset: 1px; }
+.A .btn .n { font: 600 11px var(--f-mono); background: var(--accent); color: var(--accent-ink); border-radius: 999px; padding: 1px 7px; }
+.A .btn .n.off { background: var(--surface-2); color: var(--muted); }
+.A .search { display: flex; align-items: center; gap: 7px; height: 34px; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--track); color: var(--muted); width: 230px; }
+.A .search input { all: unset; color: var(--ink); font: 13px var(--f-body); width: 100%; }
+.A .field { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; }
+.A select { font: 500 13px var(--f-body); color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 8px; height: 34px; padding: 0 28px 0 10px; appearance: none;
+  background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+  background-position: calc(100% - 15px) 15px, calc(100% - 10px) 15px; background-size: 5px 5px; background-repeat: no-repeat; }
+.A .switch { display: inline-flex; align-items: center; gap: 8px; font: 500 13px var(--f-body); color: var(--muted); cursor: pointer; user-select: none; }
+.A .switch i { width: 30px; height: 18px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--line); position: relative; transition: background-color .16s; }
+.A .switch i::after { content: ""; position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; border-radius: 50%; background: var(--muted); transition: transform .16s cubic-bezier(.23,1,.32,1); }
+.A .switch[aria-checked="true"] { color: var(--ink); }
+.A .switch[aria-checked="true"] i { background: var(--accent); border-color: var(--accent); }
+.A .switch[aria-checked="true"] i::after { transform: translateX(12px); background: var(--accent-ink); }
+.A .switch:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 6px; }
+.A .grow { flex: 1; }
+
+.A .summary { display: flex; gap: 14px; align-items: baseline; padding: 12px 18px 10px; }
+.A .summary h2 { font: 600 22px/1 var(--f-display); text-transform: uppercase; letter-spacing: .02em; margin: 0; }
+.A .summary span { color: var(--muted); font-size: 13px; }
+.A .warn { margin: 0 18px 10px; display: grid; grid-template-columns: 8px 1fr; gap: 10px; align-items: baseline; background: var(--surface-2); border-radius: 8px; padding: 9px 12px; font-size: 12px; color: var(--muted); }
+.A .warn::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--amber); box-shadow: 0 0 0 3px color-mix(in srgb, var(--amber) 25%, transparent); transform: translateY(-1px); }
+.A .warn b { color: var(--ink); font-weight: 600; }
+
+.A .table { margin: 0 18px 18px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; overflow: auto; flex: 1; max-height: 780px; }
+.A .grid { display: grid; grid-template-columns: var(--cols); column-gap: 14px; align-items: start; padding: 0 12px 0 16px; }
+.A .head { position: sticky; top: 0; z-index: 3; background: var(--surface); border-bottom: 1px solid var(--line); height: 38px; align-items: center; }
+.A .head > * { font: 600 11px var(--f-body); text-transform: uppercase; letter-spacing: .06em; color: var(--muted); white-space: nowrap; }
+.A .head button { all: unset; cursor: pointer; display: inline-flex; gap: 4px; align-items: center; }
+.A .head button:hover { color: var(--ink); }
+.A .head button[aria-sort] { color: var(--ink); }
+.A .head button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px; }
+.A .head .r { justify-self: end; }
+.A .day { position: sticky; top: 38px; z-index: 2; background: var(--surface-2); border-bottom: 1px solid var(--line); padding: 7px 16px; display: flex; gap: 10px; align-items: baseline;
+  font: 600 16px/1 var(--f-display); text-transform: uppercase; letter-spacing: .03em; }
+.A .day span { font: 400 12px var(--f-body); text-transform: none; letter-spacing: 0; color: var(--muted); }
+
+.A .row { position: relative; padding-top: 9px; padding-bottom: 9px; border-bottom: 1px solid var(--line-soft); cursor: pointer; }
+.A .row:hover { background: color-mix(in srgb, var(--ink) 4%, var(--surface)); }
+.A .row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.A .row.on { background: color-mix(in srgb, var(--accent) 12%, var(--surface)); }
+.A .row.on::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--accent); }
+/* Das Zwei-Zeilen-Raster: jede Zelle hat Heimzeile, Gastzeile, Metazeile. */
+.A .c { display: grid; grid-template-rows: var(--l) var(--l) var(--m); min-width: 0; }
+.A .c > * { min-width: 0; }
+
+.A .time { font: 600 13px/var(--l) var(--f-mono); font-variant-numeric: tabular-nums; }
+.A .time small { grid-row: 2; font: 400 11px/var(--l) var(--f-mono); color: var(--muted); }
+
+.A .match { grid-template-columns: 3px 18px minmax(0,max-content) 1fr; column-gap: 8px; }
+.A .spine { grid-row: 1 / 3; grid-column: 1; border-radius: 2px; background: linear-gradient(var(--home) 0 calc(50% - 1px), transparent 0 calc(50% + 1px), var(--away) 0); margin: 3px 0; }
+.A .crest { width: 18px; height: 18px; align-self: center; object-fit: contain; grid-column: 2; }
+.A .crest.ini { display: grid; place-items: center; font: 600 8px var(--f-body); color: var(--muted); background: var(--surface-2); border-radius: 50%; }
+.A .nm { grid-column: 3; font: 500 14px/var(--l) var(--f-body); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.A .elo { grid-column: 4; justify-self: start; font: 400 11px/var(--l) var(--f-mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+.A .elo.strong { color: var(--ink); font-weight: 600; }
+.A .elo.thin { text-decoration: underline dotted; text-underline-offset: 3px; }
+.A .meta { grid-column: 2 / 5; grid-row: 3; display: flex; gap: 6px; align-items: center; font: 400 11.5px/var(--m) var(--f-body); color: var(--muted); white-space: nowrap; overflow: hidden; }
+.A .meta .cc { font: 600 10px var(--f-mono); letter-spacing: .04em; border: 1px solid var(--line); border-radius: 3px; padding: 0 3px; line-height: 13px; }
+.A .meta .lg { overflow: hidden; text-overflow: ellipsis; }
+.A .meta .dv.low::before { content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--amber); margin-right: 4px; transform: translateY(-1px); }
+.A .tag { font: 600 10.5px/1 var(--f-body); border: 1px solid var(--line); border-radius: 4px; padding: 2px 5px; color: var(--ink); white-space: nowrap; }
+.A .hint { text-decoration: underline dotted; text-underline-offset: 3px; cursor: help; }
+
+.A .form { grid-template-columns: 32px auto minmax(16px,1fr); column-gap: 6px; align-items: center; }
+.A .form .fl { font: 400 10.5px/var(--l) var(--f-body); color: var(--muted); }
+.A .boxes { display: inline-flex; gap: 2px; align-items: center; }
+.A .bx { width: 15px; height: 15px; border-radius: 3px; display: grid; place-items: center; font: 600 10px/1 var(--f-body); color: #fff; }
+.A .bx.w { background: var(--win-fill); } .A .bx.l { background: var(--loss-fill); } .A .bx.d { background: var(--tie-fill); }
+.A .bx.h { background: var(--home); color: var(--home-ink); } .A .bx.a { background: var(--away); color: var(--away-ink); }
+.A .bx.e { border: 1px dashed var(--line); }
+.A .form .pts { font: 500 11px/var(--l) var(--f-mono); color: var(--muted); justify-self: end; font-variant-numeric: tabular-nums; }
+.A .h2h .sum { font: 400 11px/var(--l) var(--f-mono); color: var(--muted); }
+.A .h2h .none { font-size: 11.5px; color: var(--muted); line-height: var(--l); }
+.A .h2h .tag { grid-row: 3; justify-self: start; font-weight: 500; color: var(--muted); }
+
+.A .model { grid-template-columns: auto 1fr auto; column-gap: 6px; font: 500 13px/var(--l) var(--f-mono); font-variant-numeric: tabular-nums; }
+.A .model .xg { text-align: right; min-width: 32px; }
+.A .model small { font: 400 10.5px/var(--l) var(--f-body); color: var(--muted); justify-self: end; }
+.A .model .pt { color: var(--muted); text-align: right; min-width: 22px; }
+
+/* Marktzelle: der Blickfang */
+.A .mkt { grid-template-rows: var(--l) var(--l) var(--m); }
+.A .split { display: flex; height: 8px; border-radius: 4px; overflow: hidden; gap: 2px; align-self: center; background: var(--track); }
+.A .split i { display: block; height: 100%; }
+.A .split .h { background: var(--home); } .A .split .d { background: var(--draw); } .A .split .a { background: var(--away); }
+.A .split .s1 { background: var(--best-bar); } .A .split .s2 { background: color-mix(in srgb, var(--best-bar) 35%, var(--track)); }
+.A .split.none { background: transparent; border: 1px dashed var(--line); height: 8px; }
+.A .outs { display: grid; grid-template-columns: repeat(var(--n), minmax(0,1fr)); column-gap: 8px; font: 400 12px/var(--l) var(--f-mono); font-variant-numeric: tabular-nums; }
+.A .out { display: flex; gap: 4px; align-items: center; white-space: nowrap; color: var(--muted); }
+.A .out em { font-style: normal; font-family: var(--f-body); font-size: 11px; }
+.A .out .p { color: var(--ink); }
+.A .out.max .p { font-weight: 600; }
+.A .out.max em { color: var(--ink); font-weight: 600; }
+.A .q { margin-left: auto; border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; line-height: 16px; font-size: 11.5px; color: var(--ink); }
+.A .q.na { color: var(--muted); border-style: dashed; }
+.A .mline { grid-row: 3; display: flex; gap: 8px; align-items: center; font: 400 11.5px/var(--m) var(--f-body); color: var(--muted); white-space: nowrap; overflow: hidden; }
+.A .lvl { font-weight: 600; color: var(--ink); }
+.A .edge { font-family: var(--f-mono); font-size: 11px; }
+.A .edge.pos { color: var(--ink); }
+.A .nochance { font-size: 11.5px; color: var(--muted); line-height: var(--l); }
+
+.A .more { grid-template-columns: 1fr; }
+.A .rec { display: grid; grid-template-columns: 12px minmax(0,1fr) 36px 40px; column-gap: 6px; align-items: center; font: 400 12.5px/var(--l) var(--f-body); }
+.A .rec .g { font-size: 11px; color: var(--ink); text-align: center; }
+.A .rec .g.ok { color: var(--muted); }
+.A .rec .lb { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.A .rec .p { font: 500 12px var(--f-mono); text-align: right; font-variant-numeric: tabular-nums; }
+.A .rec .o { font: 400 11.5px var(--f-mono); color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; }
+.A .more .rest { grid-row: 3; font: 400 11.5px/var(--m) var(--f-body); color: var(--muted); padding-left: 18px; }
+.A .more .empty { color: var(--muted); font-size: 12px; line-height: var(--l); }
+
+.A .add { justify-items: end; }
+.A .add button { grid-row: 1 / 3; align-self: center; width: 30px; height: 30px; border-radius: 7px; border: 1px solid var(--line); background: var(--surface); color: var(--muted); font: 500 16px/1 var(--f-body); cursor: pointer; display: grid; place-items: center; transition: transform .12s; }
+.A .add button:hover { color: var(--ink); border-color: var(--muted); }
+.A .add button:active { transform: scale(.96); }
+.A .add button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.A .add button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-size: 13px; }
+
+.A .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+@media (max-width: 1360px) { .A { --h2hw: 0px; } .A .h2hcol { visibility: hidden; overflow: hidden; } }
+
+/* =========================================================================
+   VARIANTE B - „Tippschein“
+   ========================================================================= */
+.B {
+  --paper: #f3efe6; --paper-2: #e9e3d6; --sheet: #faf8f3; --ink: #1c1a16; --ink-2: #5a554b; --ink-3: #8a8374;
+  --rule: #d6cfbf; --rule-2: #1c1a16; --red: #c4361c; --red-soft: rgba(196,54,28,.09); --sel: #e9e1cd;
+  --f-serif: "Source Serif 4", Georgia, serif; --f-cond: "Archivo Narrow", "Arial Narrow", sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .B {
+  --paper: #171612; --paper-2: #211f1a; --sheet: #1b1a16; --ink: #ece6d8; --ink-2: #b0a896; --ink-3: #847d6d;
+  --rule: #39352c; --rule-2: #ece6d8; --red: #ff7357; --red-soft: rgba(255,115,87,.10); --sel: #2a2720;
+} }
+:root[data-theme="dark"] .B {
+  --paper: #171612; --paper-2: #211f1a; --sheet: #1b1a16; --ink: #ece6d8; --ink-2: #b0a896; --ink-3: #847d6d;
+  --rule: #39352c; --rule-2: #ece6d8; --red: #ff7357; --red-soft: rgba(255,115,87,.10); --sel: #2a2720;
+}
+
+.B { background: var(--paper); color: var(--ink); font: 14px/1.4 var(--f-cond); border-radius: 4px; overflow: hidden; min-height: 760px; }
+.B .mast { display: grid; grid-template-columns: 1fr auto; align-items: end; gap: 6px 24px; padding: 18px 28px 0; }
+.B .mast h2 { font: 700 34px/1 var(--f-serif); letter-spacing: -.015em; margin: 0; }
+.B .mast h2 span { font-weight: 400; font-style: italic; color: var(--ink-2); font-size: 22px; letter-spacing: 0; margin-left: 10px; }
+.B .mast nav { display: flex; gap: 18px; font: 600 13px var(--f-cond); text-transform: uppercase; letter-spacing: .08em; }
+.B .mast nav button { all: unset; cursor: pointer; color: var(--ink-3); padding-bottom: 4px; border-bottom: 2px solid transparent; }
+.B .mast nav button[aria-current="page"] { color: var(--ink); border-color: var(--red); }
+.B .mast nav button:hover { color: var(--ink); }
+.B .mast nav button:focus-visible { outline: 2px solid var(--red); outline-offset: 3px; }
+.B .rules { margin: 12px 28px 0; border-top: 3px solid var(--rule-2); border-bottom: 1px solid var(--rule-2); height: 6px; }
+.B .tools { display: flex; flex-wrap: wrap; gap: 6px 22px; align-items: center; padding: 10px 28px 12px; border-bottom: 1px solid var(--rule); font-size: 13.5px; }
+.B .tools label, .B .tools .lbl { color: var(--ink-3); text-transform: uppercase; letter-spacing: .08em; font-size: 11.5px; font-weight: 600; margin-right: 6px; }
+.B .tools select { font: 600 14px var(--f-cond); color: var(--ink); background: transparent; border: 0; border-bottom: 1px solid var(--ink-2); padding: 2px 16px 2px 0; appearance: none; cursor: pointer;
+  background-image: linear-gradient(45deg, transparent 50%, var(--ink-2) 50%), linear-gradient(135deg, var(--ink-2) 50%, transparent 50%);
+  background-position: calc(100% - 7px) 10px, calc(100% - 3px) 10px; background-size: 4px 4px; background-repeat: no-repeat; }
+.B .tools select:focus-visible, .B .tools button:focus-visible, .B .tools input:focus-visible { outline: 2px solid var(--red); outline-offset: 2px; }
+.B .tools option { background: var(--sheet); color: var(--ink); }
+.B .tools .tbtn { font: 600 13px var(--f-cond); color: var(--ink); background: transparent; border: 1px solid var(--ink-2); border-radius: 2px; padding: 4px 10px; cursor: pointer; text-transform: uppercase; letter-spacing: .06em; }
+.B .tools .tbtn:hover { background: var(--paper-2); }
+.B .tools .tbtn[aria-pressed="true"] { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.B .tools .tbtn .n { font-family: var(--f-serif); font-weight: 700; margin-left: 4px; }
+.B .tools input { font: 14px var(--f-cond); color: var(--ink); background: transparent; border: 0; border-bottom: 1px solid var(--ink-2); padding: 2px 0; width: 180px; }
+.B .tools input::placeholder { color: var(--ink-3); }
+.B .tools .sp { flex: 1; }
+.B .warn { margin: 10px 28px 0; padding: 7px 10px; border-left: 3px solid var(--red); background: var(--red-soft); font-size: 13.5px; color: var(--ink); }
+
+.B .sheet { margin: 14px 28px 24px; overflow: auto; max-height: 760px; }
+.B .bgrid { display: grid; grid-template-columns: var(--bcols); column-gap: 14px; align-items: center; }
+.B .bhead { position: sticky; top: 0; z-index: 3; background: var(--paper); border-bottom: 1px solid var(--rule-2); padding: 6px 4px; font: 600 11px var(--f-cond); text-transform: uppercase; letter-spacing: .09em; color: var(--ink-3); }
+.B .bhead .r { text-align: right; } .B .bhead .cen { text-align: center; }
+.B .bday { position: sticky; top: 27px; z-index: 2; background: var(--paper); padding: 16px 4px 4px; font: 700 20px/1.1 var(--f-serif); display: flex; gap: 12px; align-items: baseline; border-bottom: 1px solid var(--rule-2); }
+.B .bday span { font: italic 400 14px var(--f-serif); color: var(--ink-2); }
+.B .lg { padding: 10px 4px 4px; font: 700 11.5px var(--f-cond); text-transform: uppercase; letter-spacing: .12em; color: var(--ink-2); border-bottom: 1px solid var(--rule); display: flex; gap: 8px; align-items: baseline; }
+.B .lg em { font-style: normal; color: var(--ink-3); font-weight: 600; }
+.B .brow { padding: 6px 4px; border-bottom: 1px solid var(--rule); cursor: pointer; min-height: 52px; position: relative; }
+.B .brow:hover { background: var(--paper-2); }
+.B .brow.on { background: var(--sel); }
+.B .brow.on::after { content: ""; position: absolute; left: -10px; top: 50%; width: 6px; height: 6px; margin-top: -3px; background: var(--red); border-radius: 50%; }
+.B .brow:focus-visible { outline: 2px solid var(--red); outline-offset: -2px; }
+.B .tm { font: 600 15px var(--f-cond); font-variant-numeric: tabular-nums; }
+.B .side { display: flex; gap: 7px; align-items: baseline; min-width: 0; font: 600 16px/1.2 var(--f-cond); }
+.B .side.h { justify-content: flex-end; text-align: right; }
+.B .side .nmb { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.B .side .e { font: 400 12px var(--f-cond); color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.B .side .e.strong { color: var(--ink); font-weight: 700; }
+.B .side .e.thin { text-decoration: underline dotted; text-underline-offset: 2px; }
+.B .side .kl { font: 700 10.5px var(--f-cond); letter-spacing: .06em; text-transform: uppercase; color: var(--ink); border: 1px solid var(--ink-2); padding: 0 3px; border-radius: 2px; align-self: center; }
+.B .crest { width: 18px; height: 18px; object-fit: contain; align-self: center; flex: none; filter: saturate(.85); }
+.B .crest.ini { display: inline-grid; place-items: center; font: 700 8px var(--f-cond); color: var(--ink-3); border: 1px solid var(--rule); border-radius: 50%; }
+.B .dash { text-align: center; color: var(--ink-3); font-family: var(--f-serif); }
+.B .fm { display: flex; gap: 7px; align-items: center; font: 600 13px var(--f-cond); letter-spacing: .1em; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.B .fm .s { color: var(--ink); font-weight: 700; } .B .fm .u { color: var(--ink-2); font-weight: 500; } .B .fm .n { color: var(--ink-3); font-weight: 400; }
+.B .fm .x { color: var(--ink-3); font-weight: 400; letter-spacing: 0; }
+.B .fm i { font-style: normal; display: inline-block; width: 1px; height: 14px; background: var(--rule); }
+.B .hh { font: 600 13px var(--f-cond); letter-spacing: .12em; white-space: nowrap; overflow: hidden; }
+.B .hh .x { color: var(--ink-3); }
+.B .hh .ser { letter-spacing: 0; font-size: 11px; color: var(--ink-2); font-style: italic; margin-left: 4px; }
+.B .xg { font: 400 14px var(--f-serif); text-align: center; font-variant-numeric: tabular-nums lining-nums; white-space: nowrap; }
+.B .xg small { display: block; font: 400 11px var(--f-cond); color: var(--ink-3); letter-spacing: .04em; }
+
+/* Der Tippschein: Kästchen 1 | X | 2, das Modell kreuzt an. */
+.B .slip { display: flex; gap: 4px; align-items: center; }
+.B .tb { width: 66px; height: 42px; border: 1px solid var(--ink-2); background: var(--sheet); border-radius: 2px; display: grid; grid-template-columns: auto 1fr; grid-template-rows: 14px 1fr; padding: 2px 5px 3px 4px; position: relative; }
+.B .slip.two .tb { width: 101px; }
+.B .tb .k { position: relative; font: 700 11px/14px var(--f-cond); color: var(--ink-2); min-width: 12px; text-align: center; }
+.B .tb .k svg { position: absolute; inset: -2px -3px; width: calc(100% + 6px); height: 18px; stroke: var(--red); stroke-width: 2; stroke-linecap: round; fill: none; }
+.B .tb .o { justify-self: end; font: 500 11.5px/14px var(--f-cond); color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.B .tb .o.na { color: var(--ink-3); }
+.B .tb .p { grid-column: 1 / 3; justify-self: center; align-self: end; font: 400 19px/1 var(--f-serif); font-variant-numeric: tabular-nums lining-nums; }
+.B .tb .p small { font-size: 11px; color: var(--ink-2); margin-left: 1px; }
+.B .tb.pick { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
+.B .tb.pick .p { font-weight: 700; }
+.B .tb .ed { position: absolute; right: 4px; bottom: -15px; font: 500 10.5px var(--f-cond); color: var(--ink-2); white-space: nowrap; }
+.B .tb.blank .p { color: var(--ink-3); font-size: 15px; }
+.B .lv { font: 700 13px var(--f-cond); width: 14px; text-align: center; color: var(--ink); }
+.B .lv.ok { color: var(--ink-2); font-weight: 600; }
+.B .also { font: 500 13px var(--f-cond); color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.B .also b { color: var(--ink); font-weight: 700; }
+.B .also .pc { font-variant-numeric: tabular-nums; }
+.B .dt { text-align: right; font: 400 14px var(--f-serif); font-variant-numeric: tabular-nums lining-nums; white-space: nowrap; }
+.B .dt sup { font: 600 10px var(--f-cond); color: var(--red); margin-left: 1px; }
+.B .dt.low { font-style: italic; }
+.B .ad button { width: 28px; height: 28px; border: 1px solid var(--ink-2); background: transparent; color: var(--ink); border-radius: 2px; font: 600 16px/1 var(--f-cond); cursor: pointer; display: grid; place-items: center; }
+.B .ad button:hover { background: var(--paper-2); }
+.B .ad button:active { transform: scale(.96); }
+.B .ad button:focus-visible { outline: 2px solid var(--red); outline-offset: 1px; }
+.B .ad button[aria-pressed="true"] { background: var(--ink); color: var(--paper); border-color: var(--ink); font-size: 13px; }
+.B .foot { margin: 0 28px 24px; padding-top: 8px; border-top: 1px solid var(--rule); font: italic 400 13px var(--f-serif); color: var(--ink-2); }
+.B .foot b { font-style: normal; color: var(--red); font-family: var(--f-cond); }
+@media (max-width: 1400px) { .B { --hhw: 0px; --fmw: 150px; } .B .hhcol { visibility: hidden; overflow: hidden; } .B .fm { letter-spacing: .03em; gap: 5px; } }
+@media (max-width: 1250px) { .B { --alw: 0px; } .B .alsocol { visibility: hidden; } }
+</style>
+</head>
+<body>
+<div class="frame" role="toolbar" aria-label="Entwurf steuern">
+  <h1>Entwurf · Haupttabelle der alten App</h1>
+  <div class="grp"><span>Fassung</span>
+    <button data-variant="A" aria-pressed="true">A · im Neo-System</button>
+    <button data-variant="B" aria-pressed="false">B · Tippschein (frei)</button>
+  </div>
+  <div class="grp"><span>Farben</span>
+    <button data-theme-btn="auto" aria-pressed="true">Wie System</button>
+    <button data-theme-btn="dark" aria-pressed="false">Dunkel</button>
+    <button data-theme-btn="light" aria-pressed="false">Hell</button>
+  </div>
+  <span class="stand" id="stand"></span>
+</div>
+
+<div class="stage">
+  <!-- ===================== A ===================== -->
+  <section class="A" id="varA" aria-label="Variante A">
+    <nav class="rail" aria-label="Ansichten">
+      <button aria-current="page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><path d="M3.5 9.5h17M3.5 14.5h17M9.5 9.5v10"/></svg>Tabelle</button>
+      <button><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.5"/></svg>Heatmap</button>
+      <button><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="2.5"/><path d="M7.5 7.5a6.4 6.4 0 0 0 0 9M16.5 7.5a6.4 6.4 0 0 1 0 9M4.6 4.6a10.5 10.5 0 0 0 0 14.8M19.4 4.6a10.5 10.5 0 0 1 0 14.8"/></svg>Live</button>
+      <button><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 20V10M10 20V4M16 20v-7M21 20H3"/></svg>Marktprofil</button>
+    </nav>
+    <div class="main">
+      <div class="bar">
+        <button class="btn"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6h16M7 12h10M10 18h4"/></svg>Filter</button>
+        <button class="btn">Quickpick <span class="n off">aus</span></button>
+        <label class="search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/></svg><input placeholder="Mannschaft, Liga, Land" aria-label="Suchen"></label>
+        <span class="field">Markt <select id="aMarket" aria-label="Markt"></select></span>
+        <span class="field">Ordnen <select id="aSort" aria-label="Ordnen"><option value="kickoff">Nach Anstoß</option><option value="chance">Nach Chance</option></select></span>
+        <span class="grow"></span>
+        <span class="switch" role="switch" tabindex="0" aria-checked="false" id="aValue"><i></i>Value zeigen</span>
+        <button class="btn">Kelly-Auswahl</button>
+        <button class="btn" id="aCart">Wettschein <span class="n">0</span></button>
+      </div>
+      <div class="summary"><h2>Nächste 48 Std.</h2><span id="aCount"></span></div>
+      <div class="warn" id="aWarn" hidden><span><b>Value</b> ist der Abstand zwischen Modell und Quote. Ein großer Vorteil ist meist ein Fehler des Modells. Auch die Kelly-Auswahl lag, an alten Spielen geprüft, im Minus – rechne nicht mit Gewinn.</span></div>
+      <div class="table" role="table" aria-label="Spiele">
+        <div class="grid head" role="row" id="aHead"></div>
+        <div id="aBody"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== B ===================== -->
+  <section class="B" id="varB" aria-label="Variante B" hidden>
+    <div class="mast">
+      <h2>Spielplan<span id="bSub">nächste 48 Stunden</span></h2>
+      <nav aria-label="Ansichten"><button aria-current="page">Tabelle</button><button>Heatmap</button><button>Live</button><button>Marktprofil</button></nav>
+    </div>
+    <div class="rules" aria-hidden="true"></div>
+    <div class="tools">
+      <span><label for="bMarket">Markt</label><select id="bMarket"></select></span>
+      <span><label for="bSort">Ordnen</label><select id="bSort"><option value="kickoff">nach Wettbewerb</option><option value="chance">nach Chance</option></select></span>
+      <input placeholder="Mannschaft, Liga, Land" aria-label="Suchen">
+      <span class="sp"></span>
+      <button class="tbtn">Filter</button>
+      <button class="tbtn">Quickpick</button>
+      <button class="tbtn" id="bValue" aria-pressed="false">Value</button>
+      <button class="tbtn">Kelly</button>
+      <button class="tbtn" id="bCart">Wettschein <span class="n">0</span></button>
+    </div>
+    <div class="warn" id="bWarn" hidden><b>Value</b> ist der Abstand zwischen Modell und Quote. Ein großer Vorteil ist meist ein Fehler des Modells. Auch die Kelly-Auswahl lag, an alten Spielen geprüft, im Minus – rechne nicht mit Gewinn.</div>
+    <div class="sheet" role="table" aria-label="Spiele">
+      <div class="bgrid bhead" role="row" id="bHead"></div>
+      <div id="bBody"></div>
+    </div>
+    <div class="foot">Angekreuzt ist der Tipp des Modells – eine Chance, keine Sicherheit. <b>²</b> = Zahl der Hinweise zu den Daten.</div>
+  </section>
+
+  <div class="notes" id="notesA">
+    <h2>Was A anders macht</h2>
+    <ul>
+      <li><b>Zwei-Zeilen-Raster:</b> oben Heim, unten Gast – Elo, Form und erwartete Tore stehen auf der Zeile ihrer Mannschaft. Der Strich links (Orange/Violett) verbindet sie mit dem 1X2-Balken.</li>
+      <li><b>Kein Seiten-Scrollen ab 1280 px:</b> Land, Liga, Datenlage, Klasse und Hinweise wandern in die Metazeile unter die Teams; die Spalte „Daten“ entfällt.</li>
+      <li><b>Die Marktzelle führt:</b> 1X2-Balken wie in Neo, darunter Chance und Tipico-Quote je Ausgang, der wahrscheinlichste fett.</li>
+      <li><b>„Weitere Tipps“</b> als kleine Liste (★ stark, ✓ empfohlen, Chance, Quote) statt bunter Chips; höchstens zwei, der Rest als „+ n weitere“.</li>
+      <li><b>Farbe heißt etwas:</b> Orange/Violett nur Heim/Gast, Grün/Rot nur Sieg/Niederlage, Blau nur Bedienung. Teamnamen in Textfarbe.</li>
+      <li><b>Value</b> nur hinter dem Schalter, mit der Warnung darüber – wie heute.</li>
+      <li>H2H in Teamfarben mit 1/X/2 statt grauer Striche; „Remis-Serie“ bleibt grau.</li>
+      <li>Wettschein-Knopf rechts am Zeilenende; aufklappen wie heute über die ganze Zeile.</li>
+    </ul>
+  </div>
+  <div class="notes" id="notesB" hidden>
+    <h2>Was B anders macht</h2>
+    <ul>
+      <li><b>Spielplan wie im Sportteil:</b> eine Zeile je Spiel, „Heim – Gast“ in der Mitte, nach Tag und Wettbewerb gegliedert. Rund doppelt so viele Spiele auf einen Blick.</li>
+      <li><b>Der Tippschein:</b> 1 | X | 2 als Kästchen mit Quote und Chance; das Modell kreuzt seinen Tipp an. Bei Über/Unter und BTTS zwei Kästchen.</li>
+      <li><b>Fast ohne Farbe:</b> Papier, Tinte und ein Rot nur für das Kreuz und die Auswahl. Form und H2H als Buchstaben (S/U/N, 1/X/2), Gewicht statt Farbe.</li>
+      <li><b>Hell zuerst,</b> mit einer „Nachtausgabe“ in Dunkel. Schriften: Source Serif (Zahlen, Köpfe) und Archivo Narrow (Tabelle).</li>
+      <li><b>Datenlage</b> als Zahl am Zeilenende, Hinweise als hochgestellte Zahl – wie eine Fußnote.</li>
+      <li><b>Preis:</b> weicht vom Neo-System ab. Würde B gewählt, gehörte das Design-System für die alte App neu festgelegt – oder Neo zöge nach.</li>
+    </ul>
+  </div>
+</div>
+
+<script>
+const DATA = [{"id":1588309,"k":"2026-11-03T20:45:00+01:00","c":"England","lg":"National League - South","h":"Farnborough","a":"Ebbsfleet United","he":1419,"hconf":95,"ae":1609,"aconf":98,"hc":"https://media.api-sports.io/football/teams/7715.png","ac":"https://media.api-sports.io/football/teams/1840.png","dv":100,"w":[],"fs":"venue","fh":["loss","win","win","loss","loss"],"fa":["loss","win","win","draw","win"],"h2":["draw","draw","draw","loss"],"hn":"Remis auffällig: 3 direkte Duelle in Folge remis","eg":[1.1,2.07],"eh":1.33,"sc":{"favorite":80,"draw":13},"cg":null,"M":{"1x2":{"p":0.598,"o":1.5,"pick":"2","l":"none","r":true,"oh":4.3,"oa":1.5},"draw":{"p":0.208,"o":4,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"btts":{"p":0.582,"o":1.45,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"bttsNo":{"p":0.418,"o":2.4,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"over15":{"p":0.825,"o":null,"pick":null,"l":"recommended","r":true,"oh":null,"oa":null},"under15":{"p":0.175,"o":null,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"over25":{"p":0.613,"o":null,"pick":null,"l":"recommended","r":true,"oh":null,"oa":null},"under25":{"p":0.387,"o":null,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"over35":{"p":0.39,"o":2.05,"pick":null,"l":"recommended","r":true,"oh":null,"oa":null},"under35":{"p":0.61,"o":1.65,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"firstHalfOver05":{"p":0.736,"o":null,"pick":null,"l":"recommended","r":true,"oh":null,"oa":null},"firstHalfUnder05":{"p":0.264,"o":null,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"firstHalfOver15":{"p":0.385,"o":2.05,"pick":null,"l":"recommended","r":true,"oh":null,"oa":null},"firstHalfUnder15":{"p":0.615,"o":1.62,"pick":null,"l":"recommended","r":true,"oh":null,"oa":null}}},{"id":1563240,"k":"2026-11-03T20:45:00+01:00","c":"England","lg":"Championship","h":"Blackburn","a":"Stoke City","he":1862,"hconf":96,"ae":1853,"aconf":96,"hc":"https://media.api-sports.io/football/teams/67.png","ac":"https://media.api-sports.io/football/teams/75.png","dv":100,"w":[],"fs":"venue","fh":["win","win","win","loss","loss"],"fa":["win","win","win","draw","loss"],"h2":["draw","draw","loss","loss","win"],"hn":null,"eg":[1.56,1.22],"eh":1.21,"sc":{"favorite":41,"draw":42},"cg":null,"M":{"1x2":{"p":0.299,"o":2.45,"pick":"2","l":"none","r":true,"oh":2.65,"oa":2.45},"draw":{"p":0.25,"o":3.2,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"btts":{"p":0.557,"o":1.67,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"bttsNo":{"p":0.443,"o":2,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"over15":{"p":0.766,"o":null,"pick":null,"l":"recommended","r":true,"oh":null,"oa":null},"under15":{"p":0.234,"o":null,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"over25":{"p":0.526,"o":1.9,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"under25":{"p":0.474,"o":1.75,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"over35":{"p":0.304,"o":null,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"under35":{"p":0.696,"o":null,"pick":null,"l":"recommended","r":true,"oh":null,"oa":null},"firstHalfOver05":{"p":0.703,"o":1.37,"pick":null,"l":"recommended","r":true,"oh":null,"oa":null},"firstHalfUnder05":{"p":0.297,"o":2.75,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"firstHalfOver15":{"p":0.343,"o":null,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"firstHalfUnder15":{"p":0.657,"o":null,"pick":null,"l":"recommended","r":true,"oh":null,"oa":null}}},{"id":1564322,"k":"2026-11-03T20:45:00+01:00","c":"England","lg":"League One","h":"Huddersfield","a":"Luton","he":1927,"hconf":98,"ae":1891,"aconf":99,"hc":"https://media.api-sports.io/football/teams/37.png","ac":"https://media.api-sports.io/football/teams/1359.png","dv":100,"w":[],"fs":"venue","fh":["win","win","draw","win","draw"],"fa":["win","loss","win","draw","loss"],"h2":["win","loss","loss","draw","win"],"hn":null,"eg":[1.93,1.78],"eh":1.47,"sc":{"favorite":53,"draw":28},"cg":null,"M":{"1x2":{"p":0.422,"o":1.85,"pick":"1","l":"none","r":true,"oh":1.85,"oa":3.3},"draw":{"p":0.215,"o":3.8,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"btts":{"p":0.71,"o":1.45,"pick":null,"l":"strong","r":true,"oh":null,"oa":null},"bttsNo":{"p":0.29,"o":2.45,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"over15":{"p":0.884,"o":null,"pick":null,"l":"strong","r":true,"oh":null,"oa":null},"under15":{"p":0.116,"o":null,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"over25":{"p":0.716,"o":null,"pick":null,"l":"strong","r":true,"oh":null,"oa":null},"under25":{"p":0.284,"o":null,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"over35":{"p":0.507,"o":2.25,"pick":null,"l":"strong","r":true,"oh":null,"oa":null},"under35":{"p":0.493,"o":1.55,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"firstHalfOver05":{"p":0.771,"o":null,"pick":null,"l":"recommended","r":true,"oh":null,"oa":null},"firstHalfUnder05":{"p":0.229,"o":null,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"firstHalfOver15":{"p":0.433,"o":2.2,"pick":null,"l":"recommended","r":true,"oh":null,"oa":null},"firstHalfUnder15":{"p":0.567,"o":1.55,"pick":null,"l":"none","r":true,"oh":null,"oa":null}}},{"id":1563787,"k":"2026-11-03T20:45:00+01:00","c":"England","lg":"League Two","h":"Northampton","a":"Oldham","he":1627,"hconf":97,"ae":1643,"aconf":98,"hc":"https://media.api-sports.io/football/teams/1337.png","ac":"https://media.api-sports.io/football/teams/1349.png","dv":84,"w":[],"fs":"venue","fh":["win","loss","loss","win","draw"],"fa":["draw","loss","loss","loss","draw"],"h2":["loss","win","win","draw","win"],"hn":null,"eg":[1.28,1.17],"eh":1.07,"sc":{"favorite":41,"draw":35},"cg":null,"M":{"1x2":{"p":0.39,"o":2.25,"pick":"1","l":"none","r":true,"oh":2.25,"oa":2.95},"draw":{"p":0.272,"o":3.1,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"btts":{"p":0.499,"o":1.7,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"bttsNo":{"p":0.501,"o":1.97,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"over15":{"p":0.704,"o":null,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"under15":{"p":0.296,"o":null,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"over25":{"p":0.445,"o":1.95,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"under25":{"p":0.555,"o":1.72,"pick":null,"l":"recommended","r":true,"oh":null,"oa":null},"over35":{"p":0.233,"o":null,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"under35":{"p":0.767,"o":null,"pick":null,"l":"strong","r":true,"oh":null,"oa":null},"firstHalfOver05":{"p":0.658,"o":1.37,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"firstHalfUnder05":{"p":0.342,"o":2.75,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"firstHalfOver15":{"p":0.291,"o":null,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"firstHalfUnder15":{"p":0.709,"o":null,"pick":null,"l":"strong","r":true,"oh":null,"oa":null}}},{"id":1632050,"k":"2026-11-03T21:00:00+01:00","c":"Paraguay","lg":"Division Profesional - Clausura","h":"2 de Mayo","a":"Sportivo Trinidense","he":1617,"hconf":83,"ae":1687,"aconf":76,"hc":"https://media.api-sports.io/football/teams/2140.png","ac":"https://media.api-sports.io/football/teams/1187.png","dv":100,"w":[],"fs":"venue","fh":["draw","win","loss","loss","draw"],"fa":["win","draw","win","win","loss"],"h2":["win","win","win","loss","loss"],"hn":null,"eg":[0.95,1.36],"eh":0.8,"sc":{"favorite":33,"draw":58},"cg":null,"M":{"1x2":{"p":0.461,"o":2.2,"pick":"2","l":"none","r":true,"oh":3.2,"oa":2.2},"draw":{"p":0.275,"o":2.85,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"btts":{"p":0.457,"o":1.72,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"bttsNo":{"p":0.543,"o":1.9,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"over15":{"p":0.673,"o":null,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"under15":{"p":0.327,"o":null,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"over25":{"p":0.408,"o":2.05,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"under25":{"p":0.592,"o":1.65,"pick":null,"l":"recommended","r":true,"oh":null,"oa":null},"over35":{"p":0.204,"o":null,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"under35":{"p":0.796,"o":null,"pick":null,"l":"strong","r":true,"oh":null,"oa":null},"firstHalfOver05":{"p":0.551,"o":1.4,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"firstHalfUnder05":{"p":0.449,"o":2.55,"pick":null,"l":"recommended","r":true,"oh":null,"oa":null},"firstHalfOver15":{"p":0.192,"o":null,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"firstHalfUnder15":{"p":0.808,"o":null,"pick":null,"l":"strong","r":true,"oh":null,"oa":null}}},{"id":1635622,"k":"2026-11-03T21:00:00+01:00","c":"World","lg":"UEFA Champions League","h":"Atletico Madrid","a":"Bayern München","he":2238,"hconf":98,"ae":2458,"aconf":98,"hc":"https://media.api-sports.io/football/teams/530.png","ac":"https://media.api-sports.io/football/teams/157.png","dv":100,"w":["Cross-League: Teamform aus Pflichtspielen verschiedener Wettbewerbe"],"fs":"overall","fh":["win","win","draw","win","win"],"fa":["draw","win","win","draw","win"],"h2":["draw","loss","loss","win","loss"],"hn":null,"eg":[1.41,1.97],"eh":1.3,"sc":{"favorite":23,"draw":34},"cg":null,"M":{"1x2":{"p":0.506,"o":2.3,"pick":"2","l":"none","r":true,"oh":2.7,"oa":2.3},"draw":{"p":0.218,"o":4,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"btts":{"p":0.651,"o":1.33,"pick":null,"l":"recommended","r":true,"oh":null,"oa":null},"bttsNo":{"p":0.349,"o":3,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"over15":{"p":0.851,"o":null,"pick":null,"l":"strong","r":true,"oh":null,"oa":null},"under15":{"p":0.149,"o":null,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"over25":{"p":0.657,"o":null,"pick":null,"l":"recommended","r":true,"oh":null,"oa":null},"under25":{"p":0.343,"o":null,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"over35":{"p":0.438,"o":1.95,"pick":null,"l":"recommended","r":true,"oh":null,"oa":null},"under35":{"p":0.562,"o":1.77,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"firstHalfOver05":{"p":0.727,"o":null,"pick":null,"l":"recommended","r":true,"oh":null,"oa":null},"firstHalfUnder05":{"p":0.273,"o":null,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"firstHalfOver15":{"p":0.373,"o":1.93,"pick":null,"l":"recommended","r":true,"oh":null,"oa":null},"firstHalfUnder15":{"p":0.627,"o":1.75,"pick":null,"l":"recommended","r":true,"oh":null,"oa":null}}},{"id":1549539,"k":"2026-11-03T21:00:00+01:00","c":"Peru","lg":"Primera División","h":"Comerciantes Unidos","a":"ADT","he":1546,"hconf":67,"ae":1500,"aconf":74,"hc":"https://media.api-sports.io/football/teams/2558.png","ac":"https://media.api-sports.io/football/teams/10492.png","dv":100,"w":[],"fs":"venue","fh":["win","draw","loss","loss","win"],"fa":["draw","loss","loss","loss","loss"],"h2":["loss","draw","loss","draw","loss"],"hn":null,"eg":[1.75,1.14],"eh":1.1,"sc":{"favorite":48,"draw":34},"cg":null,"M":{"1x2":{"p":0.518,"o":1.95,"pick":"1","l":"none","r":true,"oh":1.95,"oa":3.3},"draw":{"p":0.235,"o":3.3,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"btts":{"p":0.562,"o":1.62,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"bttsNo":{"p":0.438,"o":2.05,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"over15":{"p":0.784,"o":null,"pick":null,"l":"recommended","r":true,"oh":null,"oa":null},"under15":{"p":0.216,"o":null,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"over25":{"p":0.552,"o":1.8,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"under25":{"p":0.448,"o":1.85,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"over35":{"p":0.328,"o":null,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"under35":{"p":0.672,"o":null,"pick":null,"l":"recommended","r":true,"oh":null,"oa":null},"firstHalfOver05":{"p":0.667,"o":null,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"firstHalfUnder05":{"p":0.333,"o":null,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"firstHalfOver15":{"p":0.3,"o":2.55,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"firstHalfUnder15":{"p":0.7,"o":1.4,"pick":null,"l":"recommended","r":true,"oh":null,"oa":null}}},{"id":1549852,"k":"2026-11-03T21:30:00+01:00","c":"Colombia","lg":"Primera A","h":"Deportivo Pereira","a":"Deportes Tolima","he":1529,"hconf":85,"ae":1629,"aconf":92,"hc":"https://media.api-sports.io/football/teams/1462.png","ac":"https://media.api-sports.io/football/teams/1142.png","dv":100,"w":[],"fs":"venue","fh":["win","win","draw","loss","draw"],"fa":["loss","loss","draw","draw","loss"],"h2":["loss","loss","draw","win","loss"],"hn":null,"eg":[1.1,1.21],"eh":1,"sc":{"favorite":21,"draw":43},"cg":null,"M":{"1x2":{"p":0.386,"o":1.55,"pick":"2","l":"none","r":true,"oh":6,"oa":1.55},"draw":{"p":0.282,"o":3.3,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"btts":{"p":0.469,"o":1.83,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"bttsNo":{"p":0.531,"o":1.8,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"over15":{"p":0.673,"o":null,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"under15":{"p":0.327,"o":null,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"over25":{"p":0.408,"o":1.77,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"under25":{"p":0.592,"o":1.87,"pick":null,"l":"recommended","r":true,"oh":null,"oa":null},"over35":{"p":0.204,"o":null,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"under35":{"p":0.796,"o":null,"pick":null,"l":"strong","r":true,"oh":null,"oa":null},"firstHalfOver05":{"p":0.633,"o":null,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"firstHalfUnder05":{"p":0.367,"o":null,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"firstHalfOver15":{"p":0.266,"o":2.6,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"firstHalfUnder15":{"p":0.734,"o":1.4,"pick":null,"l":"strong","r":true,"oh":null,"oa":null}}},{"id":1639831,"k":"2026-11-03T21:30:00+01:00","c":"Ecuador","lg":"Liga Pro","h":"Mushuc Runa SC","a":"Manta FC","he":1570,"hconf":82,"ae":1510,"aconf":75,"hc":"https://media.api-sports.io/football/teams/1162.png","ac":"https://media.api-sports.io/football/teams/1980.png","dv":100,"w":[],"fs":"venue","fh":["draw","draw","win","draw","loss"],"fa":["loss","loss","loss","loss","win"],"h2":["win","win","loss","draw","win"],"hn":null,"eg":[1.68,1.27],"eh":1.53,"sc":{"favorite":9,"draw":27},"cg":null,"M":{"1x2":{"p":0.471,"o":1.45,"pick":"1","l":"none","r":true,"oh":1.45,"oa":5.8},"draw":{"p":0.24,"o":3.9,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"btts":{"p":0.584,"o":1.97,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"bttsNo":{"p":0.416,"o":1.67,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"over15":{"p":0.792,"o":null,"pick":null,"l":"recommended","r":true,"oh":null,"oa":null},"under15":{"p":0.208,"o":null,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"over25":{"p":0.564,"o":1.85,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"under25":{"p":0.436,"o":1.8,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"over35":{"p":0.34,"o":null,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"under35":{"p":0.66,"o":null,"pick":null,"l":"recommended","r":true,"oh":null,"oa":null},"firstHalfOver05":{"p":0.784,"o":null,"pick":null,"l":"recommended","r":true,"oh":null,"oa":null},"firstHalfUnder05":{"p":0.216,"o":null,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"firstHalfOver15":{"p":0.453,"o":2.85,"pick":null,"l":"strong","r":true,"oh":null,"oa":null},"firstHalfUnder15":{"p":0.547,"o":1.32,"pick":null,"l":"none","r":true,"oh":null,"oa":null}}},{"id":1492443,"k":"2026-11-03T23:30:00+01:00","c":"Brazil","lg":"Serie A","h":"Chapecoense-sc","a":"Mirassol","he":1661,"hconf":98,"ae":1795,"aconf":95,"hc":"https://media.api-sports.io/football/teams/132.png","ac":"https://media.api-sports.io/football/teams/7848.png","dv":100,"w":[],"fs":"venue","fh":["win","loss","loss","win","draw"],"fa":["loss","loss","draw","win","loss"],"h2":["draw","loss","loss","loss","loss"],"hn":null,"eg":[1.34,1.57],"eh":1.43,"sc":{"favorite":46,"draw":28},"cg":null,"M":{"1x2":{"p":0.428,"o":1.87,"pick":"2","l":"none","r":true,"oh":3.6,"oa":1.87},"draw":{"p":0.245,"o":3.4,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"btts":{"p":0.586,"o":1.55,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"bttsNo":{"p":0.414,"o":2.2,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"over15":{"p":0.788,"o":null,"pick":null,"l":"recommended","r":true,"oh":null,"oa":null},"under15":{"p":0.212,"o":null,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"over25":{"p":0.558,"o":1.7,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"under25":{"p":0.442,"o":1.97,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"over35":{"p":0.334,"o":null,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"under35":{"p":0.666,"o":null,"pick":null,"l":"recommended","r":true,"oh":null,"oa":null},"firstHalfOver05":{"p":0.762,"o":null,"pick":null,"l":"recommended","r":true,"oh":null,"oa":null},"firstHalfUnder05":{"p":0.238,"o":null,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"firstHalfOver15":{"p":0.42,"o":2.4,"pick":null,"l":"recommended","r":true,"oh":null,"oa":null},"firstHalfUnder15":{"p":0.58,"o":1.47,"pick":null,"l":"none","r":true,"oh":null,"oa":null}}},{"id":1647445,"k":"2026-11-04T02:30:00+01:00","c":"Colombia","lg":"Primera B","h":"Real Cartagena","a":"Quindio","he":1481,"hconf":80,"ae":1522,"aconf":82,"hc":"https://media.api-sports.io/football/teams/1459.png","ac":"https://media.api-sports.io/football/teams/1461.png","dv":100,"w":[],"fs":"venue","fh":["win","loss","draw","loss","win"],"fa":["win","loss","win","loss","draw"],"h2":["draw","win","draw","win","loss"],"hn":null,"eg":[1.37,1.17],"eh":1.13,"sc":{"favorite":0,"draw":41},"cg":null,"M":{"1x2":{"p":0.414,"o":1.67,"pick":"1","l":"none","r":true,"oh":1.67,"oa":4.1},"draw":{"p":0.266,"o":3.3,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"btts":{"p":0.514,"o":1.87,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"bttsNo":{"p":0.486,"o":1.77,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"over15":{"p":0.72,"o":null,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"under15":{"p":0.28,"o":null,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"over25":{"p":0.465,"o":2,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"under25":{"p":0.535,"o":1.67,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"over35":{"p":0.25,"o":null,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"under35":{"p":0.75,"o":null,"pick":null,"l":"recommended","r":true,"oh":null,"oa":null},"firstHalfOver05":{"p":0.678,"o":1.4,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"firstHalfUnder05":{"p":0.322,"o":2.6,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"firstHalfOver15":{"p":0.313,"o":null,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"firstHalfUnder15":{"p":0.687,"o":null,"pick":null,"l":"recommended","r":true,"oh":null,"oa":null}}},{"id":1556388,"k":"2026-11-04T16:30:00+01:00","c":"Lithuania","lg":"1 Lyga","h":"Be1 NFA","a":"Atmosfera","he":1513,"hconf":75,"ae":1432,"aconf":68,"hc":"https://media.api-sports.io/football/teams/16747.png","ac":"https://media.api-sports.io/football/teams/3856.png","dv":100,"w":[],"fs":"venue","fh":["draw","win","draw","win","win"],"fa":["loss","win","draw","loss","loss"],"h2":["win","loss","win","loss","win"],"hn":null,"eg":[1.8,1.15],"eh":1.3,"sc":{"favorite":66,"draw":19},"cg":null,"M":{"1x2":{"p":0.525,"o":1.85,"pick":"1","l":"none","r":true,"oh":1.85,"oa":3.1},"draw":{"p":0.232,"o":3.5,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"btts":{"p":0.571,"o":1.45,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"bttsNo":{"p":0.429,"o":2.45,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"over15":{"p":0.793,"o":null,"pick":null,"l":"recommended","r":true,"oh":null,"oa":null},"under15":{"p":0.207,"o":null,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"over25":{"p":0.566,"o":null,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"under25":{"p":0.434,"o":null,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"over35":{"p":0.342,"o":2.2,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"under35":{"p":0.658,"o":1.55,"pick":null,"l":"recommended","r":true,"oh":null,"oa":null},"firstHalfOver05":{"p":0.728,"o":null,"pick":null,"l":"recommended","r":true,"oh":null,"oa":null},"firstHalfUnder05":{"p":0.272,"o":null,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"firstHalfOver15":{"p":0.374,"o":2.1,"pick":null,"l":"recommended","r":true,"oh":null,"oa":null},"firstHalfUnder15":{"p":0.626,"o":1.6,"pick":null,"l":"recommended","r":true,"oh":null,"oa":null}}},{"id":1636324,"k":"2026-11-04T16:30:00+01:00","c":"World","lg":"UEFA Europa League","h":"Rennes","a":"Olympiakos Piraeus","he":2017,"hconf":93,"ae":2141,"aconf":98,"hc":"https://media.api-sports.io/football/teams/94.png","ac":"https://media.api-sports.io/football/teams/553.png","dv":84,"w":["Cross-League: Teamform aus Pflichtspielen verschiedener Wettbewerbe"],"fs":"overall","fh":["loss","win","draw","loss","win"],"fa":["win","win","win","win","win"],"h2":[],"hn":null,"eg":[1.2,1.72],"eh":1.15,"sc":{"favorite":3,"draw":3},"cg":null,"M":{"1x2":{"p":0.266,"o":2.2,"pick":"1","l":"none","r":true,"oh":2.2,"oa":3.1},"draw":{"p":0.238,"o":3.5,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"btts":{"p":0.573,"o":1.55,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"bttsNo":{"p":0.427,"o":2.25,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"over15":{"p":0.788,"o":null,"pick":null,"l":"recommended","r":true,"oh":null,"oa":null},"under15":{"p":0.212,"o":null,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"over25":{"p":0.558,"o":1.7,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"under25":{"p":0.442,"o":2.1,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"over35":{"p":0.334,"o":null,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"under35":{"p":0.666,"o":null,"pick":null,"l":"recommended","r":true,"oh":null,"oa":null},"firstHalfOver05":{"p":0.685,"o":null,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"firstHalfUnder05":{"p":0.315,"o":null,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"firstHalfOver15":{"p":0.321,"o":2.45,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"firstHalfUnder15":{"p":0.679,"o":1.47,"pick":null,"l":"recommended","r":true,"oh":null,"oa":null}}},{"id":1560043,"k":"2026-11-04T18:00:00+01:00","c":"Czech-Republic","lg":"Czech Liga","h":"Artis","a":"Bohemians 1905","he":1839,"hconf":96,"ae":1953,"aconf":93,"hc":"https://media.api-sports.io/football/teams/4257.png","ac":"https://media.api-sports.io/football/teams/3714.png","dv":93,"w":[],"fs":"venue","fh":["draw","draw","loss","loss","loss"],"fa":["loss","draw","win","loss","loss"],"h2":[],"hn":null,"eg":[1.27,1.54],"eh":1.64,"sc":{"favorite":4,"draw":35},"cg":null,"M":{"1x2":{"p":0.313,"o":2.6,"pick":"1","l":"none","r":true,"oh":2.6,"oa":2.4},"draw":{"p":0.25,"o":3.3,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"btts":{"p":0.564,"o":1.52,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"bttsNo":{"p":0.436,"o":2.3,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"over15":{"p":0.77,"o":null,"pick":null,"l":"recommended","r":true,"oh":null,"oa":null},"under15":{"p":0.23,"o":null,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"over25":{"p":0.532,"o":1.7,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"under25":{"p":0.468,"o":1.97,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"over35":{"p":0.309,"o":null,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"under35":{"p":0.691,"o":null,"pick":null,"l":"recommended","r":true,"oh":null,"oa":null},"firstHalfOver05":{"p":0.805,"o":null,"pick":null,"l":"strong","r":true,"oh":null,"oa":null},"firstHalfUnder05":{"p":0.195,"o":null,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"firstHalfOver15":{"p":0.487,"o":2.45,"pick":null,"l":"strong","r":true,"oh":null,"oa":null},"firstHalfUnder15":{"p":0.513,"o":1.45,"pick":null,"l":"none","r":true,"oh":null,"oa":null}}},{"id":1647202,"k":"2026-11-04T19:00:00+01:00","c":"Uruguay","lg":"Copa Uruguay","h":"San Carlos","a":"Boston River","he":1500,"hconf":1,"ae":1557,"aconf":92,"hc":"https://media.api-sports.io/football/teams/28597.png","ac":"https://media.api-sports.io/football/teams/2361.png","dv":54,"w":["Schwache Datenlage; Wahrscheinlichkeiten nicht als Empfehlung verwenden","Kleine Heim-/Auswärtsstichprobe","Cross-League: Teamform aus Pflichtspielen verschiedener Wettbewerbe","Keine eigene Ligabasis je Team; Stärke gegen den Wettbewerbsschnitt gemessen","Kein Ligastärke-Vergleich verfügbar","unvollständige API-Football-1X2-Quoten","zu wenige Pflichtspiele für das Club-Rating","keine vergleichbare nationale Ligastichprobe","weniger als fünf Formspiele je Team","weniger als 60 mögliche Rohpunkte abgedeckt"],"fs":"overall","fh":["draw","loss","win","win"],"fa":["loss","loss","win","draw","win"],"h2":[],"hn":null,"eg":[1.46,1.32],"eh":1.1,"sc":{"favorite":0,"draw":0},"cg":{"level":"clear","stronger":"away","source":"market","label":"Quotenbild 9,00 gegen 1,22 · kein Ligastärke-Vergleich vorhanden"},"M":{"1x2":{"p":0.405,"o":9,"pick":"1","l":"none","r":false,"oh":9,"oa":1.22},"draw":{"p":0.253,"o":5.5,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"btts":{"p":0.563,"o":1.93,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"bttsNo":{"p":0.437,"o":1.72,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"over15":{"p":0.766,"o":null,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"under15":{"p":0.234,"o":null,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"over25":{"p":0.526,"o":null,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"under25":{"p":0.474,"o":null,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"over35":{"p":0.304,"o":2.15,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"under35":{"p":0.696,"o":1.6,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"firstHalfOver05":{"p":0.668,"o":null,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"firstHalfUnder05":{"p":0.332,"o":null,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"firstHalfOver15":{"p":0.302,"o":null,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"firstHalfUnder15":{"p":0.698,"o":null,"pick":null,"l":"none","r":true,"oh":null,"oa":null}}},{"id":1559178,"k":"2026-11-04T20:00:00+01:00","c":"Belgium","lg":"Challenger Pro League","h":"Francs Borains","a":"Dender","he":1739,"hconf":91,"ae":1804,"aconf":92,"hc":"https://media.api-sports.io/football/teams/5805.png","ac":"https://media.api-sports.io/football/teams/6215.png","dv":60,"w":["Nur mittleres Datenvertrauen","Kleine Heim-/Auswärtsstichprobe"],"fs":"venue","fh":["win","win","loss","draw","win"],"fa":["loss","win","win","win","loss"],"h2":["loss","loss","loss","draw"],"hn":null,"eg":[1.29,1.37],"eh":1.17,"sc":{"favorite":56,"draw":1},"cg":null,"M":{"1x2":{"p":0.389,"o":2.05,"pick":"2","l":"none","r":true,"oh":3,"oa":2.05},"draw":{"p":0.26,"o":3.6,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"btts":{"p":0.541,"o":1.5,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"bttsNo":{"p":0.459,"o":2.35,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"over15":{"p":0.744,"o":null,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"under15":{"p":0.256,"o":null,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"over25":{"p":0.497,"o":1.6,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"under25":{"p":0.503,"o":2.15,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"over35":{"p":0.278,"o":null,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"under35":{"p":0.722,"o":null,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"firstHalfOver05":{"p":0.691,"o":null,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"firstHalfUnder05":{"p":0.309,"o":null,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"firstHalfOver15":{"p":0.328,"o":2.45,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"firstHalfUnder15":{"p":0.672,"o":1.47,"pick":null,"l":"none","r":true,"oh":null,"oa":null}}},{"id":1644384,"k":"2026-11-04T20:30:00+01:00","c":"Spain","lg":"Copa del Rey","h":"Utebo","a":"Sabadell","he":1586,"hconf":92,"ae":1831,"aconf":97,"hc":"https://media.api-sports.io/football/teams/9891.png","ac":"https://media.api-sports.io/football/teams/9593.png","dv":100,"w":["Cross-League: Teamform aus Pflichtspielen verschiedener Wettbewerbe","Klassenunterschied aus dem Liga-Niveau des Vereins-Elo: Segunda División RFEF - Group 2 gegen Segunda División"],"fs":"overall","fh":["draw","draw","loss","draw","draw"],"fa":["loss","draw","loss","win","draw"],"h2":[],"hn":null,"eg":[0.6,1.76],"eh":1.2,"sc":{"favorite":32,"draw":42},"cg":{"level":"clear","stronger":"away","source":"elo","label":"Liga-Niveau (Vereins-Elo) 1608 gegen 1860 · Torfaktor 0,62"},"M":{"1x2":{"p":0.655,"o":1.4,"pick":"2","l":"none","r":true,"oh":5.8,"oa":1.4},"draw":{"p":0.223,"o":3.8,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"btts":{"p":0.375,"o":1.85,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"bttsNo":{"p":0.625,"o":1.77,"pick":null,"l":"recommended","r":true,"oh":null,"oa":null},"over15":{"p":0.684,"o":null,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"under15":{"p":0.316,"o":null,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"over25":{"p":0.422,"o":1.87,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"under25":{"p":0.578,"o":1.77,"pick":null,"l":"recommended","r":true,"oh":null,"oa":null},"over35":{"p":0.214,"o":null,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"under35":{"p":0.786,"o":null,"pick":null,"l":"strong","r":true,"oh":null,"oa":null},"firstHalfOver05":{"p":0.7,"o":null,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"firstHalfUnder05":{"p":0.3,"o":null,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"firstHalfOver15":{"p":0.338,"o":2.55,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"firstHalfUnder15":{"p":0.662,"o":1.4,"pick":null,"l":"recommended","r":true,"oh":null,"oa":null}}},{"id":1644370,"k":"2026-11-04T20:45:00+01:00","c":"Spain","lg":"Copa del Rey","h":"Calvo Sotelo","a":"Albacete","he":1622,"hconf":90,"ae":1798,"aconf":95,"hc":"https://media.api-sports.io/football/teams/9899.png","ac":"https://media.api-sports.io/football/teams/722.png","dv":100,"w":["Cross-League: Teamform aus Pflichtspielen verschiedener Wettbewerbe","Klassenunterschied aus dem Liga-Niveau des Vereins-Elo: Segunda División RFEF - Group 5 gegen Segunda División"],"fs":"overall","fh":["loss","draw","loss","draw","loss"],"fa":["win","win","loss","loss","loss"],"h2":[],"hn":null,"eg":[0.88,1.63],"eh":1,"sc":{"favorite":23,"draw":1},"cg":{"level":"clear","stronger":"away","source":"elo","label":"Liga-Niveau (Vereins-Elo) 1637 gegen 1860 · Torfaktor 0,65"},"M":{"1x2":{"p":0.552,"o":1.47,"pick":"2","l":"none","r":true,"oh":5.3,"oa":1.47},"draw":{"p":0.247,"o":3.6,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"btts":{"p":0.471,"o":1.65,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"bttsNo":{"p":0.529,"o":2,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"over15":{"p":0.715,"o":null,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"under15":{"p":0.285,"o":null,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"over25":{"p":0.459,"o":1.62,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"under25":{"p":0.541,"o":2.1,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"over35":{"p":0.245,"o":null,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"under35":{"p":0.755,"o":null,"pick":null,"l":"strong","r":true,"oh":null,"oa":null},"firstHalfOver05":{"p":0.631,"o":null,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"firstHalfUnder05":{"p":0.369,"o":null,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"firstHalfOver15":{"p":0.263,"o":2.2,"pick":null,"l":"none","r":true,"oh":null,"oa":null},"firstHalfUnder15":{"p":0.737,"o":1.55,"pick":null,"l":"strong","r":true,"oh":null,"oa":null}}}];
+const STAND = "03.11.2026, 17:11";
+const TZ = "Europe/Berlin";
+
+// ---------- gemeinsame Rechnung (wie apps/neo/src/neoData.ts) ----------
+const MARKETS = {
+  all:   { label: "Alle Märkte" },
+  "1x2": { label: "1X2" },
+  ou25:  { label: "Über/Unter 2,5", a: "over25", b: "under25", la: "Über 2,5", lb: "Unter 2,5", ka: "Ü", kb: "U" },
+  ou15:  { label: "Über/Unter 1,5", a: "over15", b: "under15", la: "Über 1,5", lb: "Unter 1,5", ka: "Ü", kb: "U" },
+  btts:  { label: "Beide treffen (BTTS)", a: "btts", b: "bttsNo", la: "BTTS Ja", lb: "BTTS Nein", ka: "Ja", kb: "Nein" },
+  hz15:  { label: "1. HZ Über/Unter 1,5", a: "firstHalfOver15", b: "firstHalfUnder15", la: "1. HZ Über 1,5", lb: "1. HZ Unter 1,5", ka: "Ü", kb: "U" },
+};
+const LONG = { btts: "BTTS Ja", bttsNo: "BTTS Nein", over15: "Über 1,5", under15: "Unter 1,5", over25: "Über 2,5", under25: "Unter 2,5", over35: "Über 3,5", under35: "Unter 3,5",
+  firstHalfOver05: "1. HZ Über 0,5", firstHalfUnder05: "1. HZ Unter 0,5", firstHalfOver15: "1. HZ Über 1,5", firstHalfUnder15: "1. HZ Unter 1,5", draw: "Remis" };
+const SHORT = { btts: "BTTS Ja", bttsNo: "BTTS Nein", over15: "Ü1,5", under15: "U1,5", over25: "Ü2,5", under25: "U2,5", over35: "Ü3,5", under35: "U3,5",
+  firstHalfOver05: "HZ Ü0,5", firstHalfUnder05: "HZ U0,5", firstHalfOver15: "HZ Ü1,5", firstHalfUnder15: "HZ U1,5", draw: "Remis" };
+const COUNTRY = { England: ["ENG", "England"], Paraguay: ["PAR", "Paraguay"], World: ["INT", "International"], Peru: ["PER", "Peru"], Colombia: ["COL", "Kolumbien"],
+  Ecuador: ["ECU", "Ecuador"], Brazil: ["BRA", "Brasilien"], Lithuania: ["LTU", "Litauen"], "Czech-Republic": ["CZE", "Tschechien"], Uruguay: ["URU", "Uruguay"],
+  Belgium: ["BEL", "Belgien"], Spain: ["ESP", "Spanien"] };
+const LEAGUE = (f) => f.lg.replace(/^(England|Paraguay|World|Peru|Colombia|Ecuador|Brazil|Lithuania|Czech-Republic|Uruguay|Belgium|Spain)\s+/, "");
+
+const pct = (p) => p == null ? "–" : (p < .01 ? "< 1" : Math.round(p * 100)) + " %";
+const pnum = (p) => p == null ? "–" : String(Math.round(p * 100));
+const odd = (o) => o ? o.toFixed(2).replace(".", ",") : "–";
+const dec = (x) => x.toFixed(2).replace(".", ",");
+const edgeOf = (p, o) => (p == null || !o) ? null : p - 1 / o;
+const pp = (e) => (e >= 0 ? "+" : "−") + Math.abs(e * 100).toFixed(1).replace(".", ",");
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const timeFmt = new Intl.DateTimeFormat("de-DE", { timeZone: TZ, hour: "2-digit", minute: "2-digit" });
+const dayFmt = new Intl.DateTimeFormat("de-DE", { timeZone: TZ, weekday: "long", day: "numeric", month: "long" });
+const keyFmt = new Intl.DateTimeFormat("en-CA", { timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit" });
+const dayKey = (iso) => keyFmt.format(new Date(iso));
+
+function triple(f) {
+  const w = f.M["1x2"], d = f.M.draw;
+  if (!w || !d || !w.r || !w.pick) return null;
+  const other = Math.max(0, 1 - w.p - d.p);
+  return w.pick === "1" ? { h: w.p, d: d.p, a: other } : { h: other, d: d.p, a: w.p };
+}
+const oddsT = (f) => [f.M["1x2"]?.oh ?? null, f.M.draw?.o ?? null, f.M["1x2"]?.oa ?? null];
+function recs(f) {
+  return Object.entries(f.M).filter(([k, m]) => k !== "1x2" && m.l !== "none" && m.r)
+    .sort((x, y) => (y[1].l === "strong") - (x[1].l === "strong") || y[1].p - x[1].p);
+}
+function chanceOf(f, mk) {
+  if (mk === "all" || mk === "1x2") { const t = triple(f); return t ? Math.max(t.h, t.d, t.a) : -1; }
+  const m = MARKETS[mk]; return Math.max(f.M[m.a]?.p ?? 0, f.M[m.b]?.p ?? 0);
+}
+const formPts = (arr) => arr.reduce((s, r) => s + (r === "win" ? 3 : r === "draw" ? 1 : 0), 0);
+const glyph = (l) => l === "strong" ? "★" : l === "recommended" ? "✓" : "";
+const lvlText = (l) => l === "strong" ? "stark empfohlen" : l === "recommended" ? "empfohlen" : "";
+function eloInfo(f) {
+  const diff = (f.he ?? 0) - (f.ae ?? 0);
+  return { home: f.he != null && f.ae != null && diff >= 50, away: f.he != null && f.ae != null && diff <= -50 };
+}
+const NOT_COMPARABLE = "Keine Chance: Die Stärke der beiden Ligen lässt sich nicht vergleichen.";
+
+const state = { variant: "A", market: "all", sort: "kickoff", value: false, cart: new Set(), open: null };
+try { const s = JSON.parse(localStorage.getItem("entwurf:tabelle") || "{}"); Object.assign(state, { variant: s.variant || "A" }); } catch {}
+
+function crest(url, name, cls) {
+  const ini = name.split(/\s+/).map((w) => w[0]).join("").slice(0, 2).toUpperCase();
+  return `<img class="${cls}" src="${esc(url)}" alt="" referrerpolicy="no-referrer" onerror="this.outerHTML='<span class=&quot;${cls} ini&quot;>${esc(ini)}</span>'">`;
+}
+function sorted() {
+  const list = [...DATA];
+  if (state.sort === "chance") list.sort((x, y) => chanceOf(y, state.market) - chanceOf(x, state.market));
+  else list.sort((x, y) => x.k.localeCompare(y.k));
+  return list;
+}
+
+// =================== Variante A ===================
+function aCols() {
+  const all = state.market === "all";
+  return `48px minmax(210px,1.4fr) 150px` + ` var(--h2hw,96px)` + ` 84px minmax(${all ? 262 : 280}px,${all ? 1.3 : 1.6}fr)` + (all ? ` minmax(186px,.95fr)` : ``) + ` 34px`;
+}
+function aHead() {
+  const all = state.market === "all", mk = MARKETS[state.market];
+  const s = (id, label, cls = "") => `<span class="${cls}"><button ${state.sort === id ? 'aria-sort="descending"' : ""} data-sort="${id}">${label}${state.sort === id ? " ↓" : ""}</button></span>`;
+  return s("kickoff", "Zeit") + `<span>Spiel</span><span title="Letzte fünf Spiele, neueste links. Zahl = Punkte daraus (Sieg 3, Remis 1).">Form · letzte 5</span>`
+    + `<span class="h2hcol" title="Letzte fünf direkte Duelle, neueste links. 1 = Heimteam gewann, X = Remis, 2 = Gastteam gewann.">H2H</span>`
+    + `<span class="r" title="Erwartete Tore laut Modell und die Punkte aus 1X2- und Remis-Profil">Tore · Pkt.</span>`
+    + s("chance", all ? "1X2 · Chance laut Modell" : mk.label + " · Chance")
+    + (all ? `<span title="Märkte mit Empfehlung: ★ stark, ✓ empfohlen">Weitere Tipps</span>` : "") + `<span></span>`;
+}
+function aForm(f) {
+  const lab = f.fs === "overall" ? ["Alle", "Alle"] : ["Heim", "Ausw."];
+  const bx = (arr) => `<span class="boxes">${[0, 1, 2, 3, 4].map((i) => { const r = arr[i]; return r ? `<span class="bx ${r[0]}">${r === "win" ? "S" : r === "draw" ? "U" : "N"}</span>` : `<span class="bx e"></span>`; }).join("")}</span>`;
+  return `<div class="c form"><span class="fl">${lab[0]}</span>${bx(f.fh)}<span class="pts">${formPts(f.fh)}</span><span class="fl">${lab[1]}</span>${bx(f.fa)}<span class="pts">${formPts(f.fa)}</span></div>`;
+}
+function aH2h(f) {
+  if (!f.h2.length) return `<div class="c h2h h2hcol"><span class="none">keine Duelle</span></div>`;
+  const map = { win: ["h", "1"], draw: ["d", "X"], loss: ["a", "2"] };
+  const boxes = [0, 1, 2, 3, 4].map((i) => { const r = f.h2[i]; return r ? `<span class="bx ${map[r][0]}">${map[r][1]}</span>` : `<span class="bx e"></span>`; }).join("");
+  const n = (k) => f.h2.filter((r) => r === k).length;
+  return `<div class="c h2h h2hcol"><span class="boxes">${boxes}</span><span class="sum" title="Siege Heim – Remis – Siege Gast">${n("win")}–${n("draw")}–${n("loss")}</span>`
+    + (f.hn ? `<span class="tag" title="${esc(f.hn)} · eine Auffälligkeit, kein Grund für einen Tipp">Remis-Serie</span>` : "") + `</div>`;
+}
+function aModel(f) {
+  return `<div class="c model"><span class="xg">${dec(f.eg[0])}</span><small>1X2</small><span class="pt">${f.sc.favorite ?? "–"}</span>`
+    + `<span class="xg">${dec(f.eg[1])}</span><small>X</small><span class="pt">${f.sc.draw ?? "–"}</span></div>`;
+}
+function aMarket(f) {
+  if (state.market === "all" || state.market === "1x2") {
+    const t = triple(f), o = oddsT(f), w = f.M["1x2"];
+    const parts = [["1", t?.h], ["X", t?.d], ["2", t?.a]];
+    const top = t ? Math.max(t.h, t.d, t.a) : -1;
+    const bar = t ? `<span class="split" aria-hidden="true"><i class="h" style="width:${t.h * 100}%"></i><i class="d" style="width:${t.d * 100}%"></i><i class="a" style="width:${t.a * 100}%"></i></span>`
+      : `<span class="split none" aria-hidden="true" title="${NOT_COMPARABLE}"></span>`;
+    const outs = parts.map(([k, v], i) => `<span class="out${v != null && v === top ? " max" : ""}"><em>${k}</em><span class="p">${v == null ? "–" : pct(v)}</span><span class="q${o[i] ? "" : " na"}" title="Tipico-Quote">${odd(o[i])}</span></span>`).join("");
+    let line = "";
+    if (!t) line = `<span>Ligastärke unbekannt – keine Chance</span>`;
+    else {
+      const side = w.pick === "1" ? f.h : f.a;
+      line = `<span>Tipp ${w.pick} · ${esc(side)}</span>` + (w.l !== "none" ? `<span class="lvl">${glyph(w.l)} ${lvlText(w.l)}</span>` : "");
+      if (state.value) { const e = edgeOf(w.p, w.pick === "1" ? w.oh : w.oa); if (e != null) line += `<span class="edge ${e >= 0 ? "pos" : ""}" title="Value: Chance laut Modell minus Chance laut Quote, in Prozentpunkten">Value ${pp(e)} PP</span>`; }
+    }
+    return `<div class="c mkt" style="--n:3">${bar}<span class="outs" style="--n:3">${outs}</span><span class="mline">${line}</span></div>`;
+  }
+  const m = MARKETS[state.market], A = f.M[m.a], B = f.M[m.b];
+  const sides = [[m.la, A], [m.lb, B]];
+  const top = Math.max(A.p, B.p);
+  const bar = `<span class="split" aria-hidden="true"><i class="s1" style="width:${A.p * 100}%;${A.p < B.p ? "background:color-mix(in srgb,var(--best-bar) 35%,var(--track))" : ""}"></i><i class="s1" style="width:${B.p * 100}%;${B.p < A.p ? "background:color-mix(in srgb,var(--best-bar) 35%,var(--track))" : ""}"></i></span>`;
+  const outs = sides.map(([lb, s]) => `<span class="out${s.p === top ? " max" : ""}"><em>${lb}</em><span class="p">${pct(s.p)}</span><span class="q${s.o ? "" : " na"}" title="Tipico-Quote">${odd(s.o)}</span></span>`).join("");
+  const best = A.p >= B.p ? [m.la, A] : [m.lb, B];
+  let line = best[1].l !== "none" ? `<span class="lvl">${glyph(best[1].l)} ${best[0]} ${lvlText(best[1].l)}</span>` : `<span>keine Empfehlung</span>`;
+  if (state.value) { const e = edgeOf(best[1].p, best[1].o); if (e != null) line += `<span class="edge ${e >= 0 ? "pos" : ""}">Value ${pp(e)} PP</span>`; }
+  return `<div class="c mkt">${bar}<span class="outs" style="--n:2">${outs}</span><span class="mline">${line}</span></div>`;
+}
+function aMore(f) {
+  const r = recs(f);
+  if (!r.length) return `<div class="c more"><span class="empty">–</span></div>`;
+  const line = ([k, m]) => `<span class="rec" title="${LONG[k]} · ${pct(m.p)} · Quote ${odd(m.o)} · ${lvlText(m.l)}"><span class="g${m.l === "strong" ? "" : " ok"}">${glyph(m.l)}</span><span class="lb">${LONG[k]}</span><span class="p">${pnum(m.p)} %</span><span class="o">${odd(m.o)}</span></span>`;
+  const rest = r.slice(2);
+  return `<div class="c more">${r.slice(0, 2).map(line).join("")}${r.length < 2 ? "<span></span>" : ""}${rest.length ? `<span class="rest" title="${rest.map(([k]) => LONG[k]).join(" · ")}">+ ${rest.length} weitere</span>` : ""}</div>`;
+}
+function aRow(f) {
+  const [cc, cn] = COUNTRY[f.c] || ["–", f.c];
+  const strong = eloInfo(f), dvTitle = `Datenvertrauen: wie viele und wie verlässliche Daten das Modell für dieses Spiel hatte (0 bis 100)${f.dv < 50 ? ". Wenig Daten: die Chancen mit Vorsicht lesen." : "."}`;
+  const elo = (v, c, st) => v == null ? `<span class="elo">–</span>` : `<span class="elo${st ? " strong" : ""}${c < 30 ? " thin" : ""}" title="Elo (Spielstärke)${c < 30 ? " – wenig Grundlage" : ""}">${v}</span>`;
+  const gap = f.cg ? `<span class="tag" title="${f.cg.level === "extreme" ? "Deutlicher " : ""}Klassenunterschied: ${esc(f.cg.stronger === "home" ? f.h : f.a)} spielt in der stärkeren Liga.">Klasse ${f.cg.stronger === "home" ? "↑" : "↓"}</span>` : "";
+  const warn = f.w.length ? `<span>·</span><span class="hint" title="${esc(f.w.join(" · "))}">${f.w.length} ${f.w.length === 1 ? "Hinweis" : "Hinweise"}</span>` : "";
+  const cells = [
+    `<div class="c time"><span>${timeFmt.format(new Date(f.k))}</span>${state.sort === "chance" ? `<small>${new Intl.DateTimeFormat("de-DE", { timeZone: TZ, day: "2-digit", month: "2-digit" }).format(new Date(f.k))}.</small>` : ""}</div>`,
+    `<div class="c match"><span class="spine"></span>${crest(f.hc, f.h, "crest")}<span class="nm">${esc(f.h)}</span>${elo(f.he, f.hconf, strong.home)}`
+      + `${crest(f.ac, f.a, "crest")}<span class="nm" style="grid-column:3">${esc(f.a)}</span>${elo(f.ae, f.aconf, strong.away)}`
+      + `<span class="meta"><span class="cc" title="${esc(cn)}">${cc}</span><span class="lg">${esc(LEAGUE(f))}</span><span>·</span><span class="dv${f.dv < 50 ? " low" : ""}" title="${dvTitle}">Datenlage ${f.dv}</span>${warn}${gap ? "<span>·</span>" + gap : ""}</span></div>`,
+    aForm(f), aH2h(f), aModel(f), aMarket(f),
+    state.market === "all" ? aMore(f) : "",
+    `<div class="c add"><button aria-pressed="${state.cart.has(f.id)}" aria-label="${state.cart.has(f.id) ? "Im Wettschein" : "In den Wettschein"}: ${esc(f.h)} – ${esc(f.a)}" data-cart="${f.id}">${state.cart.has(f.id) ? "✓" : "+"}</button></div>`,
+  ];
+  return `<div class="grid row${state.open === f.id ? " on" : ""}" role="row" tabindex="0" data-id="${f.id}" style="--cols:${aCols()}">${cells.join("")}</div>`;
+}
+function renderA() {
+  const head = document.getElementById("aHead");
+  head.style.setProperty("--cols", aCols());
+  head.innerHTML = aHead();
+  const list = sorted();
+  let html = "";
+  if (state.sort === "kickoff") {
+    const days = [...new Set(list.map((f) => dayKey(f.k)))];
+    for (const d of days) {
+      const dl = list.filter((f) => dayKey(f.k) === d);
+      html += `<div class="day">${dayFmt.format(new Date(dl[0].k))}<span>${dl.length} Spiele</span></div>` + dl.map(aRow).join("");
+    }
+  } else html = list.map(aRow).join("");
+  document.getElementById("aBody").innerHTML = html;
+  document.getElementById("aCount").textContent = `${DATA.length} Spiele · ab jetzt · Entwurf mit einer Auswahl echter Spiele`;
+  document.getElementById("aWarn").hidden = !state.value;
+  document.querySelector("#aCart .n").textContent = state.cart.size;
+  document.getElementById("aValue").setAttribute("aria-checked", state.value);
+}
+
+// =================== Variante B ===================
+function bCols() {
+  const two = state.market !== "all" && state.market !== "1x2";
+  return `46px minmax(140px,1fr) 14px minmax(140px,1fr) var(--fmw,168px) var(--hhw,96px) 70px 14px ${two ? 206 : 206}px var(--alw,minmax(130px,.8fr)) 54px 28px`;
+}
+function bHead() {
+  const mk = MARKETS[state.market];
+  return `<span>Zeit</span><span class="r">Heim</span><span></span><span>Gast</span><span title="Letzte fünf Spiele je Team, neueste links: S Sieg, U Remis, N Niederlage">Form</span>`
+    + `<span class="hhcol" title="Letzte fünf Duelle, neueste links">H2H</span><span class="cen" title="Erwartete Tore laut Modell">Tore</span><span></span>`
+    + `<span>${state.market === "all" ? "1X2 · Tipp des Modells" : mk.label}</span><span class="alsocol" title="Märkte mit Empfehlung: ★ stark, ✓ empfohlen">${state.market === "all" ? "Auch empfohlen" : ""}</span>`
+    + `<span class="r" title="Datenlage 0–100">Daten</span><span></span>`;
+}
+const CROSS = `<svg viewBox="0 0 20 18" aria-hidden="true"><path d="M3.5 3.2 C8 7.4 12 11 16.6 14.9 M16.2 2.8 C11.8 7.2 8.2 10.8 3.6 15.2"/></svg>`;
+function tbox(k, p, o, picked, valueP) {
+  const ed = state.value && picked && valueP != null ? `<span class="ed">Value ${pp(valueP)}</span>` : "";
+  return `<span class="tb${picked ? " pick" : ""}${p == null ? " blank" : ""}" title="${k}: ${p == null ? "keine Chance" : pct(p)} · Quote ${odd(o)}${picked ? " · Tipp des Modells" : ""}">`
+    + `<span class="k">${k}${picked ? CROSS : ""}</span><span class="o${o ? "" : " na"}">${odd(o)}</span>`
+    + `<span class="p">${p == null ? "–" : `${pnum(p)}<small>%</small>`}</span>${ed}</span>`;
+}
+function bSlip(f) {
+  if (state.market === "all" || state.market === "1x2") {
+    const t = triple(f), o = oddsT(f), w = f.M["1x2"];
+    if (!t) return `<span class="lv"></span><span class="slip" title="${NOT_COMPARABLE}">${tbox("1", null, o[0])}${tbox("X", null, o[1])}${tbox("2", null, o[2])}</span>`;
+    const pick = w.pick;
+    const e = edgeOf(w.p, pick === "1" ? w.oh : w.oa);
+    return `<span class="lv${w.l === "strong" ? "" : " ok"}" title="${lvlText(w.l)}">${glyph(w.l)}</span><span class="slip">${tbox("1", t.h, o[0], pick === "1", e)}${tbox("X", t.d, o[1], false)}${tbox("2", t.a, o[2], pick === "2", e)}</span>`;
+  }
+  const m = MARKETS[state.market], A = f.M[m.a], B = f.M[m.b], aPick = A.p >= B.p, best = aPick ? A : B;
+  return `<span class="lv${best.l === "strong" ? "" : " ok"}" title="${lvlText(best.l)}">${glyph(best.l)}</span><span class="slip two">${tbox(m.ka, A.p, A.o, aPick, edgeOf(A.p, A.o))}${tbox(m.kb, B.p, B.o, !aPick, edgeOf(B.p, B.o))}</span>`;
+}
+function bForm(f) {
+  const L = (arr) => [0, 1, 2, 3, 4].map((i) => { const r = arr[i]; return r ? `<span class="${r === "win" ? "s" : r === "draw" ? "u" : "n"}">${r === "win" ? "S" : r === "draw" ? "U" : "N"}</span>` : `<span class="x">·</span>`; }).join("");
+  return `<span class="fm" title="${f.fs === "overall" ? "Alle Spiele" : "Heim zu Hause, Gast auswärts"} · neueste links">${L(f.fh)}<i></i>${L(f.fa)}</span>`;
+}
+function bH2h(f) {
+  if (!f.h2.length) return `<span class="hh hhcol"><span class="x">keine</span></span>`;
+  const m = { win: "1", draw: "X", loss: "2" };
+  return `<span class="hh hhcol" title="Letzte Duelle, neueste links. 1 = ${esc(f.h)} gewann, 2 = ${esc(f.a)} gewann">${f.h2.map((r) => m[r]).join("")}${f.hn ? `<span class="ser" title="${esc(f.hn)} · eine Auffälligkeit, kein Grund für einen Tipp">Remis-Serie</span>` : ""}</span>`;
+}
+function bAlso(f) {
+  if (state.market !== "all") return `<span class="also alsocol"></span>`;
+  if (!triple(f)) return `<span class="also alsocol">Ligastärke unbekannt</span>`;
+  const r = recs(f);
+  if (!r.length) return `<span class="also alsocol">–</span>`;
+  const shown = r.slice(0, 3).map(([k, m]) => `${m.l === "strong" ? "<b>★</b> " : ""}${SHORT[k]} <span class="pc">${pnum(m.p)}</span>`).join(" · ");
+  return `<span class="also alsocol" title="${r.map(([k, m]) => `${LONG[k]} ${pct(m.p)} · Quote ${odd(m.o)} · ${lvlText(m.l)}`).join("\n")}">${shown}${r.length > 3 ? ` · +${r.length - 3}` : ""}</span>`;
+}
+function bRow(f) {
+  const st = eloInfo(f);
+  const e = (v, c, s) => v == null ? "" : `<span class="e${s ? " strong" : ""}${c < 30 ? " thin" : ""}" title="Elo (Spielstärke)${c < 30 ? " – wenig Grundlage" : ""}">${v}</span>`;
+  const kl = (side) => f.cg && f.cg.stronger === side ? `<span class="kl" title="${f.cg.level === "extreme" ? "Deutlicher " : ""}Klassenunterschied: spielt in der stärkeren Liga">Klasse ↑</span>` : "";
+  const dTitle = `Datenlage ${f.dv} von 100${f.w.length ? " · " + f.w.join(" · ") : ""}`;
+  return `<div class="bgrid brow${state.open === f.id ? " on" : ""}" role="row" tabindex="0" data-id="${f.id}" style="--bcols:${bCols()}">`
+    + `<span class="tm">${timeFmt.format(new Date(f.k))}</span>`
+    + `<span class="side h">${kl("home")}${e(f.he, f.hconf, st.home)}<span class="nmb">${esc(f.h)}</span>${crest(f.hc, f.h, "crest")}</span>`
+    + `<span class="dash">–</span>`
+    + `<span class="side">${crest(f.ac, f.a, "crest")}<span class="nmb">${esc(f.a)}</span>${e(f.ae, f.aconf, st.away)}${kl("away")}</span>`
+    + bForm(f) + bH2h(f)
+    + `<span class="xg" title="Erwartete Tore laut Modell">${dec(f.eg[0])} : ${dec(f.eg[1])}</span>`
+    + bSlip(f) + bAlso(f)
+    + `<span class="dt${f.dv < 50 ? " low" : ""}" title="${esc(dTitle)}">${f.dv}${f.w.length ? `<sup>${f.w.length}</sup>` : ""}</span>`
+    + `<span class="ad"><button aria-pressed="${state.cart.has(f.id)}" aria-label="${state.cart.has(f.id) ? "Im Wettschein" : "In den Wettschein"}: ${esc(f.h)} – ${esc(f.a)}" data-cart="${f.id}">${state.cart.has(f.id) ? "✓" : "+"}</button></span>`
+    + `</div>`;
+}
+function renderB() {
+  const head = document.getElementById("bHead");
+  head.style.setProperty("--bcols", bCols());
+  head.innerHTML = bHead();
+  const list = sorted();
+  let html = "";
+  if (state.sort === "kickoff") {
+    const days = [...new Set(list.map((f) => dayKey(f.k)))];
+    for (const d of days) {
+      const dl = list.filter((f) => dayKey(f.k) === d);
+      html += `<div class="bday">${dayFmt.format(new Date(dl[0].k))}<span>${dl.length} Spiele</span></div>`;
+      const leagues = [...new Set(dl.map((f) => f.c + "|" + f.lg))];
+      for (const l of leagues) {
+        const ll = dl.filter((f) => f.c + "|" + f.lg === l), f0 = ll[0];
+        html += `<div class="lg">${esc((COUNTRY[f0.c] || [, f0.c])[1])} · ${esc(LEAGUE(f0))}${f0.cg || /Copa|Cup|Pokal/i.test(f0.lg) ? " <em>Pokal</em>" : ""}</div>` + ll.map(bRow).join("");
+      }
+    }
+  } else html = list.map(bRow).join("");
+  document.getElementById("bBody").innerHTML = html;
+  document.getElementById("bWarn").hidden = !state.value;
+  document.querySelector("#bCart .n").textContent = state.cart.size;
+  document.getElementById("bValue").setAttribute("aria-pressed", state.value);
+}
+
+// =================== Steuerung ===================
+function render() {
+  document.getElementById("varA").hidden = state.variant !== "A";
+  document.getElementById("varB").hidden = state.variant !== "B";
+  document.getElementById("notesA").hidden = state.variant !== "A";
+  document.getElementById("notesB").hidden = state.variant !== "B";
+  document.querySelectorAll("[data-variant]").forEach((b) => b.setAttribute("aria-pressed", b.dataset.variant === state.variant));
+  for (const id of ["aMarket", "bMarket"]) document.getElementById(id).value = state.market;
+  for (const id of ["aSort", "bSort"]) document.getElementById(id).value = state.sort;
+  state.variant === "A" ? renderA() : renderB();
+}
+for (const id of ["aMarket", "bMarket"]) {
+  const sel = document.getElementById(id);
+  sel.innerHTML = Object.entries(MARKETS).map(([k, m]) => `<option value="${k}">${m.label}</option>`).join("");
+  sel.addEventListener("change", () => { state.market = sel.value; render(); });
+}
+for (const id of ["aSort", "bSort"]) document.getElementById(id).addEventListener("change", (e) => { state.sort = e.target.value; render(); });
+document.querySelectorAll("[data-variant]").forEach((b) => b.addEventListener("click", () => {
+  state.variant = b.dataset.variant; try { localStorage.setItem("entwurf:tabelle", JSON.stringify({ variant: state.variant })); } catch {} render();
+}));
+document.querySelectorAll("[data-theme-btn]").forEach((b) => b.addEventListener("click", () => {
+  const t = b.dataset.themeBtn;
+  if (t === "auto") document.documentElement.removeAttribute("data-theme"); else document.documentElement.setAttribute("data-theme", t);
+  document.querySelectorAll("[data-theme-btn]").forEach((x) => x.setAttribute("aria-pressed", x === b));
+}));
+const toggleValue = () => { state.value = !state.value; render(); };
+document.getElementById("aValue").addEventListener("click", toggleValue);
+document.getElementById("aValue").addEventListener("keydown", (e) => { if (e.key === " " || e.key === "Enter") { e.preventDefault(); toggleValue(); } });
+document.getElementById("bValue").addEventListener("click", toggleValue);
+document.addEventListener("click", (e) => {
+  const sortBtn = e.target.closest("[data-sort]");
+  if (sortBtn) { state.sort = sortBtn.dataset.sort; render(); return; }
+  const cartBtn = e.target.closest("[data-cart]");
+  if (cartBtn) { const id = +cartBtn.dataset.cart; state.cart.has(id) ? state.cart.delete(id) : state.cart.add(id); render(); return; }
+  const row = e.target.closest("[data-id]");
+  if (row) { const id = +row.dataset.id; state.open = state.open === id ? null : id; render(); }
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "Enter" || !e.target.matches?.("[data-id]")) return;
+  const id = +e.target.dataset.id; state.open = state.open === id ? null : id; render();
+});
+document.getElementById("stand").textContent = `Daten: Snapshot vom ${STAND} · ${DATA.length} echte Spiele`;
+render();
+</script>
+</body>
+</html>

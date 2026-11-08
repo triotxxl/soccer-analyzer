@@ -43,3 +43,9 @@ den Prüfern. Das ist **kein** Prüfergebnis.
 - **Bestanden:** Das heißt noch nicht, dass sich Wetten lohnen. Selbst mit b = 0,37 wäre eine
   BTTS-Wette erst ab rund 12 Punkten Abstand zwischen Modell und fairem Preis im Plus. Was daraus
   folgt, entscheidet David nach einer eigenen Prüfung durch den Prüfer-Agenten.
+
+## Ergebnis
+
+Abgeschlossen am 04.11.2026 mit 2.500 Spielen: b = 0,276 ± 0,173 (a = −0,015), BTTS eingetreten
+55,4 %, fair 55,6 %, Modell 55,9 %. **Nicht bestanden** (nötig wäre b > 0,346). BTTS ist damit wie
+die anderen Märkte, „kein Vorteil gegen den Tipico-Preis“ gilt ohne Ausnahme.

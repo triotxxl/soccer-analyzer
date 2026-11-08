@@ -1087,3 +1087,52 @@ describe("Kombi-Tipps ab 1,60", () => {
   });
 
 });
+
+describe("Daves Table-Filter", () => {
+  const D = QUICKPICK_PRESETS.davesTable.defaults;
+  /** Plätze nach jedem Spieltag; Alpha (Heim) und Beta (Gast). */
+  const trendTable = (alpha: number[], beta: number[]): NonNullable<DashboardFixture["table"]> => [
+    { ...table()[0]!, position: alpha.at(-1)!, positions: alpha },
+    { ...table()[1]!, position: beta.at(-1)!, positions: beta }
+  ];
+  const game = (alpha: number[], beta: number[], oddsHome = 2.1, oddsAway = 3.4) =>
+    fixture({ table: trendTable(alpha, beta), markets: market({ pick: "1", odds: oddsHome, oddsHome, oddsAway }) });
+
+  it("tippt die Mannschaft, die steigt, gegen die, die fällt", () => {
+    // Alpha klettert von 12 auf 4, Beta rutscht von 3 auf 10.
+    const result = evaluateFixture(game([12, 11, 10, 9, 8, 7, 6, 5, 4], [3, 4, 5, 6, 7, 8, 9, 10, 10]), D);
+    expect(result.passes).toBe(true);
+    expect(result.side).toBe("1");
+    expect(result.odds).toBe(2.1);
+    expect(result.davesTable?.pattern).toBe("hochTief");
+    expect(result.davesTable?.good.place).toBe(4);
+  });
+
+  it("zählt konstant gut gegen abrutschend nur, wenn die konstante Seite vorn steht", () => {
+    // Beta hält Platz 2, Alpha rutscht von 5 auf 11: Tipp Beta (Gast).
+    const gut = evaluateFixture(game([5, 6, 7, 8, 9, 10, 11], [2, 2, 2, 2, 2, 2, 2]), D);
+    expect(gut.passes).toBe(true);
+    expect(gut.side).toBe("2");
+    expect(gut.davesTable?.pattern).toBe("konstantTief");
+    // Beta hält Platz 16 und steht damit hinter Alpha: kein Tipp.
+    expect(evaluateFixture(game([5, 6, 7, 8, 9, 10, 11], [16, 16, 16, 16, 16, 16, 16]), D).rejectedBy).toBe("tabelle");
+    // Streng lässt „konstant“ gar nicht zu.
+    const streng = applyLevel({ ...D }, "streng");
+    expect(evaluateFixture(game([5, 6, 7, 8, 9, 10, 11], [2, 2, 2, 2, 2, 2, 2]), streng).rejectedBy).toBe("tabellenTrend");
+  });
+
+  it("verlangt Quote ab 1,60 auf die getippte Seite, Spieltage und eine gemeinsame Tabelle", () => {
+    const steigt = [12, 11, 10, 9, 8, 7, 6, 5, 4], faellt = [3, 4, 5, 6, 7, 8, 9, 10, 10];
+    expect(evaluateFixture(game(steigt, faellt, 1.45), D).rejectedBy).toBe("quote");
+    expect(evaluateFixture(game([5, 4, 3], [3, 4, 5]), D).rejectedBy).toBe("formFehlt");
+    expect(evaluateFixture(fixture({ table: undefined }), D).rejectedBy).toBe("keineTabelle");
+    expect(evaluateFixture(game([4, 4, 4, 4, 4, 4, 4], [9, 9, 9, 9, 9, 9, 9]), D).rejectedBy).toBe("tabellenTrend");
+  });
+
+  it("steht bei den Daves Filtern und hat vier Stufen mit der Vorgabe „Ausgewogen“", () => {
+    expect(QUICKPICK_PRESETS.davesTable.group).toBe("daves");
+    expect(QUICKPICK_PRESETS.davesTable.levels.map((l) => l.id)).toEqual(["streng", "ausgewogen", "locker", "weit"]);
+    expect(levelOf(D)).toBe("ausgewogen");
+    expect((D as { minOdds?: number }).minOdds).toBe(1.6);
+  });
+});

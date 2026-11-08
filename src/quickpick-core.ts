@@ -1,6 +1,7 @@
 import type { DashboardFixture, DashboardMarket, DashboardMarketKey, FormResult } from "./dashboard.ts";
 import type { DrawSignalResult } from "./draw-signals.ts";
 import type { KombiFlag, KombiTip } from "./kombi-tipps.ts";
+import type { DavesTableDetail } from "./quickpick-davestable.ts";
 import type { RecentMatchSummary } from "./types.ts";
 
 /**
@@ -11,7 +12,7 @@ import type { RecentMatchSummary } from "./types.ts";
  * Hier steht bewusst keine Regel - nur das, woraus Regeln gebaut werden.
  */
 
-export type QuickpickPresetId = "daves1x2" | "dominanz" | "hz15" | "remis" | "remisScore" | "modell1x2" | "kombi";
+export type QuickpickPresetId = "daves1x2" | "dominanz" | "hz15" | "remis" | "remisScore" | "modell1x2" | "kombi" | "davesTable";
 
 /**
  * Die Gruppe, unter der eine Voreinstellung im Dialog erscheint. `daves` wählt über Tabelle,
@@ -163,7 +164,9 @@ export type QuickpickRejection =
   // nicht zu den besten N.
   | "keinKombiTipp"
   | "auffaellig"
-  | "nichtUnterDenBesten";
+  | "nichtUnterDenBesten"
+  // Grund der Voreinstellung „Daves Table-Filter“: keine Mannschaft im Hoch gegen eine im Tief.
+  | "tabellenTrend";
 
 export const REJECTION_LABELS: Record<QuickpickRejection, string> = {
   keinTipp: "für dieses Spiel gibt es keinen Sieger-Tipp",
@@ -191,7 +194,8 @@ export const REJECTION_LABELS: Record<QuickpickRejection, string> = {
   nichtBelastbar: "Spiel zwischen verschiedenen Ligen ohne Stärkevergleich – keine belastbare Siegchance",
   keinKombiTipp: "kein Tipp ab der Mindestquote, bei dem Tipico auch die Gegenseite anbietet",
   auffaellig: "auffällige Quoten, oder Modell und Tipico liegen weit auseinander – lieber weglassen",
-  nichtUnterDenBesten: "zählt nicht zu den besten – Feld „Nur die besten“"
+  nichtUnterDenBesten: "zählt nicht zu den besten – Feld „Nur die besten“",
+  tabellenTrend: "keine Mannschaft klettert in der Tabelle, während die andere abrutscht"
 };
 
 export interface QuickpickDominance {
@@ -352,6 +356,8 @@ export interface QuickpickEvaluation {
   remisScore?: DrawSignalResult | null;
   /** Nur bei „modell1x2" gesetzt. */
   modell1x2?: Modell1x2Detail | null;
+  /** Nur bei „davesTable“ gesetzt: Tabellentrend beider Seiten. */
+  davesTable?: DavesTableDetail | null;
   /** Nur bei „kombi" gesetzt. */
   kombi?: KombiDetail | null;
   passes: boolean;
@@ -372,7 +378,8 @@ export function emptyRejections(): Record<QuickpickRejection, number> {
     keinMarkt: 0, torerwartung: 0, remisbild: 0, hzHistorie: 0,
     remisChance: 0, remisScore: 0, remisDaten: 0,
     siegChance: 0, nichtBelastbar: 0,
-    keinKombiTipp: 0, auffaellig: 0, nichtUnterDenBesten: 0
+    keinKombiTipp: 0, auffaellig: 0, nichtUnterDenBesten: 0,
+    tabellenTrend: 0
   };
 }
 
@@ -555,5 +562,6 @@ export function firstHalfRateOf(
  */
 export function oddsEstimated(evaluation: QuickpickEvaluation): boolean {
   return evaluation.dominanz?.oddsSource === "geschätzt"
-    || evaluation.modell1x2?.oddsSource === "geschätzt";
+    || evaluation.modell1x2?.oddsSource === "geschätzt"
+    || evaluation.davesTable?.oddsSource === "geschätzt";
 }

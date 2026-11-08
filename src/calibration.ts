@@ -21,10 +21,13 @@ const BETWEEN_LEAGUES = new Set<LeagueStrengthPerformanceRow["cohort"]>(["gemess
  * 3.7.0 (28.10.2026) gibt Spielen ohne oder mit geschätzter Ligastärke das Liga-Niveau aus dem
  * Vereins-Elo (eigene Gruppe "Liga-Niveau", beginnt neu). "geschätzt" bleibt, wo kein Liga-Niveau
  * greift, und rechnet dort wie 3.6.0; "gemessen" und die Team-Elo-Gruppen bleiben unverändert.
+ * 3.8.0 (04.11.2026) verschiebt nur Ligaspiele; alle Gruppen hier zählen weiter, dafür steht
+ * "Liga-Niveau" jetzt in der Liste - sonst begänne die Gruppe grundlos neu.
  */
 export const STRENGTH_COMPARABLE_SINCE: Partial<Record<LeagueStrengthPerformanceRow["cohort"], string>> = {
   gemessen: "3.5.0",
   geschätzt: "3.6.0",
+  "Liga-Niveau": "3.7.0",
   "Team-Elo": "3.5.0",
   "Team-Elo U21": "3.5.0"
 };

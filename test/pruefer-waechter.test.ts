@@ -159,6 +159,7 @@ test("jedes npm-Skript ist eingeordnet - ein neues fällt hier auf statt still g
   const unknown = scripts.filter((script) => !ALLOWED_SCRIPTS.has(script) && !(script in BLOCKED_SCRIPTS));
   assert.deepEqual(unknown, [], "in .claude/hooks/pruefer-waechter.ts eintragen");
   allowed("npm run btts-check");
+  allowed("npm run aufteilung-check");
   allowed("npm run live-model-report -- --since 2026-09-30 --min-model 3.4.0");
   allowed("npm run coverage");
   allowed("npm run kombi-tipps -- --bis 2026-10-14 --anzahl 24");

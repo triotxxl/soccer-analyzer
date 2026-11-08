@@ -102,6 +102,11 @@ auf Neo zugeschnitten. Geprüft von `apps/shared/src/colorCheck.test.ts` (Rechnu
 - **Tageskopf `.day-h`** klebt oben; **Ligakopf `.grp`** mit Länderkürzel `.cc` und Schild `.tag` („Pokal“).
 - **Tabelle:** 11px-Kopf in Großbuchstaben, Zahlen rechtsbündig, Formkästchen 18px (S/U/N auf Füllfarben).
 - **Tipp `.tip`:** Zeit | Teams + Wettbewerb | Markt, Tipp, „Chance laut Modell“ | Prozent groß, Quote, 4px-Balken.
+  Autoren-Tipp (seit 02.11.2026): statt des Markts der Filtername, beim Remis-Score „Remis-Score 16,5 von 25 ·“ davor,
+  „Modell dagegen“ als `.tag`; ohne Modellchance „–“ und leerer Balken.
+- **Warnliste `.pred-warn`** (Autoren): über den Tipps je gewähltem Filter eine Zeile, Bernstein-Punkt wie `.duel-warn`,
+  Filtername fett in `--ink`, Text 12px `--muted`, Fläche `--surface-2`. Punkt und Text in einem Rasterpaar (8px | Rest) -
+  der Text gehört in ein eigenes Element, sonst bricht er Wort für Wort in die 8px-Spalte.
 - **Marktchancen** (seit 27.10.2026, `MarketsPanel.tsx`): Kopf mit Umschalter Marktchancen | H2H („folgt“, gesperrt),
   Metazeile (Wettbewerb, Tag, Zeit, erwartete Tore, „Quoten: Tipico“) und Zeile `.sh-lead` „Am ehesten“ (je Markt
   1X2, Über/Unter 2,5, BTTS der wahrscheinlichste Tipp, dieselben Kandidaten wie bei den Predictions). Darunter zwei
@@ -129,6 +134,11 @@ auf Neo zugeschnitten. Geprüft von `apps/shared/src/colorCheck.test.ts` (Rechnu
   ≥ 4,5:1 lesbar). Kein Grün/Rot.
 - **Tabellenverlauf:** Linien Heim/Gast mit Namen am Ende („3. Dortmund“), keine Zonen-Bänder, Trend in Worten
   („1 Platz besser“).
+- **Tordifferenz-Verlauf** (seit 04.11.2026, `GoalDiffChart`): gleicher Aufbau wie der Tabellenverlauf, Linien Heim/Gast mit
+  Wert und Namen am Ende („+12 Dortmund“), Plus oben, Nulllinie `.pc-zero` in `--muted` statt `--line`, Vorzeichen immer
+  mit echtem Minus. Die Skala gilt für beide Teams, enthält immer die 0 und folgt dem Zeitraum. Er hat keine eigenen
+  Regler: Zeitraum und Vorjahr stellt der Tabellenverlauf darüber ein. Kein Grün/Rot für Plus und Minus - die Linien tragen
+  Heim und Gast.
 - **Form `.fv`:** Teamspalte 120–200px, „Alle Spiele“ und bei Ligaspielen „Heim / Auswärts“ (Heim zu Hause, Gast
   auswärts), Punkte als „8 von 12 Pkt.“.
 - **Elo** (seit 28.10.2026, `EloValue` in `ui.tsx`, `strengthOf`/`classBadge` in `neoData.ts`): Zahl rechts neben dem

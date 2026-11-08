@@ -16,6 +16,7 @@ const table = (teams: string[]) => teams.map((teamName, i) => ({
   position: i + 1, teamName, played: 8, wins: 5 - i, draws: 1, losses: 2 + i, points: 16 - 3 * i, goalsFor: 14 - i, goalsAgainst: 8 + i,
   form: (i === 0 ? ["win", "draw", "win", "loss", "win"] : i === 1 ? ["loss"] : []) as FormResult[],
   positions: i === 0 ? [3, 2, 1, 1] : i === 1 ? [1, 1, 2, 2] : [2, 3, 3, 3],
+  goalDiffs: i === 0 ? [1, 3, 2, 6] : i === 1 ? [2, 1, 3, 4] : [-1, -2, -2, -3],
   ...(i === 0 ? { previousPositions: [5, 4, 4, 3] } : {}),
 }));
 
@@ -54,7 +55,7 @@ export function fixture(id: number, extra: Partial<DashboardFixture>): Dashboard
 }
 
 export const DOCUMENT: DashboardDocument = {
-  schemaVersion: 12,
+  schemaVersion: 14,
   meta: {
     createdAt: "2026-10-27T13:00:00.000Z", timezone: "Europe/Berlin", sourceFile: "data.json", totalTipicoEvents: 3, selectedTipicoEvents: 3,
     selectedCompetitions: 3, fixtureCount: 3, firstAvailableDate: "2026-10-27", lastAvailableDate: "2026-10-28", maximumDays: 2, maximumHours: 48,

@@ -6,7 +6,9 @@ import {
   type Duel, type PhaseCounts,
 } from "../neoData";
 import { useInsights } from "../useInsights";
-import { PerfChart } from "./PerfChart";
+import { GoalDiffChart, PerfChart } from "../../../shared/src/PerfChart";
+import { minuteCover, NO_GOAL_MINUTES, noLastSeasonText, seasonList, useSeasonChoice, type MinuteCover } from "../../../shared/src/seasonView";
+import { goalDiffTrend, perfTrend, perfWindow, signed, type PerfRange } from "../../../shared/src/perf";
 import { Crest } from "./ui";
 
 /**
@@ -16,7 +18,7 @@ import { Crest } from "./ui";
  */
 
 export type Venue = "all" | "home";
-export type PerfRange = "5" | "10" | "all";
+export type { PerfRange };
 
 const count = (v: number, draw = false) => draw ? (v ? `${v} Remis` : "kein Remis") : v ? `${v} ${v === 1 ? "Sieg" : "Siege"}` : "keine Siege";
 const pct = (v: number, n: number) => (n ? Math.round((v / n) * 100) : 0);
@@ -89,8 +91,8 @@ function Freq({ label, duels, hit, tone, title }: { label: string; duels: Duel[]
   );
 }
 
-function PhaseTile({ name, crest, tone, counts, unit, note }: {
-  name: string; crest?: string; tone: "h" | "a"; counts: PhaseCounts; unit: [string, string]; note?: string;
+function PhaseTile({ name, crest, tone, counts, cover, unit, note }: {
+  name: string; crest?: string; tone: "h" | "a"; counts: PhaseCounts; cover: MinuteCover; unit: [string, string]; note?: string;
 }) {
   const max = Math.max(1, ...counts.scored, ...counts.conceded);
   const total = (list: number[]) => list.reduce((s, v) => s + v, 0);
@@ -100,15 +102,17 @@ function PhaseTile({ name, crest, tone, counts, unit, note }: {
       title={`${PERIOD_LABELS[i]}–${PERIOD_LABELS[i + 1]}: ${v} ${v === 1 ? "Tor" : "Tore"} ${what}`}>{v}</span>
   ));
   // Ohne Spiele mit vollständigen Torminuten keine Nullen: Sie läsen sich wie „nie ein Tor“.
-  if (!counts.games) return (
+  // Ebenso, wenn kein Spiel mit Toren Minuten trägt: Ein 0:0 zählt sonst als vollständig (`minuteCover`).
+  if (!counts.games || cover.none) return (
     <article className={`tile ph-tile ${tone}`}>
       <div className="tile-h"><h5><Crest name={name} logo={crest} />{name}</h5><span>{note ?? ""}</span></div>
-      <p className="ph-state">Zu diesen Spielen führt API-Football keine Torminuten.</p>
+      <p className="ph-state">{cover.total ? NO_GOAL_MINUTES : "Noch keine Spiele."}</p>
     </article>
   );
+  const games = cover.counted < cover.total ? `${cover.counted} von ${cover.total} ${unit[1]}n` : `${counts.games} ${counts.games === 1 ? unit[0] : unit[1]}`;
   return (
     <article className={`tile ph-tile ${tone}`}>
-      <div className="tile-h"><h5><Crest name={name} logo={crest} />{name}</h5><span>{counts.games} {counts.games === 1 ? unit[0] : unit[1]}{note ? ` · ${note}` : ""}</span></div>
+      <div className="tile-h"><h5><Crest name={name} logo={crest} />{name}</h5><span>{games}{note ? ` · ${note}` : ""}</span></div>
       <div className="ph-row"><span className="ph-l">erzielt</span><b className="ph-t sc">{total(counts.scored)}</b>{cells(counts.scored, "sc", "erzielt")}</div>
       <div className="ph-row"><span className="ph-l">kassiert</span><b className="ph-t co">{total(counts.conceded)}</b>{cells(counts.conceded, "co", "kassiert")}</div>
       <div className="ph-row ph-axis" aria-hidden="true"><span /><span />
@@ -119,16 +123,27 @@ function PhaseTile({ name, crest, tone, counts, unit, note }: {
   );
 }
 
-export function H2HBody({ fixture, fixtures, timezone, venue, onVenue, perfRange, onPerfRange, perfPrev, onPerfPrev, phSplit, onPhSplit }: {
+/** Saisonwahl: immer die laufende, die letzte nur auf Klick (`seasonView.ts`). */
+function SeasonSeg({ previous, onChange }: { previous: boolean; onChange: (previous: boolean) => void }) {
+  return (
+    <div className="seg" role="group" aria-label="Saison">
+      <button aria-pressed={!previous} onClick={() => onChange(false)}>Diese Saison</button>
+      <button aria-pressed={previous} onClick={() => onChange(true)}>Letzte Saison</button>
+    </div>
+  );
+}
+
+export function H2HBody({ fixture, fixtures, timezone, venue, onVenue, perfRange, onPerfRange, phSplit, onPhSplit }: {
   fixture: DashboardFixture; fixtures: readonly DashboardFixture[]; timezone: string;
   venue: Venue; onVenue: (v: Venue) => void; perfRange: PerfRange; onPerfRange: (r: PerfRange) => void;
-  perfPrev: boolean; onPerfPrev: (v: boolean) => void; phSplit: boolean; onPhSplit: (v: boolean) => void;
+  phSplit: boolean; onPhSplit: (v: boolean) => void;
 }) {
   const source = useNames();
   const H = teamName(fixture, "home", source), A = teamName(fixture, "away", source);
   const { all, shown } = shownDuels(fixture, venue);
   const s = duelStats(shown);
   const insights = useInsights(fixture.fixtureId);
+  const [perfPrev, setPerfPrev] = useSeasonChoice(fixture.fixtureId);
   const date = (iso: string) => new Date(iso).toLocaleDateString("de-DE", { timeZone: timezone, day: "2-digit", month: "2-digit", year: "2-digit" });
   const best = (d: Duel | null, name: string) => d
     ? <span><strong>{name}</strong> {Math.max(d.gh, d.ga)}:{Math.min(d.gh, d.ga)} <em>{date(d.date)}</em></span>
@@ -211,8 +226,8 @@ export function H2HBody({ fixture, fixtures, timezone, venue, onVenue, perfRange
             const list = duelMatches(ins.h2h, ins.home.id);
             return (
               <div className="tiles ph-tiles">
-                <PhaseTile name={H} crest={fixture.homeCrest} tone="h" counts={phaseCounts(list, ins.home.id)} unit={unitDuel} />
-                <PhaseTile name={A} crest={fixture.awayCrest} tone="a" counts={phaseCounts(list, ins.away.id)} unit={unitDuel} />
+                <PhaseTile name={H} crest={fixture.homeCrest} tone="h" counts={phaseCounts(list, ins.home.id)} cover={minuteCover(list, list)} unit={unitDuel} />
+                <PhaseTile name={A} crest={fixture.awayCrest} tone="a" counts={phaseCounts(list, ins.away.id)} cover={minuteCover(list, list)} unit={unitDuel} />
               </div>
             );
           })}
@@ -234,22 +249,34 @@ export function H2HBody({ fixture, fixtures, timezone, venue, onVenue, perfRange
     </>
   );
 
-  const series = [
+  const sides = [
     { name: H, color: "var(--home)", entry: homeEntry },
     { name: A, color: "var(--away)", entry: awayEntry },
-  ].filter((x) => x.entry?.row.positions?.length);
-  const played = Math.max(0, ...series.map((x) => x.entry!.row.positions!.length));
-  const range = perfRange === "all" ? played : Math.min(played, Number(perfRange));
-  const from = Math.max(1, played - range + 1);
-  const hasPrev = series.some((x) => x.entry!.row.previousPositions?.length);
+  ];
+  const hasPrev = sides.some((x) => seasonList(x.entry, "positions", true));
+  const series = sides.flatMap((x) => {
+    const positions = seasonList(x.entry, "positions", perfPrev);
+    return positions ? [{ name: x.name, color: x.color, size: x.entry!.size, positions }] : [];
+  });
+  const noLastSeason = perfPrev ? sides.filter((x) => x.entry && !seasonList(x.entry, "positions", true)).map((x) => x.name) : [];
+  const played = Math.max(0, ...series.map((x) => x.positions.length));
+  const { from } = perfWindow(played, perfRange);
+  const size = Math.max(0, ...series.flatMap((x) => [x.size, ...x.positions.filter((p): p is number => p !== null)]));
   const sameLeague = homeEntry && awayEntry && homeEntry.competition === awayEntry.competition;
-  const trend = (list: Array<number | null>) => {
-    const window = list.slice(from - 1, played).filter((p): p is number => typeof p === "number");
-    const now = window[window.length - 1], start = window[0];
-    if (now === undefined || start === undefined) return null;
-    const diff = start - now, places = (k: number) => `${k} ${k === 1 ? "Platz" : "Plätze"}`;
-    return { now, best: Math.min(...window), worst: Math.max(...window), text: diff > 0 ? `${places(diff)} besser` : diff < 0 ? `${places(-diff)} schlechter` : "gleich" };
-  };
+  const trend = (list: Array<number | null>) => perfTrend(list, from, played);
+
+  // Zeitraum und Saison gelten für beide Verläufe, damit die Spieltage untereinander stehen.
+  const gdSeries = sides.flatMap((x) => {
+    const goalDiffs = seasonList(x.entry, "goalDiffs", perfPrev);
+    return goalDiffs ? [{ name: x.name, color: x.color, goalDiffs }] : [];
+  });
+  const gdPlayed = Math.max(0, ...gdSeries.map((x) => x.goalDiffs.length));
+  const gdFrom = perfWindow(gdPlayed, perfRange).from;
+  const perfScope = `${sameLeague ? leagueName(fixture, source) : "jeweils in der eigenen Liga"}${perfPrev ? " · letzte Saison" : ""}`;
+
+  const inCompetition = insights?.status === "ready" && [...insights.insights.homeMatches, ...insights.insights.awayMatches]
+    .some((m) => m.leagueId === insights.insights.league.id && m.season === insights.insights.league.season);
+  const phaseSub = `${inCompetition ? leagueName(fixture, source) : "eigene Liga"} · diese Saison`;
 
   const season = (
     <>
@@ -264,7 +291,7 @@ export function H2HBody({ fixture, fixtures, timezone, venue, onVenue, perfRange
         </article>
       </Group>
       <Group id="h2h-perf" title="Tabellenverlauf"
-        sub={`${sameLeague ? leagueName(fixture, source) : "jeweils in der eigenen Liga"} · Platz nach Spieltag`}
+        sub={`${perfScope} · Platz nach Spieltag`}
         tools={series.length > 0 && (
           <div className="perf-ctrl">
             <div className="seg" role="group" aria-label="Zeitraum">
@@ -272,36 +299,62 @@ export function H2HBody({ fixture, fixtures, timezone, venue, onVenue, perfRange
                 <button key={v} aria-pressed={perfRange === v} onClick={() => onPerfRange(v)}>{label}</button>
               ))}
             </div>
-            {hasPrev && <label className="chk"><input type="checkbox" checked={perfPrev} onChange={(e) => onPerfPrev(e.target.checked)} />Vorjahr</label>}
+            {hasPrev && <SeasonSeg previous={perfPrev} onChange={setPerfPrev} />}
           </div>
         )}>
         <article className="tile perf-tile">
           {series.length === 0 ? <p className="ph-state">Kein Tabellenverlauf: Die Liga dieser Teams ist nicht in der aktuellen Analyse.</p> : (
             <>
-              <PerfChart series={series.map((x) => ({ name: x.name, color: x.color, positions: x.entry!.row.positions!, previous: x.entry!.row.previousPositions }))}
-                size={Math.max(...series.map((x) => x.entry!.size))} from={from} to={played} showPrevious={perfPrev && hasPrev} />
+              <PerfChart series={series} size={size} from={from} to={played} />
               <div className="perf-legend">
                 {series.map((x) => {
-                  const t = trend(x.entry!.row.positions!);
-                  return t && <span key={x.name}><i className="sw" style={{ borderColor: x.color }} /><b>{x.name}</b> aktuell {t.now}. · bester {t.best}. · schlechtester {t.worst}. · im Zeitraum {t.text}</span>;
+                  const t = trend(x.positions);
+                  return t && <span key={x.name}><i className="sw" style={{ borderColor: x.color }} /><b>{x.name}</b> {perfPrev ? "am Ende" : "aktuell"} {t.now}. · bester {t.best}. · schlechtester {t.worst}. · im Zeitraum {t.text}</span>;
                 })}
-                {perfPrev && hasPrev && <span><i className="sw dash" style={{ borderColor: "var(--muted)" }} />gestrichelt: Vorjahr</span>}
-                {perfRange !== "all" && played < Number(perfRange) && <span>Erst {played} Spieltage gespielt, daher {played} statt {perfRange}.</span>}
+                {noLastSeason.length > 0 && <span>{noLastSeasonText(noLastSeason, fixture.crossLeague === true)}</span>}
+                {!perfPrev && perfRange !== "all" && played < Number(perfRange) && <span>Erst {played} Spieltage gespielt, daher {played} statt {perfRange}.</span>}
               </div>
             </>
           )}
         </article>
       </Group>
-      <Group id="h2h-ph" title="Torphasen" sub="Ligaspiele dieser Saison"
+      <Group id="h2h-gd" title="Tordifferenz-Verlauf"
+        sub={`${perfScope} · Tore minus Gegentore nach Spieltag`}>
+        <article className="tile perf-tile">
+          {gdSeries.length === 0 ? (
+            <p className="ph-state">{series.length === 0
+              ? "Kein Tordifferenz-Verlauf: Die Liga dieser Teams ist nicht in der aktuellen Analyse."
+              : "Der Tordifferenz-Verlauf erscheint nach der nächsten Analyse."}</p>
+          ) : (
+            <>
+              <GoalDiffChart series={gdSeries} from={gdFrom} to={gdPlayed} />
+              <div className="perf-legend">
+                {gdSeries.map((x) => {
+                  const t = goalDiffTrend(x.goalDiffs, gdFrom, gdPlayed);
+                  return t && <span key={x.name}><i className="sw" style={{ borderColor: x.color }} /><b>{x.name}</b> {perfPrev ? "am Ende" : "aktuell"} {signed(t.now)} · im Zeitraum {signed(t.change)}</span>;
+                })}
+                <span>Zeitraum und Saison wie beim Tabellenverlauf.</span>
+              </div>
+            </>
+          )}
+        </article>
+      </Group>
+      <Group id="h2h-ph" title="Torphasen" sub={phaseSub}
         tools={<label className="chk"><input type="checkbox" checked={phSplit} onChange={(e) => onPhSplit(e.target.checked)} />Heim / Auswärts</label>}>
-        {phases(({ insights: ins }) => (
-          <div className="tiles ph-tiles">
-            <PhaseTile name={H} crest={fixture.homeCrest} tone="h" unit={unitGame} note={phSplit ? "nur Heimspiele" : "alle Spiele"}
-              counts={phaseCounts(seasonMatches(ins.homeMatches, ins.home.id, phSplit ? "home" : null), ins.home.id)} />
-            <PhaseTile name={A} crest={fixture.awayCrest} tone="a" unit={unitGame} note={phSplit ? "nur Auswärtsspiele" : "alle Spiele"}
-              counts={phaseCounts(seasonMatches(ins.awayMatches, ins.away.id, phSplit ? "away" : null), ins.away.id)} />
-          </div>
-        ))}
+        {phases(({ insights: ins }) => {
+          const homeSeason = seasonMatches(ins.homeMatches, ins.home.id, null, ins.league);
+          const awaySeason = seasonMatches(ins.awayMatches, ins.away.id, null, ins.league);
+          const homeShown = seasonMatches(homeSeason, ins.home.id, phSplit ? "home" : null);
+          const awayShown = seasonMatches(awaySeason, ins.away.id, phSplit ? "away" : null);
+          return (
+            <div className="tiles ph-tiles">
+              <PhaseTile name={H} crest={fixture.homeCrest} tone="h" unit={unitGame} note={phSplit ? "nur Heimspiele" : "alle Spiele"}
+                counts={phaseCounts(homeShown, ins.home.id)} cover={minuteCover(homeSeason, homeShown)} />
+              <PhaseTile name={A} crest={fixture.awayCrest} tone="a" unit={unitGame} note={phSplit ? "nur Auswärtsspiele" : "alle Spiele"}
+                counts={phaseCounts(awayShown, ins.away.id)} cover={minuteCover(awaySeason, awayShown)} />
+            </div>
+          );
+        })}
       </Group>
     </>
   );

@@ -3,7 +3,7 @@ import { config, TEAM_ALIASES_FILE } from "./config.ts";
 import { AnalyzerDatabase } from "./database.ts";
 import { scoreCrossLeagueFixture } from "./cross-league-criteria.ts";
 import { scoreCrossLeagueDrawFixture } from "./cross-league-draw-criteria.ts";
-import { buildTable, consensusOdds, leagueAverages, scoreDrawFixture, tableForm, tablePositions, tableScopeOf } from "./draw-criteria.ts";
+import { buildTable, consensusOdds, leagueAverages, roundStage, scoreDrawFixture, stageGroupOf, tableForm, tableProgress, tableScopeOf, type TableProgress, type TableScope } from "./draw-criteria.ts";
 import { scoreFavoriteFixture } from "./favorite-criteria.ts";
 import { strengthPool } from "./league-strength.ts";
 import {
@@ -46,6 +46,8 @@ import type {
   LiveMatchSelection,
   ResolutionFailure,
   ResolvedLeague,
+  DomesticStanding,
+  StandingRow,
   StrengthReloadSummary
 } from "./types.ts";
 import type { TableRow } from "./draw-criteria.ts";
@@ -65,6 +67,46 @@ import { enrichFixtureExpectedGoals } from "./xg.ts";
 interface DomesticLeagueReference {
   leagueId: number;
   season: number;
+}
+
+interface StandingsEntry {
+  table: TableRow[];
+  teamNames: Map<number, string>;
+  forms: Map<number, Array<"win" | "draw" | "loss">>;
+  progress: TableProgress;
+  previousProgress: TableProgress;
+}
+
+function standingsEntry(history: ApiFixture[], targetTimestamp: number, scope: TableScope): StandingsEntry {
+  const teamNames = new Map<number, string>();
+  for (const match of history) {
+    teamNames.set(match.teams.home.id, match.teams.home.name);
+    teamNames.set(match.teams.away.id, match.teams.away.name);
+  }
+  return {
+    table: buildTable(history, targetTimestamp, scope), teamNames, forms: tableForm(history, targetTimestamp, scope),
+    // Tabellen- und Tordifferenz-Verlauf (Neo, H2H): dieselben Partien Spieltag für Spieltag; `history`
+    // enthält auch die Vorsaison, deshalb kostet der Vorjahresverlauf ebenfalls nichts.
+    progress: tableProgress(history, targetTimestamp, scope),
+    previousProgress: tableProgress(history, targetTimestamp, { ...scope, season: scope.season - 1 })
+  };
+}
+
+function bothSides(home: DomesticStanding | undefined, away: DomesticStanding | undefined):
+  { home?: DomesticStanding; away?: DomesticStanding } | undefined {
+  return home || away ? { ...(home ? { home } : {}), ...(away ? { away } : {}) } : undefined;
+}
+
+function standingRows(entry: StandingsEntry): StandingRow[] {
+  return entry.table.map((row) => ({
+    ...row, teamName: entry.teamNames.get(row.id) ?? "?", form: entry.forms.get(row.id) ?? [],
+    positions: entry.progress.positions.get(row.id) ?? [],
+    goalDiffs: entry.progress.goalDiffs.get(row.id) ?? [],
+    ...(entry.previousProgress.positions.has(row.id) ? {
+      previousPositions: entry.previousProgress.positions.get(row.id)!,
+      previousGoalDiffs: entry.previousProgress.goalDiffs.get(row.id)!
+    } : {})
+  }));
 }
 
 export interface RequestedFixtureScope {
@@ -284,6 +326,15 @@ async function mapLimit<T, R>(
  * Favoritenanalyse luden danach je weitere 100 nur für die nächste Analyse: Bei Etar - Spartak
  * Varna fehlten so 24 von 31 Duellen der Vorsaison, die Minuten nach der Rechnung ankamen
  * (Prüfung vom 19.10.2026; 14 von 95 Prognosen mit geschätzter Seite seit August).
+ *
+ * Seit 04.11.2026 in zwei Schritten (Davids Entscheidung nach der Prüfung AEK - Real): Zuerst wie
+ * bisher drei Saisons der Wettbewerbe mit einer nicht belastbaren Seite, danach mit dem Rest des
+ * Budgets die **laufende Saison aller** Wettbewerbe mit Spielen zwischen Ligen. Vorher lud eine
+ * belastbare Ligastärke gar nicht mehr nach: Seit Oktober fehlten alle 45 Spiele der Champions
+ * League, Griechenland stand so vor Spanien. Die Saison holt die Analyse für diese Wettbewerbe
+ * ohnehin (`getSeasonFixtures` hält sie je Lauf), der zweite Schritt kostet also nur die
+ * Heimatliga neuer Teams. Ein Wettbewerb ohne Spiel im Umfang wartet bis zur nächsten Analyse mit
+ * ihm; ein Rückstand von einer Runde bewegt das Rating kaum.
  */
 async function buildMissingLeagueStrength(
   fixtures: ApiFixture[],
@@ -294,7 +345,8 @@ async function buildMissingLeagueStrength(
   now: Date
 ): Promise<StrengthReloadSummary | undefined> {
   if (!database) return undefined;
-  const competitionIds = new Set<number>();
+  const unreliable = new Set<number>();
+  const current = new Set<number>();
   for (const fixture of fixtures) {
     if (!crossLeagueFixtureIds.has(fixture.fixture.id)) continue;
     const homeDomestic = domesticByTeam.get(fixture.teams.home.id);
@@ -304,6 +356,7 @@ async function buildMissingLeagueStrength(
       !awayDomestic ||
       homeDomestic.leagueId === awayDomestic.leagueId
     ) continue;
+    current.add(fixture.league.id);
     const pool = strengthPool(fixture);
     const homeStrength = database.getLeagueStrength(
       pool,
@@ -317,26 +370,25 @@ async function buildMissingLeagueStrength(
       awayDomestic.season,
       fixture.fixture.date
     );
-    if (!homeStrength?.reliable || !awayStrength?.reliable) {
-      competitionIds.add(fixture.league.id);
-    }
+    if (!homeStrength?.reliable || !awayStrength?.reliable) unreliable.add(fixture.league.id);
   }
-  if (competitionIds.size === 0) return undefined;
-  const result = await buildLeagueStrength({
-    client,
-    database,
-    seasons: 3,
-    requestBudget: config.strengthOnDemandRequestBudget,
-    now,
-    competitionIds: [...competitionIds]
-  });
-  return {
-    competitions: competitionIds.size,
-    fixturesStored: result.fixturesStored,
-    apiRequests: result.apiRequests,
-    budget: config.strengthOnDemandRequestBudget,
-    stoppedAt: result.stoppedAt
+  if (current.size === 0) return undefined;
+  const budget = config.strengthOnDemandRequestBudget;
+  const summary: StrengthReloadSummary = {
+    competitions: current.size, fixturesStored: 0, apiRequests: 0, budget, stoppedAt: null
   };
+  const load = async (competitionIds: number[], seasons: number, requestBudget: number): Promise<void> => {
+    const result = await buildLeagueStrength({ client, database, seasons, requestBudget, now, competitionIds });
+    summary.fixturesStored += result.fixturesStored;
+    summary.apiRequests += result.apiRequests;
+    summary.stoppedAt = result.stoppedAt;
+  };
+  if (unreliable.size > 0) await load([...unreliable], 3, budget);
+  const rest = [...current].filter((id) => !unreliable.has(id));
+  if (rest.length > 0 && summary.stoppedAt === null && summary.apiRequests < budget) {
+    await load(rest, 1, budget - summary.apiRequests);
+  }
+  return summary;
 }
 
 export class LeagueResolutionError extends Error {
@@ -614,10 +666,7 @@ export async function runGoalLineAnalysis(
     // die laufende und die vorige Saison, und innerhalb einer Saison führt API-Football
     // Apertura und Clausura unter derselben ID. Ohne den Zuschnitt auf Saison und Abschnitt
     // summiert sich das zu einem Bestand, den es als Tabelle nie gab.
-    const standingsByCompetition = new Map<string, {
-      table: TableRow[]; teamNames: Map<number, string>; forms: Map<number, Array<"win" | "draw" | "loss">>;
-      positions: Map<number, Array<number | null>>; previousPositions: Map<number, Array<number | null>>;
-    }>();
+    const standingsByCompetition = new Map<string, StandingsEntry>();
     for (const fixture of fixtures) {
       const key = standingsKey(fixture);
       if (standingsByCompetition.has(key)) continue;
@@ -630,19 +679,67 @@ export async function runGoalLineAnalysis(
         ...fixtures.filter((entry) => standingsKey(entry) === key).map((entry) => entry.fixture.timestamp)
       );
       if (!Number.isFinite(targetTimestamp)) continue;
-      const teamNames = new Map<number, string>();
-      for (const match of history) {
-        teamNames.set(match.teams.home.id, match.teams.home.name);
-        teamNames.set(match.teams.away.id, match.teams.away.name);
-      }
-      standingsByCompetition.set(key, {
-        table: buildTable(history, targetTimestamp, scope), teamNames, forms: tableForm(history, targetTimestamp, scope),
-        // Tabellenverlauf (Neo, H2H): dieselben Partien Spieltag für Spieltag; `history` enthält auch die
-        // Vorsaison, deshalb kostet der Vorjahresverlauf ebenfalls nichts.
-        positions: tablePositions(history, targetTimestamp, scope),
-        previousPositions: tablePositions(history, targetTimestamp, { ...scope, season: scope.season - 1 })
-      });
+      standingsByCompetition.set(key, standingsEntry(history, targetTimestamp, scope));
     }
+
+    // Tabelle eines Spiels zwischen Ligen (seit 04.11.2026, Davids Vorgabe): Im Turnier zählt die
+    // Platzierung im Turnier, also Ligaphase oder Gruppe, in der K.-o.-Runde die letzte Tabelle des Teams.
+    // Nur Anzeige in einem eigenen Feld: `table` lesen die Filter, die bei diesen Spielen bewusst keine
+    // Tabelle kennen. Die Saison liegt in `competitionHistory` ohnehin da - 0 Aufrufe.
+    const tournamentStandings = new Map<string, StandingsEntry>();
+    const isMatchday = (match: ApiFixture) => roundStage(match.league.round ?? "").matchday;
+    const tournamentStandingOf = (fixture: ApiFixture, teamId: number): DomesticStanding | undefined => {
+      const rounds = (competitionHistory.get(`${fixture.league.id}:${fixture.league.season}`) ?? []).filter(isMatchday);
+      const history = rounds.filter((match) => match.league.season === fixture.league.season);
+      const involves = (match: ApiFixture) => match.teams.home.id === teamId || match.teams.away.id === teamId;
+      const latestOf = (matches: ApiFixture[]) => matches
+        .reduce<ApiFixture | null>((latest, match) => !latest || match.fixture.timestamp > latest.fixture.timestamp ? match : latest, null);
+      const anchor = isMatchday(fixture) ? fixture
+        : latestOf(history.filter((match) => match.fixture.timestamp < fixture.fixture.timestamp && involves(match)));
+      if (!anchor) return undefined;
+      const stage = roundStage(anchor.league.round ?? "").stage;
+      const group = stageGroupOf(history.filter((match) => roundStage(match.league.round ?? "").stage === stage), teamId);
+      const key = `${standingsKey(anchor)}:${Math.min(...group.map((match) => match.teams.home.id))}`;
+      const entry = tournamentStandings.get(key)
+        ?? standingsEntry(group, domesticCutoff, tableScopeOf(anchor));
+      tournamentStandings.set(key, entry);
+      const rows = standingRows(entry), row = rows.find((candidate) => candidate.id === teamId);
+      if (!row) return undefined;
+      // Die letzte Ausgabe des Turniers, wenn das Team dabei war: Ligaphase oder Gruppe, die es damals hatte.
+      const lastEdition = latestOf(rounds.filter((match) => match.league.season < fixture.league.season && involves(match)));
+      const previous = lastEdition && tableProgress(
+        stageGroupOf(rounds.filter((match) => match.league.season === lastEdition.league.season
+          && roundStage(match.league.round ?? "").stage === roundStage(lastEdition.league.round ?? "").stage), teamId),
+        Number.POSITIVE_INFINITY, tableScopeOf(lastEdition));
+      return {
+        row: previous?.positions.has(teamId)
+          ? { ...row, previousPositions: previous.positions.get(teamId)!, previousGoalDiffs: previous.goalDiffs.get(teamId)! }
+          : row,
+        size: rows.length, competition: `${fixture.league.country}|${fixture.league.name}`
+      };
+    };
+
+    // Ersatz für Wettbewerbe ohne Tabelle (reiner K.-o.-Pokal): die Heimatliga. `domesticHistory` liegt für
+    // das Modell ohnehin da, mit Vorsaison - 0 Aufrufe. Ändert keine Chance.
+    const domesticCutoff = Math.min(...fixtures.filter((fixture) => crossLeagueFixtureIds.has(fixture.fixture.id))
+      .map((fixture) => fixture.fixture.timestamp));
+    const domesticStandings = new Map<string, StandingsEntry>();
+    const domesticStandingOf = (teamId: number): DomesticStanding | undefined => {
+      const reference = domesticByTeam.get(teamId);
+      const history = reference && domesticHistory.get(`${reference.leagueId}:${reference.season}`);
+      if (!history) return undefined;
+      const last = history
+        .filter((match) => match.league.season === reference.season && match.fixture.timestamp < domesticCutoff
+          && (match.teams.home.id === teamId || match.teams.away.id === teamId)
+          && (!match.league.round || roundStage(match.league.round).matchday))
+        .reduce<ApiFixture | null>((latest, match) => !latest || match.fixture.timestamp > latest.fixture.timestamp ? match : latest, null);
+      if (!last) return undefined;
+      const key = standingsKey(last);
+      const entry = domesticStandings.get(key) ?? standingsEntry(history, domesticCutoff, tableScopeOf(last));
+      domesticStandings.set(key, entry);
+      const rows = standingRows(entry), row = rows.find((candidate) => candidate.id === teamId);
+      return row ? { row, size: rows.length, competition: `${last.league.country}|${last.league.name}` } : undefined;
+    };
 
     const baselineCache = new Map<string, LeagueBaseline>();
     const domesticBaseline = (
@@ -860,12 +957,14 @@ export async function runGoalLineAnalysis(
           // Eine leere Tabelle ist bei reinen Pokalwettbewerben der richtige Zustand: Dort
           // gibt es keine Spieltage, aus denen sich ein Klassement ergibt.
           if (!entry || entry.table.length === 0) return undefined;
-          return entry.table.map((row) => ({
-            ...row, teamName: entry.teamNames.get(row.id) ?? "?", form: entry.forms.get(row.id) ?? [],
-            positions: entry.positions.get(row.id) ?? [],
-            ...(entry.previousPositions.has(row.id) ? { previousPositions: entry.previousPositions.get(row.id)! } : {})
-          }));
+          return standingRows(entry);
         })(),
+        tournamentStandings: crossLeague
+          ? bothSides(tournamentStandingOf(fixture, fixture.teams.home.id), tournamentStandingOf(fixture, fixture.teams.away.id))
+          : undefined,
+        domesticStandings: crossLeague
+          ? bothSides(domesticStandingOf(fixture.teams.home.id), domesticStandingOf(fixture.teams.away.id))
+          : undefined,
         probabilities: goalLineProbabilities(
           model.expectedHomeGoals,
           model.expectedAwayGoals

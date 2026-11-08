@@ -76,9 +76,13 @@ const MODEL_BOUND_PRESETS = new Set<QuickpickPresetId>(["hz15", "remis", "modell
  * zwischen Ligen. Nur an 3.5.0 standen hinter den Knöpfen rund 20 Tipps. 3.6.0 (19.10.2026)
  * ändert nur Spiele zwischen Ligen mit einer nicht belastbaren Seite; „Sieger laut Modell"
  * zählt weiter ab 3.2.0 (Davids Entscheidung vom 19.10.2026), „Erste Halbzeit" und
- * „Remis-Kandidaten" beginnen mit 3.6.0 neu.
+ * „Remis-Kandidaten" begannen mit 3.6.0 neu.
+ * 3.8.0 (04.11.2026, Heim-/Gast-Aufteilung bei Ligaspielen) ändert 1X2 und Remis jedes Ligaspiels:
+ * Alle drei beginnen neu. Die Knöpfe tragen bis genug Spiele da sind den Stand vom 04.11.2026
+ * (`modell1x2` ab 3.2.0, `hz15` und `remis` ab 3.6.0); die Meldung „Abweichung“ ist mit den ersten Spielen zu
+ * erwarten, nachgezogen wird erst ab rund 100 Tipps der Vorgabestufe.
  */
-const MODEL_BOUND_SINCE: Partial<Record<QuickpickPresetId, string>> = { modell1x2: "3.2.0" };
+const MODEL_BOUND_SINCE: Partial<Record<QuickpickPresetId, string>> = { modell1x2: "3.8.0", hz15: "3.8.0", remis: "3.8.0" };
 
 /** Vergleicht Versionen wie "3.10.0" numerisch; `null`, wenn eine davon keine ist. */
 function compareVersions(left: string, right: string): number | null {

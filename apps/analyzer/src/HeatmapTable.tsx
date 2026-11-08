@@ -1,6 +1,6 @@
-import { countryName, leagueName, selectionText, teamName, useNames } from "../../shared/src/names";
-import { useMemo, type CSSProperties, type ReactNode } from "react";
-import { ClassGapBadge, formatOdd, formatPercent, kickoffParts, sortStateLabel } from "./App";
+import { countryName, leagueName, selectionText, teamName, useNames, type NameSource } from "../../shared/src/names";
+import { memo, useMemo, type CSSProperties, type ReactNode } from "react";
+import { ClassGapBadge, EloAgainstBadge, formatOdd, formatPercent, kickoffParts, sortStateLabel } from "./App";
 import {
   drawScoreLabel, drawScoreTone, eloDelta, expectedGoalsDelta, formatDelta, formDelta, HEAT_SCALE, heatOf,
   recentDelta, sortHeatmap, valueHeat, type Heat, type HeatmapColumn
@@ -99,15 +99,69 @@ function drawScoreCell(fixture: DashboardFixture) {
  * Spalte sortiert ist, übernimmt sie deren Reihenfolge. Die Spaltensortierung liegt in der App,
  * damit die Sortierauswahl über der Tabelle sie anzeigen und zurücksetzen kann.
  */
-export function HeatmapTable({ fixtures, markets, timezone, now, showEdge, openFixture, onToggleFixture, cartSlot, empty, sort, onSortChange }: {
+type HeatmapMarkets = Array<{ key: DashboardMarketKey; label: string }>;
+
+/**
+ * Eine Zeile der Heatmap. `memo`, damit ein offenes Menü oder ein Tastendruck in der Suche nicht
+ * jede Zeile neu zeichnet - dafür müssen die Rückrufe und `style` ihre Identität behalten.
+ */
+const HeatmapRow = memo(function HeatmapRow({ fixture, markets, timezone, started, open, cartMenuOpen, showEdge, names, style, onToggleFixture, cartSlot }: {
+  fixture: DashboardFixture;
+  markets: HeatmapMarkets;
+  timezone: string;
+  started: boolean;
+  open: boolean;
+  cartMenuOpen: boolean;
+  showEdge: boolean;
+  names: NameSource;
+  style: CSSProperties;
+  onToggleFixture(fixtureId: number): void;
+  cartSlot(fixture: DashboardFixture, menuOpen: boolean): ReactNode;
+}) {
+  const time = kickoffParts(fixture.kickoff, timezone);
+  const team = { home: teamName(fixture, "home", names), away: teamName(fixture, "away", names) };
+  return <article className={`heatmap-row-wrap${open ? " open" : ""}${cartMenuOpen ? " cart-open" : ""}`} style={style}>
+    <div className="fixture-row-wrap">
+      {cartSlot(fixture, cartMenuOpen)}
+      <button className="heatmap-grid heatmap-row" style={style} aria-expanded={open} onClick={() => onToggleFixture(fixture.fixtureId)}>
+        <span className={`heatmap-time${started ? " started" : ""}`} title={started ? "Bereits angepfiffen" : undefined}>
+          <small>{time.day}</small><strong>{time.clock}</strong>
+        </span>
+        <span className="heatmap-teams">
+          <strong className="home">{team.home}</strong>
+          <i aria-hidden>–</i>
+          <strong className="away">{team.away}</strong>
+          <small className="heatmap-league" title={`${countryName(fixture, names)} · ${leagueName(fixture, names)}`}>{leagueName(fixture, names)}</small>
+          {fixture.classGap && <ClassGapBadge gap={fixture.classGap} homeTeam={team.home} awayTeam={team.away} />}
+          <EloAgainstBadge fixture={fixture} homeTeam={team.home} awayTeam={team.away} />
+        </span>
+        {eloCell(fixture, team)}
+        {formCell(fixture, team)}
+        {xgCell(fixture, team)}
+        {recentCell(fixture, "shotsOnGoal", team)}
+        {recentCell(fixture, "corners", team)}
+        {drawScoreCell(fixture)}
+        {markets.map((market) => {
+          const shown = fixture.markets.find((item) => item.key === market.key);
+          return <OddsCell key={market.key} market={shown} showEdge={showEdge}
+            selection={shown ? selectionText(fixture, shown, names) : ""} />;
+        })}
+      </button>
+    </div>
+  </article>;
+});
+
+export function HeatmapTable({ fixtures, markets, timezone, now, showEdge, openFixture, cartMenuFixture, onToggleFixture, cartSlot, empty, sort, onSortChange }: {
   fixtures: DashboardFixture[];
-  markets: Array<{ key: DashboardMarketKey; label: string }>;
+  markets: HeatmapMarkets;
   timezone: string;
   now: number;
   showEdge: boolean;
   openFixture: number | null;
+  /** Das Spiel, dessen Wettschein-Menü offen ist. */
+  cartMenuFixture: number | null;
   onToggleFixture(fixtureId: number): void;
-  cartSlot(fixture: DashboardFixture): ReactNode;
+  cartSlot(fixture: DashboardFixture, menuOpen: boolean): ReactNode;
   empty: ReactNode;
   sort: HeatmapSort;
   onSortChange(sort: HeatmapSort): void;
@@ -133,11 +187,13 @@ export function HeatmapTable({ fixtures, markets, timezone, now, showEdge, openF
 
   // Hinzufügen 38 + Innenabstand 10, Zeit 88, Spiel 260, fünf Vorsprünge je 84, Remis-Punkte 76,
   // Märkte je 100, dazu die Lücken. Muss zur Spaltenliste in styles.css passen.
-  const columns = 8 + markets.length;
-  const style = {
-    "--heatmap-markets": markets.length,
-    "--heatmap-min-width": `${48 + 88 + 260 + 5 * 84 + 76 + markets.length * 100 + (columns - 1) * 6}px`
-  } as CSSProperties;
+  const style = useMemo(() => {
+    const columns = 8 + markets.length;
+    return {
+      "--heatmap-markets": markets.length,
+      "--heatmap-min-width": `${48 + 88 + 260 + 5 * 84 + 76 + markets.length * 100 + (columns - 1) * 6}px`
+    } as CSSProperties;
+  }, [markets.length]);
 
   return <div className="heatmap-area">
     <div className="table-scroll heatmap-scroll">
@@ -152,40 +208,10 @@ export function HeatmapTable({ fixtures, markets, timezone, now, showEdge, openF
         {head("drawScore", "Remis-Pkt.", "Remis-Punkte", "Remis-Punkte (0–100). Grün ab 50, kräftiger ab 60 und 70.")}
         {markets.map((market) => head(`market:${market.key}`, market.label, `Quote ${market.label}`))}
       </div>
-      {rows.map((fixture) => {
-        const time = kickoffParts(fixture.kickoff, timezone);
-        const started = Date.parse(fixture.kickoff) < now;
-        const open = openFixture === fixture.fixtureId;
-        const team = { home: teamName(fixture, "home", names), away: teamName(fixture, "away", names) };
-        return <article className={`heatmap-row-wrap${open ? " open" : ""}`} style={style} key={fixture.fixtureId}>
-          <div className="fixture-row-wrap">
-            {cartSlot(fixture)}
-            <button className="heatmap-grid heatmap-row" style={style} aria-expanded={open} onClick={() => onToggleFixture(fixture.fixtureId)}>
-              <span className={`heatmap-time${started ? " started" : ""}`} title={started ? "Bereits angepfiffen" : undefined}>
-                <small>{time.day}</small><strong>{time.clock}</strong>
-              </span>
-              <span className="heatmap-teams">
-                <strong className="home">{team.home}</strong>
-                <i aria-hidden>–</i>
-                <strong className="away">{team.away}</strong>
-                <small className="heatmap-league" title={`${countryName(fixture, names)} · ${leagueName(fixture, names)}`}>{leagueName(fixture, names)}</small>
-                {fixture.classGap && <ClassGapBadge gap={fixture.classGap} homeTeam={team.home} awayTeam={team.away} />}
-              </span>
-              {eloCell(fixture, team)}
-              {formCell(fixture, team)}
-              {xgCell(fixture, team)}
-              {recentCell(fixture, "shotsOnGoal", team)}
-              {recentCell(fixture, "corners", team)}
-              {drawScoreCell(fixture)}
-              {markets.map((market) => {
-                const shown = fixture.markets.find((item) => item.key === market.key);
-                return <OddsCell key={market.key} market={shown} showEdge={showEdge}
-                  selection={shown ? selectionText(fixture, shown, names) : ""} />;
-              })}
-            </button>
-          </div>
-        </article>;
-      })}
+      {rows.map((fixture) => <HeatmapRow key={fixture.fixtureId} fixture={fixture} markets={markets} timezone={timezone}
+        started={Date.parse(fixture.kickoff) < now} open={openFixture === fixture.fixtureId}
+        cartMenuOpen={cartMenuFixture === fixture.fixtureId} showEdge={showEdge} names={names} style={style}
+        onToggleFixture={onToggleFixture} cartSlot={cartSlot} />)}
       {rows.length === 0 && empty}
     </div>
     <p className="heatmap-legend">

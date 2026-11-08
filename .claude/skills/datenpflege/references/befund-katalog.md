@@ -133,6 +133,18 @@ letzten Saisons in `strength_build_progress` als fertig markiert?
 auch dann nicht, ist es strukturell (späte Pokalrunden nur einer Liga, Teams ohne Heimatliga).
 Die Analyse lädt vor der Rechnung selbst nach (300 Aufrufe, `strengthOnDemandRequestBudget`).
 
+## 5b. Ligastärke-Duelle fehlen (`data-check` Abschnitt 5b, seit 04.11.2026)
+
+**Heißt:** Ein gespieltes Spiel zweier Teams verschiedener Heimatligen aus den letzten 60 Tagen steht nicht in
+`strength_matches`, ab drei je Wettbewerb. Die Bewertung der Ligen ist dann belastbar, aber veraltet.
+
+**Herkunft:** Seit Oktober fehlten alle 45 Spiele der Champions League, Griechenland stand vor Spanien. Abschnitt 5
+sieht das nicht, weil beide Ligen belastbar waren.
+
+**Behebung:** Die Analyse holt die laufende Saison selbst, sobald der Wettbewerb im Umfang ist. Für alles andere
+`npm run strength -- --competition <id> --seasons 1 --request-budget <n>`. Bleibt ein Wettbewerb danach gemeldet, liegt es
+an der Heimatliga der Teams oder an der Saison des Wettbewerbs (NM Cupen führt API-Football als 2027), nicht an der Menge.
+
 ## 6. Abrechnung (`data-check` Abschnitt 6)
 
 - **„Torminuten lückenlos“, aber Halbzeittore passen nicht zum Stand:** `goals_complete = 1` ist

@@ -1,7 +1,8 @@
+import { eloAgainstOf, eloAgainstText } from "../../shared/src/eloAgainst";
 import {
   Binoculars, CaretLeft, CaretRight, Crosshair, Info, MagnifyingGlass, RocketLaunch, Shield, ShieldCheck, WarningCircle, X
 } from "@phosphor-icons/react";
-import { Fragment, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { Fragment, memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { BetSlipWindow, CartAddMenu, CartButton, type CartPutFeedback } from "./BetCartUI";
 import {
   cartEntryId, cartKey, quickpickCartEntry, requestedTotal, toCartEntry, toCounterCartEntry, useBetCart, useComboSetup,
@@ -9,6 +10,9 @@ import {
 } from "./betCart";
 import { countryFlagCode } from "../../shared/src/countryFlags";
 import { FixtureInsightPanels, InsightsNotice, useFixtureInsights } from "./FixtureInsights";
+import { H2hSnapshotPanel } from "./H2hSnapshot";
+import { LeaguePerfPanel } from "./LeaguePerf";
+import { QuickpickDetail } from "./QuickpickDetail";
 import { useDashboardData } from "../../shared/src/data";
 import { heatmapMarkets } from "./heatmap";
 import { HeatmapTable, type HeatmapSort } from "./HeatmapTable";
@@ -34,11 +38,12 @@ import { FilterButton, FilterChip, FilterMenu, FilterSegment, type ClassGapFilte
 import { MarketProfileView } from "./MarketProfileUI";
 import { BrandMark, NavRail, type NavKey } from "./NavRail";
 import { QuickpickButton, QuickpickChip, QuickpickDialog, QuickpickTableTip, type QuickpickCartFeedback } from "./QuickpickUI";
-import { applyQuickpick, loadQuickpickStore, saveQuickpickStore, settingsOf, withSettings, QUICKPICK_PRESETS, REJECTION_LABELS, presetOf, type QuickpickFilterReport, type QuickpickPresetId, type QuickpickRejection, type QuickpickStore } from "./quickpick";
+import { applyQuickpick, loadQuickpickStore, saveQuickpickStore, settingsOf, withSettings, QUICKPICK_PRESETS, REJECTION_LABELS, presetOf, type QuickpickEvaluation, type QuickpickFilterReport, type QuickpickPresetId, type QuickpickRejection, type QuickpickStore } from "./quickpick";
 import { TeamCrest } from "../../shared/src/TeamCrest";
 import { competitionCountry, competitionLeague, competitionMatches, competitionVariants, countryName, displayTeam, fixtureMatches, leagueName, loadNameSource, NamesContext, saveNameSource, selectionText, teamName, useNames, type NameSource } from "../../shared/src/names";
 import { SettingsButton, SettingsWindow } from "./SettingsUI";
 import { useMarketProfile } from "./marketProfile";
+import { dateFormat } from "./dateFormat";
 import { eloSystemLabel } from "../../../src/elo-config.ts";
 import { gridTemplate, isFirstHalfMarket, isGoalLineMarket, minimumWidth, showsPoints, tableColumns, type TableColumn, type TableColumnId } from "./tableColumns";
 import type { ClassGap, DashboardDocument, DashboardFixture, DashboardMarket, DashboardMarketKey, FormResult, LeagueStats, RecommendationLevel } from "../../shared/src/types";
@@ -177,7 +182,7 @@ const h2hSortLabels: Record<FormResult, { badge: string; label: string }> = {
 };
 
 function berlinDate(value: string, timezone: string): string {
-  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date(value));
+  const parts = dateFormat("en-CA", { timeZone: timezone, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date(value));
   const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((item) => item.type === type)?.value ?? "";
   return `${part("year")}-${part("month")}-${part("day")}`;
 }
@@ -196,15 +201,15 @@ function clampDate(value: string, minimum: string, maximum: string): string {
 }
 
 function formatCalendarDate(value: string, options: Intl.DateTimeFormatOptions = { day: "2-digit", month: "2-digit", year: "numeric" }): string {
-  return new Intl.DateTimeFormat("de-DE", { ...options, timeZone: "UTC" }).format(dateOnly(value));
+  return dateFormat("de-DE", { ...options, timeZone: "UTC" }).format(dateOnly(value));
 }
 
 /** "Di 29.09., 11:00" - das Ende von `next48` im Kartenkopf. */
 function formatRangeEnd(value: number, timezone: string): string {
   const date = new Date(value);
-  const weekday = new Intl.DateTimeFormat("de-DE", { timeZone: timezone, weekday: "short" }).format(date).replace(".", "");
-  const day = new Intl.DateTimeFormat("de-DE", { timeZone: timezone, day: "2-digit", month: "2-digit" }).format(date);
-  const clock = new Intl.DateTimeFormat("de-DE", { timeZone: timezone, hour: "2-digit", minute: "2-digit" }).format(date);
+  const weekday = dateFormat("de-DE", { timeZone: timezone, weekday: "short" }).format(date).replace(".", "");
+  const day = dateFormat("de-DE", { timeZone: timezone, day: "2-digit", month: "2-digit" }).format(date);
+  const clock = dateFormat("de-DE", { timeZone: timezone, hour: "2-digit", minute: "2-digit" }).format(date);
   return `${weekday} ${day}, ${clock}`;
 }
 
@@ -480,8 +485,8 @@ function LeagueFilterModal({ leagues, statsByKey, deselected, search, onSearchCh
 export function kickoffParts(value: string, timezone: string): { clock: string; day: string } {
   const date = new Date(value);
   return {
-    clock: new Intl.DateTimeFormat("de-DE", { timeZone: timezone, hour: "2-digit", minute: "2-digit" }).format(date),
-    day: new Intl.DateTimeFormat("de-DE", { timeZone: timezone, day: "2-digit", month: "2-digit" }).format(date)
+    clock: dateFormat("de-DE", { timeZone: timezone, hour: "2-digit", minute: "2-digit" }).format(date),
+    day: dateFormat("de-DE", { timeZone: timezone, day: "2-digit", month: "2-digit" }).format(date)
   };
 }
 
@@ -494,7 +499,7 @@ export function formatOdd(value: number | null): string {
 }
 
 function formatDataTimestamp(value: string, timezone: string): string {
-  return new Intl.DateTimeFormat("de-DE", { timeZone: timezone, day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }).format(new Date(value));
+  return dateFormat("de-DE", { timeZone: timezone, day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }).format(new Date(value));
 }
 
 const BANNER_STORAGE_KEY = "football-analyzer:banner-dismissed";
@@ -712,7 +717,7 @@ function scoreLine(match: MatchSummary, rename: Rename = SAME_NAME): string {
 function matchDate(match: MatchSummary, timezone: string): string {
   const date = new Date(match.date);
   if (Number.isNaN(date.getTime())) return "";
-  return new Intl.DateTimeFormat("de-DE", { timeZone: timezone, day: "2-digit", month: "2-digit", year: "2-digit" }).format(date);
+  return dateFormat("de-DE", { timeZone: timezone, day: "2-digit", month: "2-digit", year: "2-digit" }).format(date);
 }
 
 function matchDetail(match: MatchSummary | undefined, timezone: string, rename: Rename = SAME_NAME): string {
@@ -841,7 +846,7 @@ function EloTag({ value, team }: { value: DashboardFixture["homeElo"]; team: str
   if (!value) return null;
   const elo = Math.round(value.elo);
   const confidence = Math.round(value.confidence);
-  const stand = new Date(value.asOf).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" });
+  const stand = dateFormat("de-DE", { day: "2-digit", month: "2-digit" }).format(new Date(value.asOf));
   return <small className={confidence < 50 ? "elo-tag unsicher" : "elo-tag"}
     title={`Elo ${elo} (${eloSystemLabel(value.system)}): Stärkewert von ${team} aus den Spielen der letzten fünf Jahre.`
       + ` Vertrauen ${confidence} %, Stand ${stand}. Nur zur Einordnung – geht in keinen Tipp ein.`}>
@@ -1148,6 +1153,14 @@ export function ClassGapBadge({ gap, homeTeam, awayTeam }: { gap: ClassGap; home
   </i>;
 }
 
+/** „Elo dagegen“: Hinweis bei Spielen zwischen Ligen, ändert weder Tipp noch Chance (`eloAgainstOf`). */
+export function EloAgainstBadge({ fixture, homeTeam, awayTeam }: { fixture: DashboardFixture; homeTeam: string; awayTeam: string }) {
+  const hint = eloAgainstOf(fixture);
+  if (!hint) return null;
+  const title = eloAgainstText(hint, homeTeam, awayTeam);
+  return <i className="class-gap" title={title} aria-label={`Elo dagegen: ${title}`}>Elo dagegen</i>;
+}
+
 function EmptyState({ title, text, action }: { title: string; text: string; action?: ReactNode }) {
   return <div className="empty-state">
     <Binoculars size={32} weight="duotone" />
@@ -1193,6 +1206,192 @@ function standingsWindow(table: StandingsRow[], homeTeam: string, awayTeam: stri
   });
   return rows;
 }
+
+/**
+ * Ein Rückruf mit fester Identität, der beim Aufruf immer den neuesten Stand liest. Die Zeilen
+ * sind `memo`; eine Inline-Funktion als Prop zeichnete sonst bei jedem Rendern alle neu.
+ */
+function useStableCallback<Args extends unknown[], Result>(callback: (...args: Args) => Result): (...args: Args) => Result {
+  const ref = useRef(callback);
+  ref.current = callback;
+  return useCallback((...args: Args) => ref.current(...args), []);
+}
+
+/**
+ * Die Uhr der Ansicht, einmal je Minute neu. Vorher war `now` bei jedem Rendern ein anderer
+ * Wert - damit war keine abgeleitete Liste zwischenzuspeichern, und ohne Bedienung blieb er
+ * trotzdem stehen. Jetzt fällt ein angepfiffenes Spiel spätestens nach einer Minute aus
+ * „Nächste 48 Std.“, auch ohne Klick.
+ */
+function useMinuteClock(): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
+  return now;
+}
+
+/** Was für alle Zeilen der Tabelle gleich ist - ein Objekt, damit `memo` es mit einem Vergleich prüft. */
+interface RowView {
+  columns: TableColumn[];
+  gridStyle: CSSProperties;
+  tableWidth: CSSProperties;
+  timezone: string;
+  names: NameSource;
+  marketFilter: MarketFilter;
+  formView: FormView;
+  h2hView: H2hView;
+  overLine: FullTimeOverLine;
+  firstHalfOverLine: FirstHalfOverLine;
+  counterDirection: boolean;
+  showKelly: boolean;
+  /** Das Datum in der Anstoßzelle - nur ohne Tages-Trennzeilen. */
+  showDay: boolean;
+  quickpickPreset: QuickpickPresetId;
+}
+
+/** Die Rückrufe der Zeilen, alle mit fester Identität (`useStableCallback`). */
+interface RowActions {
+  toggleOpen(fixtureId: number): void;
+  openCartMenu(fixtureId: number): void;
+  closeCartMenu(fixtureId: number): void;
+  addToCart(fixture: DashboardFixture, market: DashboardMarket, counterSide: "1" | "2" | null): CartPutFeedback | null;
+  removeFromCart(fixtureId: number, market: DashboardMarket): void;
+}
+
+/**
+ * Eine Zeile der Tabelle. `memo`: Filtermenü, Quickpicker, Suche und Aufklappen zeichneten vorher
+ * jede Zeile neu - bei 700 Spielen 1,5 bis 3 s je Klick (Messung vom 03.11.2026). Jetzt zeichnet
+ * eine Zeile nur neu, wenn sich ihr Spiel, ihr Zustand oder die gemeinsame Ansicht ändert.
+ */
+const FixtureRow = memo(function FixtureRow({ fixture, view, actions, open, cartMenuOpen, cart, started, isPast, quickpickEvaluation }: {
+  fixture: DashboardFixture;
+  view: RowView;
+  actions: RowActions;
+  open: boolean;
+  cartMenuOpen: boolean;
+  cart: CartEntry[];
+  /** Anstoß erreicht: Der Wettschein-Knopf ist gesperrt. */
+  started: boolean;
+  /** Anstoß vorbei: „angepfiffen“ an der Uhrzeit. */
+  isPast: boolean;
+  /** Nur bei aktivem Quickpick-Filter gesetzt. */
+  quickpickEvaluation: QuickpickEvaluation | undefined;
+}) {
+  const { columns, timezone, names: nameSource, marketFilter, formView, h2hView, overLine, firstHalfOverLine, counterDirection, showKelly } = view;
+  const selectedMarketKey: DashboardMarketKey = marketFilter === "all" ? "1x2" : marketFilter;
+  const showFirstHalfExpected = isFirstHalfMarket(marketFilter);
+  // Das Datenvertrauen des gezeigten Marktes; bei „Alle Märkte“ das des Spiels.
+  const dataMarket = marketFilter !== "all" ? marketFor(fixture, selectedMarketKey) : undefined;
+  const time = kickoffParts(fixture.kickoff, timezone);
+  // Nur Anzeige - Vergleiche und Schlüssel bleiben auf den API-Feldern (`names.ts`).
+  const home = teamName(fixture, "home", nameSource);
+  const away = teamName(fixture, "away", nameSource);
+  const place = `${countryName(fixture, nameSource)} · ${leagueName(fixture, nameSource)}`;
+  const rename: Rename = (name) => displayTeam(name, fixture, nameSource);
+  const cells: ReactNode[] = [];
+  for (const column of columns) {
+    switch (column.id) {
+      case "match": cells.push(<span className="fixture-summary-cell" key="match">
+        <span className="teams-cell">
+          <span className="team-name"><TeamCrest name={home} logo={fixture.homeCrest} /><strong>{home}</strong><EloTag value={fixture.homeElo} team={home} /><DefenseShield profile={fixture.defense?.home} team={home} /></span>
+          <span className="team-name"><TeamCrest name={away} logo={fixture.awayCrest} /><strong>{away}</strong><EloTag value={fixture.awayElo} team={away} /><DefenseShield profile={fixture.defense?.away} team={away} /></span>
+        </span>
+        {quickpickEvaluation?.passes && <QuickpickTableTip preset={view.quickpickPreset}
+          row={{ fixture, evaluation: quickpickEvaluation, names: nameSource }} />}
+      </span>); break;
+      case "kickoff": cells.push(<span className="kickoff-cell" key="kickoff">
+        <span className="kickoff-line">
+          <strong>{time.clock}{isPast && <em> angepfiffen</em>}</strong>
+          {fixture.classGap && <ClassGapBadge gap={fixture.classGap} homeTeam={home} awayTeam={away} />}
+          <EloAgainstBadge fixture={fixture} homeTeam={home} awayTeam={away} />
+        </span>
+        {/* Das Datum nur ohne Tages-Trennzeile - sonst stünde es in jeder Zeile doppelt. */}
+        <small className="kickoff-place" title={place}>{view.showDay && `${time.day} · `}<CountryFlag country={fixture.country} /> {place}</small>
+      </span>); break;
+      case "form": cells.push(<span className="form-cell" key="form">
+        {/*
+          * Bei Pokal- und Länderspielen zählt der Lauf die letzten Spiele insgesamt
+          * (src/dashboard.ts setzt dann scope "overall"). "Heim"/"Ausw." hätte dort
+          * eine Trennung nach Ort behauptet, die in den Punkten gar nicht steckt.
+          */}
+        <span
+          className="form-labels"
+          title={fixture.form.scope === "overall"
+            ? `Alle Spiele der letzten Zeit, zu Hause und auswärts zusammen – oben ${home}, unten ${away}`
+            : `Nur die Heimspiele von ${home} gegen die Auswärtsspiele von ${away}`}
+          aria-label={fixture.form.scope === "overall" ? "Form aus allen Spielen" : "Heim- und Auswärtsform"}
+        >
+          {fixture.form.scope === "overall"
+            ? <><small>Alle</small><small>Alle</small></>
+            : <><small>Heim</small><small>Ausw.</small></>}
+        </span>
+        <span>{formView === "outcome"
+          ? <>
+            <FormOutcomeBars team={home} results={fixture.form.home} matches={fixture.form.homeMatches} timezone={timezone} rename={rename} />
+            <FormOutcomeBars team={away} results={fixture.form.away} matches={fixture.form.awayMatches} timezone={timezone} rename={rename} />
+          </>
+          : <>
+            <MatchViewBars subject={home} matches={fixture.form.homeMatches} view={formView} overLine={overLine} firstHalfOverLine={firstHalfOverLine} inverted={counterDirection} rename={rename} />
+            <MatchViewBars subject={away} matches={fixture.form.awayMatches} view={formView} overLine={overLine} firstHalfOverLine={firstHalfOverLine} inverted={counterDirection} rename={rename} />
+          </>}</span>
+      </span>); break;
+      case "h2h": cells.push(<span className="h2h-cell" key="h2h">
+        <H2hBars fixture={fixture} view={h2hView} overLine={overLine} firstHalfOverLine={firstHalfOverLine} inverted={counterDirection} timezone={timezone} />
+        {/* Eine Auffälligkeit, kein Grund für einen Tipp - deshalb grau, nie grün oder gold. */}
+        {fixture.h2hNotice && <small className="h2h-notice" title={`${fixture.h2hNotice} · eine Auffälligkeit, kein Grund für einen Tipp`}>Remis-Serie</small>}
+      </span>); break;
+      case "expected": {
+        const title = `Erwartete Tore laut Modell · ${home} ${goalLabel(fixture.expectedGoals.home)} · ${away} ${goalLabel(fixture.expectedGoals.away)}`;
+        if (showFirstHalfExpected) cells.push(<span className="expected-cell total" key="expected" title={title}>
+          <strong>Σ {goalLabel(fixture.expectedFirstHalfGoals?.total)}</strong><small>Spiel Σ {goalLabel(fixture.expectedGoals.total)}</small>
+        </span>);
+        else if (isGoalLineMarket(marketFilter)) cells.push(<span className="expected-cell total" key="expected" title={title}>
+          <strong>Σ {goalLabel(fixture.expectedGoals.total)}</strong><small>{goalLabel(fixture.expectedGoals.home)} : {goalLabel(fixture.expectedGoals.away)}</small>
+        </span>);
+        else cells.push(<span className="expected-cell" key="expected" title={title}>
+          <strong>{goalLabel(fixture.expectedGoals.home)}</strong><i>:</i><strong>{goalLabel(fixture.expectedGoals.away)}</strong>
+        </span>);
+        break;
+      }
+      case "points": cells.push(<span className="score-cell" key="points">
+        {marketFilter !== "draw" && <span><small>1X2</small><strong>{fixture.scores.favorite ?? "–"}</strong></span>}
+        {marketFilter !== "1x2" && <span><small>X</small><strong>{fixture.scores.draw ?? "–"}</strong></span>}
+      </span>); break;
+      case "shots": cells.push(<RecentStatCell fixture={fixture} field="shotsOnGoal" label="Schüsse aufs Tor" key="shots" />); break;
+      case "market": {
+        const market = marketFor(fixture, selectedMarketKey);
+        cells.push(market
+          ? <MarketCard market={market} showEdge={showKelly} selection={selectionText(fixture, market, nameSource)} key="market" />
+          : <span className="market-card missing" key="market">–</span>);
+        break;
+      }
+      case "recommended": cells.push(<RecommendedMarkets fixture={fixture} key="recommended" />); break;
+      case "data": cells.push(<DataCell fixture={fixture} market={dataMarket} key="data" />); break;
+    }
+  }
+
+  // `cart-open` nimmt die Zeile aus `content-visibility` (styles.css): Das Menü hängt mit
+  // `position: fixed` in der Zeile und würde sonst an ihr abgeschnitten.
+  return <article data-fixture-id={fixture.fixtureId} className={`fixture-wrap level-${bestLevel(fixture, marketFilter)} ${open ? "open" : ""}${cartMenuOpen ? " cart-open" : ""}`} style={view.tableWidth}>
+    <div className="fixture-row-wrap">
+    <CartAddMenu
+      fixture={fixture}
+      cart={cart}
+      open={cartMenuOpen}
+      started={started}
+      onOpen={() => actions.openCartMenu(fixture.fixtureId)}
+      onClose={() => actions.closeCartMenu(fixture.fixtureId)}
+      onSelect={(market, counterSide) => actions.addToCart(fixture, market, counterSide)}
+      onRemove={(market) => actions.removeFromCart(fixture.fixtureId, market)}
+    />
+    <button className="fixture-grid fixture-row" style={view.gridStyle} onClick={() => actions.toggleOpen(fixture.fixtureId)} aria-expanded={open}>
+      {cells}
+    </button>
+    </div>
+  </article>;
+});
 
 function Dashboard({ document }: { document: DashboardDocument }) {
   const [view, setView] = useState<AppView>(loadView);
@@ -1298,16 +1497,28 @@ function Dashboard({ document }: { document: DashboardDocument }) {
   // gespeicherten Tipp - Tipps von vor dem 21.10.2026 tragen keine Tipico-Ereignis-ID.
   const tipicoEventIds = useMemo(() => new Map(document.fixtures.flatMap((fixture) =>
     fixture.tipico?.eventId ? [[fixture.fixtureId, fixture.tipico.eventId] as const] : [])), [document]);
+  // Das Live-Fenster zeigt H2H und Form aus dem Snapshot - nach Fixture-ID, 0 Aufrufe.
+  const fixtureById = useMemo(() => new Map(document.fixtures.map((fixture) => [fixture.fixtureId, fixture] as const)), [document]);
   // Was „Alle n in den Wettschein“ getan hat - der Quickpicker meldet es im Fuß, statt den
   // Wettschein zu öffnen. `changeId` sagt, ob „Rückgängig“ noch genau diesen Schritt zurücknimmt.
   const [cartFeedback, setCartFeedback] = useState<QuickpickCartFeedback | null>(null);
   // Gegensätze ersetzen einander: Beim 1X2 teilen sich Modelltipp und Gegenseite eine Kennung,
   // und Remis verdrängt einen Sieger-Tipp desselben Spiels (`putEntriesInto`).
-  const addFromMenu = (fixture: DashboardFixture, market: DashboardMarket, counterSide: "1" | "2" | null): CartPutFeedback | null => {
+  const addFromMenu = useStableCallback((fixture: DashboardFixture, market: DashboardMarket, counterSide: "1" | "2" | null): CartPutFeedback | null => {
     const entry = counterSide === null ? toCartEntry(fixture, market) : toCounterCartEntry(fixture, market);
     if (!entry) return null;
     return { entry, replaced: putEntry(entry) };
-  };
+  });
+  const removeFromCart = useStableCallback((fixtureId: number, market: DashboardMarket) =>
+    removeEntry(cartEntryId(fixtureId, market.key)));
+  // Fest für alle Zeilen: Die Zustände werden über die Funktionsform gesetzt.
+  const rowActions = useMemo<RowActions>(() => ({
+    toggleOpen: (fixtureId) => setOpenFixture((value) => value === fixtureId ? null : fixtureId),
+    openCartMenu: (fixtureId) => setCartMenuFixtureId(fixtureId),
+    closeCartMenu: (fixtureId) => setCartMenuFixtureId((current) => current === fixtureId ? null : current),
+    addToCart: addFromMenu,
+    removeFromCart
+  }), [addFromMenu, removeFromCart]);
   const watchedFixtureIds = useMemo(() => document.fixtures
     .filter((fixture) => !deselectedLeagues.has(leagueKey(fixture.country, fixture.league)))
     .filter((fixture) => !liveRatedOnly
@@ -1316,7 +1527,7 @@ function Dashboard({ document }: { document: DashboardDocument }) {
     [deselectedLeagues, document, liveRatedOnly]);
   const live = useLiveBoard(view === "live", watchedFixtureIds);
   const marketProfile = useMarketProfile(showKelly && view === "prematch");
-  const now = Date.now();
+  const now = useMinuteClock();
 
   // Eine Zeile je API-Liga (`leagueKey`, daran hängt die gemerkte Abwahl), dazu alle
   // Tipico-Bezeichnungen ihrer Spiele - eine API-Liga kann bei Tipico mehrere Gruppen haben.
@@ -1533,58 +1744,61 @@ function Dashboard({ document }: { document: DashboardDocument }) {
     setSelectingRangeEnd(false);
   };
 
-  const inSelectedRange = (fixture: DashboardFixture): boolean => {
-    const kickoff = Date.parse(fixture.kickoff);
-    if (rangeMode === "next48") {
-      const earliest = showPast ? now - IN_PLAY_LOOKBACK_MS : now;
-      return kickoff >= earliest && kickoff <= now + 48 * 3_600_000;
-    }
-    if (!showPast && kickoff < now) return false;
-    if (!customStart || !customEnd) return false;
-    const localDate = berlinDate(fixture.kickoff, document.meta.timezone);
-    return localDate >= customStart && localDate <= customEnd;
-  };
-
-  const scopedFixtures = document.fixtures.filter((fixture) =>
-    inSelectedRange(fixture) &&
-    (showCrossLeague || !fixture.crossLeague) &&
-    !deselectedLeagues.has(leagueKey(fixture.country, fixture.league)));
-  const counts = {
+  // Die Listen hängen nur an ihren Eingaben (`useMemo`): Ein offenes Menü oder ein Klick auf eine
+  // Zeile rechnet sie nicht neu. `now` ist dafür die Minutenuhr, nicht `Date.now()` je Rendern.
+  const scopedFixtures = useMemo(() => {
+    const inSelectedRange = (fixture: DashboardFixture): boolean => {
+      const kickoff = Date.parse(fixture.kickoff);
+      if (rangeMode === "next48") {
+        const earliest = showPast ? now - IN_PLAY_LOOKBACK_MS : now;
+        return kickoff >= earliest && kickoff <= now + 48 * 3_600_000;
+      }
+      if (!showPast && kickoff < now) return false;
+      if (!customStart || !customEnd) return false;
+      const localDate = berlinDate(fixture.kickoff, document.meta.timezone);
+      return localDate >= customStart && localDate <= customEnd;
+    };
+    return document.fixtures.filter((fixture) =>
+      inSelectedRange(fixture) &&
+      (showCrossLeague || !fixture.crossLeague) &&
+      !deselectedLeagues.has(leagueKey(fixture.country, fixture.league)));
+  }, [document, rangeMode, showPast, now, customStart, customEnd, showCrossLeague, deselectedLeagues]);
+  const counts = useMemo(() => ({
     all: scopedFixtures.length,
     strong: scopedFixtures.filter((fixture) => bestLevel(fixture, marketFilter) === "strong").length,
     recommended: scopedFixtures.filter((fixture) => levelRank[bestLevel(fixture, marketFilter)] >= levelRank.recommended).length
-  };
+  }), [scopedFixtures, marketFilter]);
   // Bewusst aus `scopedFixtures` gerechnet und erst in `filtered` angewandt: In
   // `scopedFixtures` hingen auch die KPI-Zahlen und die Kelly-Auswahl daran. Kelly ist eine
   // eigene Regel mit eigener Rückrechnung und darf von einem Tabellenfilter nicht
   // beschnitten werden.
-  const quickpick = applyQuickpick(quickpickActive ? scopedFixtures : [], quickpickSettings);
+  const quickpick = useMemo(() => applyQuickpick(quickpickActive ? scopedFixtures : [], quickpickSettings),
+    [quickpickActive, scopedFixtures, quickpickSettings]);
   // Eine Rechnung für Kelly-Zeile und Dialog - auf dem Umfang, nicht auf `filtered`.
-  // Ohne useMemo: `scopedFixtures` und `now` entstehen je Render neu, und die Rechnung ist billig.
   // `now` hält angepfiffene Spiele heraus, auch wenn „Laufende / beendete Partien“ sie in der
   // Tabelle zeigt: Ihre Quote stammt von vor dem Anpfiff.
-  const kellySelection = showKelly && view === "prematch"
+  const kellySelection = useMemo(() => showKelly && view === "prematch"
     ? selectKelly(scopedFixtures, marketFilter, kellySettings, kellyAuto, marketProfile.profile, { now })
-    : null;
+    : null, [showKelly, view, scopedFixtures, marketFilter, kellySettings, kellyAuto, marketProfile.profile, now]);
   const quickpickLabel = presetOf(quickpickSettings).label;
+  // Die Tabelle folgt der Suche einen Augenblick später: Das Feld bleibt beim Tippen flüssig, auch
+  // wenn hunderte Zeilen neu gefiltert werden. Das Feld selbst zeigt immer `search`.
+  const deferredSearch = useDeferredValue(search);
   // Die Suche grenzt wie Quickpick und Stufe nur die Tabelle ein, nicht den Umfang - Kelly und die
   // Zähler im Filtermenü bleiben unberührt.
-  const filtered = scopedFixtures.filter((fixture) => {
-    if (!fixtureMatches(fixture, search)) return false;
+  const filtered = useMemo(() => scopedFixtures.filter((fixture) => {
+    if (!fixtureMatches(fixture, deferredSearch)) return false;
     if (quickpickActive && !quickpick.passing.has(fixture.fixtureId)) return false;
     if (classGapFilter === "only" && !fixture.classGap) return false;
     if (classGapFilter === "hide" && fixture.classGap) return false;
     const level = bestLevel(fixture, marketFilter);
     return levelFilter === "all" || (levelFilter === "strong" ? level === "strong" : levelRank[level] >= levelRank.recommended);
-  });
+  }), [scopedFixtures, deferredSearch, quickpickActive, quickpick, classGapFilter, levelFilter, marketFilter]);
+  const tableFixtureIds = useMemo(() => new Set(filtered.map((fixture) => fixture.fixtureId)), [filtered]);
 
   const heatmap = layout === "heatmap";
-  const columns = tableColumns(marketFilter);
+  const columns = useMemo(() => tableColumns(marketFilter), [marketFilter]);
   const selectedMarketKey: DashboardMarketKey = marketFilter === "all" ? "1x2" : marketFilter;
-  // Das Datenvertrauen des gezeigten Marktes; bei „Alle Märkte“ das des Spiels.
-  const dataMarketOf = (fixture: DashboardFixture): DashboardMarket | undefined =>
-    marketFilter !== "all" ? marketFor(fixture, selectedMarketKey) : undefined;
-  const confidenceOf = (fixture: DashboardFixture): number => dataMarketOf(fixture)?.confidence ?? fixture.dataConfidence;
   // Sortierbar ist nur, was zu sehen ist. Eine gemerkte Wahl auf eine ausgeblendete Spalte fällt
   // auf den Anstoß zurück, wird aber nicht überschrieben - beim Zurückwechseln ist sie wieder da.
   const sortableKeys: SortKey[] = heatmap
@@ -1593,30 +1807,36 @@ function Dashboard({ document }: { document: DashboardDocument }) {
   const effectiveSortKey: SortKey = sortableKeys.includes(sortKey) ? sortKey : "kickoff";
   const effectiveDirection: 1 | -1 = effectiveSortKey === sortKey ? sortDirection : 1;
 
-  const sortedFixtures = [...filtered].sort((left, right) => {
-    const byKickoff = Date.parse(left.kickoff) - Date.parse(right.kickoff);
-    let comparison = 0;
-    if (effectiveSortKey === "kickoff") comparison = byKickoff;
-    else if (effectiveSortKey === "league") comparison = `${countryName(left, nameSource)} ${leagueName(left, nameSource)}`.localeCompare(`${countryName(right, nameSource)} ${leagueName(right, nameSource)}`, "de");
-    else if (effectiveSortKey === "team") comparison = `${teamName(left, "home", nameSource)} ${teamName(left, "away", nameSource)}`.localeCompare(`${teamName(right, "home", nameSource)} ${teamName(right, "away", nameSource)}`, "de");
-    else if (effectiveSortKey === "expected") {
-      const firstHalf = isFirstHalfMarket(marketFilter);
-      comparison = (firstHalf ? left.expectedFirstHalfGoals?.total ?? -1 : left.expectedGoals.total) -
-        (firstHalf ? right.expectedFirstHalfGoals?.total ?? -1 : right.expectedGoals.total);
-    }
-    else if (effectiveSortKey === "shots") comparison = recentSortValue(left, "shotsOnGoal") - recentSortValue(right, "shotsOnGoal");
-    else if (effectiveSortKey === "corners") comparison = recentSortValue(left, "corners") - recentSortValue(right, "corners");
-    else if (effectiveSortKey === "score") comparison = (marketFilter === "draw" ? left.scores.draw ?? -1 : left.scores.favorite ?? -1) - (marketFilter === "draw" ? right.scores.draw ?? -1 : right.scores.favorite ?? -1);
-    else if (effectiveSortKey === "market") comparison = (marketFor(left, selectedMarketKey)?.probability ?? -1) - (marketFor(right, selectedMarketKey)?.probability ?? -1);
-    else if (effectiveSortKey === "confidence") comparison = confidenceOf(left) - confidenceOf(right);
-    else if (effectiveSortKey === "form" || effectiveSortKey === "h2h") {
-      comparison = columnComparison(effectiveSortKey, left, right, formView, h2hView, formSortMode, h2hSortMode, overLine, firstHalfOverLine, counterDirection);
-      if (comparison === 0 && secondarySortKey) {
-        comparison = columnComparison(secondarySortKey, left, right, formView, h2hView, formSortMode, h2hSortMode, overLine, firstHalfOverLine, counterDirection);
+  const sortedFixtures = useMemo(() => {
+    // Das Datenvertrauen des gezeigten Marktes; bei „Alle Märkte“ das des Spiels.
+    const confidenceOf = (fixture: DashboardFixture): number =>
+      (marketFilter !== "all" ? marketFor(fixture, selectedMarketKey)?.confidence : undefined) ?? fixture.dataConfidence;
+    return [...filtered].sort((left, right) => {
+      const byKickoff = Date.parse(left.kickoff) - Date.parse(right.kickoff);
+      let comparison = 0;
+      if (effectiveSortKey === "kickoff") comparison = byKickoff;
+      else if (effectiveSortKey === "league") comparison = `${countryName(left, nameSource)} ${leagueName(left, nameSource)}`.localeCompare(`${countryName(right, nameSource)} ${leagueName(right, nameSource)}`, "de");
+      else if (effectiveSortKey === "team") comparison = `${teamName(left, "home", nameSource)} ${teamName(left, "away", nameSource)}`.localeCompare(`${teamName(right, "home", nameSource)} ${teamName(right, "away", nameSource)}`, "de");
+      else if (effectiveSortKey === "expected") {
+        const firstHalf = isFirstHalfMarket(marketFilter);
+        comparison = (firstHalf ? left.expectedFirstHalfGoals?.total ?? -1 : left.expectedGoals.total) -
+          (firstHalf ? right.expectedFirstHalfGoals?.total ?? -1 : right.expectedGoals.total);
       }
-    }
-    return comparison * effectiveDirection || byKickoff;
-  });
+      else if (effectiveSortKey === "shots") comparison = recentSortValue(left, "shotsOnGoal") - recentSortValue(right, "shotsOnGoal");
+      else if (effectiveSortKey === "corners") comparison = recentSortValue(left, "corners") - recentSortValue(right, "corners");
+      else if (effectiveSortKey === "score") comparison = (marketFilter === "draw" ? left.scores.draw ?? -1 : left.scores.favorite ?? -1) - (marketFilter === "draw" ? right.scores.draw ?? -1 : right.scores.favorite ?? -1);
+      else if (effectiveSortKey === "market") comparison = (marketFor(left, selectedMarketKey)?.probability ?? -1) - (marketFor(right, selectedMarketKey)?.probability ?? -1);
+      else if (effectiveSortKey === "confidence") comparison = confidenceOf(left) - confidenceOf(right);
+      else if (effectiveSortKey === "form" || effectiveSortKey === "h2h") {
+        comparison = columnComparison(effectiveSortKey, left, right, formView, h2hView, formSortMode, h2hSortMode, overLine, firstHalfOverLine, counterDirection);
+        if (comparison === 0 && secondarySortKey) {
+          comparison = columnComparison(secondarySortKey, left, right, formView, h2hView, formSortMode, h2hSortMode, overLine, firstHalfOverLine, counterDirection);
+        }
+      }
+      return comparison * effectiveDirection || byKickoff;
+    });
+  }, [filtered, effectiveSortKey, effectiveDirection, nameSource, marketFilter, selectedMarketKey, formView, h2hView,
+    formSortMode, h2hSortMode, overLine, firstHalfOverLine, counterDirection, secondarySortKey]);
 
   const cyclePairMode = (key: "form" | "h2h") => {
     if (key === "form") setFormSortMode((value) => (value + 1) % 3);
@@ -1689,8 +1909,9 @@ function Dashboard({ document }: { document: DashboardDocument }) {
   }, []);
   const showFirstHalfExpected = isFirstHalfMarket(marketFilter);
   // Raster und Mindestbreite kommen aus derselben Spaltenliste (tableColumns.ts).
-  const tableWidth = { "--table-min-width": `${minimumWidth(columns)}px` } as CSSProperties;
-  const gridStyle = { ...tableWidth, gridTemplateColumns: gridTemplate(columns) } as CSSProperties;
+  // Fest je Spaltenliste - die Zeilen sind `memo` und vergleichen die Objekte, nicht ihren Inhalt.
+  const tableWidth = useMemo(() => ({ "--table-min-width": `${minimumWidth(columns)}px` } as CSSProperties), [columns]);
+  const gridStyle = useMemo(() => ({ ...tableWidth, gridTemplateColumns: gridTemplate(columns) } as CSSProperties), [tableWidth, columns]);
   const fixtureGridClass = "fixture-grid";
   const activeSortDirection = heatmap && heatmapSort ? heatmapSort.direction : effectiveDirection;
   const flipSortDirection = () => {
@@ -1715,8 +1936,8 @@ function Dashboard({ document }: { document: DashboardDocument }) {
   const sortOptions: Array<[SortKey, string]> = SORT_ORDER
     .filter((key) => sortableKeys.includes(key))
     .map((key) => [key, sortLabels[key]]);
-  const heatmapColumns = heatmapMarkets(marketFilter).map((key) =>
-    ({ key, label: MARKET_OPTIONS.find((option) => option.key === key)?.label ?? key }));
+  const heatmapColumns = useMemo(() => heatmapMarkets(marketFilter).map((key) =>
+    ({ key, label: MARKET_OPTIONS.find((option) => option.key === key)?.label ?? key })), [marketFilter]);
   const emptyState = search.trim() !== ""
     ? <EmptyState title={`Kein Spiel passt zu „${search.trim()}“`}
         text="Gesucht wird in Mannschaften, Wettbewerb und Land – unter den Spielen, die die übrigen Filter zeigen."
@@ -1900,6 +2121,9 @@ function Dashboard({ document }: { document: DashboardDocument }) {
     <QuickpickButton buttonRef={quickpickButtonRef} active={quickpickActive} open={quickpickOpen}
       onToggle={() => (quickpickOpen ? setQuickpickOpen(false) : openQuickpick())} />
     {quickpickOpen && <QuickpickDialog
+      renderDetail={(fixture) => <QuickpickDetail key={fixture.fixtureId} fixture={fixture} fixtures={document.fixtures}
+        home={teamName(fixture, "home", nameSource)} away={teamName(fixture, "away", nameSource)}
+        league={leagueName(fixture, nameSource)} timezone={document.meta.timezone} />}
       fixtures={scopedFixtures}
       store={quickpickStore}
       active={quickpickActive}
@@ -1917,7 +2141,7 @@ function Dashboard({ document }: { document: DashboardDocument }) {
         removeEntry(id);
         setCartFeedback(null);
       }}
-      tableFixtureIds={new Set(filtered.map((fixture) => fixture.fixtureId))}
+      tableFixtureIds={tableFixtureIds}
       onShowInTable={(fixtureId) => {
         // Der Filter bleibt an - „zeigen“ heißt die gefilterte Tabelle, mit Spiel aufgeklappt
         // (lädt wie ein Klick auf die Zeile einmalig die Detailkennzahlen). Ohne Spiel geht der
@@ -2127,104 +2351,32 @@ function Dashboard({ document }: { document: DashboardDocument }) {
     }
   };
 
-  const rowCells = (fixture: DashboardFixture, showDay: boolean): ReactNode[] => {
-    const time = kickoffParts(fixture.kickoff, document.meta.timezone);
-    // Nur Anzeige - Vergleiche und Schlüssel bleiben auf den API-Feldern (`names.ts`).
-    const home = teamName(fixture, "home", nameSource);
-    const away = teamName(fixture, "away", nameSource);
-    const place = `${countryName(fixture, nameSource)} · ${leagueName(fixture, nameSource)}`;
-    const rename: Rename = (name) => displayTeam(name, fixture, nameSource);
-    const isPast = Date.parse(fixture.kickoff) < now;
-    const quickpickEvaluation = quickpickActive ? quickpick.evaluations.get(fixture.fixtureId) : undefined;
-    const cells: ReactNode[] = [];
-    for (const column of columns) {
-      switch (column.id) {
-        case "match": cells.push(<span className="fixture-summary-cell" key="match">
-          <span className="teams-cell">
-            <span className="team-name"><TeamCrest name={home} logo={fixture.homeCrest} /><strong>{home}</strong><EloTag value={fixture.homeElo} team={home} /><DefenseShield profile={fixture.defense?.home} team={home} /></span>
-            <span className="team-name"><TeamCrest name={away} logo={fixture.awayCrest} /><strong>{away}</strong><EloTag value={fixture.awayElo} team={away} /><DefenseShield profile={fixture.defense?.away} team={away} /></span>
-          </span>
-          {quickpickEvaluation?.passes && <QuickpickTableTip preset={quickpickSettings.preset}
-            row={{ fixture, evaluation: quickpickEvaluation, names: nameSource }} />}
-        </span>); break;
-        case "kickoff": cells.push(<span className="kickoff-cell" key="kickoff">
-          <span className="kickoff-line">
-            <strong>{time.clock}{isPast && <em> angepfiffen</em>}</strong>
-            {fixture.classGap && <ClassGapBadge gap={fixture.classGap} homeTeam={home} awayTeam={away} />}
-          </span>
-          {/* Das Datum nur ohne Tages-Trennzeile - sonst stünde es in jeder Zeile doppelt. */}
-          <small className="kickoff-place" title={place}>{showDay && `${time.day} · `}<CountryFlag country={fixture.country} /> {place}</small>
-        </span>); break;
-        case "form": cells.push(<span className="form-cell" key="form">
-          {/*
-            * Bei Pokal- und Länderspielen zählt der Lauf die letzten Spiele insgesamt
-            * (src/dashboard.ts setzt dann scope "overall"). "Heim"/"Ausw." hätte dort
-            * eine Trennung nach Ort behauptet, die in den Punkten gar nicht steckt.
-            */}
-          <span
-            className="form-labels"
-            title={fixture.form.scope === "overall"
-              ? `Alle Spiele der letzten Zeit, zu Hause und auswärts zusammen – oben ${home}, unten ${away}`
-              : `Nur die Heimspiele von ${home} gegen die Auswärtsspiele von ${away}`}
-            aria-label={fixture.form.scope === "overall" ? "Form aus allen Spielen" : "Heim- und Auswärtsform"}
-          >
-            {fixture.form.scope === "overall"
-              ? <><small>Alle</small><small>Alle</small></>
-              : <><small>Heim</small><small>Ausw.</small></>}
-          </span>
-          <span>{formView === "outcome"
-            ? <>
-              <FormOutcomeBars team={home} results={fixture.form.home} matches={fixture.form.homeMatches} timezone={document.meta.timezone} rename={rename} />
-              <FormOutcomeBars team={away} results={fixture.form.away} matches={fixture.form.awayMatches} timezone={document.meta.timezone} rename={rename} />
-            </>
-            : <>
-              <MatchViewBars subject={home} matches={fixture.form.homeMatches} view={formView} overLine={overLine} firstHalfOverLine={firstHalfOverLine} inverted={counterDirection} rename={rename} />
-              <MatchViewBars subject={away} matches={fixture.form.awayMatches} view={formView} overLine={overLine} firstHalfOverLine={firstHalfOverLine} inverted={counterDirection} rename={rename} />
-            </>}</span>
-        </span>); break;
-        case "h2h": cells.push(<span className="h2h-cell" key="h2h">
-          <H2hBars fixture={fixture} view={h2hView} overLine={overLine} firstHalfOverLine={firstHalfOverLine} inverted={counterDirection} timezone={document.meta.timezone} />
-          {/* Eine Auffälligkeit, kein Grund für einen Tipp - deshalb grau, nie grün oder gold. */}
-          {fixture.h2hNotice && <small className="h2h-notice" title={`${fixture.h2hNotice} · eine Auffälligkeit, kein Grund für einen Tipp`}>Remis-Serie</small>}
-        </span>); break;
-        case "expected": {
-          const title = `Erwartete Tore laut Modell · ${home} ${goalLabel(fixture.expectedGoals.home)} · ${away} ${goalLabel(fixture.expectedGoals.away)}`;
-          if (showFirstHalfExpected) cells.push(<span className="expected-cell total" key="expected" title={title}>
-            <strong>Σ {goalLabel(fixture.expectedFirstHalfGoals?.total)}</strong><small>Spiel Σ {goalLabel(fixture.expectedGoals.total)}</small>
-          </span>);
-          else if (isGoalLineMarket(marketFilter)) cells.push(<span className="expected-cell total" key="expected" title={title}>
-            <strong>Σ {goalLabel(fixture.expectedGoals.total)}</strong><small>{goalLabel(fixture.expectedGoals.home)} : {goalLabel(fixture.expectedGoals.away)}</small>
-          </span>);
-          else cells.push(<span className="expected-cell" key="expected" title={title}>
-            <strong>{goalLabel(fixture.expectedGoals.home)}</strong><i>:</i><strong>{goalLabel(fixture.expectedGoals.away)}</strong>
-          </span>);
-          break;
-        }
-        case "points": cells.push(<span className="score-cell" key="points">
-          {marketFilter !== "draw" && <span><small>1X2</small><strong>{fixture.scores.favorite ?? "–"}</strong></span>}
-          {marketFilter !== "1x2" && <span><small>X</small><strong>{fixture.scores.draw ?? "–"}</strong></span>}
-        </span>); break;
-        case "shots": cells.push(<RecentStatCell fixture={fixture} field="shotsOnGoal" label="Schüsse aufs Tor" key="shots" />); break;
-        case "market": {
-          const market = marketFor(fixture, selectedMarketKey);
-          cells.push(market
-            ? <MarketCard market={market} showEdge={showKelly} selection={selectionText(fixture, market, nameSource)} key="market" />
-            : <span className="market-card missing" key="market">–</span>);
-          break;
-        }
-        case "recommended": cells.push(<RecommendedMarkets fixture={fixture} key="recommended" />); break;
-        case "data": cells.push(<DataCell fixture={fixture} market={dataMarketOf(fixture)} key="data" />); break;
-      }
-    }
-    return cells;
-  };
-
   // Trennzeilen je Tag nur, wenn nach Anstoß sortiert ist - in beide Richtungen. Der Tag kommt
   // aus der Berliner Zeit, nicht aus UTC; angepfiffene Spiele gehören zu ihrem Tag.
   const groupedByDay = effectiveSortKey === "kickoff";
-  const dayOf = (fixture: DashboardFixture) => berlinDate(fixture.kickoff, document.meta.timezone);
-  const dayCounts = new Map<string, number>();
-  for (const fixture of sortedFixtures) dayCounts.set(dayOf(fixture), (dayCounts.get(dayOf(fixture)) ?? 0) + 1);
+  const { dayOf, dayCounts } = useMemo(() => {
+    const days = new Map(sortedFixtures.map((fixture) => [fixture.fixtureId, berlinDate(fixture.kickoff, document.meta.timezone)]));
+    const counts = new Map<string, number>();
+    for (const day of days.values()) counts.set(day, (counts.get(day) ?? 0) + 1);
+    return { dayOf: (fixture: DashboardFixture) => days.get(fixture.fixtureId)!, dayCounts: counts };
+  }, [sortedFixtures, document.meta.timezone]);
+  const rowView = useMemo<RowView>(() => ({
+    columns, gridStyle, tableWidth, timezone: document.meta.timezone, names: nameSource, marketFilter, formView, h2hView,
+    overLine, firstHalfOverLine, counterDirection, showKelly, showDay: !groupedByDay, quickpickPreset: quickpickSettings.preset
+  }), [columns, gridStyle, tableWidth, document.meta.timezone, nameSource, marketFilter, formView, h2hView,
+    overLine, firstHalfOverLine, counterDirection, showKelly, groupedByDay, quickpickSettings.preset]);
+  // Das Wettschein-Menü der Heatmap; fest, solange sich Wettschein und Uhr nicht ändern.
+  const heatmapCartSlot = useCallback((fixture: DashboardFixture, menuOpen: boolean) => <CartAddMenu
+    compact
+    fixture={fixture}
+    cart={cart}
+    open={menuOpen}
+    started={Date.parse(fixture.kickoff) <= now}
+    onOpen={() => rowActions.openCartMenu(fixture.fixtureId)}
+    onClose={() => rowActions.closeCartMenu(fixture.fixtureId)}
+    onSelect={(market, counterSide) => rowActions.addToCart(fixture, market, counterSide)}
+    onRemove={(market) => rowActions.removeFromCart(fixture.fixtureId, market)}
+  />, [cart, now, rowActions]);
   const dayLabel = (day: string) => `${formatCalendarDate(day, { weekday: "short" }).replace(".", "")} ${formatCalendarDate(day, { day: "2-digit", month: "2-digit" })}`;
 
   // Unten in der Leiste, über dem abgedunkelten Hintergrund wie Filter und Wettschein (z-index 41).
@@ -2306,18 +2458,9 @@ function Dashboard({ document }: { document: DashboardDocument }) {
         now={now}
         showEdge={showKelly}
         openFixture={openFixture}
-        onToggleFixture={(fixtureId) => setOpenFixture((value) => value === fixtureId ? null : fixtureId)}
-        cartSlot={(fixture) => <CartAddMenu
-          compact
-          fixture={fixture}
-          cart={cart}
-          open={cartMenuFixtureId === fixture.fixtureId}
-          started={Date.parse(fixture.kickoff) <= now}
-          onOpen={() => setCartMenuFixtureId(fixture.fixtureId)}
-          onClose={() => setCartMenuFixtureId((current) => current === fixture.fixtureId ? null : current)}
-          onSelect={(market, counterSide) => addFromMenu(fixture, market, counterSide)}
-          onRemove={(market) => removeEntry(cartEntryId(fixture.fixtureId, market.key))}
-        />}
+        cartMenuFixture={cartMenuFixtureId}
+        onToggleFixture={rowActions.toggleOpen}
+        cartSlot={heatmapCartSlot}
         empty={emptyState}
       /> : <div className="table-scroll">
         <div className={`table-head ${fixtureGridClass}`} style={gridStyle} data-columns={columns.map((column) => column.id).join(" ")}>
@@ -2334,23 +2477,10 @@ function Dashboard({ document }: { document: DashboardDocument }) {
               {divider && <div className="day-divider" style={tableWidth}>
                 <h3>{dayLabel(day)}</h3><span>{count} {count === 1 ? "Spiel" : "Spiele"}</span>
               </div>}
-              <article data-fixture-id={fixture.fixtureId} className={`fixture-wrap level-${bestLevel(fixture, marketFilter)} ${openFixture === fixture.fixtureId ? "open" : ""}`} style={tableWidth}>
-                <div className="fixture-row-wrap">
-                <CartAddMenu
-                  fixture={fixture}
-                  cart={cart}
-                  open={cartMenuFixtureId === fixture.fixtureId}
-                  started={Date.parse(fixture.kickoff) <= now}
-                  onOpen={() => setCartMenuFixtureId(fixture.fixtureId)}
-                  onClose={() => setCartMenuFixtureId((current) => current === fixture.fixtureId ? null : current)}
-                  onSelect={(market, counterSide) => addFromMenu(fixture, market, counterSide)}
-                  onRemove={(market) => removeEntry(cartEntryId(fixture.fixtureId, market.key))}
-                />
-                <button className={`${fixtureGridClass} fixture-row`} style={gridStyle} onClick={() => setOpenFixture((value) => value === fixture.fixtureId ? null : fixture.fixtureId)} aria-expanded={openFixture === fixture.fixtureId}>
-                  {rowCells(fixture, !groupedByDay)}
-                </button>
-                </div>
-              </article>
+              <FixtureRow fixture={fixture} view={rowView} actions={rowActions}
+                open={openFixture === fixture.fixtureId} cartMenuOpen={cartMenuFixtureId === fixture.fixtureId} cart={cart}
+                started={Date.parse(fixture.kickoff) <= now} isPast={Date.parse(fixture.kickoff) < now}
+                quickpickEvaluation={quickpickActive ? quickpick.evaluations.get(fixture.fixtureId) : undefined} />
             </Fragment>;
           });
         })()}
@@ -2365,6 +2495,7 @@ function Dashboard({ document }: { document: DashboardDocument }) {
         const loading = insights.status === "loading";
         const home = teamName(fixture, "home", nameSource);
         const away = teamName(fixture, "away", nameSource);
+        const leaguePerf = <LeaguePerfPanel fixture={fixture} fixtures={document.fixtures} homeName={home} awayName={away} />;
         return <aside className="fixture-detail-panel" aria-label="Details">
               <header className="fixture-detail-head">
                 <span className="fixture-detail-teams">
@@ -2385,32 +2516,10 @@ function Dashboard({ document }: { document: DashboardDocument }) {
                 : <>
               {detailed
                 ? <FixtureInsightPanels insights={insights.insights} timezone={document.meta.timezone}
-                  homeName={home} awayName={away} leagueName={leagueName(fixture, nameSource)} />
-                : <section className="insight-panel"><h3>Direkte Begegnungen</h3><InsightsNotice state={insights} />{fixture.h2h.matches.length
-                ? <ul className="h2h-match-list">{fixture.h2h.matches.map((match, index) => {
-                    const outcome = fixture.h2h.outcomes[index];
-                    const hasHalfTime = typeof match.halfTimeHomeGoals === "number" && typeof match.halfTimeAwayGoals === "number";
-                    const homeTeamWasHome = match.homeTeam === fixture.homeTeam;
-                    const currentHomeGoals = homeTeamWasHome ? match.homeGoals : match.awayGoals;
-                    const currentAwayGoals = homeTeamWasHome ? match.awayGoals : match.homeGoals;
-                    const currentHalfHomeGoals = homeTeamWasHome ? match.halfTimeHomeGoals : match.halfTimeAwayGoals;
-                    const currentHalfAwayGoals = homeTeamWasHome ? match.halfTimeAwayGoals : match.halfTimeHomeGoals;
-                    return <li className={`h2h-match-row ${outcome ?? ""}`} key={`${match.date}-${match.homeTeam}`}>
-                      <span className="h2h-match-date">{new Intl.DateTimeFormat("de-DE", { timeZone: document.meta.timezone, day: "2-digit", month: "2-digit", year: "numeric" }).format(new Date(match.date))}</span>
-                      <span className="h2h-match-teams">
-                        <span className="home">{home}</span>
-                        <span className="h2h-match-score">
-                          <strong className={outcome === "win" ? "home" : outcome === "loss" ? "lose" : ""}>{currentHomeGoals}</strong>
-                          <i>:</i>
-                          <strong className={outcome === "loss" ? "away" : outcome === "win" ? "lose" : ""}>{currentAwayGoals}</strong>
-                        </span>
-                        <span className="away">{away}</span>
-                      </span>
-                      <span className="h2h-match-venue" title={homeTeamWasHome ? `${home} spielte zu Hause` : `${home} spielte auswärts`}>{homeTeamWasHome ? "H" : "A"}</span>
-                      {hasHalfTime && <span className="h2h-match-half">HZ {currentHalfHomeGoals}:{currentHalfAwayGoals}</span>}
-                    </li>;
-                  })}</ul>
-                : <p>Keine H2H-Ergebnisse verfügbar.</p>}</section>}
+                  homeName={home} awayName={away} leagueName={leagueName(fixture, nameSource)} afterH2h={leaguePerf} />
+                : <H2hSnapshotPanel fixture={fixture} home={home} away={away} timezone={document.meta.timezone}
+                  notice={<InsightsNotice state={insights} />} />}
+              {!detailed && leaguePerf}
               {showTable && <section className="insight-panel"><h3>Ligatabelle</h3>
                 <table className="standings-table" aria-label="Ligatabelle">
                   <thead><tr><th>Pl.</th><th>Team</th><th>Sp</th><th>+/-</th><th>Pkt</th></tr></thead>
@@ -2444,6 +2553,7 @@ function Dashboard({ document }: { document: DashboardDocument }) {
       <LiveView
         state={live}
         matches={liveVisible}
+        fixtures={fixtureById}
         runningCount={liveMatches.length}
         question={liveQuestion}
         onResetFilters={resetFilters}

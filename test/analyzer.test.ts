@@ -418,6 +418,27 @@ test("Remis-End-to-End-Analyse schaltet Pokalspiele auf Cross-League um", async 
   assert.equal(strengthCatalogCalls, 1);
   assert.equal(goals.strengthReload?.competitions, 1);
   assert.equal(goals.strengthReload?.budget, 300);
+  // Ein Wettbewerb ohne Spieltage hat keine Tabelle: Dann trägt das Spiel die Heimatliga jedes Teams.
+  assert.equal(goals.rows[0]?.tournamentStandings, undefined);
+  const own = goals.rows[0]?.domesticStandings;
+  assert.equal(own?.home?.row.id, 1);
+  assert.equal(own?.home?.competition, "Germany|Bundesliga");
+  assert.equal(own?.away?.row.id, 2);
+  assert.equal(own?.away?.competition, "Switzerland|Super League");
+  assert.ok((own?.home?.row.played ?? 0) > 0);
+
+  // Belastbare Ligastärke beider Seiten: Die laufende Saison lädt trotzdem nach (seit 04.11.2026,
+  // bis dahin fehlten alle Oktober-Spiele der Champions League).
+  database.replaceLeagueStrength([78, 207].map((leagueId) => ({
+    pool: "uefa", leagueId, season: 2026, asOf: "2026-07-01T00:00:00.000Z", rating: 1600, matches: 40, clubs: 6, reliable: true
+  })));
+  const reliable = await runGoalLineAnalysis({
+    selections: [{ country: "World", league: "UEFA Europa League" }],
+    markets: ["draw"],
+    dates: "both"
+  }, { client: fake, database, now: target });
+  assert.equal(strengthCatalogCalls, 2);
+  assert.equal(reliable.strengthReload?.competitions, 1);
   database.close();
 });
 

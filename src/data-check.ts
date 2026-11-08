@@ -24,6 +24,11 @@ import { teamNameSimilarity } from "./team-resolver.ts";
  *   von 300 Spielen als vollständig.
  * - **Ligastärke geschätzt** (`strengthGaps`): Bei Etar fehlten 24 von 31 Duellen (19.10.2026).
  *   Die Regel zeigt, wie weit eine geschätzte Liga von der Belastbarkeit entfernt ist.
+ * - **Ligastärke-Duelle fehlen** (`strengthDuelGaps`): Seit Oktober fehlten alle 45 Spiele der Champions
+ *   League (04.11.2026, AEK - Real), Griechenland stand vor Spanien. Die Analyse lud nur nach, wenn eine
+ *   Seite nicht belastbar war, und die Regel „geschätzt“ sieht nur solche Seiten - eine belastbare, aber
+ *   veraltete Bewertung fiel niemandem auf. Bekannt war das seit 05.10.2026 und wurde damals nur einmalig
+ *   nachgeladen. Ein Spiel zählt, wenn beide Teams eine verschiedene Heimatliga haben, also ein Duell ist.
  * - **Tore beim falschen Team** (`goalSideMismatches`): Bis 02.11.2026 schrieb `goalEventsDetailed`
  *   jedes Eigentor dem falschen Team gut - API-Football führt es schon unter der begünstigten
  *   Mannschaft. 2.615 der 2.800 „lückenhaften“ Spiele in `fixture_results` waren solche, und die
@@ -61,6 +66,8 @@ const CANDIDATE_MIN_SIMILARITY = 0.5;
 /** Eine Saison gilt als lückenhaft unter diesem Anteil des Medians der übrigen Saisons der Liga. */
 const SEASON_MIN_SHARE = 0.6;
 const SEASON_MIN_MEDIAN = 40;
+/** Ein einzelnes fehlendes Duell kann eine Verlegung sein, ab drei ist es eine Lücke. */
+const STRENGTH_GAP_MIN_MISSING = 3;
 
 /**
  * Saisons, die wirklich kurz waren - nachgeprüft, nicht vermutet. Eine Saison, die nach dem
@@ -344,6 +351,39 @@ export function strengthGaps(
     }
   }
   return gaps;
+}
+
+export interface StrengthDuelRow {
+  competition: string;
+  season: number;
+  kickoff: number;
+  stored: boolean;
+}
+
+export interface StrengthDuelGap {
+  competition: string;
+  season: number;
+  missing: number;
+  total: number;
+  lastKickoff: number;
+}
+
+/** Wettbewerbe, bei denen gespielte Duelle zwischen Ligen nicht in `strength_matches` angekommen sind. */
+export function strengthDuelGaps(rows: StrengthDuelRow[]): StrengthDuelGap[] {
+  const byCompetition = new Map<string, StrengthDuelGap>();
+  for (const row of rows) {
+    const key = `${row.competition}|${row.season}`;
+    const gap = byCompetition.get(key) ?? { competition: row.competition, season: row.season, missing: 0, total: 0, lastKickoff: 0 };
+    gap.total += 1;
+    if (!row.stored) {
+      gap.missing += 1;
+      gap.lastKickoff = Math.max(gap.lastKickoff, row.kickoff);
+    }
+    byCompetition.set(key, gap);
+  }
+  return [...byCompetition.values()]
+    .filter((gap) => gap.missing >= STRENGTH_GAP_MIN_MISSING)
+    .sort((left, right) => right.missing - left.missing);
 }
 
 // ---------------------------------------------------------------- Abrechnung

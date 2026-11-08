@@ -517,8 +517,8 @@ test("homeShift hebt den Heimsieg, ohne die Torlinien zu ändern", () => {
     (shifted.expectedHomeGoals + shifted.expectedAwayGoals) - (plain.expectedHomeGoals + plain.expectedAwayGoals)
   ) < 1e-9);
 
-  assert.equal(config.goalLineHomeShift, 0, "eingeschaltet wird erst nach der BTTS-Prüfung");
-  assert.deepEqual(analyzeFixture(upcoming, history(base), history(base), { homeShift: config.goalLineHomeShift }), plain);
+  assert.equal(config.goalLineHomeShift, 0.054, "seit 3.8.0 eingeschaltet, jede Änderung erhöht die Modellversion");
+  assert.deepEqual(analyzeFixture(upcoming, history(base), history(base), { homeShift: config.goalLineHomeShift }), shifted);
 });
 
 test("marketDetail passt zu Torlinien und 1X2 derselben Torerwartung", () => {

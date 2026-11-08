@@ -588,7 +588,43 @@ const KOMBI_COLUMNS: QuickpickColumn[] = [
   }
 ];
 
+/** Tabellentrend als „6. · +4 in 10“; positiv heißt Plätze gewonnen. */
+function trendText(side: { place: number; delta5: number; delta10: number }): string {
+  const sign = (v: number) => (v > 0 ? `+${v}` : v < 0 ? `−${-v}` : "0");
+  return `${side.place}. · ${sign(side.delta5)} in 5 · ${sign(side.delta10)} in 10`;
+}
+
+/** Die Spalten von „Daves Table-Filter“: Trend der getippten und der abrutschenden Mannschaft. */
+const DAVES_TABLE_COLUMNS: QuickpickColumn[] = [
+  partie,
+  {
+    key: "tipp", label: "Tipp", sortable: false, className: "quickpick-side",
+    cell: (row) => ({
+      main: teamOf(row),
+      note: row.evaluation.davesTable?.pattern === "konstantTief" ? "konstant gut" : "im Hoch"
+    })
+  },
+  {
+    key: "hoch", label: "Im Hoch", ariaLabel: "Tabellentrend der getippten Mannschaft", sortable: true,
+    value: (row) => row.evaluation.davesTable ? Math.max(row.evaluation.davesTable.good.delta5, row.evaluation.davesTable.good.delta10) : -99,
+    cell: (row) => {
+      const detail = row.evaluation.davesTable;
+      return detail ? { main: trendText(detail.good), mainTitle: "Platz jetzt und Plätze gewonnen (+) bzw. verloren (−) in den letzten 5 und 10 Spieltagen." } : { main: "–" };
+    }
+  },
+  {
+    key: "tief", label: "Im Tief", ariaLabel: "Tabellentrend des Gegners", sortable: true,
+    value: (row) => row.evaluation.davesTable ? -Math.min(row.evaluation.davesTable.bad.delta5, row.evaluation.davesTable.bad.delta10) : -99,
+    cell: (row) => {
+      const detail = row.evaluation.davesTable;
+      return detail ? { main: trendText(detail.bad), mainTitle: `${detail.bad.team}: Platz jetzt und Plätze verloren in den letzten 5 und 10 Spieltagen.` } : { main: "–" };
+    }
+  },
+  MODELL1X2_COLUMNS.find((column) => column.key === "quote")!
+];
+
 const QUICKPICK_COLUMNS: Record<QuickpickPresetId, QuickpickColumn[]> = {
+  davesTable: DAVES_TABLE_COLUMNS,
   daves1x2: DAVES_COLUMNS,
   dominanz: DOMINANZ_COLUMNS,
   hz15: HZ15_COLUMNS,
@@ -689,6 +725,18 @@ export function strengthOf(preset: QuickpickPresetId, row: QuickpickRow): Quickp
       percent: detail.chosen.fair * 100, label: `Tipico ${tipicoPercent(detail.chosen.fair)}`, gut: 57, mittel: 55,
       title: "Die Chance, die Tipico diesem Tipp gibt – aus der Quote ohne Aufschlag gerechnet. Ab Werk"
         + " ist die Liste danach sortiert, und „Nur die besten“ zählt danach."
+    };
+  }
+  if (preset === "davesTable") {
+    const detail = evaluation.davesTable;
+    if (detail === null || detail === undefined) return null;
+    // Wie weit die beiden in der Tabelle auseinanderlaufen: Plätze gewonnen plus Plätze verloren, je der
+    // stärkere der beiden Zeiträume (5 oder 10 Spieltage) - wie bei der Regel, die einen von beiden genügen lässt.
+    const swing = Math.max(0, detail.good.delta5, detail.good.delta10) - Math.min(0, detail.bad.delta5, detail.bad.delta10);
+    return {
+      percent: Math.min(100, swing * 5), label: `Trend ±${swing}`, gut: 50, mittel: 25,
+      title: "Wie weit die beiden in der Tabelle auseinanderlaufen: Plätze, die die eine gewonnen, plus Plätze,"
+        + " die die andere verloren hat – in den letzten 5 oder 10 Spieltagen, je nachdem, wo es mehr ist."
     };
   }
   if (preset === "remisScore") {

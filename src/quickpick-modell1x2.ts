@@ -121,46 +121,48 @@ export function modell1x2Note(measured: QuickpickMeasurement | null): string {
 }
 
 /**
- * Gemessen an Modellversion 3.2.0 und neuer (`MODEL_BOUND_SINCE` in
- * `tools/quickpick-report.ts`, Davids Entscheidung vom 10.10.2026), Stand 10.10.2026, 4.183
- * abgerechnete Spiele. „Je Tag" ist über den ganzen Zeitraum gerechnet; die Analysen seit
+ * Gemessen an den Modellversionen 3.2.0 bis 3.7.0 (Davids Entscheidung vom 10.10.2026), Stand
+ * 04.11.2026, 9.189 abgerechnete Spiele. Ab 3.5.0 allein (5.175 Spiele): Vorgabe 251 Tipps,
+ * 64,9 %, −3,2 ± 3,0 % je Tipp, Zeithälften 64,8 / 65,1 % - das schwache Bild vom 10.10. (47,7 %
+ * bei n = 44 ab 3.3.0) hat nicht gehalten. Seit 3.8.0 (Heim-/Gast-Aufteilung) beginnt die
+ * Messung neu (`MODEL_BOUND_SINCE`), die Knöpfe zeigen bis dahin diesen Stand. „Je Tag" ist über den ganzen Zeitraum gerechnet; die Analysen seit
  * Oktober sind größer und liefern mehr (Vorgabe am Wochenende rund 30 Spiele über drei Tage).
  */
 export const MODELL1X2_LEVELS: Array<QuickpickLevel<Modell1x2LevelValues>> = [
   {
     id: "streng", label: "Streng",
-    measured: { n: 64, proTag: 1.9, trefferquote: 0.719, roi: 0.063 },
-    hint: "Siegchance laut Modell ab 65 %, Quote 1,30 bis 2,00. Gut 7 von 10 Tipps stimmen,"
-      + " aber es sind nur wenige Spiele – das Plus kann auch Zufall sein.",
+    measured: { n: 136, proTag: 2.2, trefferquote: 0.699, roi: 0.012 },
+    hint: "Siegchance laut Modell ab 65 %, Quote 1,30 bis 2,00. Rund 7 von 10 Tipps stimmen,"
+      + " aber es sind nur wenige Spiele – das kleine Plus kann auch Zufall sein.",
     values: LEVELS.streng
   },
   {
     id: "ausgewogen", label: "Ausgewogen",
     measured: {
-      n: 157, proTag: 4.5, trefferquote: 0.631, roi: -0.066,
+      n: 386, proTag: 6.4, trefferquote: 0.648, roi: -0.038,
       kombis: [
-        { beine: 2, n: 2960, trefferquote: 0.41, quote: 2.3, roi: -0.111, erwartung: -0.127 },
-        { beine: 3, n: 1880, trefferquote: 0.265, quote: 3.5, roi: -0.152, erwartung: -0.185 },
-        { beine: 4, n: 1280, trefferquote: 0.186, quote: 5.3, roi: -0.114, erwartung: -0.238 },
-        { beine: 5, n: 1000, trefferquote: 0.08, quote: 7.9, roi: -0.471, erwartung: -0.288 },
-        { beine: 6, n: 760, trefferquote: 0.068, quote: 11.9, roi: -0.387, erwartung: -0.335 },
-        { beine: 7, n: 640, trefferquote: 0.033, quote: 18.6, roi: -0.548, erwartung: -0.379 }
+        { beine: 2, n: 7360, trefferquote: 0.429, quote: 2.26, roi: -0.055, erwartung: -0.075 },
+        { beine: 3, n: 4800, trefferquote: 0.285, quote: 3.41, roi: -0.072, erwartung: -0.11 },
+        { beine: 4, n: 3280, trefferquote: 0.175, quote: 5.14, roi: -0.161, erwartung: -0.144 },
+        { beine: 5, n: 2720, trefferquote: 0.102, quote: 7.72, roi: -0.293, erwartung: -0.176 },
+        { beine: 6, n: 2000, trefferquote: 0.059, quote: 11.65, roi: -0.406, erwartung: -0.208 },
+        { beine: 7, n: 1680, trefferquote: 0.033, quote: 17.83, roi: -0.486, erwartung: -0.238 }
       ]
     },
-    hint: "Siegchance laut Modell ab 60 %, Quote 1,30 bis 2,00. Etwa 6 von 10 Tipps stimmen."
+    hint: "Siegchance laut Modell ab 60 %, Quote 1,30 bis 2,00. Knapp 2 von 3 Tipps stimmen."
       + " Die Vorgabe.",
     values: LEVELS.ausgewogen
   },
   {
     id: "locker", label: "Locker",
-    measured: { n: 363, proTag: 10.5, trefferquote: 0.623, roi: -0.048 },
-    hint: "Siegchance laut Modell ab 55 %, Quote 1,30 bis 2,00. Trifft genauso oft wie die"
-      + " Vorgabe, liefert aber mehr als doppelt so viele Spiele.",
+    measured: { n: 896, proTag: 14.7, trefferquote: 0.619, roi: -0.061 },
+    hint: "Siegchance laut Modell ab 55 %, Quote 1,30 bis 2,00. Gut 6 von 10 Tipps stimmen,"
+      + " etwas seltener als bei der Vorgabe, dafür mehr als doppelt so viele Spiele.",
     values: LEVELS.locker
   },
   {
     id: "weit", label: "Weit",
-    measured: { n: 752, proTag: 21.6, trefferquote: 0.609, roi: -0.048 },
+    measured: { n: 1791, proTag: 29, trefferquote: 0.59, roi: -0.086 },
     hint: "Siegchance laut Modell ab 50 %, Quote 1,30 bis 2,00. Nur zum Überblick: sehr viele"
       + " Spiele, etwa 6 von 10 Tipps stimmen.",
     values: LEVELS.weit
@@ -261,12 +263,11 @@ export const MODELL1X2_PRESET: QuickpickPreset<Modell1x2QuickpickSettings> = {
         + ` (an ${measured.n} alten Wetten geprüft). In einer Kombi müssen alle Tipps stimmen –`
         + " deshalb zählt genau dieser Wert."
   }),
-  honesty: "Etwa 6 von 10 Tipps stimmen – ohne Filter gewinnt der Favorit des Modells nur"
+  honesty: "Knapp 2 von 3 Tipps stimmen – ohne Filter gewinnt der Favorit des Modells nur"
     + " knapp jedes zweite Spiel. Das kommt fast ganz aus der Quote: Das Modell weiß nichts, was"
     + " der Buchmacher nicht schon eingepreist hat, und wo es sich deutlich sicherer ist als die"
-    + " Quote, stimmt nur jeder zweite Tipp. In den letzten Tagen stimmte nur gut jeder zweite,"
-    + " vor allem bei Länderspielen – bei so wenigen Spielen kann das auch Zufall sein. Ein"
-    + " Schein mit vier Spielen ging in etwa 1 von 5 Fällen durch. Rechne nicht mit Gewinn.",
+    + " Quote, stimmt nur jeder zweite Tipp. Ein Schein mit vier Spielen ging in etwa 1 von 6"
+    + " Fällen durch. Rechne nicht mit Gewinn.",
   warnung: "Die Treffer kommen fast ganz aus der Quote, nicht aus dem Modell. Rechne nicht mit"
     + " Gewinn.",
   wettschein: {

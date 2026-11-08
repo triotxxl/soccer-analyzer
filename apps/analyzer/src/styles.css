@@ -666,6 +666,13 @@ fieldset.filter-field { min-width: 0; margin-inline: 0; padding: 0; border: 0; }
    Die aufgeklappte Zeile trägt die Wahl-Fläche von Leiste und Menü; der Balken ist hell statt
    blau (Blau ist nur Tastaturfokus) und nicht grün (Grün heißt in der Tabelle „Empfehlenswert“). */
 .fixture-wrap.open { background: #37373d; box-shadow: inset 3px 0 0 var(--text); }
+/* Zeilen außerhalb des Bildes ordnet und zeichnet der Browser nicht (bei 700 Spielen rund 58.000
+   Elemente). `auto` merkt sich die zuletzt gemessene Höhe, damit die Bildlaufleiste nicht springt.
+   Mit offenem Wettschein-Menü nicht: Es hängt `position: fixed` in der Zeile und würde an ihr
+   abgeschnitten, weil die Eindämmung die Zeile zum Bezugsrahmen macht. */
+.fixture-wrap, .heatmap-row-wrap { content-visibility: auto; contain-intrinsic-block-size: auto 60px; }
+.heatmap-row-wrap { contain-intrinsic-block-size: auto 35px; }
+.fixture-wrap.cart-open, .heatmap-row-wrap.cart-open { content-visibility: visible; }
 .fixture-row { width: 100%; min-height: 56px; padding: 6px 10px 6px 40px; border: 0; background: transparent; text-align: left; }
 /* Der "Add"-Knopf im Leistenstil (seit 30.09.2026 statt der gestrichelten Nabe mit Ring):
    Ruhe --bg, Ueberfahren #222, offen #37373d. Liegt aus dem Spiel etwas im Wettschein, steht
@@ -1021,7 +1028,8 @@ fieldset.filter-field { min-width: 0; margin-inline: 0; padding: 0; border: 0; }
 /* Sechs Spalten statt fünf plus bis zu vierzehn Marktkästchen (seit 29.09.2026): Die Zeile
    beantwortet eine gewählte Frage, Quote und Stufe vor dem Anpfiff stehen im Fenster. Keine
    Streifen - wie die Tabelle seit 28.09. */
-.live-row { display: grid; grid-template-columns: 64px minmax(170px,1.3fr) 40px minmax(200px,1.5fr) 64px 84px 84px 112px; gap: 14px; align-items: center; min-width: 900px; min-height: 76px; padding: 10px 12px; border-bottom: 1px solid var(--line-soft); cursor: pointer; }
+/* Seit 03.11.2026: Min. | Spiel | Stand | Frage | Dein Tipp · jetzt | Aufs Tor (+ Ballbesitz) | Karten. Ballbesitz und Pässe hatten eigene Spalten. */
+.live-row { display: grid; grid-template-columns: 64px minmax(170px,1.3fr) 40px minmax(180px,1.2fr) minmax(220px,1.45fr) 70px 70px; gap: 14px; align-items: center; min-width: 900px; min-height: 76px; padding: 10px 12px; border-bottom: 1px solid var(--line-soft); cursor: pointer; }
 .live-row:hover, .live-row:focus-visible { background: rgba(255,255,255,.05); }
 .live-row.open { background: rgba(255,255,255,.08); }
 .live-row > span { min-width: 0; }
@@ -1055,7 +1063,7 @@ fieldset.filter-field { min-width: 0; margin-inline: 0; padding: 0; border: 0; }
 /* Kopfzeile wie in der Tabelle: bleibt beim Scrollen stehen, blendet nichts aus. */
 .live-head { position: sticky; top: -14px; z-index: 2; min-height: 0; padding-block: 8px; background: var(--bg); color: #969696; font-size: 10px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; cursor: default; }
 .live-head:hover { background: var(--bg); }
-.live-head > span:nth-child(n+5) { text-align: center; }
+.live-head > span:nth-child(n+6) { text-align: center; }
 /* Heim oben, Gast unten - auf Höhe der Teamnamen und des Stands. */
 .live-stat { display: grid; gap: 6px; text-align: center; font-size: 12px; font-variant-numeric: tabular-nums; }
 .live-stat .home, .live-stat .away { display: flex; justify-content: center; align-items: center; gap: 6px; min-height: 17px; white-space: nowrap; }
@@ -1082,10 +1090,6 @@ fieldset.filter-field { min-width: 0; margin-inline: 0; padding: 0; border: 0; }
 .live-section h4 .live-provisional { letter-spacing: 0; text-transform: none; }
 .live-panel-empty { margin: 0; color: #969696; font-size: 11px; line-height: 1.5; }
 .live-panel-note { margin: 6px 0 0; color: #969696; font-size: 10px; line-height: 1.5; }
-.live-chances { display: grid; gap: 4px; margin: 0; }
-.live-chances div { display: grid; grid-template-columns: 128px minmax(0,1fr); gap: 8px; font-size: 11px; }
-.live-chances dt { color: #969696; }
-.live-chances dd { margin: 0; color: var(--text); font-variant-numeric: tabular-nums; }
 .live-cards { margin: 0; color: #b9b9b9; font-size: 11px; }
 .live-cards strong { color: var(--text); font-variant-numeric: tabular-nums; }
 .live-metric-list { display: grid; gap: 7px; }
@@ -1111,6 +1115,112 @@ fieldset.filter-field { min-width: 0; margin-inline: 0; padding: 0; border: 0; }
 .live-prematch li.strong { background: rgba(217,180,95,.1); color: #ecdcb4; }
 .live-prematch li span:nth-child(2) { text-align: right; }
 .live-prematch li strong { text-align: right; font-variant-numeric: tabular-nums; }
+
+/* ===== Live seit 03.11.2026 (Entwurf „Live-Ansicht“, Davids Freigabe): Spieluhr, Tipps vorher · jetzt,
+   Spielverlauf, Chancen-Kacheln und H2H im Fenster. Nur bestehende Farben der alten App. ===== */
+.live-minute-cell { display: grid; gap: 6px; }
+.live-clock { position: relative; display: block; height: 3px; overflow: hidden; border-radius: 2px; background: #333333; }
+.live-clock i { position: absolute; top: 0; bottom: 0; left: 0; background: var(--red); opacity: .7; }
+.live-clock::after { position: absolute; top: 0; bottom: 0; left: 50%; width: 1px; background: var(--bg); content: ""; }
+.live-tips { display: grid; gap: 4px; justify-items: start; min-width: 0; }
+.live-tips small { padding-left: 2px; color: #969696; font-size: 10px; }
+.live-tip { display: inline-flex; align-items: center; gap: 5px; max-width: 100%; padding: 3px 7px; overflow: hidden; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); color: var(--text); font-size: 11px; white-space: nowrap; }
+.live-tip.recommended { border-color: rgba(95,191,139,.56); }
+.live-tip.strong { border-color: rgba(217,180,95,.65); }
+.live-tip .level-glyph { width: auto; }
+.live-tip.recommended .level-glyph { color: var(--green); }
+.live-tip.strong .level-glyph { color: var(--gold); }
+.live-tip-label { flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis; }
+.live-tip-stand { flex: 0 0 auto; color: #969696; font-variant-numeric: tabular-nums; }
+.live-tip-stand.won { color: var(--green); font-weight: 700; }
+.live-tip-stand.lost { color: var(--red); }
+.live-possession { width: 54px; height: 4px; justify-self: center; }
+
+.live-panel-head .live-tabs { justify-self: start; margin-top: 6px; }
+.live-tabs button { min-width: 64px; padding: 6px 12px; }
+.live-timeline { position: relative; height: 78px; margin: 0 8px; }
+.live-timeline-track, .live-timeline-played { position: absolute; top: 34px; left: 0; height: 4px; border-radius: 2px; }
+.live-timeline-track { right: 0; background: #333333; }
+.live-timeline-played { background: #6a6a6a; }
+.live-timeline-tick { position: absolute; top: 29px; width: 1px; height: 14px; background: var(--line); }
+.live-timeline-now { position: absolute; top: 26px; width: 2px; height: 20px; margin-left: -1px; border-radius: 1px; background: var(--red); }
+.live-timeline-event { position: absolute; width: 10px; height: 10px; margin-left: -5px; border-radius: 50%; background: #8a8a8a; }
+.live-timeline-event.home { top: 18px; }
+.live-timeline-event.away { top: 44px; }
+.live-timeline-event.neutral { top: 31px; }
+.live-timeline-event.goal.home { background: var(--home); }
+.live-timeline-event.goal.away { background: var(--away); }
+.live-timeline-event.yellow, .live-timeline-event.red { width: 7px; height: 10px; margin-left: -3px; border-radius: 2px; background: #e8c93a; }
+.live-timeline-event.red { background: var(--red); }
+.live-timeline-event small { position: absolute; left: 50%; transform: translateX(-50%); color: #b9b9b9; font-size: 10px; white-space: nowrap; }
+.live-timeline-event.home small { bottom: 12px; }
+.live-timeline-event.away small { top: 12px; }
+.live-timeline-event.goal.home small { color: var(--home); }
+.live-timeline-event.goal.away small { color: var(--away); }
+.live-timeline-axis { position: absolute; bottom: 0; color: var(--dim); font-size: 10px; }
+.live-timeline-axis.center { transform: translateX(-50%); }
+.live-chance-tiles { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 8px; }
+.live-chance-tile { display: grid; gap: 3px; align-content: start; min-width: 0; padding: 9px 10px; border: 1px solid var(--line); border-radius: 10px; background: #1e1e1e; }
+.live-chance-tile small { color: #969696; font-size: 10px; line-height: 1.4; }
+.live-event-line { margin-top: -2px; color: #b9b9b9; }
+.live-chance-tile strong { font-size: 18px; font-variant-numeric: tabular-nums; }
+.live-chance-tile strong.home { color: var(--home); }
+.live-chance-tile strong.away { color: var(--away); }
+.live-goal-lines { margin: 8px 0 0; color: #b9b9b9; font-size: 11px; font-variant-numeric: tabular-nums; }
+.live-tip-table { display: grid; gap: 3px; }
+.live-tip-row { display: grid; grid-template-columns: minmax(0,1.3fr) 40px 42px 42px minmax(0,1fr); gap: 10px; padding: 3px 6px; border-radius: 6px; color: #b9b9b9; font-size: 11px; font-variant-numeric: tabular-nums; }
+.live-tip-row > :nth-child(n+2):nth-child(-n+4) { text-align: right; }
+.live-tip-row > span:first-child, .live-tip-row .live-tip-stand { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.live-tip-row.head { padding-block: 0; color: var(--dim); font-size: 10px; }
+.live-tip-row.recommended { background: rgba(95,191,139,.1); color: #cfe9d8; }
+.live-tip-row.strong { background: rgba(217,180,95,.1); color: #ecdcb4; }
+
+.live-h2h-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+.live-h2h-head h4 { margin: 0; }
+.live-duel { display: grid; grid-template-columns: minmax(0,1fr) auto minmax(0,1fr); align-items: end; gap: 6px 12px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; background: #1e1e1e; }
+.live-duel > span { display: grid; gap: 2px; min-width: 0; }
+.live-duel > span strong { font-size: 26px; line-height: 1; font-variant-numeric: tabular-nums; }
+.live-duel > span small { overflow: hidden; color: #969696; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.live-duel .home strong { color: var(--home); }
+.live-duel .draw { text-align: center; }
+.live-duel .draw strong { color: var(--muted); }
+.live-duel .away { text-align: right; }
+.live-duel .away strong { color: var(--away); }
+.live-duel > .live-duel-bar { display: flex; grid-column: 1 / -1; height: 6px; margin-top: 4px; }
+.live-duel-foot { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; grid-column: 1 / -1; color: #969696; font-size: 10px; }
+.live-duel-foot b { font-weight: 700; font-variant-numeric: tabular-nums; }
+.live-duel-foot b.home { color: var(--home); }
+.live-duel-foot b.away { color: var(--away); }
+.live-h2h-notice { margin-top: 8px; padding: 7px 10px; }
+.live-freq-list { display: grid; gap: 6px; }
+.live-freq { display: grid; grid-template-columns: minmax(0,1fr) auto 64px; align-items: center; gap: 12px; font-size: 11px; }
+.live-freq-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.live-freq-marks { display: flex; gap: 3px; }
+.live-freq-marks i { width: 6px; height: 16px; border-radius: 3px; background: #3a3a3a; }
+.live-freq-marks i.hit { background: var(--green); }
+.live-freq-marks i.home { background: var(--home); }
+.live-freq-marks i.away { background: var(--away); }
+.live-freq-marks i.unknown { background: transparent; box-shadow: inset 0 0 0 1px #4a4a4a; }
+.live-freq-count { color: #969696; text-align: right; font-variant-numeric: tabular-nums; }
+.live-freq-count strong { color: var(--text); }
+.live-duel-list { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
+.live-duel-list li { display: grid; grid-template-columns: 58px minmax(0,1fr) 34px 30px 20px; align-items: center; gap: 10px; padding: 3px 6px; font-size: 11px; font-variant-numeric: tabular-nums; }
+.live-duel-list li strong { text-align: right; }
+.live-duel-date, .live-duel-ht { color: var(--dim); }
+.live-duel-ht { text-align: right; }
+.live-duel-teams { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.live-duel-teams .home { color: var(--home); }
+.live-duel-teams .away { color: var(--away); }
+.live-duel-teams small { color: var(--dim); font-size: 10px; }
+.live-duel-result { display: grid; place-items: center; height: 18px; border-radius: 4px; color: var(--bg); font-size: 10px; font-weight: 700; }
+.live-duel-result.win { background: var(--green); }
+.live-duel-result.draw { background: #6a6a6a; }
+.live-duel-result.loss { background: var(--red); }
+.live-form { display: grid; grid-template-columns: minmax(90px,150px) auto minmax(0,1fr); align-items: center; gap: 12px; padding: 3px 0; font-size: 11px; }
+.live-form strong { overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.live-form strong.home { color: var(--home); }
+.live-form strong.away { color: var(--away); }
+.live-form > span:last-child { color: #969696; text-align: right; }
 
 @media (max-width: 1100px) {
   .content { padding-inline: 12px; }
@@ -1258,3 +1368,23 @@ fieldset.filter-field { min-width: 0; margin-inline: 0; padding: 0; border: 0; }
 .heatmap-legend b.home { color: var(--home); }
 .heatmap-legend b.away { color: var(--away); }
 .heatmap-legend b.value { color: var(--green); }
+
+/* Tabellenverlauf bei den direkten Duellen (seit 02.11.2026). Diagramm aus apps/shared/src/PerfChart.tsx -
+   dieselben Klassen wie in Neo, hier in den Farben und der kleinen Schrift der alten App. */
+.league-perf .perf-chart { width: 100%; min-height: 230px; overflow: hidden; }
+.league-perf .pc-grid { stroke: var(--line-soft); stroke-width: 1; }
+.league-perf .pc-zero { stroke: var(--muted); stroke-width: 1; }
+.league-perf .pc-axis { fill: var(--dim); font-family: var(--mono); font-size: 9px; }
+.league-perf .pc-line { stroke-width: 2.25; stroke-linejoin: round; stroke-linecap: round; }
+.league-perf .pc-dot { fill: var(--surface); stroke-width: 2; }
+.league-perf .pc-end { font-family: var(--mono); font-size: 10px; font-weight: 600; }
+.league-perf .perf-legend { display: grid; gap: 4px; margin: 8px 0 0; padding: 0; list-style: none; color: var(--muted); font-size: 9px; line-height: 1.5; }
+.league-perf .perf-legend b { color: var(--text); font-weight: 600; }
+.league-perf .perf-legend .sw { display: inline-block; width: 14px; margin-right: 6px; border-top: 2px solid var(--muted); vertical-align: middle; }
+.league-perf > p { margin: 0; color: var(--muted); font-size: 10px; }
+
+/* Quickpicker mit aufgeklapptem Spiel (seit 02.11.2026): rechts eine dritte Spalte mit direkten Duellen und
+   Tabellenverlauf. Das Fenster wird dafür breiter, die Spalte scrollt für sich. */
+.filter-menu.quickpick-menu:has(.quickpick-body.with-detail) { width: min(1340px, calc(100vw - 140px)); }
+.quickpick-body.with-detail { grid-template-columns: minmax(280px, 320px) minmax(0, 1fr) minmax(320px, 380px); }
+.quickpick-detail { display: grid; gap: 12px; align-content: start; min-width: 0; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }

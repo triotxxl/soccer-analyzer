@@ -4,7 +4,7 @@ import { config, ROOT_DIR } from "./config.ts";
 import { recentAverage, type MatchSideStats, type RecentAverage } from "./recent-stats.ts";
 import { marketDetail, type MarketDetail } from "./model.ts";
 import { teamNameSimilarity } from "./team-resolver.ts";
-import type { DefensiveProfile, DrawAnalysisResult, FavoriteAnalysisResult, GoalLineAnalysisResult, GoalLineRow, LeagueStats, LeagueStrengthComparison, LiveCoverage, RecentMatchSummary, TipicoOdds } from "./types.ts";
+import type { DefensiveProfile, DrawAnalysisResult, FavoriteAnalysisResult, GoalLineAnalysisResult, GoalLineRow, LeagueStats, LeagueStrengthComparison, LiveCoverage, RecentMatchSummary, StandingRow, TipicoOdds } from "./types.ts";
 import type { EloSystem } from "./elo-config.ts";
 
 export interface DashboardInput {
@@ -68,6 +68,43 @@ export interface TeamElo {
    */
   leagueLevel?: number;
   leagueClubs?: number;
+}
+
+export interface SideTables {
+  home?: { row: DashboardTableRow; size: number; competition: string };
+  away?: { row: DashboardTableRow; size: number; competition: string };
+}
+
+export interface DashboardTableRow {
+  position: number;
+  teamName: string;
+  played: number;
+  wins: number;
+  draws: number;
+  losses: number;
+  points: number;
+  goalsFor: number;
+  goalsAgainst: number;
+  /** Heim- und Auswärtsbilanz, ab schemaVersion 6. Ältere Läufe führen sie nicht. */
+  homePlayed?: number;
+  homePoints?: number;
+  awayPlayed?: number;
+  awayPoints?: number;
+  /**
+   * Letzte fünf Tabellenspiele, neueste zuerst, heim und auswärts (`tableForm`), ab
+   * schemaVersion 9. Nicht zu verwechseln mit `form.home`/`form.away` (nur am Spielort).
+   */
+  form?: FormResult[];
+  /** Platz nach jedem Spieltag, ab schemaVersion 11 (`tablePositions`); `null` = noch kein Spiel. */
+  positions?: Array<number | null>;
+  /** Dasselbe für die Vorsaison, nur für Teams, die dort in dieser Liga spielten. */
+  previousPositions?: Array<number | null>;
+  /** Tordifferenz nach jedem Spieltag, ab schemaVersion 13 (`tableProgress`); `null` = noch kein Spiel. */
+  goalDiffs?: Array<number | null>;
+  /** Dasselbe für die Vorsaison, nur für Teams, die dort in dieser Liga spielten. */
+  previousGoalDiffs?: Array<number | null>;
+  /** Team-Elo der Zeile, ab schemaVersion 12 - auch für Teams ohne Spiel in der Analyse. Nur Anzeige. */
+  elo?: TeamElo;
 }
 
 export type RecommendationLevel = "none" | "recommended" | "strong";
@@ -206,33 +243,15 @@ export interface DashboardFixture {
   };
   defense?: { home: DefensiveProfile; away: DefensiveProfile };
   strength?: LeagueStrengthComparison;
-  table?: Array<{
-    position: number;
-    teamName: string;
-    played: number;
-    wins: number;
-    draws: number;
-    losses: number;
-    points: number;
-    goalsFor: number;
-    goalsAgainst: number;
-    /** Heim- und Auswärtsbilanz, ab schemaVersion 6. Ältere Läufe führen sie nicht. */
-    homePlayed?: number;
-    homePoints?: number;
-    awayPlayed?: number;
-    awayPoints?: number;
-    /**
-     * Letzte fünf Tabellenspiele, neueste zuerst, heim und auswärts (`tableForm`), ab
-     * schemaVersion 9. Nicht zu verwechseln mit `form.home`/`form.away` (nur am Spielort).
-     */
-    form?: FormResult[];
-    /** Platz nach jedem Spieltag, ab schemaVersion 11 (`tablePositions`); `null` = noch kein Spiel. */
-    positions?: Array<number | null>;
-    /** Dasselbe für die Vorsaison, nur für Teams, die dort in dieser Liga spielten. */
-    previousPositions?: Array<number | null>;
-    /** Team-Elo der Zeile, ab schemaVersion 12 - auch für Teams ohne Spiel in der Analyse. Nur Anzeige. */
-    elo?: TeamElo;
-  }>;
+  table?: DashboardTableRow[];
+  /**
+   * Ab schemaVersion 14, nur Spiele zwischen Ligen: die Zeile jedes Teams in der Tabelle des Turniers (Ligaphase,
+   * Gruppe, in der K.-o.-Runde die letzte Tabelle des Teams). Nur Anzeige (`tableEntryOf`), keine Filterregel
+   * liest sie - `table` bleibt bei diesen Spielen leer, weil die Filter dort bewusst keine Tabelle kennen.
+   */
+  tournamentTable?: SideTables;
+  /** Ab schemaVersion 14: Ersatz, wenn das Turnier keine Tabelle hat - die Zeile jedes Teams in seiner Heimatliga. */
+  domesticTable?: SideTables;
   expectedGoals: { home: number; away: number; total: number };
   expectedFirstHalfGoals?: { home: number; away: number; total: number };
   /**
@@ -251,7 +270,7 @@ export interface DashboardFixture {
 }
 
 export interface DashboardDocument {
-  schemaVersion: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12;
+  schemaVersion: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14;
   meta: {
     createdAt: string;
     timezone: string;
@@ -436,6 +455,29 @@ function withMatchStats(
   });
 }
 
+function sideTables(sides: NonNullable<GoalLineRow["domesticStandings"]>, elo: DashboardInput["elo"]): SideTables {
+  return {
+    ...(sides.home ? { home: { ...sides.home, row: tableRowOf(sides.home.row, elo) } } : {}),
+    ...(sides.away ? { away: { ...sides.away, row: tableRowOf(sides.away.row, elo) } } : {})
+  };
+}
+
+/** Eine Tabellenzeile des Snapshots. */
+function tableRowOf(standing: StandingRow, elo: DashboardInput["elo"]): DashboardTableRow {
+  return {
+    position: standing.position, teamName: standing.teamName, played: standing.played,
+    wins: standing.wins, draws: standing.draws, losses: standing.played - standing.wins - standing.draws,
+    points: standing.points, goalsFor: standing.goalsFor, goalsAgainst: standing.goalsAgainst,
+    homePlayed: standing.homePlayed, homePoints: standing.homePoints,
+    awayPlayed: standing.awayPlayed, awayPoints: standing.awayPoints, form: standing.form,
+    ...(standing.positions ? { positions: standing.positions } : {}),
+    ...(standing.previousPositions ? { previousPositions: standing.previousPositions } : {}),
+    ...(standing.goalDiffs ? { goalDiffs: standing.goalDiffs } : {}),
+    ...(standing.previousGoalDiffs ? { previousGoalDiffs: standing.previousGoalDiffs } : {}),
+    ...(elo?.has(standing.id) ? { elo: elo.get(standing.id)! } : {})
+  };
+}
+
 export function buildDashboardDocument(input: DashboardInput): DashboardDocument {
   const recentStats = input.recentStats ?? new Map<number, { home: MatchSideStats; away: MatchSideStats }>();
   const drawByFixture = new Map(input.draw.rows.map((row) => [row.fixtureId, row]));
@@ -601,16 +643,9 @@ export function buildDashboardDocument(input: DashboardInput): DashboardDocument
       },
       ...(row.defense ? { defense: row.defense } : {}),
       ...(row.strength ? { strength: row.strength } : {}),
-      ...(row.standings ? { table: row.standings.map((standing) => ({
-        position: standing.position, teamName: standing.teamName, played: standing.played,
-        wins: standing.wins, draws: standing.draws, losses: standing.played - standing.wins - standing.draws,
-        points: standing.points, goalsFor: standing.goalsFor, goalsAgainst: standing.goalsAgainst,
-        homePlayed: standing.homePlayed, homePoints: standing.homePoints,
-        awayPlayed: standing.awayPlayed, awayPoints: standing.awayPoints, form: standing.form,
-        ...(standing.positions ? { positions: standing.positions } : {}),
-        ...(standing.previousPositions ? { previousPositions: standing.previousPositions } : {}),
-        ...(input.elo?.has(standing.id) ? { elo: input.elo.get(standing.id)! } : {})
-      })) } : {}),
+      ...(row.standings ? { table: row.standings.map((standing) => tableRowOf(standing, input.elo)) } : {}),
+      ...(row.tournamentStandings ? { tournamentTable: sideTables(row.tournamentStandings, input.elo) } : {}),
+      ...(row.domesticStandings ? { domesticTable: sideTables(row.domesticStandings, input.elo) } : {}),
       expectedGoals: { home: row.expectedHomeGoals, away: row.expectedAwayGoals, total: row.expectedTotalGoals },
       expectedFirstHalfGoals: {
         home: row.firstHalf.expectedHomeGoals,
@@ -631,7 +666,7 @@ export function buildDashboardDocument(input: DashboardInput): DashboardDocument
   const createdAt = Date.parse(input.createdAt);
   const latestKickoff = fixtures.reduce((latest, fixture) => Math.max(latest, Date.parse(fixture.kickoff)), createdAt);
   return {
-    schemaVersion: 12,
+    schemaVersion: 14,
     meta: {
       createdAt: input.createdAt, timezone: config.timezone, sourceFile: input.sourceFile,
       totalTipicoEvents: input.totalTipicoEvents, selectedTipicoEvents: input.selectedTipicoEvents,

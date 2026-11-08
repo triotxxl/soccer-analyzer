@@ -348,6 +348,27 @@ export interface LeagueStrengthComparison {
   source?: "league" | "sameLeague" | "teamElo" | "eloLevel";
 }
 
+/** `form`: letzte fünf Tabellenspiele des Teams, neueste zuerst (`tableForm`). */
+export interface StandingRow extends TableRow {
+  teamName: string;
+  form: Array<"win" | "draw" | "loss">;
+  /** Platz nach jedem Spieltag dieses Abschnitts (`tablePositions`), ab schemaVersion 11. */
+  positions?: Array<number | null>;
+  /** Dasselbe für die Vorsaison; fehlt, wenn das Team dort nicht in dieser Liga spielte. */
+  previousPositions?: Array<number | null>;
+  /** Tordifferenz nach jedem Spieltag dieses Abschnitts (`tableProgress`), ab schemaVersion 13. */
+  goalDiffs?: Array<number | null>;
+  /** Dasselbe für die Vorsaison. */
+  previousGoalDiffs?: Array<number | null>;
+}
+
+/** Eine Tabellenzeile samt Größe der Tabelle und Wettbewerb `Land|Liga`. */
+export interface DomesticStanding {
+  row: StandingRow;
+  size: number;
+  competition: string;
+}
+
 export interface GoalLineProbabilities {
   over15: number;
   under15: number;
@@ -408,15 +429,15 @@ export interface GoalLineRow {
   probabilities: GoalLineProbabilities;
   defense?: { home: DefensiveProfile; away: DefensiveProfile };
   strength?: LeagueStrengthComparison;
-  /** `form`: letzte fünf Tabellenspiele des Teams, neueste zuerst (`tableForm`). */
-  standings?: Array<TableRow & {
-    teamName: string;
-    form: Array<"win" | "draw" | "loss">;
-    /** Platz nach jedem Spieltag dieses Abschnitts (`tablePositions`), ab schemaVersion 11. */
-    positions?: Array<number | null>;
-    /** Dasselbe für die Vorsaison; fehlt, wenn das Team dort nicht in dieser Liga spielte. */
-    previousPositions?: Array<number | null>;
-  }>;
+  standings?: StandingRow[];
+  /**
+   * Nur Spiele zwischen Ligen, ab schemaVersion 14 (0 Aufrufe): die Zeile jedes Teams in der Tabelle des
+   * Turniers selbst (Ligaphase, Gruppe, in der K.-o.-Runde die letzte Tabelle des Teams). Fehlt bei reinen
+   * K.-o.-Wettbewerben und vor dem ersten Spiel.
+   */
+  tournamentStandings?: { home?: DomesticStanding; away?: DomesticStanding };
+  /** Ersatz, wenn das Turnier keine Tabelle hat: die Zeile jedes Teams in seiner Heimatliga. */
+  domesticStandings?: { home?: DomesticStanding; away?: DomesticStanding };
   firstHalf: {
     expectedHomeGoals: number;
     expectedAwayGoals: number;

@@ -173,6 +173,30 @@ export function tableScopeOf(fixture: ApiFixture): TableScope {
   return { season: fixture.league.season, stage: roundStage(round).stage, matchdaysOnly: true };
 }
 
+/**
+ * Die Spiele der Gruppe eines Teams innerhalb eines Turnierabschnitts. API-Football führt alle Gruppen
+ * als „Group Stage - 3“ in einem Abschnitt; als eine Tabelle stünden dort 32 Teams der Libertadores.
+ * Eine Gruppe ist, wer über Spiele miteinander verbunden ist, bei einer Ligaphase also alle.
+ */
+export function stageGroupOf(fixtures: ApiFixture[], teamId: number): ApiFixture[] {
+  const opponents = new Map<number, number[]>();
+  const link = (from: number, to: number) => opponents.set(from, [...(opponents.get(from) ?? []), to]);
+  for (const fixture of fixtures) {
+    link(fixture.teams.home.id, fixture.teams.away.id);
+    link(fixture.teams.away.id, fixture.teams.home.id);
+  }
+  const group = new Set([teamId]);
+  const open = [teamId];
+  while (open.length > 0) {
+    for (const next of opponents.get(open.pop()!) ?? []) {
+      if (group.has(next)) continue;
+      group.add(next);
+      open.push(next);
+    }
+  }
+  return fixtures.filter((fixture) => group.has(fixture.teams.home.id));
+}
+
 /** Zählt eine Partie für die Tabelle? Gemeinsame Eingrenzung von `buildTable` und `tableForm`. */
 function countsForTable(fixture: ApiFixture, cutoff: number, scope?: TableScope): boolean {
   if (fixture.fixture.timestamp >= cutoff) return false;
@@ -213,31 +237,50 @@ export function tableForm(
   return form;
 }
 
+export interface TableProgress {
+  positions: Map<number, Array<number | null>>;
+  /** Tordifferenz der Tabelle nach jedem Spieltag: alle Tore minus alle Gegentore bis dahin. */
+  goalDiffs: Map<number, Array<number | null>>;
+}
+
 /**
- * Platz jedes Teams nach jedem Spieltag des Abschnitts - der Tabellenverlauf. Gezählt werden genau
- * die Partien von `buildTable` (gleiche Eingrenzung, gleiche Reihenfolge nach Punkten, Tordifferenz,
- * Toren), nur schrittweise bis Spieltag 1, 2, … . Ein Nachholspiel zählt zu seinem Spieltag, nicht zu
- * seinem Datum - so lesen auch die Ligen ihre Tabelle „nach dem 8. Spieltag“. `null` heißt: Das Team
- * hatte bis dahin kein Spiel. Ohne Spieltagsangaben (`matchdaysOnly: false`) gibt es keinen Verlauf.
+ * Platz und Tordifferenz jedes Teams nach jedem Spieltag des Abschnitts - Tabellen- und
+ * Tordifferenz-Verlauf. Gezählt werden genau die Partien von `buildTable` (gleiche Eingrenzung, gleiche
+ * Reihenfolge nach Punkten, Tordifferenz, Toren), nur schrittweise bis Spieltag 1, 2, … . Ein Nachholspiel
+ * zählt zu seinem Spieltag, nicht zu seinem Datum - so lesen auch die Ligen ihre Tabelle „nach dem
+ * 8. Spieltag“. `null` heißt: Das Team hatte bis dahin kein Spiel. Ohne Spieltagsangaben
+ * (`matchdaysOnly: false`) gibt es keinen Verlauf.
  */
-export function tablePositions(
+export function tableProgress(
   fixtures: ApiFixture[],
   cutoff: number,
   scope: TableScope
-): Map<number, Array<number | null>> {
+): TableProgress {
   const positions = new Map<number, Array<number | null>>();
-  if (!scope.matchdaysOnly) return positions;
+  const goalDiffs = new Map<number, Array<number | null>>();
+  if (!scope.matchdaysOnly) return { positions, goalDiffs };
   const matchdayOf = (fixture: ApiFixture) => Number((fixture.league.round ?? "").split(" - ").pop());
   const counted = fixtures.filter((fixture) => countsForTable(fixture, cutoff, scope) && completedScore(fixture));
   const matchdays = [...new Set(counted.map(matchdayOf))].filter(Number.isFinite).sort((left, right) => left - right);
   const teams = new Set(counted.flatMap((fixture) => [fixture.teams.home.id, fixture.teams.away.id]));
-  for (const id of teams) positions.set(id, []);
+  for (const id of teams) {
+    positions.set(id, []);
+    goalDiffs.set(id, []);
+  }
   for (const matchday of matchdays) {
     const table = buildTable(counted.filter((fixture) => matchdayOf(fixture) <= matchday), Number.POSITIVE_INFINITY);
-    const byTeam = new Map(table.map((row) => [row.id, row.position]));
-    for (const id of teams) positions.get(id)!.push(byTeam.get(id) ?? null);
+    const byTeam = new Map(table.map((row) => [row.id, row]));
+    for (const id of teams) {
+      const row = byTeam.get(id);
+      positions.get(id)!.push(row?.position ?? null);
+      goalDiffs.get(id)!.push(row ? row.goalsFor - row.goalsAgainst : null);
+    }
   }
-  return positions;
+  return { positions, goalDiffs };
+}
+
+export function tablePositions(fixtures: ApiFixture[], cutoff: number, scope: TableScope): Map<number, Array<number | null>> {
+  return tableProgress(fixtures, cutoff, scope).positions;
 }
 
 /**

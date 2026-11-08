@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import type { PerfRange, Venue } from "./components/H2HPanel";
-import type { DayScope, TipMarket, TipOrder } from "./neoData";
+import { AUTHOR_FILTERS, type AuthorFilter, type DayScope, type TipMarket, type TipOrder } from "./neoData";
 
 export type NeoView = "fixtures" | "teams" | "preds";
 
@@ -20,6 +20,10 @@ export interface NeoState {
   split: number;
   /** Predictions je Tag nach Chance oder nach Anstoß. */
   tipOrder: TipOrder;
+  /** Predictions: Tipps des Modells oder der Autoren (Daves Filter). */
+  tipSource: "model" | "authors";
+  /** Die gewählten Daves-Filter unter „Autoren“. */
+  authorFilters: AuthorFilter[];
   pmarkets: TipMarket[];
   pmin: number;
   pmax: number;
@@ -32,7 +36,6 @@ export interface NeoState {
   /** H2H: alle Duelle oder nur die im Stadion des Heimteams. */
   h2hVenue: Venue;
   perfRange: PerfRange;
-  perfPrev: boolean;
   /** Torphasen der Saison: Heimteam nur zu Hause, Gast nur auswärts. */
   phSplit: boolean;
 }
@@ -42,8 +45,8 @@ const STORAGE_KEY = "neo:state:v1";
 
 const DEFAULTS: NeoState = {
   view: "fixtures", scope: null, calMonth: null, deselected: [], closedCountries: [], fixture: null, team: null, tip: null,
-  fxOrder: "kickoff", teamsByLeague: false, split: SPLIT.def, tipOrder: "chance", pmarkets: ["1x2", "ou", "btts"], pmin: 0, pmax: 100, ou: 2.5, moreOpen: false,
-  fxSide: "markets", h2hVenue: "all", perfRange: "10", perfPrev: false, phSplit: true,
+  fxOrder: "kickoff", teamsByLeague: false, split: SPLIT.def, tipOrder: "chance", tipSource: "model", authorFilters: [...AUTHOR_FILTERS], pmarkets: ["1x2", "ou", "btts"], pmin: 0, pmax: 100, ou: 2.5, moreOpen: false,
+  fxSide: "markets", h2hVenue: "all", perfRange: "10", phSplit: true,
 };
 
 function load(): NeoState {

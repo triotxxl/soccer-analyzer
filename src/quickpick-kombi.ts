@@ -87,21 +87,22 @@ export function kombiNote(measured: QuickpickMeasurement | null): string {
 }
 
 /**
- * Gemessen vom Prüfer am 14.10.2026 (Tabelle oben). „Je Tag“ ist das Mittel über den ganzen
+ * Stufen und Vorgabe gemessen vom Prüfer am 14.10.2026 (Tabelle oben), die Zahlen nachkalibriert
+ * am 04.11.2026 (`npm run quickpick-report`). „Je Tag“ ist das Mittel über den ganzen
  * Zeitraum; die Wochenenden treiben es, unter der Woche sind es deutlich weniger.
  */
 export const KOMBI_LEVELS: Array<QuickpickLevel<KombiLevelValues>> = [
   {
     id: "streng", label: "Streng",
     measured: {
-      n: 2038, proTag: 59.3, trefferquote: 0.575, roi: -0.069,
+      n: 3836, proTag: 69.6, trefferquote: 0.579, roi: -0.063,
       kombis: [
-        { beine: 2, n: 40520, trefferquote: 0.33, quote: 2.6, roi: -0.134, erwartung: -0.133 },
-        { beine: 3, n: 26880, trefferquote: 0.187, quote: 4.3, roi: -0.204, erwartung: -0.193 },
-        { beine: 4, n: 20080, trefferquote: 0.106, quote: 6.9, roi: -0.27, erwartung: -0.248 },
-        { beine: 5, n: 16000, trefferquote: 0.061, quote: 11.2, roi: -0.313, erwartung: -0.3 },
-        { beine: 6, n: 13240, trefferquote: 0.035, quote: 18.1, roi: -0.377, erwartung: -0.348 },
-        { beine: 7, n: 11320, trefferquote: 0.02, quote: 29.3, roi: -0.398, erwartung: -0.393 }
+        { beine: 2, n: 76400, trefferquote: 0.335, quote: 2.62, roi: -0.121, erwartung: -0.121 },
+        { beine: 3, n: 50760, trefferquote: 0.193, quote: 4.25, roi: -0.18, erwartung: -0.176 },
+        { beine: 4, n: 37920, trefferquote: 0.111, quote: 6.89, roi: -0.239, erwartung: -0.228 },
+        { beine: 5, n: 30200, trefferquote: 0.064, quote: 11.16, roi: -0.284, erwartung: -0.276 },
+        { beine: 6, n: 25160, trefferquote: 0.034, quote: 18.08, roi: -0.378, erwartung: -0.322 },
+        { beine: 7, n: 21520, trefferquote: 0.022, quote: 29.28, roi: -0.364, erwartung: -0.364 }
       ]
     },
     hint: "Quote 1,60 bis 1,65. Knapp 6 von 10 Tipps stimmen – so oft, wie die Quote sagt."
@@ -110,19 +111,19 @@ export const KOMBI_LEVELS: Array<QuickpickLevel<KombiLevelValues>> = [
   },
   {
     id: "ausgewogen", label: "Ausgewogen",
-    measured: { n: 2974, proTag: 86.5, trefferquote: 0.564, roi: -0.075 },
+    measured: { n: 5516, proTag: 100.2, trefferquote: 0.566, roi: -0.073 },
     hint: "Quote 1,60 bis 1,70. Mehr Spiele, ein Tipp stimmt etwas seltener.",
     values: LEVELS.ausgewogen
   },
   {
     id: "locker", label: "Locker",
-    measured: { n: 3662, proTag: 106.5, trefferquote: 0.557, roi: -0.076 },
+    measured: { n: 6798, proTag: 123.4, trefferquote: 0.559, roi: -0.073 },
     hint: "Quote 1,60 bis 1,80. Noch mehr Spiele, gut jeder zweite Tipp stimmt.",
     values: LEVELS.locker
   },
   {
     id: "weit", label: "Weit",
-    measured: { n: 3902, proTag: 113.5, trefferquote: 0.548, roi: -0.079 },
+    measured: { n: 7469, proTag: 135.6, trefferquote: 0.545, roi: -0.078 },
     hint: "Ohne Grenze nach oben: jedes Spiel mit einem Tipp ab 1,60. Nur zum Überblick.",
     values: LEVELS.weit
   }
@@ -218,7 +219,7 @@ export const KOMBI_PRESET: QuickpickPreset<KombiQuickpickSettings> = {
   honesty: "Gut 5 von 10 Tipps stimmen – genau so oft, wie die Quote es sagt. Der Filter sucht je"
     + " Spiel den wahrscheinlichsten Tipp ab 1,60, keinen Vorteil. Der Aufschlag von Tipico steckt"
     + " in jedem Tipp: Eine Kombi aus 4 Tipps geht etwa jedes zehnte Mal auf und kostet auf Dauer"
-    + " rund ein Viertel des Einsatzes, eine aus 7 rund 40 %. Eine Liste, die gut getroffen hat,"
+    + " rund ein Viertel des Einsatzes, eine aus 7 gut ein Drittel. Eine Liste, die gut getroffen hat,"
     + " beweist nichts. Rechne nicht mit Gewinn. Die Quoten sind so alt wie die letzte Analyse –"
     + " prüf jeden Preis vor dem Setzen in der Tipico-App; fällt er unter 1,60, nimm den Ersatz"
     + " oder das nächste Spiel.",

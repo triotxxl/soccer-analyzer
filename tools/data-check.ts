@@ -18,8 +18,8 @@ import { DB_FILE, ROOT_DIR } from "../src/config.ts";
 import { teamIdOf } from "../src/coverage.ts";
 import type { DashboardDocument } from "../src/dashboard.ts";
 import {
-  DATA_CHECK_WINDOW_MS, eloSeasonGaps, goalSideMismatches, mappingIssues, sharedTeamIds, staleTeams, strengthGaps,
-  type GoalSideRow,
+  DATA_CHECK_WINDOW_MS, eloSeasonGaps, goalSideMismatches, mappingIssues, sharedTeamIds, staleTeams, strengthDuelGaps, strengthGaps,
+  type GoalSideRow, type StrengthDuelGap, type StrengthDuelRow,
   type LeagueSeasonCount, type TipicoCompetitionStats
 } from "../src/data-check.ts";
 import type { EloMatch } from "../src/elo-competitions.ts";
@@ -108,6 +108,19 @@ try {
       return row ? { matches: row.matches, clubs: row.clubs, women: row.pool.endsWith(":women") } : null;
     });
 
+  // Gespielte Duelle zwischen Ligen der letzten 60 Tage, die nicht in der Ligastärke stehen. Ab einem Tag
+  // nach Anpfiff: Die Analyse lädt sie erst, wenn der Wettbewerb wieder im Umfang ist.
+  const duels = strengthDuelGaps(db.prepare(`SELECT e.country || ' · ' || e.league_name AS competition, e.season, e.kickoff,
+      m.fixture_id IS NOT NULL AS stored
+    FROM elo_matches e
+    JOIN strength_team_leagues h ON h.team_id = e.home_id AND h.season = e.season
+    JOIN strength_team_leagues a ON a.team_id = e.away_id AND a.season = e.season
+    LEFT JOIN strength_matches m ON m.fixture_id = e.fixture_id
+    WHERE lower(e.league_type) <> 'league' AND e.league_name NOT LIKE '%Friendlies%'
+      AND h.league_id > 0 AND a.league_id > 0 AND h.league_id <> a.league_id
+      AND e.home_goals IS NOT NULL AND e.kickoff BETWEEN ? AND ?`)
+    .all(now - MAPPING_WINDOW_MS, now - DAY_MS).map((row) => ({ ...row, stored: row.stored === 1 })) as unknown as StrengthDuelRow[]);
+
   // Abrechnung
   const goalsMismatch = db.prepare(`SELECT fixture_id AS fixtureId, status, home_team AS home, away_team AS away
     FROM fixture_results WHERE goals_complete = 1 AND (
@@ -129,7 +142,7 @@ try {
 
   const report = {
     createdAt: document.meta.createdAt, fixtures: document.fixtures.length,
-    mapping, shared, stale, seasonGaps, strength,
+    mapping, shared, stale, seasonGaps, strength, duels,
     results: { goalsCompleteMismatch: goalsMismatch, goalSides, overdueUnsettled: overdue.n, oldestUnsettled: overdue.oldest, deferred: deferredRows }
   };
   if (asJson) {
@@ -144,7 +157,7 @@ try {
 function print(report: {
   createdAt: string; fixtures: number;
   mapping: ReturnType<typeof mappingIssues>; shared: ReturnType<typeof sharedTeamIds>; stale: ReturnType<typeof staleTeams>;
-  seasonGaps: ReturnType<typeof eloSeasonGaps>; strength: ReturnType<typeof strengthGaps>;
+  seasonGaps: ReturnType<typeof eloSeasonGaps>; strength: ReturnType<typeof strengthGaps>; duels: StrengthDuelGap[];
   results: {
     goalsCompleteMismatch: Array<{ fixtureId: number; status: string; home: string; away: string }>;
     goalSides: GoalSideRow[];
@@ -162,7 +175,7 @@ function print(report: {
   console.log(`Datenprüfung · Analyse ${report.createdAt} · ${report.fixtures} Spiele · 0 API-Aufrufe`);
   console.log(`Zuordnung verdächtig: ${suspicious.length} · geteilte Team-IDs: ${report.shared.length} (${sharedInAnalysis} in der Analyse)`
     + ` · abgerissene Geschichte: ${report.stale.length} · Elo-Saisonlücken: ${report.seasonGaps.length} (${gapsInAnalysis} in der Analyse, rund ${missingMatches} Spiele)`
-    + ` · Ligastärke geschätzt: ${report.strength.length}`
+    + ` · Ligastärke geschätzt: ${report.strength.length} · Ligastärke-Duelle fehlen: ${report.duels.length} Wettbewerbe`
     + ` · Torminuten unstimmig: ${report.results.goalsCompleteMismatch.length} · Tore beim falschen Team: ${report.results.goalSides.length}`
     + ` · lange offen: ${report.results.overdueUnsettled}`);
 
@@ -214,6 +227,14 @@ function print(report: {
     }
     console.log("    Maßnahme: ältere Saisons der Pokale dieses Landes nachladen (npm run strength -- --competition <id> --seasons 3);"
       + " reichen die Duelle auch dann nicht, ist es strukturell");
+  }
+  if (report.duels.length > 0) {
+    console.log("\n== 5b. Ligastärke-Duelle fehlen: gespielt in den letzten 60 Tagen, aber nicht in der Bewertung der Ligen");
+    for (const gap of limit(report.duels)) {
+      console.log(`- ${gap.competition} ${gap.season}: ${gap.missing} von ${gap.total} Duellen fehlen, zuletzt ${date(gap.lastKickoff)}`);
+    }
+    const tail = more(report.duels); if (tail) console.log(tail);
+    console.log("    Maßnahme: Die Analyse holt sie, sobald der Wettbewerb im Umfang ist; sonst npm run strength -- --competition <id> --seasons 1");
   }
   const { goalsCompleteMismatch, goalSides, overdueUnsettled, oldestUnsettled } = report.results;
   if (goalsCompleteMismatch.length > 0 || goalSides.length > 0 || overdueUnsettled > 0) {

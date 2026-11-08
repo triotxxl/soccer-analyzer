@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-  eloSeasonGaps, goalSideMismatches, mappingIssues, sharedTeamIds, staleTeams, strengthGaps, type GoalSideRow,
+  eloSeasonGaps, goalSideMismatches, mappingIssues, sharedTeamIds, staleTeams, strengthDuelGaps,
+  strengthGaps, type GoalSideRow,
   type LeagueSeasonCount
 } from "../src/data-check.ts";
 import type { EloMatch } from "../src/elo-competitions.ts";
@@ -146,4 +147,14 @@ test("Tore beim falschen Team: Ereignisse tragen jedes Tor, nur anders verteilt"
     row({ fixtureId: 1373026, finalHome: 0, finalAway: 1, eventsHome: 1, eventsAway: 0 })
   ]);
   assert.deepEqual(found.map((item) => item.fixtureId), [1]);
+});
+
+test("Ligastärke-Duelle: Lücke je Wettbewerb ab drei fehlenden, belastbar oder nicht", () => {
+  const row = (competition: string, kickoff: number, stored: boolean) => ({ competition, season: 2026, kickoff, stored });
+  const gaps = strengthDuelGaps([
+    row("World · UEFA Champions League", 1, false), row("World · UEFA Champions League", 3, false),
+    row("World · UEFA Champions League", 2, false), row("World · UEFA Champions League", 4, true),
+    row("Germany · DFB Pokal", 1, false), row("Germany · DFB Pokal", 2, false), row("Germany · DFB Pokal", 3, true)
+  ]);
+  assert.deepEqual(gaps, [{ competition: "World · UEFA Champions League", season: 2026, missing: 3, total: 4, lastKickoff: 3 }]);
 });

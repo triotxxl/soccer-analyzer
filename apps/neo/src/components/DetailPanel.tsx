@@ -1,4 +1,5 @@
 import { leagueName, teamName, useNames } from "../../../shared/src/names";
+import { eloAgainstOf, eloAgainstText } from "../../../shared/src/eloAgainst";
 import type { DashboardFixture } from "../../../shared/src/types";
 import {
   dayKey, eloFormat, eloThin, formatDay, formatTime, goalsFormat, likelyTips, percent, strengthOf, type TeamRow, type Tip,
@@ -16,7 +17,7 @@ const LEVEL_HINT = "Liga-Niveau: das mittlere Elo der Vereine einer Liga. Zeigt,
 /** Elo beider Teams und, bei Spielen zwischen Ligen, das Liga-Niveau - je mit Urteil in Worten. */
 function StrengthLines({ fixture }: { fixture: DashboardFixture }) {
   const source = useNames();
-  const s = strengthOf(fixture, source);
+  const s = strengthOf(fixture, source), against = eloAgainstOf(fixture);
   if (!s.home.elo && !s.away.elo) return null;
   const side = (x: typeof s.home, strong: boolean) => (
     <span className={strong ? "up" : undefined}>
@@ -33,6 +34,7 @@ function StrengthLines({ fixture }: { fixture: DashboardFixture }) {
         <span className={s.league.stronger === "home" ? "up" : undefined}>{s.league.home.name} <span className="num">{eloFormat(s.league.home.level)}</span></span>
         <span className={s.league.stronger === "away" ? "up" : undefined}>{s.league.away.name} <span className="num">{eloFormat(s.league.away.level)}</span></span>
         <em>{s.league.verdict}</em></div>}
+      {against && <p className="sh-against"><span className="tag">Elo dagegen</span>{eloAgainstText(against, s.home.name, s.away.name)}</p>}
     </div>
   );
 }
@@ -40,7 +42,7 @@ function StrengthLines({ fixture }: { fixture: DashboardFixture }) {
 /** Kurzform für „Am ehesten“: der Tipp so, wie er im Kopf steht. */
 const likelyLabel = (tip: Tip) => (tip.market === "btts" ? (tip.pick === "Ja" ? "Beide treffen" : "Nicht beide treffen") : tip.pick);
 
-type DetailState = Pick<NeoState, "ou" | "moreOpen" | "fxSide" | "h2hVenue" | "perfRange" | "perfPrev" | "phSplit">;
+type DetailState = Pick<NeoState, "ou" | "moreOpen" | "fxSide" | "h2hVenue" | "perfRange" | "phSplit">;
 
 /**
  * Rechte Detailansicht. Bei „Spiele“ Marktchancen oder H2H des gewählten Spiels (Referenz `renderMarkets`,
@@ -80,7 +82,8 @@ export function DetailPanel({ fixture, fixtures, team, tip, timezone, view, ui, 
             <div className="sh-sub">
               <div className="mk-meta">
                 <span>{meta}</span>
-                {preds && tip && <span>Tipp <b>{likelyLabel(tip)}</b> <span className="num">{percent(tip.probability)}</span></span>}
+                {preds && tip && <span>{tip.author ? `Tipp aus ${tip.author.label}` : "Tipp"} <b>{likelyLabel(tip)}</b>
+                  {tip.probability != null && <> <span className="num">{percent(tip.probability)}</span></>}</span>}
                 {showFixture && !h2h && <>
                   <span>Erwartete Tore <b>{goalsFormat(fixture.expectedGoals.home)} : {goalsFormat(fixture.expectedGoals.away)}</b></span>
                   <span>Quoten: Tipico</span>
@@ -93,7 +96,7 @@ export function DetailPanel({ fixture, fixtures, team, tip, timezone, view, ui, 
           {likely.length > 0 && (
             <div className="sh-lead">
               <b>Am ehesten</b>
-              {likely.map((tip) => <span key={tip.id}><strong>{likelyLabel(tip)}</strong> <span className="num">{percent(tip.probability)}</span></span>)}
+              {likely.map((tip) => <span key={tip.id}><strong>{likelyLabel(tip)}</strong> <span className="num">{percent(tip.probability ?? 0)}</span></span>)}
             </div>
           )}
         </div>
@@ -104,7 +107,6 @@ export function DetailPanel({ fixture, fixtures, team, tip, timezone, view, ui, 
             ? <H2HBody fixture={fixture} fixtures={fixtures} timezone={timezone}
                 venue={ui.h2hVenue} onVenue={(h2hVenue) => onUi({ h2hVenue })}
                 perfRange={ui.perfRange} onPerfRange={(perfRange) => onUi({ perfRange })}
-                perfPrev={ui.perfPrev} onPerfPrev={(perfPrev) => onUi({ perfPrev })}
                 phSplit={ui.phSplit} onPhSplit={(phSplit) => onUi({ phSplit })} />
             : showFixture
               ? <MarketsBody fixture={fixture} ou={ui.ou} onOu={(ou) => onUi({ ou })} moreOpen={ui.moreOpen} onMoreOpen={(moreOpen) => onUi({ moreOpen })} />

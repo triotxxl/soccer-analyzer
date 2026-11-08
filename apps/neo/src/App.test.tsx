@@ -98,7 +98,7 @@ describe("Neo Dashboard", () => {
     expect(screen.getByRole("heading", { name: /London FC/ })).toBeInTheDocument();
   });
 
-  it("zeigt Teams aus den Ligatabellen und Modell-Tipps mit gesperrten Autoren", async () => {
+  it("zeigt Teams aus den Ligatabellen und Modell-Tipps", async () => {
     serve(DOCUMENT);
     render(<App />);
     await screen.findAllByText("Leeds AFC");
@@ -107,9 +107,31 @@ describe("Neo Dashboard", () => {
     fireEvent.click(screen.getByRole("button", { name: /Predictions/ }));
     expect(screen.getByRole("heading", { name: "Modell-Tipps" })).toBeInTheDocument();
     expect(screen.getAllByText("Chance laut Modell").length).toBe(3);
-    fireEvent.click(screen.getByRole("button", { name: /Quelle/ }));
-    expect(screen.getByRole("option", { name: /Autoren/ })).toBeDisabled();
     expect(screen.getByText(/rechne nicht mit Gewinn/)).toBeInTheDocument();
+  });
+
+  it("zeigt unter „Autoren“ Daves Filter mit ihren Warnungen statt Märkten und Wahrscheinlichkeit", async () => {
+    serve(DOCUMENT);
+    render(<App />);
+    await screen.findAllByText("Leeds AFC");
+    fireEvent.click(screen.getByRole("button", { name: /Predictions/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Quelle/ }));
+    fireEvent.click(screen.getByRole("option", { name: /Autoren/ }));
+    expect(screen.getByRole("heading", { name: "Daves Tipps" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Märkte/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Wahrscheinlichkeit/ })).not.toBeInTheDocument();
+    const warnings = screen.getByRole("list", { name: "Warnungen der Filter" });
+    expect(within(warnings).getAllByRole("listitem").length).toBe(3);
+    expect(warnings).toHaveTextContent(/Daves 1x2-Filter:.*Rechne nicht mit Gewinn/);
+
+    // Ein Filter abgewählt: seine Warnung verschwindet, die Quelle nennt die übrigen.
+    fireEvent.click(screen.getByRole("checkbox", { name: /Remis-Score/ }));
+    expect(within(warnings).getAllByRole("listitem").length).toBe(2);
+    expect(screen.getByRole("button", { name: /Quelle/ })).toHaveTextContent("Daves 1x2-Filter, Dominanz zum Kombipreis");
+
+    fireEvent.click(screen.getByRole("option", { name: /Modell/ }));
+    expect(screen.getByRole("heading", { name: "Modell-Tipps" })).toBeInTheDocument();
+    expect(screen.queryByRole("list", { name: "Warnungen der Filter" })).not.toBeInTheDocument();
   });
 
   it("zeigt rechts die Marktchancen des gewählten Spiels", async () => {
@@ -160,6 +182,8 @@ describe("Neo Dashboard", () => {
     expect(detail.getAllByText("Premier League").length).toBeGreaterThan(0);
     expect(await detail.findAllByText("erzielt")).toHaveLength(4);
     expect(detail.getByText(/aktuell 2./)).toBeInTheDocument();
+    expect(detail.getByRole("region", { name: /Tordifferenz-Verlauf/ })).toBeInTheDocument();
+    expect(detail.getAllByText(/aktuell \+\d+ · im Zeitraum \+\d+/).length).toBeGreaterThan(0);
     fireEvent.click(detail.getByRole("button", { name: "Nur in London FC" }));
     expect(detail.getByText(/Nur 2 Duelle – die Anteile/)).toBeInTheDocument();
     expect(detail.getByText(/gilt unabhängig vom Filter oben/)).toBeInTheDocument();

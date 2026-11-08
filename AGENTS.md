@@ -243,7 +243,7 @@ nur auf Davids ausdrücklichen Wunsch mit `ANALYZER_NEW_DATABASE=1`.
   der API); (3) Teams der Analyse, deren letztes Spiel über ein Jahr alt ist, mit Kandidaten für
   die zweite ID; (4) **Elo-Saisonlücken**: als vollständig markierte Ligasaisons unter 60 % des
   Medians (bekannt kurze in `KNOWN_SHORT_SEASONS`); (5) geschätzte Ligastärke mit Abstand zu
-  30 Duellen; (6) Torminuten „lückenlos“, die nicht zum Stand passen, Spiele mit allen Toren in der
+  30 Duellen, (5b) gespielte Duelle zwischen Ligen, die nicht in der Ligastärke stehen (seit 04.11.2026); (6) Torminuten „lückenlos“, die nicht zum Stand passen, Spiele mit allen Toren in der
   Ereignisliste, aber beim falschen Team (seit 02.11.2026, Eigentor-Fehler; bekannte Fehler der API in
   `KNOWN_SWAPPED_GOALS`), und lange offene Prognosen.
   Jede Regel stammt aus einem echten Fund (Kopf von `src/data-check.ts`). Erster Lauf 20.10.2026:
@@ -288,7 +288,8 @@ nur auf Davids ausdrücklichen Wunsch mit `ANALYZER_NEW_DATABASE=1`.
      (`ELO_COMPETITIONS`, `ELO_NATIONAL_CATEGORY_COMPETITIONS`, `ELO_WOMEN_CLUB_COMPETITIONS`,
      Verband in `CONFEDERATION_OF_COMPETITION`), dann `npm run elo -- build`.
   4. **Ligastärke:** Jedes Spiel mit „Kein Ligastärke-Vergleich verfügbar“ prüfen und den Pokal
-     gezielt nachladen (`npm run strength -- --competition <id>`).
+     gezielt nachladen (`npm run strength -- --competition <id>`). **Die laufende Saison holt die Analyse
+     seit 04.11.2026 selbst** (Punkt 5 oben, `buildMissingLeagueStrength`).
   5. **Prüfen, dass Bestehendes gleich bleibt:** Nach einer Änderung an Listen oder Einordnung
      müssen die Werte der übrigen Teams unverändert sein (so am 29.09.2026 für Vereine und
      A-Nationalteams nachgewiesen) - sonst ist es kein Nachziehen, sondern eine Modelländerung.
@@ -341,12 +342,15 @@ nur auf Davids ausdrücklichen Wunsch mit `ANALYZER_NEW_DATABASE=1`.
   Dashboard-Snapshot; das kostet keinen zusätzlichen Aufruf. Führt die Antwort kein Wappen
   oder lädt das Bild nicht, zeigt `TeamCrest` (`apps/shared/src/`) die beiden Anfangsbuchstaben. Snapshots
   aus Läufen vor dieser Ergänzung tragen die Felder nicht und bleiben bei den Initialen.
-- **Die alte App `apps/analyzer/` ist seit 26.10.2026 entfernt** (Davids Entscheidung): Tabelle,
-  Heatmap, Filtermenü, Quickpicker-Fenster, Wettschein, Kelly-Dialog, Marktprofil- und Live-Ansicht.
-  Mit ihr entfielen die Kelly-Auswahl (`selectKelly`), `npm run edge-report -- --simulate`, der
-  Endpunkt `/api/combos/markdown`, der UX-Agent `betting-ux-architect` und der Skill `betting-ux`.
-  Der letzte Stand liegt im Commit `3c7c35f` (Code und die Beschreibung der Ansichten in dieser
-  Datei). **Entscheidungen der alten App gelten für Neo nicht von selbst** - etwa Value nur hinter
+- **Die alte App `apps/analyzer/` war vom 26.10. bis 02.11.2026 entfernt** (Davids Entscheidung) und
+  ist **seit 02.11.2026 wieder da** (Davids Wunsch), unverändert aus Commit `3c7c35f`: Tabelle,
+  Heatmap, Filtermenü, Quickpicker-Fenster, Wettschein, Kelly-Dialog mit der Kelly-Auswahl
+  (`selectKelly` in `apps/analyzer/src/kelly.ts`), Marktprofil- und Live-Ansicht, dazu wieder der
+  Endpunkt `/api/combos/markdown`. `npm run app` (Port 5173), `app:build`, `app:preview`. Nicht
+  zurückgeholt: `npm run edge-report -- --simulate`, `npm run kelly-tracker`, der UX-Agent
+  `betting-ux-architect` und der Skill `betting-ux`. Die Beschreibung der Ansichten steht in
+  `3c7c35f:AGENTS.md`. Die Messungen zu Kelly im Abschnitt „Kelly-Automatik“ gelten für den Dialog
+  unverändert: Er findet keinen Vorteil gegen den Tipico-Preis. **Entscheidungen der alten App gelten für Neo nicht von selbst** - etwa Value nur hinter
   einem Schalter, kein Vorteil in Live, Grün heißt „Empfehlenswert“, Gegensätze eines Spiels nie in
   einer Kombi. Sie werden je Ansicht mit David neu entschieden; dort nachlesen, bevor etwas neu
   gebaut wird, das es schon einmal gab.
@@ -535,6 +539,32 @@ nur auf Davids ausdrücklichen Wunsch mit `ANALYZER_NEW_DATABASE=1`.
   späteren Analysen. Jetzt 300 Aufrufe an der einen Stelle. Am 19.10.2026 zusätzlich die älteren
   Saisons der Pokale mit Spielen zwischen Ligen seit 01.09. nachgeladen (Davids Entscheidung,
   Schätzung rund 2.400 Aufrufe in Etappen).
+- **Laufende Saison in die Ligastärke (seit 04.11.2026, Davids Entscheidung nach der Prüfung AEK - Real):**
+  `buildMissingLeagueStrength` lädt zuerst wie bisher drei Saisons der Wettbewerbe mit einer nicht
+  belastbaren Seite und danach mit dem Rest der 300 Aufrufe die laufende Saison **aller** Wettbewerbe
+  mit Spielen zwischen Ligen im Umfang. Vorher lud eine belastbare Ligastärke gar nicht mehr nach: Seit
+  Oktober fehlten alle 45 Spiele der Champions League, Griechenland stand vor Spanien. Die Saison holt die
+  Analyse ohnehin; es kostet nur die Heimatliga neuer Teams, einmal je Team und Saison (bei nationalen
+  Pokalen mit vielen unterklassigen Teams anfangs einige hundert Aufrufe, gedeckelt). Keine neue
+  Modellversion. Am 04.11.2026 einmalig die internationalen Vereinswettbewerbe nachgeladen (150 Aufrufe,
+  178 neue Duelle): UEFA-Pool Spanien 1611 → 1658, Griechenland 1634 → 1604, England 1767 → 1731. Gemessen
+  bringt das Schließen der Lücke keinen Gewinn (+0,0080 ± 0,0084, 116 Spiele); es geht um richtige Daten.
+  **Warum das niemand gemeldet hat:** Die Lücke stand seit 05.10.2026 in dieser Datei und wurde damals nur einmalig
+  nachgeladen, statt die Ursache zu beheben, und `data-check` sah nur nicht belastbare Ligen. Seither prüft
+  `data-check` Abschnitt 5b (`strengthDuelGaps`) gespielte Duelle der letzten 60 Tage gegen `strength_matches`; der erste
+  Lauf fand 15 weitere Wettbewerbe, ein sechzehnter kam beim Nachladen dazu (81 Aufrufe, 224 Duelle).
+- **Bei Vereinsspielen zwischen Ligen trägt die Aufteilung aus der Teamform nichts** (Prüfung AEK - Real vom
+  04.11.2026): Das Spiel ist kein Rechenfehler (2,486 : 1,410 nachgebaut, 84 % des Abstands zu Tipico aus den
+  Teamwerten, die nicht nach Gegner bereinigt sind, 16 % aus dem Faktor). Neben Elo und Faktor trägt die Form
+  dort −0,125 ± 0,107; gegen Tipico +0,0932 ± 0,0222 Log-Loss (406 Spiele), Europapokal und übrige gleich; wo das
+  Modell über 20 Punkte über fair lag, 46,1 % vorhergesagt, fair 19,9 %, eingetreten 19,5 ± 3,6 % (123 Spiele).
+  Das gilt nur für diese Spiele und die Aufteilung, nicht für Ligaspiele oder die Torsumme. **Modell unverändert**
+  (Davids Entscheidung): Die nachträglich gefundene Elo-Aufteilung läuft als vorab festgelegte Prüfung nur mit
+  (`docs/aufteilung-zwischen-ligen.md`, `npm run aufteilung-check`, `src/elo-split.ts`, 400 Spiele ab 05.11.2026;
+  Plan nicht ändern, bis dahin nur die Zahl nennen). Bis dahin zeigen beide Apps den Hinweis **„Elo dagegen“**
+  (`apps/shared/src/eloAgainst.ts`), wenn das Modell die Seite vorn sieht, die laut Elo mindestens 100 Punkte
+  schwächer ist, nur Vereine zwischen Ligen, nur bei belastbarem 1X2 und Elo-Vertrauen ab 30 %. Das sind 30 von 234
+  Spielen (dort stärkere Seite 56,0 ± 10,1 % eingetreten, Modell 30,0 %). Reine Anzeige, keine Regel liest ihn.
 - **„Saison fertig“ in der Ligastärke (seit 05.10.2026, `src/strength-builder.ts`):** Eine
   Pokalsaison gilt erst als fertig, wenn ihr `end` vorbei ist **und** keine Ansetzung mehr offen
   steht (PST zählt als offen, eine offene Ansetzung über 30 Tage vor heute aber als erledigt -
@@ -567,18 +597,57 @@ nur auf Davids ausdrücklichen Wunsch mit `ANALYZER_NEW_DATABASE=1`.
   **Zurückspielen:** `npm run restore` (`tools/restore.ts`, Abschnitt „Neuer PC“).
 ## Apps
 
-Seit 19.10.2026 liegen die Oberflächen unter `apps/` (vorher `frontend/`), seit 26.10.2026 ohne die
-alte App `apps/analyzer/` (Abschnitt „Pflege“):
+Seit 19.10.2026 liegen die Oberflächen unter `apps/` (vorher `frontend/`). Die alte App
+`apps/analyzer/` war vom 26.10. bis 02.11.2026 entfernt (Abschnitt „Pflege“):
 
+- `apps/analyzer/` - die **alte App** (`npm run app`, Port 5173, `app:build`, `app:preview`), seit
+  02.11.2026 wieder da, Stand vom 26.10.2026. Sie hat als einzige eine Live-Ansicht. Eigene Stildatei
+  `apps/analyzer/src/base.css` (alter Stand; die gemeinsame trägt seit 26.10. die Tokens von Neo). Neu seit
+  02.11.2026 (Davids Wunsch): **Tabellenverlauf** direkt unter „Direkte Begegnungen“ (`LeaguePerf.tsx`) - dasselbe
+  Diagramm und dieselbe Rechnung wie im H2H-Reiter von Neo, dafür nach `apps/shared/src/PerfChart.tsx` und
+  `apps/shared/src/perf.ts` (`tableEntryOf`, `perfWindow`, `perfTrend`) verschoben; 0 Aufrufe. Im **Quickpicker**
+  öffnet ein aufgeklapptes Spiel rechts eine dritte Spalte (`QuickpickDetail.tsx` über `renderDetail` in
+  `QuickpickUI.tsx`; das Fenster wird dafür breiter): Torphasen (`GoalPhasesPanel`, dieselbe Tafel wie in der
+  Detailansicht, aus den Detailkennzahlen - rund vier Aufrufe beim ersten Öffnen eines Spiels), direkte Duelle aus
+  der Analyse (`H2hSnapshot.tsx`, dieselbe Liste wie in der Detailansicht) und Tabellen- und Tordifferenz-Verlauf (alle 0 Aufrufe).
+  **Live seit 03.11.2026** (Davids Freigabe des Entwurfs https://claude.ai/artifact/D6XFu5HeV2ZZK5NrjrrDqH, im Stil der
+  alten App): Die Liste trägt **„Dein Tipp · jetzt“** - die zwei stärksten Empfehlungen von vor dem Anpfiff (★ vor ✓,
+  dann nach Chance, nie bei `probabilityReliable: false`) mit Stand („noch 2 Tore“, „erreicht“, „führt“) und Live-Chance
+  (`prematchTips` in `apps/analyzer/src/liveQuestions.ts`; Stand aus `marketStands`, 1. Halbzeit aus Stand bzw.
+  Pausenstand, 1X2/Remis aus dem Spielstand) -, eine Spieluhr unter der Minute (`matchClock`) und eine Zeile mit Toren
+  und Roten Karten (`eventSummary`). Ballbesitz steht als Balken unter „Aufs Tor“; die Spalten Ballbesitz und Pässe
+  sind entfallen. Die Quote von vor dem Anpfiff steht weiter nicht in der Zeile, nur im Tooltip und im Fenster. Das
+  Fenster (540 statt 440 px) hat die Reiter **Live** (Spielverlauf 0-90 bzw. 120 mit Toren und Karten, Chancen als
+  Kacheln, Tabelle „Deine Tipps vor dem Anpfiff · jetzt“ mit Quote, vorher, jetzt, Stand; ersetzt „Vor dem Anpfiff“)
+  und **H2H** (Bilanz, Hinweis unter 5 Duellen und bei über 2 Jahre altem letzten Duell, „Wie oft war es so?“ mit
+  einem Strich je Duell, letzte Duelle mit Pausenstand und S/U/N, Form; Filter „Alle / Nur in <Heim>“). H2H kommt aus
+  `h2h.history` des Snapshots über `duelsOf`/`duelStats` (`apps/shared/src/duels.ts`, bis dahin in Neo) - 0 Aufrufe.
+  Den Spielverlauf ordnet `event.side` der API zu; führt API-Football ein Tor beim falschen Team (Rochdale -
+  Doncaster am 03.11.2026), steht es dort.
+  **Leistung (seit 03.11.2026, Davids Auftrag „träge bei 600+ Spielen“):** Tabellen- und Heatmap-Zeilen sind
+  `memo` (`FixtureRow` in `App.tsx`, `HeatmapRow` in `HeatmapTable.tsx`); alle Listen in `Dashboard` hängen über
+  `useMemo` an ihren Eingaben, `now` ist eine Minutenuhr (`useMinuteClock`), Rückrufe an Zeilen laufen über
+  `useStableCallback`/`rowActions`. **Neue Props einer Zeile müssen ihre Identität behalten** (kein Inline-Objekt,
+  keine Inline-Funktion), sonst zeichnet wieder jede Bedienung alle Zeilen neu. Datumsformate über `dateFormat`
+  (`apps/analyzer/src/dateFormat.ts`), nie `new Intl.DateTimeFormat` je Zeile. Die Suche läuft über
+  `useDeferredValue`, Zeilen außerhalb des Bildes über `content-visibility` (nicht bei offenem Wettschein-Menü,
+  Klasse `cart-open`). `/api/dashboard/latest` trägt ein ETag, unverändert kommt 304 (`fetchDashboardIfChanged` in
+  `apps/shared/src/data.ts`) - vorher lud jede App alle 5 s den ganzen Snapshot (987 Spiele = 48,6 MB). Gemessen
+  (jsdom, 700 Spiele): Filtermenü 1,8 s → 0,04 s, Aufklappen 3,1 s → 0,19 s; in Chrome keine langen Blockaden mehr
+  beim Tippen und im Leerlauf. Teuer bleibt nur, was jede Zeile ändert (Marktwechsel rund 0,4 s bei 987 Spielen).
 - `apps/neo/` - das **Neo Dashboard** (`npm run neo`, Port 5174, `neo:build`, `neo:preview`), die
-  einzige App. Sie liest den Snapshot, den `npm run dashboard` schreibt. **Seit 27.10.2026 die Startseite der
+  neue App. Sie liest den Snapshot, den `npm run dashboard` schreibt. **Seit 27.10.2026 die Startseite der
   freigegebenen Referenz `docs/neo-referenz.html`** (aus Davids Vorlage `docs/NEO-Kickoff-referenz.html`), mit echten
   Daten: Spiele (nach Anstoß oder Liga, 1X2-Balken aus `pick` + Remis + Rest, Tipico-Quoten, `dataConfidence` als
   „Datenlage“), Teams (Ligatabellen aus `fixture.table`; Form = letzte fünf Tabellenspiele heim und auswärts, seit
   `schemaVersion: 9` je Tabellenzeile `form` aus `tableForm` in `src/draw-criteria.ts` - dieselben Saisonpartien und
   dieselbe Eingrenzung wie `buildTable`, 0 Aufrufe; nicht `form.home`/`form.away` der Spiele, die nur am Spielort
-  zählen. Zonen gibt es nicht), Predictions (je Spiel der wahrscheinlichste Tipp aus 1X2, Über/Unter 2,5, BTTS; Quelle „Autoren“
-  gesperrt mit „folgt“, Davids Entscheidung - Autoren-Tipps kommen später; seit 28.10.2026 je Tag „Nach Chance“ oder
+  zählen. Zonen gibt es nicht), Predictions (je Spiel der wahrscheinlichste Tipp aus 1X2, Über/Unter 2,5, BTTS; **Quelle „Autoren“ seit
+  02.11.2026 die drei Daves-Filter** - Daves 1x2-Filter, Dominanz, Remis-Score -, einzeln anzuhaken, jeder mit seiner
+  Vorgabe-Stufe und `warnung` sichtbar über der Liste, Davids Wahl; `authorTips` in `neoData.ts` ruft `evaluateFixture`
+  aus `src/quickpick.ts`, keine zweite Fassung der Regel; ein Spiel steht je Filter einmal da, die Chance daneben ist die
+  des Modells, bei Dominanz gegen den Modelltipp mit „Modell dagegen“; Märkte und Wahrscheinlichkeit gelten dort nicht
+  und sind ausgeblendet; seit 28.10.2026 je Tag „Nach Chance“ oder
   „Nach Anstoß“ geordnet, `sortTips`, und rechts das H2H zum Spiel des gewählten Tipps, ohne Reiter, mit dem Tipp im
   Kopf - Davids Wunsch), Zeitraum- und Wettbewerbsauswahl
   (Pokal heuristisch, `isCup` in `apps/neo/src/neoData.ts`). **Vorbei ist vorbei** (seit 29.10.2026, Davids Wunsch):
@@ -593,12 +662,33 @@ alte App `apps/analyzer/` (Abschnitt „Pflege“):
   0-5, 6+; vier wahrscheinlichste Endstände aus der Poisson-Matrix; Pausenstand aus den Halbzeit-λ; erstes Tor =
   λ-Anteil × P(mindestens ein Tor)). Bei `probabilityReliable: false` fehlen Halbzeit, erstes Tor und Endstände. Halbzeit-1X2,
   erstes Tor und Endstände sind **nicht an alten Spielen geprüft** - die App sagt das; wer sie für Filter oder Tipps nutzt,
-  misst vorher. Über/Unter 0,5 und 4,5 haben keine Tipico-Quote. **Reiter H2H seit 28.10.2026**
+  misst vorher. Über/Unter 0,5 und 4,5 haben keine Tipico-Quote. **Immer nur eine Saison (seit 04.11.2026, Davids Vorgabe, auch für Turniere):** Tabellen- und Tordifferenz-Verlauf zeigen in beiden Apps
+  die laufende Saison oder Ausgabe. „Letzte Saison“ ersetzt die Ansicht (`seasonList`, `useSeasonChoice` in `apps/shared/src/seasonView.ts`),
+  gilt nur für das geöffnete Spiel und wird nicht gemerkt; die gestrichelte Überlagerung „Vorjahr“ gibt es nicht mehr. Bei Turnieren kommt die
+  letzte Ausgabe aus `tournamentTable` (`previousPositions`). Die Torphasen zeigen **nur** die laufende Saison, ohne Umschalter (`seasonMatches`:
+  Wettbewerb dieses Spiels, sonst die eigene Liga) - in der alten App mischte die Heatmap bei Pokalspielen bis dahin alle Wettbewerbe und Saisons.
+  **Ohne Torminuten keine Nullen (seit 06.11.2026, Davids Wunsch, `minuteCover`):** Ein 0:0 ohne Ereignisliste gilt als vollständig; in einer Liga, deren
+  Spiele mit Toren keine Minuten tragen (Sambia), stand die Heatmap deshalb mit lauter Nullen da. Jetzt steht dort „keine Torminuten“, je Team auf der ganzen
+  Saison gemessen, und bei einer Teillücke zählt der Kopf „2 von 5 Spielen“.
+  **Tordifferenz-Verlauf seit 04.11.2026** (Davids Wunsch, in Neo im H2H-Reiter und in der alten App in `LeaguePerf.tsx`, je unter dem Tabellenverlauf):
+  Tore minus Gegentore der Tabelle nach jedem Spieltag, Plus oben, Minus unten, Nulllinie hervorgehoben (`GoalDiffChart`
+  in `apps/shared/src/PerfChart.tsx`, Rechnung `goalDiffScale`/`goalDiffTrend` in `perf.ts`). Zeitraum und Saison teilt
+  er mit dem Tabellenverlauf, damit die Spieltage untereinander stehen; „im Zeitraum“ zählt ab
+  dem Stand vor dem ersten Spieltag des Zeitraums. Daten ab `schemaVersion: 13`, 0 Aufrufe: `goalDiffs`/`previousGoalDiffs`
+  je Tabellenzeile (`tableProgress` in `src/draw-criteria.ts`, dieselben Partien wie `tablePositions`, Nachholspiele
+  zählen zu ihrem Spieltag). Ältere Snapshots zeigen „erscheint nach der nächsten Analyse“.
+  **Tabelle bei Spielen zwischen Ligen seit 04.11.2026** (Davids Vorgabe, `schemaVersion: 14`, 0 Aufrufe): **Im Turnier
+  zählt die Platzierung im Turnier, in der Liga die Ligaspiele.** Solche Spiele tragen je Team die Zeile der Turniertabelle
+  (`tournamentTable`: Ligaphase oder Gruppe, in der K.-o.-Runde die letzte Tabelle des Teams; Gruppen über `stageGroupOf`,
+  weil API-Football alle Gruppen in einem Abschnitt führt). Nur wo es keine Tabelle gibt (reiner K.-o.-Pokal, vor dem ersten
+  Spiel), gilt die eigene Liga, zuletzt `domesticTable` aus `domesticHistory`. Reihenfolge in `tableEntryOf`. Beide Felder
+  sind reine Anzeige: `table` bleibt bei diesen Spielen leer, weil die Filter dort bewusst keine Tabelle kennen.
+  **Reiter H2H seit 28.10.2026**
   (`apps/neo/src/components/H2HPanel.tsx`, nach Davids Entscheidungen aus der impeccable-Prüfung vom selben Tag): Kopfzeile
   „In den Duellen“, Block **„Direkte Duelle (H2H)“** mit Filter „Alle / Nur in <Heim>“ (Bilanz mit höchstem Sieg und
   Datum, Häufigkeiten als „5 von 8“ mit einem Kästchen je Duell - bewusst nicht in der Zeilenform der Marktchancen, damit
   sie nicht als Chance gelesen werden -, letzte Duelle, Torphasen der Duelle) und Block **„Aktuelle Saison“**, unabhängig
-  vom Filter (Form Liga und Heim/Auswärts, Tabellenverlauf, Torphasen der Saison). Unter 5 Duellen bzw. Spielen
+  vom Filter (Form Liga und Heim/Auswärts, Tabellenverlauf, Tordifferenz-Verlauf, Torphasen der Saison). Unter 5 Duellen bzw. Spielen
   „kann auch Zufall sein“. Testspiele zählen dort nicht mit. Daten ab `schemaVersion: 11`, 0 Aufrufe:
   `h2h.history` (bis zu 10 Duelle mit Wettbewerb, `h2hHistory` in `src/draw-criteria.ts`; `h2h.matches` bleibt bei
   fünf, weil Remis-Score und Statistik darauf stehen) und je Tabellenzeile `positions`/`previousPositions` (Platz nach
@@ -610,14 +700,15 @@ alte App `apps/analyzer/` (Abschnitt „Pflege“):
   `.interface-design/system.md`.
 - `apps/shared/` - Bausteine für Apps: `server/endpoints.ts` (`dataEndpoints()`: Dashboard, Live,
   Detailkennzahlen, Marktprofil), `src/` (`types.ts`, `data.ts`, `liveData.ts`, `names.ts`,
-  `TeamCrest.tsx`, `countryFlags.ts`), `styles/base.css` (Farb-Tokens, Schrift, Reset, Wappen) und
+  `TeamCrest.tsx`, `countryFlags.ts`, `perf.ts`/`PerfChart.tsx` Tabellen- und Tordifferenz-Verlauf, `duels.ts` direkte Duelle - je für
+  beide Apps), `styles/base.css` (Farb-Tokens, Schrift, Reset, Wappen) und
   `vitest.setup.ts`.
-- `npm run app:test` läuft über `vitest.config.ts` in der Wurzel: Neo, `apps/shared` und die
-  Quickpick-Regeln (`test/rules/*.spec.ts`). `npm run typecheck` prüft Wurzel und Neo
-  (`apps/tsconfig.base.json`). Ein neues npm-Script gehört in `.claude/hooks/pruefer-waechter.ts`
+- `npm run app:test` läuft über `vitest.config.ts` in der Wurzel: alte App, Neo, `apps/shared` und die
+  Quickpick-Regeln (`test/rules/*.spec.ts`; die Quickpick-Tests der alten App liegen seit 26.10.2026
+  dort). `npm run typecheck` prüft Wurzel, alte App und Neo (`apps/tsconfig.base.json`). Ein neues npm-Script gehört in `.claude/hooks/pruefer-waechter.ts`
   eingeordnet, sonst schlägt `test/pruefer-waechter.test.ts` fehl.
-- Neo hat vorerst keine Live-Ansicht. Kommt eine zweite App dazu, startet jede ihren eigenen Server mit
-  denselben Endpunkten - **zeigen beide gleichzeitig Live, fragen zwei Server API-Football ab**.
+- Neo hat vorerst keine Live-Ansicht. Jede App startet ihren eigenen Server mit denselben Endpunkten -
+  **zeigen beide gleichzeitig Live, fragen zwei Server API-Football ab**.
 
 ## Stack-Karte
 
@@ -803,6 +894,9 @@ nachgezogen, nicht gesammelt am Ende.
   Ligaliste, 0 Aufrufe) und `cardData` (`AnalyzerDatabase.cardDataByLeague`: unter einer Gelben
   je Spiel über mindestens 20 Spiele = keine Kartendaten; am 29.09.2026 31 von 211 Ligen).
   Ältere Snapshots tragen beides nicht; die App sagt dann nichts Falsches, nur weniger.
+- **Seit 03.11.2026** zeigt die Live-Liste der alten App den Stand der Empfehlungen von vor dem Anpfiff (★/✓, Stand,
+  Live-Chance) und das Fenster einen Reiter H2H - Aufbau im Abschnitt „Apps“. Das ist Anzeige: keine neue
+  Wahrscheinlichkeit, keine Quote in der Zeile (Davids Entscheidung vom 28.09.2026 gilt weiter), kein Vorteil.
 - **Bewusst nicht gebaut:** Momentum, `/odds/live` (Live-Preis neben Live-Chance wäre genau der
   Vorteil, den Live nie zeigt), „Karten ab N“ (die Sortierung erledigt das), „Nur mit
   Live-Statistik“ (die Statistik trägt keine belastbare Aussage; der Filter versteckte Spiele,
@@ -816,12 +910,14 @@ nachgezogen, nicht gesammelt am Ende.
   Ursache in `analyzeFixture`: 75 % Ortswert plus 25 % Gesamtwert, beides durch den Ligaschnitt
   des Spielorts geteilt - das staucht λH/λA um rund 0,89. Tipico selbst ist dabei unverzerrt.
   Korrektur `shiftHomeAway` (`src/model.ts`) **nach** `recalibrateGoals`, Summe fest, nur
-  Ligaspiele (`!crossLeague` im Analyzer), Stärke `config.goalLineHomeShift`. **Ab Werk 0 =
-  aus.** Einschalten nach der BTTS-Prüfung (`docs/btts-pruefung.md`, rund Mitte November):
-  0,054 setzen, `goalLineModelVersion` **3.8.0** (3.6.0 ist seit 19.10.2026 die Ligastärke
-  geschätzter Ligen, 3.7.0 seit 28.10.2026 das Liga-Niveau aus dem Vereins-Elo), dann beginnen die
-  modellgebundenen Quickpick-Messungen neu (`MODEL_BOUND_SINCE.modell1x2` auf 3.8.0 setzen);
-  `STRENGTH_COMPARABLE_SINCE` bleibt (Spiele zwischen Ligen rechnen identisch). Gemessen: 1X2-Log-Loss −0,0035 ± 0,0013 an 4.038 echten Ligaprognosen, an 74.033
+  Ligaspiele (`!crossLeague` im Analyzer), Stärke `config.goalLineHomeShift` 0,054.
+  **Eingeschaltet am 04.11.2026, `goalLineModelVersion` 3.8.0** (Davids Entscheidung, nach dem
+  Abschluss der BTTS-Prüfung). Die modellgebundenen Quickpick-Messungen beginnen damit neu
+  (`MODEL_BOUND_SINCE`: hz15, remis, modell1x2 ab 3.8.0), die Knöpfe tragen bis dahin den Stand vom
+  04.11.2026. `STRENGTH_COMPARABLE_SINCE` zählt weiter (Spiele zwischen Ligen rechnen identisch),
+  `Liga-Niveau` steht seitdem in der Liste. **Spiele zwischen Ligen bleiben ohne Verschiebung**, bis
+  die vorab festgelegte Prüfung `docs/heimvorteil-zwischen-ligen.md` entschieden ist (400 Spiele ab
+  05.11.2026, rund Mitte Dezember; Plan nicht ändern). Gemessen: 1X2-Log-Loss −0,0035 ± 0,0013 an 4.038 echten Ligaprognosen, an 74.033
   nachgebauten Ligaspielen −0,0036 / −0,0023 ± 0,0004 im Zeit-Split; Über/Unter unverändert,
   BTTS praktisch gleich; gegen Tipico fair nur ein Zehntel näher. Die Behebung an der Wurzel
   maß etwas schlechter und bewegte Spiele zwischen Ligen und Länderspiele ungemessen mit.
@@ -846,8 +942,9 @@ nachgezogen, nicht gesammelt am Ende.
 
 ## Kelly-Automatik und Marktprofil
 
-- **Seit 26.10.2026 gibt es keine Kelly-Auswahl mehr** (Davids Entscheidung, mit der alten App
-  entfernt): `selectKelly`, `recommendedSettings`, `marketCandidates`, `applyStakeFloor`, der
+- **Seit 02.11.2026 ist die Kelly-Auswahl mit der alten App wieder da** (`apps/analyzer/src/kelly.ts`,
+  Kelly-Dialog); `edge-report -- --simulate` und `kelly-tracker` nicht. Vom 26.10. bis 02.11.2026 gab
+  es keine Kelly-Auswahl (Davids Entscheidung, mit der alten App entfernt): `selectKelly`, `recommendedSettings`, `marketCandidates`, `applyStakeFloor`, der
   Kelly-Dialog und `npm run edge-report -- --simulate` standen in `apps/analyzer/src/kelly.ts`
   (Commit `3c7c35f`). Geblieben sind `autoDecide`, `AUTO_RULE` und `buildMarketProfile`
   (`src/market-profile.ts`), das Marktprofil über `/api/market-profile`, `npm run edge-report` mit
@@ -876,6 +973,9 @@ nachgezogen, nicht gesammelt am Ende.
   - Die **Automatik beachtet die Marktabwahl** (`disabledMarkets`, 1X2 ab Werk aus).
   - Eine Häufung auf einem angehobenen Markt (am Wochenende fast nur BTTS Nein) wird im Dialog
     **nur benannt** (`concentrationNotice`), die Auswahl bleibt.
+  - **Abgeschlossen am 04.11.2026: nicht bestanden** (2.500 Spiele, b = 0,276 ± 0,173, nötig über
+    2 Standardfehler; eingetreten 55,4 %, fair 55,6 %, Modell 55,9 %). „Kein Vorteil gegen den
+    Tipico-Preis“ gilt damit ohne Ausnahme.
   - BTTS, der einzige Hinweis auf eigenes Wissen (b = 0,37 ± 0,17, nachträglich herausgegriffen,
     in der zweiten Hälfte nicht stabil), wird **vorab festgelegt geprüft**:
     `docs/btts-pruefung.md`, `npm run btts-check`, ab 07.10.2026, 2.500 Spiele.
@@ -1334,7 +1434,7 @@ nachgezogen, nicht gesammelt am Ende.
 Der **Quickpicker** wählt Spiele des Snapshots nach einer **Voreinstellung** aus. Die Regeln stehen in
 `src/quickpick*.ts`, ihre Tests in `test/rules/quickpick.spec.ts`. Fenster, gemerkte Regler und
 Wettschein gehörten zur alten App und sind seit 26.10.2026 entfernt.
-Es gibt sieben, und sie haben **verschiedene Maßstäbe** - was für die eine gilt, gilt für die
+Es gibt acht, und sie haben **verschiedene Maßstäbe** - was für die eine gilt, gilt für die
 anderen ausdrücklich nicht.
 
 ### Gemeinsames Gerüst
@@ -1355,13 +1455,13 @@ anderen ausdrücklich nicht.
   App Treffer nach Stärke, braucht sie einen eigenen Zweig je Voreinstellung - die alte App fiel ohne
   ihn still in den Remis-Zweig, und der Compiler merkte es nicht.
 - Das Feld `group` im Deskriptor (`QUICKPICK_GROUPS` in `src/quickpick.ts`) ordnet jede
-  Voreinstellung einer Gruppe zu: **Daves Filter** (`daves1x2`, `dominanz`, `remisScore`) wählen über
+  Voreinstellung einer Gruppe zu: **Daves Filter** (`daves1x2`, `dominanz`, `remisScore`, `davesTable`) wählen über
   Tabelle, H2H und Form, **Modell-Filter** (`modell1x2`, `hz15`, `remis`) über Wahrscheinlichkeiten
   und Torerwartung des Modells, **Tipico-Filter** (`kombi`) über die Tipico-Quote ohne Aufschlag. Die
   Gruppe ist reine Anzeige, keine Regel liest sie.
 - `QuickpickPreset.warnung` ist der Haken in einem Satz, gekürzt aus `honesty`, und gehört immer
   sichtbar neben die Treffer. Sie nennt keine Zahl, die nur für eine Stufe gilt, und wird bei jeder
-  Nachkalibrierung mit `honesty` geprüft. Bei „Erste Halbzeit“ steht trotz +6,8 % bei Streng „Rechne
+  Nachkalibrierung mit `honesty` geprüft. Bei „Erste Halbzeit“ stand schon bei +6,8 % für Streng „Rechne
   nicht mit Gewinn“ (Schwellen an denselben Daten gesucht, zweite Zeithälfte überall schwächer).
 - **Die Messwerte der Stufen sind Zahlen, keine Strings.** `QuickpickLevel.measured` trägt
   `{ n, proTag, trefferquote, roi }`; den Knopftext formatiert `preset.noteOf`. Früher stand
@@ -1393,6 +1493,34 @@ anderen ausdrücklich nicht.
   Dominanz und Remis-Score sind damit ganz korrigiert, Daves 1x2 nur beim Tabellenvorsprung.
   Wirkung: Dominanz um 2 bis 6 Punkte schlechter, Remis-Score-Trefferquote um bis zu 8 Punkte
   niedriger, Daves unverändert.
+
+### Nachkalibrierung 04.11.2026 (12.041 abgerechnete Spiele)
+
+Alle Knöpfe und Texte stehen auf diesem Stand; die Messwerte in den Abschnitten darunter sind ältere
+Stände. Treffer je Tipp und Ertrag je Tipp, Stufen Streng / Ausgewogen / Locker / Weit:
+
+| Filter | Treffer | Ertrag |
+|---|---|---|
+| Daves 1x2 | 64,6 / 63,8 / 63,3 / 60,9 % | −4,0 / −4,6 / −5,1 / −6,7 % |
+| Dominanz | 42,7 / 39,7 / 45,7 / 42,5 % | −13,4 / −12,7 / −13,2 / −12,2 % |
+| Remis-Score | 22,5 / 28,1 / 29,2 / 27,4 % | −33,8 / −14,5 / −8,3 / −12,0 % |
+| Daves Table | 51,1 / 37,2 / 39,0 / 41,0 % | +2,4 / −18,0 / −10,5 / −6,7 % |
+| Sieger laut Modell (ab 3.2.0) | 69,9 / 64,8 / 61,9 / 59,0 % | +1,2 / −3,8 / −6,1 / −8,6 % |
+| Erste Halbzeit (ab 3.6.0) | 53,0 / 50,8 / 50,6 / 46,1 % | −5,4 / −6,7 / −4,0 / −8,5 % |
+| Remis-Kandidaten (ab 3.6.0) | 47,4 / 47,1 / 38,5 / 37,4 % | +27,4 / +26,5 / +9,6 / +8,4 % |
+| Kombi-Tipps | 57,9 / 56,6 / 55,9 / 54,5 % | −6,3 / −7,3 / −7,3 / −7,8 % |
+
+- **Daves 1x2:** Der Vorsprung von „Ausgewogen“ (66,5 %, −0,8 %) war Zufall, die Stufen sind nicht
+  trennbar, auf keinem Knopf steht mehr „die beste“.
+- **Erste Halbzeit:** Das Plus von Streng (+6,8 %) hat nicht gehalten, jede Stufe liegt im Minus.
+- **Remis-Score:** Streng trifft nicht besser als die Basisrate, die Warnung sagt das jetzt.
+- **Remis-Kandidaten:** nur 19 bis 99 Tipps - das Plus ist kein Beleg. Vorher maß der Report nur die
+  laufende Version (5 bis 39 Tipps); die Regel „ab 3.6.0“ vom 19.10.2026 stand nicht im Code.
+- **Sieger laut Modell:** Nachmessung ab 3.5.0 erledigt (251 Tipps Vorgabe, 64,9 %, −3,2 ± 3,0 %,
+  Zeithälften 64,8 / 65,1 %); das schwache Bild vom 10.10. hat nicht gehalten.
+
+Seit 3.8.0 zählen die drei modellgebundenen Filter bei 0; mit den ersten Spielen meldet der Report dort Abweichungen -
+nachgezogen wird erst ab rund 100 Tipps der Vorgabestufe.
 
 ### „Daves 1x2-Filter": klar überlegene Mannschaften
 
@@ -1657,6 +1785,10 @@ anderen ausdrücklich nicht.
   +8,4 %, weit 13,6 bei 32,9 % und −0,4 %. Vorgabe ist `ausgewogen`: die stabilste Stufe
   (36,1 % gegen 40,2 % in den Zeithälften), während `streng` mit 33,3 % gegen 47,6 % weit
   auseinanderläuft.
+- **Stand 04.11.2026 (ab 3.6.0): zu wenige Spiele für eine Aussage.** Streng 19 Tipps 47,4 %,
+  Ausgewogen 34 Tipps 47,1 %, Locker 52 Tipps 38,5 %, Weit 99 Tipps 37,4 %. Das widerspricht dem
+  Absatz darunter und belegt nichts; die Texte in der App nennen die Spielzahl. Seit 3.8.0 misst
+  der Filter neu, die Remis-Chance jedes Ligaspiels verschiebt sich leicht mit.
 - **Mit dem laufenden Modell trägt dieser Filter kaum noch** (Nachkalibrierung 28.09.2026, nur
   Modellversion 3.2.0, 3.695 Partien - Davids Entscheidung, modellgebundene Filter nur am
   laufenden Modell zu messen): streng 1,2/Tag bei **20,7 ± 7,5 %** und −44,8 %, ausgewogen 2,6
@@ -1807,3 +1939,20 @@ anderen ausdrücklich nicht.
   wurden 15 Kriterien in drei Bändern geprüft, einzelne Zwei-Sigma-Treffer sind da zu erwarten.
 
 - Vor Codeänderungen und danach: `npm test` und `npm run typecheck`
+
+### „Daves Table-Filter": Hoch gegen Tief in der Tabelle (seit 02.11.2026)
+
+- Davids Auftrag vom 02.11.2026 (`davesTable`, `src/quickpick-davestable.ts`, Gruppe Daves Filter): Ligaspiele, in
+  denen eine Mannschaft in der Tabelle steigt und die andere fällt, oder eine konstant **vor** einer fallenden steht
+  (Davids „konstant gut", nicht konstant schlecht). Getippt wird die Seite im Hoch, Quote ab 1,60 (Davids Vorgabe,
+  Identität). Grundlage sind die Plätze nach jedem Spieltag (`positions`, ab schemaVersion 11): Trend = Platz am
+  Anfang minus Platz jetzt über 5 bzw. 10 Spieltage; „steigt" ab 2 in 5 oder 3 in 10, ohne dass der andere
+  Zeitraum dagegen zeigt; „konstant" höchstens 1 bzw. 2. Nur Spiele, deren Tabelle beide Teams trägt, je mindestens
+  6 Spieltage. Stufen staffeln Trendstärke, „konstant" und bei Streng die Höchstquote 3,00.
+- **Erste Rückrechnung 02.11.2026, rund 4,4 Tage** (die Plätze gibt es erst seit 28.10.): Vorgabe 160 Tipps, 34,4 %
+  Treffer bei Ø-Quote 2,59, **−23,2 ± 3,8 % je Tipp**; Streng 40 Tipps, 47,5 %, −3,5 ± 7,9 %. Viele Treffer sind
+  laut Quote Außenseiter, der Markt kennt die Tabelle. Die Vorgabe ist Daves Regel, nicht die beste Stufe.
+  **Nachmessen nach rund zwei Wochen weiterer Analysen** (`npm run quickpick-report -- --preset davesTable`), ohne
+  die Schwellen an diesen Daten nachzustellen. In Neo steht er noch nicht unter „Autoren".
+- In der alten App mit Reglern (Plätze in 5/10, Spieltage, Quote) und Schalter „Auch konstant gut gegen
+  abrutschend"; Spalten „Im Hoch"/„Im Tief" („6. · +4 in 5 · +7 in 10"), Stärke „Trend ±n".

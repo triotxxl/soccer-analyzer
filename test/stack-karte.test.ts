@@ -17,7 +17,7 @@ const page = readFileSync(PAGE_FILE, "utf8");
 const HINT = `${PAGE_FILE} nachziehen und neu veröffentlichen (AGENTS.md, Abschnitt „Stack-Karte“)`;
 
 /** Pfade, die die Karte bewusst als entfernt nennt. */
-const REMOVED_PATHS = ["apps/analyzer"];
+const REMOVED_PATHS: string[] = [];
 
 const packageJson = JSON.parse(readFileSync("package.json", "utf8")) as {
   scripts: Record<string, string>;

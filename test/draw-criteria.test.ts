@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildTable, h2hHistory, leagueAverages, roundStage, scoreDrawFixture, tableForm, tablePositions, tableScopeOf } from "../src/draw-criteria.ts";
+import { buildTable, h2hHistory, leagueAverages, roundStage, scoreDrawFixture, stageGroupOf, tableForm, tablePositions, tableProgress, tableScopeOf } from "../src/draw-criteria.ts";
 import { formatDrawAnalysis } from "../src/output.ts";
-import type { ApiFixtureOdds, DrawScoreRow } from "../src/types.ts";
+import type { ApiFixture, ApiFixtureOdds, DrawScoreRow } from "../src/types.ts";
 import { fixture, history } from "./helpers.ts";
 
 function odds(fixtureId: number): ApiFixtureOdds[] {
@@ -245,6 +245,23 @@ test("tablePositions rechnet den Platz nach jedem Spieltag wie buildTable", () =
   for (const row of final) assert.equal(positions.get(row.id)!.at(-1), row.position);
   assert.deepEqual(tablePositions(fixtures, cutoff, { ...scope, season: 2025 }).get(1), [1]);
   assert.equal(tablePositions(fixtures, cutoff, { season: 2026, stage: null, matchdaysOnly: false }).size, 0);
+
+  // Tordifferenz: dieselben Partien, zusammengezählt; das Nachholspiel zählt zu Spieltag 2
+  const { goalDiffs } = tableProgress(fixtures, cutoff, scope);
+  assert.deepEqual(goalDiffs.get(1), [-1, 3, 6]);
+  assert.deepEqual(goalDiffs.get(2), [1, 1, 1]);
+  for (const row of final) assert.equal(goalDiffs.get(row.id)!.at(-1), row.goalsFor - row.goalsAgainst);
+});
+
+test("tableProgress führt ein Team bis zu seinem ersten Spiel mit null", () => {
+  const cutoff = 2_000_000_000;
+  const scope = tableScopeOf(fixture({ id: 99, timestamp: cutoff + 10, homeId: 1, awayId: 2, season: 2026, round: "Regular Season - 3" }));
+  const { goalDiffs } = tableProgress([
+    fixture({ id: 1, timestamp: cutoff - 900, homeId: 1, awayId: 2, homeGoals: 2, awayGoals: 0, season: 2026, round: "Regular Season - 1" }),
+    fixture({ id: 2, timestamp: cutoff - 800, homeId: 3, awayId: 1, homeGoals: 1, awayGoals: 1, season: 2026, round: "Regular Season - 2" })
+  ], cutoff, scope);
+  assert.deepEqual(goalDiffs.get(3), [null, 0]);
+  assert.deepEqual(goalDiffs.get(2), [-2, -2]);
 });
 
 test("h2hHistory führt bis zu zehn Duelle mit Wettbewerb, neueste zuerst", () => {
@@ -345,4 +362,14 @@ test("roundStage erkennt Spieltag, Abschnitt und K.-o.-Runde", () => {
   assert.deepEqual(roundStage("Apertura - 5"), { stage: "Apertura", matchday: true });
   assert.deepEqual(roundStage("Apertura - Semi-finals"), { stage: "Apertura", matchday: false });
   assert.deepEqual(roundStage("Quarter-finals"), { stage: null, matchday: false });
+});
+
+test("Gruppe eines Teams: verbunden über Spiele, Ligaphase bleibt ganz", () => {
+  const game = (id: number, home: number, away: number) =>
+    ({ fixture: { id }, teams: { home: { id: home }, away: { id: away } } }) as unknown as ApiFixture;
+  const groups = [game(1, 1, 2), game(2, 3, 2), game(3, 7, 8), game(4, 8, 9)];
+  assert.deepEqual(stageGroupOf(groups, 1).map((match) => match.fixture.id), [1, 2]);
+  assert.deepEqual(stageGroupOf(groups, 9).map((match) => match.fixture.id), [3, 4]);
+  assert.equal(stageGroupOf([...groups, game(5, 2, 8)], 1).length, 5);
+  assert.deepEqual(stageGroupOf(groups, 99), []);
 });
