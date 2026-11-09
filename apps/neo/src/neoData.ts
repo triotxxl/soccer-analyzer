@@ -183,7 +183,7 @@ export function oneXTwo(fixture: Pick<DashboardFixture, "markets">): OneXTwo | n
     : { home: other, draw: draw.probability, away: pick };
 }
 
-/** Tipico-Quoten für 1, X und 2 - nur Anzeige, sie ändern keinen Tipp. */
+/** Quoten für 1, X und 2 (Anbieter laut `quoteSourceName`) - nur Anzeige, sie ändern keinen Tipp. */
 export function oddsTriple(fixture: Pick<DashboardFixture, "markets">): [number | null, number | null, number | null] {
   const winner = marketOf(fixture, "1x2"), draw = marketOf(fixture, "draw");
   return [winner?.oddsHome ?? null, draw?.odds ?? null, winner?.oddsAway ?? null];
@@ -529,7 +529,7 @@ export function classBadge(fixture: DashboardFixture, strength: StrengthView):
   }
   const g = fixture.classGap;
   if (!g) return null;
-  return { level: g.level, stronger: g.stronger, basis: g.source === "market" ? "laut Tipico-Quoten" : g.source === "elo" ? "laut Elo" : "laut Ligastärke" };
+  return { level: g.level, stronger: g.stronger, basis: g.source === "market" ? "laut Quoten" : g.source === "elo" ? "laut Elo" : "laut Ligastärke" };
 }
 
 /** Elo je Teamname aus den Spielen des Snapshots - für die Tabellen unter „Teams“. */

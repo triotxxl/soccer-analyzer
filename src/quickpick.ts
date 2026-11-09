@@ -92,8 +92,8 @@ export const QUICKPICK_GROUPS: Array<{ id: QuickpickGroup; label: string; title:
   },
   {
     id: "tipico",
-    label: "Tipico-Filter",
-    title: "Filter, die nach der Tipico-Quote ohne Aufschlag aussuchen – nicht nach dem Modell"
+    label: "Quoten-Filter",
+    title: "Filter, die nach der Quote ohne Aufschlag aussuchen – nicht nach dem Modell"
   }
 ];
 

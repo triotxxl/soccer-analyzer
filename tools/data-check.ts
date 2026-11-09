@@ -45,7 +45,9 @@ try {
   const analysisLeagueIds = new Set<number>();
   const analysisTeams: Array<{ fixture: string; teamId: number; name: string }> = [];
   for (const fixture of document.fixtures) {
-    const leagueId = (leagueIdOf.get(fixture.country, fixture.league) as { api_league_id: number } | undefined)?.api_league_id;
+    // Ab schemaVersion 15 trägt das Spiel seine Liga-ID; ältere Snapshots über die Tipico-Zuordnung.
+    const leagueId = fixture.leagueId
+      ?? (leagueIdOf.get(fixture.country, fixture.league) as { api_league_id: number } | undefined)?.api_league_id;
     if (leagueId !== undefined) analysisLeagueIds.add(leagueId);
     for (const side of ["home", "away"] as const) {
       const teamId = teamIdOf(fixture, side);

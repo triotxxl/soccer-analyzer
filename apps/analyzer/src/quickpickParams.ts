@@ -226,7 +226,7 @@ const DAVES_TABLE: QuickpickParam[] = [
   },
   {
     id: "maxOdds", label: "Quote bis", min: 1.2, max: 99, step: 0.05, sliderMax: 6,
-    title: "Höchstquote. 99 heißt: keine Grenze. Eine hohe Quote heißt: Tipico sieht die Mannschaft im Hoch"
+    title: "Höchstquote. 99 heißt: keine Grenze. Eine hohe Quote heißt: Der Buchmacher sieht die Mannschaft im Hoch"
       + " trotzdem als Außenseiter."
   }
 ];

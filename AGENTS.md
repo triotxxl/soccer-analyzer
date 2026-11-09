@@ -20,7 +20,7 @@ und ihr Neuaufbau kostet Tausende API-Aufrufe. Schritte für David:
    Eine vorhandene Datenbank ersetzt erst `--force`, und sie wird dabei beiseitegelegt.
 4. Nicht in der Sicherung: der API-Cache (`data/cache/`, füllt sich mit den Analysen, die erste
    ist teurer), die Snapshots in `output/` (Marktprofil und Kelly-Automatik beginnen mit dem
-   übertragenen Stand der Datenbank, aber ohne alte Snapshots), `data.json` und Claudes Notizen
+   übertragenen Stand der Datenbank, aber ohne alte Snapshots), `data.json` (nur für `--source tipico`) und Claudes Notizen
    (`C:\Users\<Name>\.claude\projects\…\memory\` - von Hand kopieren, sonst fehlen die
    Daueraufträge).
 
@@ -32,40 +32,70 @@ Ohne Datenbank verweigert `AnalyzerDatabase` den Start mit genau diesem Hinweis
 (`MISSING_DATABASE_MESSAGE` in `src/database.ts`), statt still eine leere anzulegen. Neu beginnen
 nur auf Davids ausdrücklichen Wunsch mit `ANALYZER_NEW_DATABASE=1`.
 
-## Primärer data.json-Workflow
+## Primärer Ablauf: Spiele und Quoten aus API-Football
 
-1. Die vom Benutzer aktualisierte `data.json` im Repository ist die alleinige Quelle für
-   die zu analysierenden Tipico-Fixtures und Tipico-Quoten.
-2. **Reihenfolge jeder Analyse (Davids Anweisung vom 05.10.2026): erst zuordnen, dann Daten
-   nachziehen, erst am Ende analysieren.** Eine Zuordnung, die erst nach der Analyse gesetzt
-   wird, braucht eine zweite Analyse - am 05.10.2026 kostete das zwei Wiederholungen.
-   1. **Zuordnen:** `npm run prepare-analysis -- --dates <bereich>` (gleicher Bereich und
-      gleiche `--input` wie die Analyse; `tools/prepare-analysis.ts`, praktisch 0 Aufrufe, weil
-      Ligaliste und Ansetzungen danach ohnehin aus dem Cache kommen). Es nennt offene Ligen mit
-      Kandidaten, jedes Tipico-Spiel ohne API-Ansetzung mit den ähnlichsten Ansetzungen der Liga
-      (Team-IDs, Anstoß, Status, Namensähnlichkeit) und die laut API verschobenen Spiele.
-      Liga-Aliase (`npm run aliases`) und Team-Aliase (`npm run team-aliases`) setzen, unklare
-      Namen recherchieren (Umbenennung, Umzug), dann das Werkzeug erneut laufen lassen, bis nur
-      noch Spiele ohne API-Gegenstück übrig sind. **Bestehende Aliase können falsch sein**
-      („Shanghai Segenda“ zeigte seit der ersten Fassung auf Shanghai Second) - passt ein
-      Kandidat nicht, den vorhandenen Alias prüfen.
-   2. **Daten nachziehen:** Abschnitt 3 desselben Werkzeugs listet Teams ohne Elo mit Ursache
-      und Maßnahme; Lücken nach „Pflege“, erster Punkt, schließen (Backfill, Listen in
-      `src/elo-config.ts`, `npm run elo -- build`). Das wöchentliche Elo-Nachladen und die
-      fehlende Ligastärke holt die Analyse selbst vor dem Rechnen.
-   3. **Analysieren:** erst jetzt die Analyse für den gewünschten Zeitraum. Ohne abweichende
-      Zeitangabe:
+**Seit 09.11.2026** (Davids Entscheidung; den Tipico-Export gibt es nicht mehr) kommen die zu
+analysierenden Spiele und ihre Quoten direkt aus `/odds?date=&bookmaker=` von API-Football
+(`src/bookmaker-odds.ts`, `importApiOdds`). API-Football führt Tipico (22) noch, liefert aber 0
+Spiele; geprüft wurden alle deutschen Anbieter, nur Betano (32) und Bet365 (8) liefern.
+
+1. **Analysiert wird jedes Spiel, für das Betano Quoten führt** (Davids Wahl: alle Betano-Spiele,
+   nicht nur die früheren Tipico-Ligen). Bet365 ist als Ersatz abschaltbar zugeschaltet über
+   `ODDS_BOOKMAKERS=32,8` (`config.oddsBookmakers`, Vorgabe nur 32): Es brachte am 08./09.11. 6 Spiele
+   mehr bei rund 70 Aufrufen je vollem Tag. Ein Spiel bekommt **alle** Quoten vom ersten Anbieter der
+   Liste, der 1X2 führt - nie den besseren Preis je Markt, sonst stimmt der faire Preis nicht. Ob eine
+   Quote *vorhanden* ist, entscheidet über die Auswahl, ihr Preis nie.
+2. **Umfang gemessen (Phase 0, 08./09.11.2026):** Betano führte am Sonntag 08.11. 762 Spiele in 243
+   Ligen (77 Seiten), davon 482 in Ligen, die Tipico zuletzt geführt hatte; vom letzten Tipico-Lauf
+   deckt Betano 290 von 299 Spielen ab. Quoten gibt es nur etwa 4-5 Tage im Voraus, `twentyone`
+   bringt also kaum mehr als `seven`. In der Länderspielpause waren es 70-100 Spiele je Tag.
+3. **Kosten:** rund 10 Spiele je Seite, eine Seite je Aufruf, Seiten strikt nacheinander
+   (`getOddsByDate`, zusammengeführt 60 Minuten im Cache, `cacheTtlMs.oddsListing`). An einem vollen
+   Wochenende kostet die Liste für `next48` rund 150-230 Aufrufe, unter der Woche 20-40, dazu je Tag
+   eine frische Tagesliste. **Mehr Spiele kosten in der Analyse selbst mehr** (Teamhistorien, H2H,
+   Saisons, je neues Team) - die erste Analyse eines vollen Wochenendes kann einige tausend Aufrufe
+   kosten (Tageslimit 7.500).
+4. **Reihenfolge (Davids Anweisung vom 05.10.2026) gilt weiter, die Zuordnung entfällt:** Die Spiele
+   tragen Fixture- und Liga-ID (`AnalysisInput.fixtureIds`, `LeagueSelection.apiLeagueId`, in
+   `resolveLeagues` vor jedem Alias und nie Exitcode 2). `npm run prepare-analysis -- --dates <bereich>`
+   zählt nur, was nicht analysiert wird (ohne Ansetzung, laut API nicht spielbar), und listet Teams ohne
+   Elo; Lücken nach „Pflege“, erster Punkt, schließen. Dann:
 
    ```powershell
    npm run dashboard -- --dates next48
    ```
 
-   Danach wie bisher `npm run coverage` für die Ligastärke-Lücken und die Abrechnung.
+   Danach wie bisher `npm run coverage` und die Abrechnung. Ohne ein einziges Spiel mit Quote bricht
+   die Analyse ab und schreibt nichts - das letzte Dashboard bleibt (vorher schrieb ein leerer Import
+   ein leeres Dashboard). Die Zählerzeile am Ende: `Quoten: Betano n Spiele · m Wettbewerbe · x Aufrufe ·
+   a ohne Ansetzung · b laut API nicht spielbar · c Anstoß vorbei, Status noch NS`.
+5. **Grenze:** Platzhaltertermine von API-Football (siehe „Pflege“) lassen sich auf diesem Weg nicht
+   mehr über die Tipico-Anstoßzeit korrigieren; die Zählerzeile weist sie als „Anstoß vorbei, Status
+   noch NS“ aus.
+6. **Snapshot `schemaVersion: 15`:** `meta.oddsSource` (`api`/`tipico`, fehlt = Tipico), je Spiel
+   `bookmaker` und `oddsUpdatedAt` (Quelle api) und `leagueId` (beide Wege; `coverage` und
+   `data-check` lesen die Liga darüber statt über `tipico_competitions`). Die Apps nennen den Anbieter
+   (`quoteSourceName` in `apps/shared/src/quoteSource.ts`), bei älteren Snapshots „Tipico“. David setzt
+   seit 09.11.2026 bei Betano; Hinweise zum Preisprüfen nennen Betano.
+7. **Messungen stehen auf Tipico-Preisen.** Quickpick-Knöpfe, Kombi-Messung, Kelly-Befunde und
+   Marktprofil wurden bis 09.11.2026 an Tipico gemessen; keine Regel wurde angepasst. Aufschlag
+   (Median Σ1/Quote, 08./09.11.2026): Betano 1X2 1,092 (Tipico 1,107), BTTS 1,083, Über/Unter
+   1,082-1,083, 1. Halbzeit 1,117; Bet365 1X2 1,111, Torlinien 1,061-1,076. Bei Betano liegen 56 von 837
+   1X2-Tripeln unter 1,03 (`KOMBI_FLAGS.bookRange` markiert sie als auffällig), und Unter 1,5 / Unter
+   3,5 fehlen oft (dann greift `MEDIAN_BOOK`). Betano führt alle drei Ganzspiel-Torlinien statt einer
+   - das verändert die Kandidaten der Kombi-Tipps. `npm run quickpick-report` weist die Tipps mit
+   API-Quote je Stufe eigens aus („davon Quoten aus API-Football“). Das Marktprofil mischt ab dem
+   Stichtag beide Quellen; **nach rund 1.000 abgerechneten Spielen mit API-Quote misst der
+   Prüfer-Agent nach** (Aufschlag, Treffer gegen fairen Preis, Quickpick-Stufen). `TIPICO_BOOK` und
+   `MEDIAN_BOOK` bleiben (an Tipico gemessen, nur für fehlende Gegenquoten und alte Snapshots).
+8. **Tipico-Weg als Option:** `npm run dashboard -- --source tipico [--input data.json]` (`--input`
+   setzt `tipico` voraus) und `npm run prepare-analysis -- --source tipico` laufen unverändert wie
+   bis 09.11.2026 - mit Zuordnung über Liga- und Team-Aliase, `tipico_*`-Tabellen und Tipico-Namen.
+   Die folgenden Punkte gelten für beide Wege, wo nicht anders gesagt; „Tipico-Quote“ heißt dann die
+   Quote des Anbieters.
 
-3. Der Lauf importiert Tipico-IDs und Quoten in SQLite, verwendet gespeicherte Liga- und
-   Teamzuordnungen, analysiert Liga- und Pokal-/Cross-League-Spiele getrennt und erzeugt
-   `output/dashboard-latest.json` sowie einen datierten JSON-Snapshot. Das Neo
-   Dashboard (`npm run neo`) liest nur diesen neuesten Lauf.
+### Regeln für Quoten, Märkte und Zeiträume
+
 4. Eine Tipico-Auswahl ändert niemals den sportlichen 1X2-Tipp des Modells. Das Dashboard
    zeigt Tipico-Quoten deutlich, verwendet aber weder Quoten noch einen relativen
    Modellvorteil für die Empfehlungsstufe. Diese beruht ausschließlich auf absoluter
@@ -138,7 +168,9 @@ nur auf Davids ausdrücklichen Wunsch mit `ANALYZER_NEW_DATABASE=1`.
 
 1. Lies aus angehängten Tipico-Screenshots ausschließlich sichtbare Länder- und
    Ligabezeichnungen ab. Behaupte keine nicht sichtbaren Inhalte.
-2. Die konkreten Fixtures stammen ab jetzt ausschließlich aus der zum Auftrag gehörenden
+2. **Seit 09.11.2026 gibt es keine Tipico-data.json mehr:** Ohne sie die Partien aus dem Screenshot
+   über `--select "Land|Liga"` und `--match "Heim|Gast"` eingrenzen (Namen wie API-Football sie führt).
+   Liegt doch eine data.json vor, gilt weiter: Die konkreten Fixtures stammen ausschließlich aus der zum Auftrag gehörenden
    `Screenshots/YYYY-MM/data.json`, nicht aus dem Screenshot. Lies sie aus
    `SELECTION.events` (`team1`, `team2`, `eventStartTime`, `competitionId`) und grenze den
    CLI-Aufruf für jede gewünschte Partie mit `--match "Heimteam|Auswärtsteam"` ein. Nutze

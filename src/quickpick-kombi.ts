@@ -65,7 +65,7 @@ export interface KombiQuickpickSettings {
   minOdds: number;
   /** Die Stufe: Höchstquote des gewählten Tipps. 99 heißt: keine Grenze. */
   maxOdds: number;
-  /** Nur die besten N nach Chance laut Tipico; `null` = alle. Wirkt in `applyQuickpick`. */
+  /** Nur die besten N nach Chance laut Quote; `null` = alle. Wirkt in `applyQuickpick`. */
   limit: number | null;
 }
 
@@ -133,7 +133,7 @@ export const DEFAULT_KOMBI_SETTINGS: KombiQuickpickSettings = {
   preset: "kombi", minOdds: 1.6, limit: null, ...LEVELS.streng
 };
 
-/** Der Tipp mit der höchsten Chance laut Tipico unter den übrigen ab der Mindestquote. */
+/** Der Tipp mit der höchsten Chance laut Quote unter den übrigen ab der Mindestquote. */
 function ersatzOf(tips: KombiTip[], chosen: KombiTip, minOdds: number): KombiTip | null {
   return tips
     .filter((tip) => tip !== chosen && tip.odds >= minOdds)
@@ -189,19 +189,19 @@ export const KOMBI_PRESET: QuickpickPreset<KombiQuickpickSettings> = {
   id: "kombi",
   label: "Kombi-Tipps ab 1,60",
   group: "tipico",
-  description: "Je Spiel genau ein Tipp aus allen Wettarten: der, dem die Tipico-Quote ohne"
+  description: "Je Spiel genau ein Tipp aus allen Wettarten: der, dem die Quote ohne"
     + " Aufschlag die höchste Chance gibt – Quote ab 1,60. Das Modell entscheidet nicht mit.",
   criteria: [
     "Je Spiel nur ein Tipp – aus Sieg, Remis, BTTS (beide Teams treffen) und allen Torlinien,"
       + " auch der 1. Halbzeit",
-    "Maßstab ist die Chance laut Tipico: die Chance, die Tipico dem Tipp selbst gibt, aus der"
+    "Maßstab ist die Chance laut Quote: die Chance, die der Buchmacher dem Tipp selbst gibt, aus der"
       + " Quote ohne Aufschlag gerechnet",
     "Quote ab 1,60. Die Stufen begrenzen die Quote nach oben – je näher an 1,60, desto"
       + " wahrscheinlicher der Tipp",
-    "Nur Tipps, bei denen Tipico auch die Gegenseite anbietet – sonst lässt sich der Aufschlag"
+    "Nur Tipps, bei denen der Buchmacher auch die Gegenseite anbietet – sonst lässt sich der Aufschlag"
       + " nicht herausrechnen",
-    "Die wahrscheinlichsten Tipps liegen fast alle knapp über 1,60. Fällt eine Quote in der"
-      + " Tipico-App darunter, nimm den Ersatz (aufgeklappt) oder das nächste Spiel der Liste",
+    "Die wahrscheinlichsten Tipps liegen fast alle knapp über 1,60. Fällt eine Quote bei"
+      + " Betano darunter, nimm den Ersatz (aufgeklappt) oder das nächste Spiel der Liste",
     "Auffällige Spiele fallen weg und stehen unter der Liste",
     "Bei Spielen zwischen verschiedenen Ligen ohne Stärkevergleich fällt der Sieger-Tipp weg"
   ],
@@ -217,14 +217,14 @@ export const KOMBI_PRESET: QuickpickPreset<KombiQuickpickSettings> = {
         + " die wahrscheinlichsten Tipps, keinen Vorteil."
   }),
   honesty: "Gut 5 von 10 Tipps stimmen – genau so oft, wie die Quote es sagt. Der Filter sucht je"
-    + " Spiel den wahrscheinlichsten Tipp ab 1,60, keinen Vorteil. Der Aufschlag von Tipico steckt"
+    + " Spiel den wahrscheinlichsten Tipp ab 1,60, keinen Vorteil. Der Aufschlag des Buchmachers steckt"
     + " in jedem Tipp: Eine Kombi aus 4 Tipps geht etwa jedes zehnte Mal auf und kostet auf Dauer"
     + " rund ein Viertel des Einsatzes, eine aus 7 gut ein Drittel. Eine Liste, die gut getroffen hat,"
     + " beweist nichts. Rechne nicht mit Gewinn. Die Quoten sind so alt wie die letzte Analyse –"
-    + " prüf jeden Preis vor dem Setzen in der Tipico-App; fällt er unter 1,60, nimm den Ersatz"
+    + " prüf jeden Preis vor dem Setzen bei Betano; fällt er unter 1,60, nimm den Ersatz"
     + " oder das nächste Spiel.",
-  warnung: "Rechne nicht mit Gewinn, denn der Aufschlag von Tipico steckt in jedem Tipp – und prüf"
-    + " jeden Preis vor dem Setzen in der Tipico-App.",
+  warnung: "Rechne nicht mit Gewinn, denn der Aufschlag des Buchmachers steckt in jedem Tipp – und prüf"
+    + " jeden Preis vor dem Setzen bei Betano.",
   wettschein: {
     hinweis: "Legt je Spiel den gefundenen Tipp in den Wettschein, egal welche Wettart. Setz jede"
       + " Kombi vor ihrem ersten Anstoß."

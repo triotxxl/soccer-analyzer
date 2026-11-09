@@ -100,7 +100,7 @@ test("übernimmt die Tipico-Namen je Fixture und lässt die API-Namen unverände
 
 test("Dashboard-Dokument führt alle Analysen über fixtureId zusammen", () => {
   const document = buildDashboardDocument(dashboardInput());
-  assert.equal(document.schemaVersion, 14);
+  assert.equal(document.schemaVersion, 15);
   // Beide Seitenquoten gehören in den 1X2-Markt, damit sich auch die Gegenseite bewerten
   // lässt; `odds` bleibt daneben die Quote des getippten Weges.
   const oneXTwo = document.fixtures[0]!.markets.find((market) => market.key === "1x2")!;
@@ -203,7 +203,7 @@ test("Dashboard-Ausgabe schreibt latest und datierten Snapshot als JSON", async 
     assert.equal(path.basename(files.latest), "dashboard-latest.json");
     assert.match(path.basename(files.snapshot), /^dashboard-2026-08-11T16-00-00-000Z\.json$/);
     const latest = JSON.parse(await readFile(files.latest, "utf8")) as { schemaVersion: number };
-    assert.equal(latest.schemaVersion, 14);
+    assert.equal(latest.schemaVersion, 15);
   } finally {
     await rm(directory, { recursive: true, force: true });
   }
@@ -394,8 +394,32 @@ test("Tipico-Quoten kommen über die Fixture-ID, nicht über den Namensvergleich
   const oneXTwo = (document: ReturnType<typeof buildDashboardDocument>) =>
     document.fixtures[0]!.markets.find((market) => market.key === "1x2")!;
   assert.notEqual(oneXTwo(buildDashboardDocument({ ...input, tipicoOdds: [tipico] })).oddsHome, 2.1);
-  const document = buildDashboardDocument({ ...input, tipicoOdds: [tipico], tipicoOddsByFixture: new Map([[1, tipico]]) });
+  const document = buildDashboardDocument({ ...input, tipicoOdds: [tipico], oddsByFixture: new Map([[1, tipico]]) });
   assert.equal(oneXTwo(document).oddsHome, 2.1);
+});
+
+test("Quelle api: Quoten, Anbieter und Liga-ID je Spiel, kein Namensvergleich (schemaVersion 15)", () => {
+  const input = dashboardInput();
+  input.goals.rows[0]!.leagueId = 78;
+  const named = { ...input.tipicoOdds[0]!, home: 9.9 };
+  const document = buildDashboardDocument({
+    ...input,
+    tipicoOdds: [named],
+    oddsSource: "api",
+    oddsByFixture: new Map([[1, { home: 2.3, draw: 3.4, away: 3.1, bttsYes: 1.7, bttsNo: 2.05 }]]),
+    bookmakerByFixture: new Map([[1, { name: "Betano", updatedAt: "2026-11-09T17:01:13+01:00" }]])
+  });
+  const fixture = document.fixtures[0]!;
+  assert.equal(document.meta.oddsSource, "api");
+  assert.equal(fixture.bookmaker, "Betano");
+  assert.equal(fixture.oddsUpdatedAt, "2026-11-09T17:01:13+01:00");
+  assert.equal(fixture.leagueId, 78);
+  assert.equal(fixture.markets.find((market) => market.key === "1x2")!.oddsHome, 2.3);
+  assert.equal(fixture.markets.find((market) => market.key === "btts")!.odds, 1.7);
+  // Ohne Quote für ein Spiel greift auf dem API-Weg kein Namensvergleich mit fremden Quoten.
+  const without = buildDashboardDocument({ ...input, tipicoOdds: [named], oddsSource: "api", oddsByFixture: new Map() });
+  assert.equal(without.fixtures[0]!.markets.find((market) => market.key === "1x2")!.oddsHome, null);
+  assert.equal(buildDashboardDocument(input).meta.oddsSource, "tipico");
 });
 
 test("Spiele zwischen Ligen mit Liga-Niveau aus dem Vereins-Elo zeigen 1X2 und die Markierung (3.7.0)", () => {

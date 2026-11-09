@@ -47,6 +47,26 @@ export async function resolveLeagues(
   const failures: ResolutionFailure[] = [];
 
   for (const requested of selections) {
+    // Spiele aus den Quoten von API-Football tragen ihre Liga-ID schon mit. Sie gilt vor jedem Alias
+    // und nie als Fehler: Fehlt sie in der Ligaliste (nur laufende Saisons, 7 Tage gespeichert),
+    // gelten die Namen der Quotenantwort und keine Saisons - `previousSeason` und
+    // `usesCrossLeagueModel` im Analyzer kommen ohne sie aus. Sonst bräche eine einzige unbekannte
+    // Liga mit Exitcode 2 die ganze Analyse ab.
+    if (requested.apiLeagueId !== undefined) {
+      const match = leagues.find((item) => item.league.id === requested.apiLeagueId);
+      if (!match) {
+        console.warn(`Liga ${requested.country} | ${requested.league} (${requested.apiLeagueId}) fehlt in der Ligaliste von API-Football - ohne Saisonangaben weiter.`);
+      }
+      resolved.push({
+        requested,
+        leagueId: requested.apiLeagueId,
+        country: match?.country.name ?? requested.country,
+        league: match?.league.name ?? requested.league,
+        seasons: match?.seasons ?? [],
+        source: "id"
+      });
+      continue;
+    }
     const stored = aliases[aliasKey(requested.country, requested.league)];
     if (stored) {
       const match = leagues.find((item) => item.league.id === stored.leagueId);

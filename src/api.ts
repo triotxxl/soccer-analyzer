@@ -119,7 +119,8 @@ export class ApiFootballClient {
     ttlMs: number,
     bypassCache = false,
     attempt = 0,
-    transportAttempt = 0
+    transportAttempt = 0,
+    onPaging?: (paging: { current: number; total: number } | null) => void
   ): Promise<T> {
     if (attempt > 5) {
       throw new ApiFootballError("API-Football blieb nach mehreren Warteversuchen im Rate-Limit.", 429);
@@ -159,7 +160,7 @@ export class ApiFootballClient {
       }
       if (response.status === 429) {
         await this.sleepFn(this.rateLimitRetryMs * 2 ** attempt);
-        return this.get<T>(endpoint, params, ttlMs, bypassCache, attempt + 1);
+        return this.get<T>(endpoint, params, ttlMs, bypassCache, attempt + 1, 0, onPaging);
       }
       if (!response.ok) {
         throw new ApiFootballError(
@@ -179,7 +180,7 @@ export class ApiFootballClient {
       if (transportAttempt < this.transportRetries) {
         clearTimeout(timer);
         await this.sleepFn(this.transportRetryMs * 2 ** transportAttempt);
-        return this.get<T>(endpoint, params, ttlMs, bypassCache, attempt, transportAttempt + 1);
+        return this.get<T>(endpoint, params, ttlMs, bypassCache, attempt, transportAttempt + 1, onPaging);
       }
       if (error instanceof Error && error.name === "AbortError") {
         throw new ApiFootballError(`API-Football antwortete nicht innerhalb von ${this.timeoutMs} ms.`);
@@ -200,11 +201,12 @@ export class ApiFootballClient {
     if (errors.length > 0) {
       if (errors.some((error) => error.toLocaleLowerCase().includes("too many requests"))) {
         await this.sleepFn(this.rateLimitRetryMs * 2 ** attempt);
-        return this.get<T>(endpoint, params, ttlMs, bypassCache, attempt + 1);
+        return this.get<T>(endpoint, params, ttlMs, bypassCache, attempt + 1, 0, onPaging);
       }
       throw new ApiFootballError(`API-Football-Fehler: ${errors.join("; ")}`, status);
     }
     this.lastPaging = envelope.paging ?? null;
+    onPaging?.(envelope.paging ?? null);
     await this.cache.set(cacheKey, envelope.response);
     if (
       this.requestsRemaining !== null &&
@@ -230,12 +232,46 @@ export class ApiFootballClient {
     return this.get<ApiLeague[]>("leagues", { id: leagueId }, config.cacheTtlMs.leagues);
   }
 
-  getFixturesForDate(date: string, timezone: string): Promise<ApiFixture[]> {
+  /**
+   * Alle Spiele eines Tages. Mit `fresh` an der API vorbei - der Weg über die Quoten (Quelle "api")
+   * holt die Tagesliste einmal je Analyse frisch, damit sie nicht älter ist als die Quotenliste.
+   */
+  getFixturesForDate(date: string, timezone: string, fresh = false): Promise<ApiFixture[]> {
     return this.get<ApiFixture[]>(
       "fixtures",
       { date, timezone },
-      config.cacheTtlMs.dailyFixtures
+      fresh ? 0 : config.cacheTtlMs.dailyFixtures,
+      fresh
     );
+  }
+
+  /**
+   * Alle Spiele eines Tages, für die ein Anbieter Quoten führt, samt dieser Quoten (`/odds`, rund
+   * zehn Spiele je Seite, an einem vollen Spieltag gut 75 Seiten).
+   *
+   * Die Seiten laufen strikt nacheinander und jede meldet ihr eigenes Paging - `lastPaging` taugt
+   * dafür nicht, weil parallele Aufrufe es überschreiben und ein Cache-Treffer es gar nicht setzt.
+   * Gespeichert wird das zusammengeführte Ergebnis unter einem eigenen Schlüssel; die einzelnen
+   * Seiten gehen immer an die API.
+   */
+  async getOddsByDate(date: string, bookmakerId: number, timezone: string): Promise<ApiFixtureOdds[]> {
+    const listingKey = `odds-listing?bookmaker=${bookmakerId}&date=${date}&timezone=${timezone}`;
+    const cached = await this.cache.get<ApiFixtureOdds[]>(listingKey, config.cacheTtlMs.oddsListing);
+    if (cached !== null) return cached;
+    const items: ApiFixtureOdds[] = [];
+    for (let page = 1; page <= config.oddsListingMaxPages; page += 1) {
+      let paging: { current: number; total: number } | null = null;
+      const params: Record<string, string | number> = { date, bookmaker: bookmakerId, timezone };
+      if (page > 1) params.page = page;
+      const response = await this.get<ApiFixtureOdds[]>("odds", params, 0, true, 0, 0, (value) => {
+        paging = value;
+      });
+      items.push(...response);
+      const total = (paging as { current: number; total: number } | null)?.total ?? 1;
+      if (page >= total) break;
+    }
+    await this.cache.set(listingKey, items);
+    return items;
   }
 
   /**

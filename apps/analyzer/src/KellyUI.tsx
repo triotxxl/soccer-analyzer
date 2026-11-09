@@ -436,8 +436,8 @@ export function KellyDialog({ selection, profileState, marketFilter, marketLabel
               Preis, die Modellchance versprach rund +10 % bei rund -6 % eingetreten. Neutral,
               nicht grün und nicht rot - es ist eine Rechnung, keine Messung. */}
           <MetricCard label="Auf Dauer" value={formatSignedEuro(expected)}
-            title="Gerechnet mit der Chance, die die Tipico-Quote ohne ihren Aufschlag behauptet. Fehlt die Gegenquote, ist der Aufschlag geschätzt."
-            note={`zur Tipico-Quote ohne Aufschlag${partlyEstimated ? ", teils geschätzt" : ""}.`
+            title="Gerechnet mit der Chance, die die Quote ohne ihren Aufschlag behauptet. Fehlt die Gegenquote, ist der Aufschlag geschätzt."
+            note={`zur Quote ohne Aufschlag${partlyEstimated ? ", teils geschätzt" : ""}.`
               + " Das Modell trifft geprüft nicht öfter als die Quote."} />
         </div>
 
@@ -603,7 +603,7 @@ export function KellyDialog({ selection, profileState, marketFilter, marketLabel
           </div>
           <div>
             <dt>Auf Dauer</dt>
-            <dd>was die Liste im Schnitt einbringt, wenn die Tipico-Quote ohne ihren Aufschlag
+            <dd>was die Liste im Schnitt einbringt, wenn die Quote ohne ihren Aufschlag
               die richtige Chance nennt. An alten Spielen geprüft trafen die gewählten Wetten
               genau so oft – deshalb steht hier fast immer ein Minus</dd>
           </div>

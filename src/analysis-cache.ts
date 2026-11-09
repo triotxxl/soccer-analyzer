@@ -37,6 +37,8 @@ function canonicalInput(input: AnalysisInput): object {
       .sort((left, right) =>
         left.homeTeam.localeCompare(right.homeTeam) || left.awayTeam.localeCompare(right.awayTeam)
       ),
+    // Nur wenn gesetzt, damit die Schlüssel bisheriger Aufrufe gleich bleiben.
+    ...(input.fixtureIds ? { fixtureIds: [...input.fixtureIds].sort((left, right) => left - right) } : {}),
     tipicoOdds: [...(input.tipicoOdds ?? [])]
       .map((item) => ({ ...item }))
       .sort((left, right) =>

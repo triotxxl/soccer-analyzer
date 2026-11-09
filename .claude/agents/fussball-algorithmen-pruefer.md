@@ -88,7 +88,7 @@ ist kein Prüfergebnis und wird so benannt.
 | Teiler 1200 (3.5.0) | rund 150 Spiele der Gruppe „gemessen" seit 3.5.0, Tabelle „Stärkere Seite je Modellversion" in `npm run report` | „Pflege", `strength.factorDivisor` |
 | U21-Modell | 100 abgerechnete Spiele „Team-Elo U21": Teiler, Torkorrektur, BTTS-Aufteilung, Heimvorteil, Abstand zu Tipico | „Team-Elo" |
 | Länderspiele gegen Tipico | rund 400 abgerechnete Länderspiele | „Team-Elo" |
-| Frauen-Ligastärke gegen Tipico | rund 90 abgerechnete Frauen-Europapokalspiele mit Quote | „Primärer data.json-Workflow", Punkt 5 |
+| Frauen-Ligastärke gegen Tipico | rund 90 abgerechnete Frauen-Europapokalspiele mit Quote | „Regeln für Quoten, Märkte und Zeiträume", Punkt 5 |
 | „Sieger laut Modell" | rund 100 Tipps der Vorgabestufe unter 3.5.0, `npm run quickpick-report -- --preset modell1x2` | „Quickpicker", `MODEL_BOUND_SINCE` |
 | Heim-/Gast-Aufteilung einschalten | nach der BTTS-Prüfung; Entscheidung bei David | „Märkte" |
 

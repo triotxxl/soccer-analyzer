@@ -10,13 +10,17 @@ mit falschen oder fehlenden Daten - ein Alias auf die falsche Liga, eine Team-ID
 trägt, eine Saison, die als vollständig gilt und 10 % der Spiele hat. Kein Fehler, keine Warnung.
 Deshalb wird nicht gewartet, bis etwas auffällt, sondern nach jeder Analyse gezielt gesucht.
 
-## Ablauf je Analyse (Davids Reihenfolge, AGENTS.md „Primärer data.json-Workflow“)
+## Ablauf je Analyse (Davids Reihenfolge, AGENTS.md „Primärer Ablauf: Spiele und Quoten aus API-Football“)
 
-1. **Vorher zuordnen:** `npm run prepare-analysis -- --dates <bereich>` so oft, bis nur noch Spiele
+Seit 09.11.2026 kommen Spiele und Quoten aus `/odds` von API-Football und tragen ihre Fixture- und
+Liga-ID: Liga- und Team-Aliase braucht nur noch `--source tipico`. `prepare-analysis` zählt dann nur
+Spiele ohne Ansetzung und listet Teams ohne Elo (Schritt 1 entfällt, Schritt 3 bleibt).
+
+1. **Vorher zuordnen (nur `--source tipico`):** `npm run prepare-analysis -- --dates <bereich>` so oft, bis nur noch Spiele
    ohne API-Gegenstück übrig sind. Liga-Aliase `npm run aliases`, Team-Aliase `npm run team-aliases`.
    Unklare Namen im Internet recherchieren (Umbenennung, Umzug, Lizenzübernahme) und mit Quelle
    setzen. Australien nur nach Rückfrage (AGENTS.md Punkt 10).
-2. **Analyse:** `npm run dashboard -- --dates <bereich>`. Blockiert ein Wettbewerb, den API-Football
+2. **Analyse:** `npm run dashboard -- --dates <bereich>`. Nur `--source tipico`: Blockiert ein Wettbewerb, den API-Football
    nachweislich nicht führt, mit `--skip-unresolved` (Nachweis über `getAllLeagues`, siehe
    `references/api-football-eigenheiten.md`).
 3. **Nachher prüfen, beide kosten 0 Aufrufe:**

@@ -4,7 +4,7 @@ import { config, ROOT_DIR } from "./config.ts";
 import { recentAverage, type MatchSideStats, type RecentAverage } from "./recent-stats.ts";
 import { marketDetail, type MarketDetail } from "./model.ts";
 import { teamNameSimilarity } from "./team-resolver.ts";
-import type { DefensiveProfile, DrawAnalysisResult, FavoriteAnalysisResult, GoalLineAnalysisResult, GoalLineRow, LeagueStats, LeagueStrengthComparison, LiveCoverage, RecentMatchSummary, StandingRow, TipicoOdds } from "./types.ts";
+import type { DefensiveProfile, DrawAnalysisResult, FavoriteAnalysisResult, GoalLineAnalysisResult, GoalLineRow, LeagueStats, LeagueStrengthComparison, LiveCoverage, MarketOdds, RecentMatchSummary, StandingRow, TipicoOdds } from "./types.ts";
 import type { EloSystem } from "./elo-config.ts";
 
 export interface DashboardInput {
@@ -16,14 +16,20 @@ export interface DashboardInput {
   draw: DrawAnalysisResult;
   favorites: FavoriteAnalysisResult;
   goals: GoalLineAnalysisResult;
+  /** Nur Quelle "tipico": Ersatz über den Namensabgleich, wenn `oddsByFixture` ein Spiel nicht kennt. */
   tipicoOdds: TipicoOdds[];
   /**
-   * Tipico-Quoten je Fixture-ID, zugeordnet über `tipico_fixtures.api_fixture_id`. Vorrang vor
-   * dem Namensabgleich, der 6 % der Spiele verlor ("Lyon W" gegen "Olympique Lyon (F)").
+   * Quoten je Fixture-ID. Quelle "tipico": zugeordnet über `tipico_fixtures.api_fixture_id`, mit
+   * Vorrang vor dem Namensabgleich, der 6 % der Spiele verlor ("Lyon W" gegen "Olympique Lyon (F)").
+   * Quelle "api" (seit 09.11.2026): direkt aus `/odds` von API-Football.
    */
-  tipicoOddsByFixture?: Map<number, TipicoOdds>;
+  oddsByFixture?: Map<number, MarketOdds>;
+  /** Woher die Quoten kommen; fehlt bei Aufrufen aus der Zeit vor dem 09.11.2026 und heißt dann "tipico". */
+  oddsSource?: "api" | "tipico";
+  /** Nur Quelle "api": Anbieter und Stand der Quoten je Fixture-ID. */
+  bookmakerByFixture?: Map<number, { name: string; updatedAt: string | null }>;
   /**
-   * Tipico-Namen je Fixture-ID, über dieselbe Zuordnung wie `tipicoOddsByFixture`. Nur Anzeige:
+   * Tipico-Namen je Fixture-ID, über dieselbe Zuordnung wie `oddsByFixture`. Nur Anzeige:
    * Die App zeigt sie ab Werk statt der Namen von API-Football (Einstellungen, seit 11.10.2026).
    */
   tipicoNamesByFixture?: Map<number, TipicoNames>;
@@ -190,6 +196,14 @@ export interface DashboardFixture {
    * in älteren Läufen und bei Spielen ohne zugeordnetes Tipico-Ereignis.
    */
   tipico?: TipicoNames;
+  /** Ab schemaVersion 15: Liga-ID von API-Football (coverage und data-check, sonst nur über Namen). */
+  leagueId?: number;
+  /**
+   * Ab schemaVersion 15, nur Quelle "api": der Anbieter, von dem alle Quoten dieses Spiels stammen
+   * (etwa "Betano"), und wann API-Football sie zuletzt aktualisiert hat.
+   */
+  bookmaker?: string;
+  oddsUpdatedAt?: string;
   /**
    * Wappen-URLs von API-Football. Sie fehlen, wenn die Fixture-Antwort sie nicht führt, und
    * in jedem Snapshot vor dieser Ergänzung; die App zeigt dann die Initialen des Teams.
@@ -270,11 +284,18 @@ export interface DashboardFixture {
 }
 
 export interface DashboardDocument {
-  schemaVersion: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14;
+  schemaVersion: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15;
   meta: {
     createdAt: string;
     timezone: string;
+    /**
+     * Ab schemaVersion 15: Woher Spiele und Quoten kommen. "api" = `/odds` von API-Football (seit
+     * 09.11.2026, `fixture.bookmaker` nennt den Anbieter), "tipico" = data.json. Fehlt = Tipico.
+     */
+    oddsSource?: "api" | "tipico";
+    /** Quelle "api": "API-Football"; sonst der Pfad der data.json. */
     sourceFile: string;
+    /** Quelle "api": Spiele, die der Anbieter führte, und davon im Umfang (statt Tipico-Ereignissen). */
     totalTipicoEvents: number;
     selectedTipicoEvents: number;
     selectedCompetitions: number;
@@ -485,7 +506,11 @@ export function buildDashboardDocument(input: DashboardInput): DashboardDocument
   const fixtures: DashboardFixture[] = input.goals.rows.map((row) => {
     const draw = drawByFixture.get(row.fixtureId);
     const favorite = favoriteByFixture.get(row.fixtureId);
-    const tipico = input.tipicoOddsByFixture?.get(row.fixtureId) ?? matchingOdds(row, input.tipicoOdds);
+    // Der Name `tipico` bleibt aus der Zeit vor dem 09.11.2026; bei Quelle "api" stehen hier die
+    // Quoten des Anbieters aus `bookmakerByFixture`. Der Namensabgleich gilt nur für Tipico.
+    const tipico: MarketOdds | undefined = input.oddsByFixture?.get(row.fixtureId)
+      ?? (input.oddsSource === "api" ? undefined : matchingOdds(row, input.tipicoOdds));
+    const bookmaker = input.bookmakerByFixture?.get(row.fixtureId);
     const crossLeague = draw?.model === "cross-league" || favorite?.model === "cross-league";
     const selection = favorite?.selection ?? (row.outcomeProbabilities.home >= row.outcomeProbabilities.away ? "1" : "2");
     const selectedTeam = selection === "1" ? row.homeTeam : row.awayTeam;
@@ -617,6 +642,9 @@ export function buildDashboardDocument(input: DashboardInput): DashboardDocument
       fixtureId: row.fixtureId, kickoff: row.kickoff, country: row.country, league: row.league,
       homeTeam: row.homeTeam, awayTeam: row.awayTeam, modelVersion: row.modelVersion, crossLeague,
       ...(input.tipicoNamesByFixture?.has(row.fixtureId) ? { tipico: input.tipicoNamesByFixture.get(row.fixtureId)! } : {}),
+      ...(row.leagueId !== undefined ? { leagueId: row.leagueId } : {}),
+      ...(bookmaker ? { bookmaker: bookmaker.name } : {}),
+      ...(bookmaker?.updatedAt ? { oddsUpdatedAt: bookmaker.updatedAt } : {}),
       ...(row.homeTeamId !== undefined && input.elo?.has(row.homeTeamId) ? { homeElo: input.elo.get(row.homeTeamId)! } : {}),
       ...(row.awayTeamId !== undefined && input.elo?.has(row.awayTeamId) ? { awayElo: input.elo.get(row.awayTeamId)! } : {}),
       ...(row.homeCrest ? { homeCrest: row.homeCrest } : {}),
@@ -666,9 +694,10 @@ export function buildDashboardDocument(input: DashboardInput): DashboardDocument
   const createdAt = Date.parse(input.createdAt);
   const latestKickoff = fixtures.reduce((latest, fixture) => Math.max(latest, Date.parse(fixture.kickoff)), createdAt);
   return {
-    schemaVersion: 14,
+    schemaVersion: 15,
     meta: {
-      createdAt: input.createdAt, timezone: config.timezone, sourceFile: input.sourceFile,
+      createdAt: input.createdAt, timezone: config.timezone, oddsSource: input.oddsSource ?? "tipico",
+      sourceFile: input.sourceFile,
       totalTipicoEvents: input.totalTipicoEvents, selectedTipicoEvents: input.selectedTipicoEvents,
       selectedCompetitions: input.selectedCompetitions, fixtureCount: fixtures.length,
       firstAvailableDate, lastAvailableDate, maximumDays,

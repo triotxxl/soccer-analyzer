@@ -186,7 +186,7 @@ describe("Aufbau des Dialogs", () => {
     render(<Harness initial={{ minEdge: 0 }} />);
     const value = screen.getByText("Auf Dauer").parentElement!;
     expect(value.querySelector(".kelly-metric-good, .kelly-metric-bad")).toBeNull();
-    expect(value).toHaveTextContent("zur Tipico-Quote ohne Aufschlag, teils geschätzt.");
+    expect(value).toHaveTextContent("zur Quote ohne Aufschlag, teils geschätzt.");
     expect(value).toHaveTextContent("Das Modell trifft geprüft nicht öfter als die Quote.");
     expect(value).toHaveTextContent("−");
   });

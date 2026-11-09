@@ -425,7 +425,7 @@ export function QuickpickDialog({
       <h2 ref={headingRef} tabIndex={-1}>Quickpicker</h2>
       <p className="filter-menu-count">
         <strong>{report.passed}</strong> von {report.evaluated} Spielen passen
-        {cutByLimit > 0 && <span title="Gezeigt werden nur die Spiele mit der höchsten Chance laut Tipico.">
+        {cutByLimit > 0 && <span title="Gezeigt werden nur die Spiele mit der höchsten Chance laut Quote.">
           {" · "}die besten {report.passed} von {report.passed + cutByLimit}
         </span>}
         {tableDiffers && <span title="Bewertung oder Klassenunterschied im Filtermenü grenzen die Tabelle weiter ein.">
@@ -574,13 +574,13 @@ export function QuickpickDialog({
       <FilterCard title="Gefundene Spiele" className="quickpick-results"
         aside={<span className="quickpick-results-tools">
           {settings.preset === "kombi" && <label className="quickpick-limit"
-            title="Nur die Spiele mit der höchsten Chance laut Tipico – für Liste, Tabelle und Wettschein. Leer heißt alle.">
+            title="Nur die Spiele mit der höchsten Chance laut Quote – für Liste, Tabelle und Wettschein. Leer heißt alle.">
             Nur die besten
             {/* Die Plätze der Kombis stehen im festen Stand unten im Fuß und hier im Tooltip - eine
                 eigene Angabe im Kopf schob die Sortierung aus dem Fenster (im Browser gemessen am
                 19.10.2026). */}
             <input type="number" min={1} step={1} inputMode="numeric" placeholder="alle"
-              title={"Nur die Spiele mit der höchsten Chance laut Tipico – für Liste, Tabelle und Wettschein. Leer heißt alle."
+              title={"Nur die Spiele mit der höchsten Chance laut Quote – für Liste, Tabelle und Wettschein. Leer heißt alle."
                 + (comboPlaces > 0 ? ` Deine Kombis brauchen ${comboPlaces} ${comboPlaces === 1 ? "Platz" : "Plätze"}.` : "")}
               value={limit ?? ""} onChange={(event) => setLimit(event.target.value)} />
           </label>}
@@ -669,7 +669,7 @@ export function QuickpickDialog({
           <Disclosure label={flagged.length === 1
             ? "1 auffälliges Spiel weggelassen"
             : `${flagged.length} auffällige Spiele weggelassen`}
-            title="Spiele, deren Quoten nach einem Fehler aussehen oder bei denen Modell und Tipico sehr weit auseinanderliegen"
+            title="Spiele, deren Quoten nach einem Fehler aussehen oder bei denen Modell und Quote sehr weit auseinanderliegen"
             open={flaggedOpen} onToggle={() => setFlaggedOpen((value) => !value)} />
           {flaggedOpen && <ul className="quickpick-rejections quickpick-flagged">
             {flagged.map(({ fixture, evaluation }) => <li key={fixture.fixtureId}>

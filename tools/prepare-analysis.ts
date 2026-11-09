@@ -1,9 +1,17 @@
 /**
- * Vorbereitung einer Analyse - Davids Ablauf vom 05.10.2026 (AGENTS.md, „Primärer
- * data.json-Workflow“): erst Ligen und Spiele zuordnen, dann die Datengrundlage für Elo und
- * Ligastärke nachziehen, erst danach die Analyse für den gewünschten Zeitraum starten.
+ * Vorbereitung einer Analyse - Davids Ablauf vom 05.10.2026 (AGENTS.md): erst Ligen und Spiele
+ * zuordnen, dann die Datengrundlage für Elo und Ligastärke nachziehen, erst danach die Analyse für
+ * den gewünschten Zeitraum starten.
  *
- *   npm run prepare-analysis -- --dates seven [--input datei.json]
+ *   npm run prepare-analysis -- --dates seven                       (Quelle api, Vorgabe)
+ *   npm run prepare-analysis -- --dates seven --source tipico [--input datei.json]
+ *
+ * Quelle "api" (seit 09.11.2026): Spiele und Quoten kommen mit Fixture- und Liga-ID aus `/odds` von
+ * API-Football - es gibt nichts zuzuordnen. Das Werkzeug zählt nur, was davon nicht analysiert wird
+ * (ohne Ansetzung, nicht spielbar), und zeigt Schritt 3. Die Quotenliste bleibt 60 Minuten im Cache,
+ * die Analyse kurz danach zahlt sie nicht noch einmal.
+ *
+ * Quelle "tipico":
  *
  * Schritt 1 Ligen: Tipico-Wettbewerbe ohne API-Liga, je mit den drei besten Kandidaten.
  * Schritt 2 Spiele: dieselbe Zuordnung wie die Analyse (`requestedFixtureScope`), dazu je
@@ -28,6 +36,7 @@ import { getEloByTeam } from "../src/elo-store.ts";
 import { resolveLeagues } from "../src/resolver.ts";
 import { teamNameSimilarity } from "../src/team-resolver.ts";
 import { importTipicoData } from "../src/tipico.ts";
+import { importApiOdds } from "../src/bookmaker-odds.ts";
 import type { ApiFixture, DateRange, LiveMatchSelection } from "../src/types.ts";
 import { datesForRange, isAnalyzableStatus } from "../src/util.ts";
 
@@ -39,6 +48,8 @@ function option(name: string): string | undefined {
 const RANGES = ["today", "tomorrow", "tomorrow2", "both", "next48", "three", "five", "seven", "fourteen", "twentyone"];
 const dates = (option("dates") ?? "next48") as DateRange;
 if (!RANGES.includes(dates)) throw new Error(`--dates muss ${RANGES.join(", ")} sein.`);
+const source = option("source") ?? (option("input") ? "tipico" : "api");
+if (source !== "api" && source !== "tipico") throw new Error("--source muss api oder tipico sein.");
 const sourceFile = path.resolve(option("input") ?? path.join(ROOT_DIR, "data.json"));
 const NEARBY_MS = 4 * 24 * 60 * 60 * 1000;
 
@@ -48,10 +59,12 @@ const berlin = new Intl.DateTimeFormat("de-DE", {
 const when = (value: string | number) => berlin.format(new Date(value));
 const pairing = (fixture: ApiFixture) => `${fixture.teams.home.name} – ${fixture.teams.away.name}`;
 
-const imported = await importTipicoData(sourceFile, dates);
 const client = new ApiFootballClient();
 const database = new AnalyzerDatabase();
-try {
+
+/** Schritte 1 und 2 der Quelle Tipico; liefert die spielbaren, zugeordneten Spiele. */
+async function prepareTipico(): Promise<ApiFixture[]> {
+  const imported = await importTipicoData(sourceFile, dates);
   console.log(`Vorbereitung ${dates} · ${imported.selectedEvents} Tipico-Spiele in ${imported.selectedCompetitions} Wettbewerben`);
 
   // Schritt 1: Ligen
@@ -123,6 +136,31 @@ try {
   for (const fixture of notPlayable) {
     console.log(`- nicht spielbar: ${pairing(fixture)} · ${when(fixture.fixture.date)} · ${fixture.fixture.status.short}`);
   }
+
+  return playable;
+}
+
+/** Quelle API: die Spiele der Quotenliste, wie die Analyse sie danach wählt. */
+async function prepareApi(): Promise<ApiFixture[]> {
+  const imported = await importApiOdds(client, dates);
+  const wanted = new Set(imported.input.fixtureIds);
+  const days = datesForRange(dates, config.timezone);
+  const daily = (await Promise.all(days.map((day) => client.getFixturesForDate(day, config.timezone)))).flat();
+  const found = daily.filter((fixture) => wanted.has(fixture.fixture.id));
+  const playable = found.filter((fixture) => isAnalyzableStatus(fixture.fixture.status.short));
+  const notPlayable = found.filter((fixture) => !isAnalyzableStatus(fixture.fixture.status.short));
+  const perBookmaker = [...imported.byBookmaker].map(([name, count]) => `${name} ${count}`).join(", ");
+  console.log(`Vorbereitung ${dates} · Quoten: ${perBookmaker} Spiele in ${imported.input.selections.length} Wettbewerben`);
+  console.log(`\n== 1./2. Spiele: ${playable.length} spielbar, ${wanted.size - found.length} ohne Ansetzung in der Tagesliste,`
+    + ` ${notPlayable.length} laut API nicht spielbar (Zuordnung entfällt, die Spiele tragen ihre IDs)`);
+  for (const fixture of notPlayable) {
+    console.log(`- nicht spielbar: ${pairing(fixture)} · ${when(fixture.fixture.date)} · ${fixture.fixture.status.short}`);
+  }
+  return playable;
+}
+
+try {
+  const playable = source === "api" ? await prepareApi() : await prepareTipico();
 
   // Schritt 3: Elo
   const elo = getEloByTeam(database);

@@ -4,6 +4,7 @@ import { DRAW_SIGNAL_CONFIG, DRAW_SIGNAL_META, formatDrawPoints } from "../../..
 import type { KombiFlag, KombiTip } from "../../../src/kombi-tipps.ts";
 import { oddsEstimated, type QuickpickEvaluation, type QuickpickPresetId } from "./quickpick";
 import { countryName, leagueName, teamName, type NameSource } from "../../shared/src/names";
+import { quoteSourceName } from "../../shared/src/quoteSource";
 import type { DashboardFixture } from "../../shared/src/types";
 
 /**
@@ -515,7 +516,7 @@ export function kombiFlagLabel(flag: KombiFlag): string {
     case "quote": return "Eine Sieger-Quote fast bei 1,00 – so niedrig ist meist ein Fehler in den Daten";
     case "aufschlag": return "Die drei Sieger-Quoten passen nicht zusammen – vermutlich falsch eingelesen";
     case "gleicheQuoten": return "Dreimal dieselbe Quote – vermutlich ein Platzhalter";
-    case "modellAbstand": return "Modell und Tipico liegen beim Sieger sehr weit auseinander – meist ein Fehler des Modells oder der Daten";
+    case "modellAbstand": return "Modell und Quote liegen beim Sieger sehr weit auseinander – meist ein Fehler des Modells oder der Daten";
     case "anstoss": return "Anstoß bei Tipico und in den Spieldaten über eine Stunde auseinander – Zuordnung fraglich";
   }
 }
@@ -536,7 +537,7 @@ const KOMBI_COLUMNS: QuickpickColumn[] = [
         main: kombiTipLabel(row, detail.chosen),
         // Kein Hinweis „knapp über der Mindestquote“ in der Zeile: Er stand am 14.10.2026 bei fast
         // jeder Zeile der Vorgabe und sagte damit nichts mehr. Die Kriterien nennen es einmal.
-        mainTitle: "Der Tipp, dem die Tipico-Quote ohne Aufschlag die höchste Chance gibt – je Spiel nur einer."
+        mainTitle: "Der Tipp, dem die Quote ohne Aufschlag die höchste Chance gibt – je Spiel nur einer."
       };
     }
   },
@@ -547,9 +548,9 @@ const KOMBI_COLUMNS: QuickpickColumn[] = [
       if (ersatz === null) return { main: "–", note: "kein zweiter Tipp ab der Mindestquote" };
       return {
         main: kombiTipLabel(row, ersatz),
-        mainTitle: "Falls die Quote bei Tipico unter die Mindestquote gefallen ist: der nächstwahrscheinliche"
+        mainTitle: "Falls die Quote beim Buchmacher unter die Mindestquote gefallen ist: der nächstwahrscheinliche"
           + " Tipp desselben Spiels.",
-        note: `${formatOdd(ersatz.odds)} · Tipico ${tipicoPercent(ersatz.fair)}`
+        note: `${formatOdd(ersatz.odds)} · ${quoteSourceName(row.fixture)} ${tipicoPercent(ersatz.fair)}`
       };
     }
   },
@@ -574,7 +575,7 @@ const KOMBI_COLUMNS: QuickpickColumn[] = [
       return {
         main: detail == null ? "–" : `${Math.round(detail.chosen.model * 100)} %`,
         mainTitle: "Was das Modell dem Tipp oben gibt (nicht dem Ersatz). Es entscheidet hier nicht mit: Wo es mehr sieht als"
-          + " Tipico, ist das meist ein Fehler des Modells, kein Vorteil.",
+          + " die Quote, ist das meist ein Fehler des Modells, kein Vorteil.",
       };
     }
   },
@@ -583,7 +584,7 @@ const KOMBI_COLUMNS: QuickpickColumn[] = [
     value: (row) => row.evaluation.odds ?? -1,
     cell: (row) => ({
       main: row.evaluation.odds === null ? "–" : formatOdd(row.evaluation.odds),
-      mainTitle: "Die Tipico-Quote dieses Tipps aus der letzten Analyse. Vor dem Setzen in der Tipico-App prüfen."
+      mainTitle: `Die Quote von ${quoteSourceName(row.fixture)} für diesen Tipp aus der letzten Analyse. Vor dem Setzen bei Betano prüfen.`
     })
   }
 ];
@@ -722,8 +723,8 @@ export function strengthOf(preset: QuickpickPresetId, row: QuickpickRow): Quickp
     if (detail === null || detail === undefined) return null;
     // Ungerundet, damit die Sortierung „Stärke“ die Rangfolge des Werkzeugs genau nachbildet.
     return {
-      percent: detail.chosen.fair * 100, label: `Tipico ${tipicoPercent(detail.chosen.fair)}`, gut: 57, mittel: 55,
-      title: "Die Chance, die Tipico diesem Tipp gibt – aus der Quote ohne Aufschlag gerechnet. Ab Werk"
+      percent: detail.chosen.fair * 100, label: `${quoteSourceName(row.fixture)} ${tipicoPercent(detail.chosen.fair)}`, gut: 57, mittel: 55,
+      title: `Die Chance, die ${quoteSourceName(row.fixture)} diesem Tipp gibt – aus der Quote ohne Aufschlag gerechnet. Ab Werk`
         + " ist die Liste danach sortiert, und „Nur die besten“ zählt danach."
     };
   }

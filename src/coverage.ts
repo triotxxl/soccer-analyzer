@@ -144,7 +144,8 @@ function strengthGap(fixture: DashboardFixture, lookup: CoverageLookup): Omit<St
       intended: false
     };
   }
-  const competitionId = lookup.apiLeagueId(fixture.country, fixture.league);
+  // Ab schemaVersion 15 trägt das Spiel seine Liga-ID; ältere Snapshots über die Tipico-Zuordnung.
+  const competitionId = fixture.leagueId ?? lookup.apiLeagueId(fixture.country, fixture.league);
   return {
     cause: "Ligabewertung einer Seite fehlt oder ist noch nicht belastbar",
     action: competitionId === null

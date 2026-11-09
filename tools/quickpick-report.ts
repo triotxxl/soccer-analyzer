@@ -107,7 +107,12 @@ interface CalibrationState {
   stufen?: Record<string, StufenStand>;
 }
 
-interface Bet { kickoff: string; odds: number; hit: boolean }
+/**
+ * `api`: Quote aus API-Football (seit 09.11.2026, Spiel trägt `bookmaker`), sonst Tipico. Die Knöpfe
+ * stehen auf Tipico-Preisen; die API-Zeilen werden getrennt ausgewiesen, damit ein anderer Aufschlag
+ * nicht unbemerkt in die Messung rutscht.
+ */
+interface Bet { kickoff: string; odds: number; hit: boolean; source: "api" | "tipico" }
 interface Triple { home: number; draw: number; away: number }
 
 /**
@@ -193,7 +198,7 @@ function betsFor(
     const odds = geschaetzt ? echterPreis : (evaluation.odds ?? echterPreis);
     if (odds === null) { result.ohnePreis += 1; continue; }
 
-    result.bets.push({ kickoff: fixture.kickoff, odds, hit: treffer });
+    result.bets.push({ kickoff: fixture.kickoff, odds, hit: treffer, source: fixture.bookmaker ? "api" : "tipico" });
   }
   result.bets.sort((left, right) => left.kickoff.localeCompare(right.kickoff));
   return result;
@@ -443,6 +448,12 @@ function main(): void {
         + `${percent(metrics.hitRate).padStart(10)}${metrics.averageOdds.toFixed(2).padStart(8)}`
         + `${signed(metrics.roi).padStart(10)}${percent(preset.massstab === "roi" ? metrics.roiError : metrics.standardError).padStart(9)}`
         + `${halb[0]!.padStart(9)}${halb[1]!.padStart(9)}   ${preset.noteOf(level.measured)}`);
+      const apiBets = bets.filter((bet) => bet.source === "api");
+      const apiMetrics = metricsOf(apiBets);
+      if (apiMetrics !== null) {
+        console.log(`    davon Quoten aus API-Football: ${apiMetrics.n} Tipps, Treffer ${percent(apiMetrics.hitRate)},`
+          + ` Ertrag ${signed(apiMetrics.roi)} ± ${percent(apiMetrics.roiError)}`);
+      }
 
       // Die Knöpfe in der App tragen diese Zahlen. Laufen sie auseinander, wirbt die
       // Oberfläche mit einem Stand, den die Daten nicht mehr hergeben.

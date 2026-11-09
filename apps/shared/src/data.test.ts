@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { useDashboardData } from "./data";
 
 function dashboard(createdAt: string) {
-  return { schemaVersion: 14, meta: { createdAt, timezone: "Europe/Berlin" }, fixtures: [] };
+  return { schemaVersion: 15, meta: { createdAt, timezone: "Europe/Berlin" }, fixtures: [] };
 }
 
 afterEach(() => {

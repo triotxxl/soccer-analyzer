@@ -192,8 +192,8 @@ export const REJECTION_LABELS: Record<QuickpickRejection, string> = {
   remisDaten: "zu wenige Daten, um den Remis-Score zu bilden",
   siegChance: "das Modell sieht den Sieger nicht sicher genug",
   nichtBelastbar: "Spiel zwischen verschiedenen Ligen ohne Stärkevergleich – keine belastbare Siegchance",
-  keinKombiTipp: "kein Tipp ab der Mindestquote, bei dem Tipico auch die Gegenseite anbietet",
-  auffaellig: "auffällige Quoten, oder Modell und Tipico liegen weit auseinander – lieber weglassen",
+  keinKombiTipp: "kein Tipp ab der Mindestquote, bei dem der Buchmacher auch die Gegenseite anbietet",
+  auffaellig: "auffällige Quoten, oder Modell und Quote liegen weit auseinander – lieber weglassen",
   nichtUnterDenBesten: "zählt nicht zu den besten – Feld „Nur die besten“",
   tabellenTrend: "keine Mannschaft klettert in der Tabelle, während die andere abrutscht"
 };

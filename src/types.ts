@@ -7,6 +7,11 @@ export interface LeagueSelection {
   country: string;
   league: string;
   tipicoCompetitionId?: number;
+  /**
+   * Liga-ID von API-Football. Gesetzt bei Spielen aus den Quoten von API-Football (seit 09.11.2026):
+   * Dann gilt die ID direkt, ohne Alias und Namensvergleich (`resolveLeagues`).
+   */
+  apiLeagueId?: number;
 }
 
 export interface AnalysisInput {
@@ -15,11 +20,15 @@ export interface AnalysisInput {
   dates: DateRange;
   matches?: LiveMatchSelection[];
   tipicoOdds?: TipicoOdds[];
+  /**
+   * Die zu analysierenden Spiele als Fixture-IDs von API-Football (Quelle "api", seit 09.11.2026).
+   * Ist das Feld gesetzt, gilt nur diese Liste - ein leeres Feld heißt "kein Spiel", nicht "alle".
+   */
+  fixtureIds?: number[];
 }
 
-export interface TipicoOdds {
-  homeTeam: string;
-  awayTeam: string;
+/** Quoten der Märkte eines Spiels, gleich von welchem Anbieter. */
+export interface MarketOdds {
   home?: number;
   draw?: number;
   away?: number;
@@ -37,6 +46,11 @@ export interface TipicoOdds {
   firstHalfUnder05?: number;
   firstHalfOver15?: number;
   firstHalfUnder15?: number;
+}
+
+export interface TipicoOdds extends MarketOdds {
+  homeTeam: string;
+  awayTeam: string;
 }
 
 export interface ApiEnvelope<T> {
@@ -118,6 +132,10 @@ export interface ApiBookmakerOdds {
 
 export interface ApiFixtureOdds {
   fixture: { id: number; timezone?: string; date?: string; timestamp?: number };
+  /** Bei `/odds?date=` immer dabei, bei `/odds?fixture=` nicht geprüft. */
+  league?: { id: number; name: string; country: string; logo?: string; flag?: string | null; season: number };
+  /** Zeitpunkt, zu dem API-Football die Quoten zuletzt aktualisiert hat. */
+  update?: string;
   bookmakers: ApiBookmakerOdds[];
 }
 
@@ -241,7 +259,7 @@ export interface ResolvedLeague {
   country: string;
   league: string;
   seasons: ApiLeagueSeason[];
-  source: "alias" | "exact" | "fuzzy";
+  source: "alias" | "exact" | "fuzzy" | "id";
 }
 
 export interface ResolutionCandidate {
@@ -401,6 +419,8 @@ export interface GoalLineRow {
   league: string;
   homeTeam: string;
   awayTeam: string;
+  /** Liga-ID von API-Football, ab schemaVersion 15 im Snapshot (coverage und data-check lesen sie). */
+  leagueId?: number;
   /** Team-IDs von API-Football - darüber findet der Dashboard-Lauf das Team-Elo. */
   homeTeamId?: number;
   awayTeamId?: number;

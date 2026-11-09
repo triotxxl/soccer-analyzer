@@ -28,7 +28,7 @@ function HeatCell({ heat, text, title, faint = false }: { heat: Heat | null; tex
 
 function OddsCell({ market, showEdge, selection }: { market: DashboardMarket | undefined; showEdge: boolean; selection: string }) {
   if (!market || market.odds === null) {
-    return <span className="odds-cell missing" title="Keine Tipico-Quote für diesen Markt">–</span>;
+    return <span className="odds-cell missing" title="Keine Quote für diesen Markt">–</span>;
   }
   const heat = valueHeat(market, showEdge);
   const reliable = market.probabilityReliable !== false;

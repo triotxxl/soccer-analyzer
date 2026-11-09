@@ -477,7 +477,7 @@ describe("Vier Voreinstellungen", () => {
       .getAllByRole("radio").map((radio) => radio.getAttribute("value"));
     expect(werte("Daves Filter")).toEqual(["daves1x2", "dominanz", "remisScore", "davesTable"]);
     expect(werte("Modell-Filter")).toEqual(["modell1x2", "hz15", "remis"]);
-    expect(werte("Tipico-Filter")).toEqual(["kombi"]);
+    expect(werte("Quoten-Filter")).toEqual(["kombi"]);
   });
 
   /** Jeder Eintrag nennt, wie viele Spiele er mit **seinen** Einstellungen findet. */
@@ -651,8 +651,8 @@ describe("Kombi-Tipps ab 1,60", () => {
 
   it("sagt immer, dass man nicht mit Gewinn rechnen und jeden Preis prüfen soll", () => {
     render(<Harness fixtures={[spiel(1, "Alpha", "Beta")]} preset="kombi" />);
-    const warnung = screen.getByText(/Rechne nicht mit Gewinn, denn der Aufschlag von Tipico/);
-    expect(warnung).toHaveTextContent("prüf jeden Preis vor dem Setzen in der Tipico-App");
+    const warnung = screen.getByText(/Rechne nicht mit Gewinn, denn der Aufschlag des Buchmachers/);
+    expect(warnung).toHaveTextContent("prüf jeden Preis vor dem Setzen bei Betano");
   });
 
   it("meldet eigene Werte, sobald die Mindestquote von 1,60 abweicht", async () => {

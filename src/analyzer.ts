@@ -114,6 +114,11 @@ export interface RequestedFixtureScope {
   aliases: TeamAliasMap;
   /** Tipico-Spiele ohne API-Ansetzung - Arbeitsliste für `npm run prepare-analysis`. */
   unmatched: LiveMatchSelection[];
+  /**
+   * Quelle "api": angefragte Fixture-IDs, die in den geladenen Tageslisten der gewählten Ligen fehlen.
+   * Die Quotenantwort trägt keine Teamnamen, deshalb ein eigenes Feld statt `unmatched`.
+   */
+  missingFixtureIds?: number[];
 }
 
 function aliasMatchesApiName(requestedName: string, apiName: string, aliases: TeamAliasMap): boolean {
@@ -141,6 +146,19 @@ export async function requestedFixtureScope(
   database?: AnalyzerDatabase
 ): Promise<RequestedFixtureScope> {
   const aliases = await readTeamAliases(teamAliasFile);
+  // Quelle "api": Die Spiele stehen als Fixture-IDs fest. Muss vor der Rückgabe "alle Spiele" stehen -
+  // ein leeres Feld heißt "kein Spiel", nicht "alle Spiele der Ligen".
+  if (input.fixtureIds !== undefined) {
+    const wanted = new Set(input.fixtureIds);
+    const selected = fixtures.filter((fixture) => wanted.has(fixture.fixture.id));
+    const found = new Set(selected.map((fixture) => fixture.fixture.id));
+    return {
+      fixtures: selected,
+      aliases,
+      unmatched: [],
+      missingFixtureIds: input.fixtureIds.filter((id) => !found.has(id))
+    };
+  }
   if (!input.matches || input.matches.length === 0) return { fixtures, aliases, unmatched: [] };
   const resolveAmong = async (
     match: NonNullable<AnalysisInput["matches"]>[number],
@@ -935,6 +953,7 @@ export async function runGoalLineAnalysis(
         league: fixture.league.name,
         homeTeam: fixture.teams.home.name,
         awayTeam: fixture.teams.away.name,
+        leagueId: fixture.league.id,
         homeTeamId: fixture.teams.home.id,
         awayTeamId: fixture.teams.away.id,
         homeCrest: fixture.teams.home.logo,

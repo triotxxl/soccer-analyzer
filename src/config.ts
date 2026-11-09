@@ -26,7 +26,15 @@ const apiRequestsPerSecond = Number(
 const apiDailyReserve = Number(
   process.env.API_DAILY_RESERVE ?? 100
 );
-const livePollMs = Number(process.env.LIVE_POLL_MS ?? 15_000);
+// Anbieter, deren Quoten bei API-Football die Spiele der Analyse festlegen (Quelle "api", seit
+// 09.11.2026), in dieser Reihenfolge: Ein Spiel bekommt alle Quoten vom ersten, der es führt. Vorgabe
+// nur Betano (32, Davids Wahl): Bet365 (8) brachte am 08./09.11. 6 Spiele mehr bei rund 70 Aufrufen
+// je vollem Tag. Mit ODDS_BOOKMAKERS=32,8 kommt es dazu.
+const oddsBookmakers = (process.env.ODDS_BOOKMAKERS ?? "32")
+  .split(",")
+  .map((value) => Number(value.trim()))
+  .filter((value) => Number.isInteger(value) && value > 0);
+const livePollMs =Number(process.env.LIVE_POLL_MS ?? 15_000);
 const liveDailyRequestBudget = Number(process.env.LIVE_DAILY_REQUEST_BUDGET ?? 2_000);
 const liveAllThreshold = Number(process.env.LIVE_ALL_THRESHOLD ?? 25);
 const insightsHistoryLimit = Number(process.env.INSIGHTS_HISTORY_LIMIT ?? 20);
@@ -50,6 +58,9 @@ export const config = {
   apiBaseUrl: process.env.API_FOOTBALL_BASE_URL ?? "https://v3.football.api-sports.io",
   timezone: process.env.ANALYZER_TIMEZONE ?? "Europe/Berlin",
   timeoutMs: Number(process.env.API_TIMEOUT_MS ?? 15_000),
+  oddsBookmakers: oddsBookmakers.length > 0 ? oddsBookmakers : [32],
+  // Ein voller Spieltag hat bei Betano rund 77 Seiten (08.11.2026: 762 Spiele).
+  oddsListingMaxPages: 200,
   apiRequestsPerMinute:
     Number.isInteger(apiRequestsPerMinute) && apiRequestsPerMinute > 0
       ? apiRequestsPerMinute
@@ -329,6 +340,9 @@ export const config = {
     recentTeamFixtures: 24 * 60 * 60 * 1000,
     headToHead: 7 * 24 * 60 * 60 * 1000,
     odds: 6 * 60 * 60 * 1000,
+    // Quotenliste je Tag und Anbieter: kurz, damit prepare-analysis und eine Analyse kurz danach
+    // dieselbe Liste teilen, eine spätere Analyse aber frische Preise sieht.
+    oddsListing: 60 * 60 * 1000,
     fixtureExpectedGoals: 24 * 60 * 60 * 1000,
     settledFixtures: 30 * 24 * 60 * 60 * 1000
   }

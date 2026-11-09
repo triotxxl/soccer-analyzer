@@ -1,12 +1,13 @@
 import type { ReactNode } from "react";
 import { teamName, useNames } from "../../../shared/src/names";
+import { quoteSourceName } from "../../../shared/src/quoteSource";
 import type { DashboardFixture } from "../../../shared/src/types";
 import { bothScore, goalsFormat, oddsFormat, oddsTriple, oneXTwo, OU_LINES, overUnder, percent } from "../neoData";
 
 /**
  * Marktchancen eines Spiels wie in der Referenz (`renderMarkets` in docs/neo-referenz.html): zwei Gruppen
  * „Wer gewinnt“ und „Wie viele Tore“, dahinter „Weitere Märkte“. Alle Chancen kommen aus dem Snapshot,
- * Tipico-Quoten stehen nur daneben und ändern nichts.
+ * die Quoten (seit 09.11.2026 vom Anbieter aus dem Snapshot, davor Tipico) stehen nur daneben und ändern nichts.
  */
 
 type Tone = "h" | "d" | "a";
@@ -17,13 +18,13 @@ const UNRELIABLE = "Spiel zwischen verschiedenen Ligen ohne Vergleich der Ligast
 const NOT_YET = "Kommt mit der nächsten Analyse.";
 const UNCHECKED = "Noch nicht an alten Spielen geprüft";
 
-function Outcomes({ list }: { list: Outcome[] }) {
+function Outcomes({ list, quoted }: { list: Outcome[]; quoted: string }) {
   const max = Math.max(...list.map((o) => o.probability));
   return <>{list.map((o) => (
     <div key={o.label} className={`oc${o.probability === max && list.length > 1 ? " best" : ""}`}>
       <span className="oc-l" title={o.label}>{o.label}</span>
       <span className="oc-p">{percent(o.probability)}</span>
-      <span className={`oc-o${o.odds == null ? " none" : ""}`} title={o.odds == null ? "Tipico führt hierfür keine Quote" : "Tipico-Quote"}><span className="sr">{o.odds == null ? "keine Quote" : "Quote "}</span>{oddsFormat(o.odds ?? null)}</span>
+      <span className={`oc-o${o.odds == null ? " none" : ""}`} title={o.odds == null ? `${quoted} führt hierfür keine Quote` : `Quote von ${quoted}`}><span className="sr">{o.odds == null ? "keine Quote" : "Quote "}</span>{oddsFormat(o.odds ?? null)}</span>
       <span className="oc-bar"><i className={o.tone} style={{ width: `${(o.probability * 100).toFixed(1)}%` }} /></span>
     </div>
   ))}</>;
@@ -64,6 +65,7 @@ export function MarketsBody({ fixture, ou, onOu, moreOpen, onMoreOpen }: {
   const source = useNames();
   const home = teamName(fixture, "home", source), away = teamName(fixture, "away", source);
   const detail = fixture.marketDetail;
+  const quoted = quoteSourceName(fixture);
   const triple = oneXTwo(fixture), [o1, ox, o2] = oddsTriple(fixture);
   // Ohne belastbares 1X2 fehlt alles mit Richtung; ohne `marketDetail` (Analyse vor schemaVersion 10) nur die neuen Märkte.
   const sideMissing = triple ? NOT_YET : UNRELIABLE;
@@ -82,7 +84,7 @@ export function MarketsBody({ fixture, ou, onOu, moreOpen, onMoreOpen }: {
         <div className="tiles">
           <Tile title="Endergebnis" sub="1X2 · 90 Min." wide>
             {triple
-              ? <Outcomes list={[
+              ? <Outcomes quoted={quoted} list={[
                   { label: `${home} (1)`, probability: triple.home, odds: o1, tone: "h" },
                   { label: "Remis (X)", probability: triple.draw, odds: ox, tone: "d" },
                   { label: `${away} (2)`, probability: triple.away, odds: o2, tone: "a" },
@@ -91,7 +93,7 @@ export function MarketsBody({ fixture, ou, onOu, moreOpen, onMoreOpen }: {
           </Tile>
           <Tile title="1. Halbzeit" sub="Stand zur Pause" foot={detail?.halfTime ? UNCHECKED : undefined}>
             {detail?.halfTime
-              ? <Outcomes list={[
+              ? <Outcomes quoted={quoted} list={[
                   { label: home, probability: detail.halfTime.home, tone: "h" },
                   { label: "Remis", probability: detail.halfTime.draw, tone: "d" },
                   { label: away, probability: detail.halfTime.away, tone: "a" },
@@ -100,7 +102,7 @@ export function MarketsBody({ fixture, ou, onOu, moreOpen, onMoreOpen }: {
           </Tile>
           <Tile title="Erstes Tor" sub="wer trifft zuerst" foot={detail?.firstGoal ? UNCHECKED : undefined}>
             {detail?.firstGoal
-              ? <Outcomes list={[
+              ? <Outcomes quoted={quoted} list={[
                   { label: home, probability: detail.firstGoal.home, tone: "h" },
                   { label: "Kein Tor", probability: detail.firstGoal.none, tone: "d" },
                   { label: away, probability: detail.firstGoal.away, tone: "a" },
@@ -120,7 +122,7 @@ export function MarketsBody({ fixture, ou, onOu, moreOpen, onMoreOpen }: {
           </Tile>
           <Tile title="Über / Unter" sub={`Tore gesamt · Linie ${lineFormat(ou)}`}>
             {line
-              ? <Outcomes list={[
+              ? <Outcomes quoted={quoted} list={[
                   { label: `Über ${lineFormat(ou)}`, probability: line.yes, odds: line.oddsYes },
                   { label: `Unter ${lineFormat(ou)}`, probability: line.no, odds: line.oddsNo },
                 ]} />
@@ -128,7 +130,7 @@ export function MarketsBody({ fixture, ou, onOu, moreOpen, onMoreOpen }: {
           </Tile>
           <Tile title="Beide treffen" sub="BTTS · beide Teams treffen">
             {btts
-              ? <Outcomes list={[{ label: "Ja", probability: btts.yes, odds: btts.oddsYes }, { label: "Nein", probability: btts.no, odds: btts.oddsNo }]} />
+              ? <Outcomes quoted={quoted} list={[{ label: "Ja", probability: btts.yes, odds: btts.oddsYes }, { label: "Nein", probability: btts.no, odds: btts.oddsNo }]} />
               : <Missing>Für dieses Spiel gibt es keine Chance.</Missing>}
           </Tile>
         </div>
@@ -139,7 +141,7 @@ export function MarketsBody({ fixture, ou, onOu, moreOpen, onMoreOpen }: {
         <div className="tiles">
           <Tile title="Doppelte Chance" sub="zwei von drei">
             {triple
-              ? <Outcomes list={[
+              ? <Outcomes quoted={quoted} list={[
                   { label: `${home} oder Remis (1X)`, probability: triple.home + triple.draw },
                   { label: "Kein Remis (12)", probability: triple.home + triple.away },
                   { label: `${away} oder Remis (X2)`, probability: triple.draw + triple.away },
@@ -148,14 +150,14 @@ export function MarketsBody({ fixture, ou, onOu, moreOpen, onMoreOpen }: {
           </Tile>
           <Tile title="Exakte Ergebnisse" sub="Top 4" foot={detail?.exactScores ? UNCHECKED : undefined}>
             {detail?.exactScores
-              ? <Outcomes list={detail.exactScores.map((s) => ({ label: `${s.home} : ${s.away}`, probability: s.probability }))} />
+              ? <Outcomes quoted={quoted} list={detail.exactScores.map((s) => ({ label: `${s.home} : ${s.away}`, probability: s.probability }))} />
               : <Missing>{sideMissing}</Missing>}
           </Tile>
         </div>
       </details>
 
       <p className="note tiles-note">
-        Chancen sind Schätzungen des Modells, die Quoten stammen von Tipico und ändern keinen Tipp. Auch wahrscheinliche
+        Chancen sind Schätzungen des Modells, die Quoten stammen von {quoted} und ändern keinen Tipp. Auch wahrscheinliche
         Ausgänge treten oft nicht ein – rechne nicht mit Gewinn.
       </p>
     </>

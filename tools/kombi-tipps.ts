@@ -114,7 +114,15 @@ function select(): void {
   const top = clean.slice(0, count);
   const reserves = clean.slice(count, count + reserve);
 
-  const seen = window.map((fixture) => tipico.get(fixture.fixtureId)?.seen).filter((value): value is string => !!value).sort();
+  // Quelle "api" (seit 09.11.2026): Stand der Quoten laut API-Football je Spiel; sonst wann die
+  // Tipico-data.json das Spiel zuletzt führte.
+  const apiSource = document.meta?.oddsSource === "api";
+  const bookmakers = [...new Set(window.map((fixture) => fixture.bookmaker).filter((name): name is string => !!name))];
+  const priceSource = apiSource ? (bookmakers.join("/") || "Anbieter") : "Tipico";
+  const seen = window
+    .map((fixture) => apiSource ? fixture.oddsUpdatedAt : tipico.get(fixture.fixtureId)?.seen)
+    .filter((value): value is string => !!value)
+    .sort((left, right) => Date.parse(left) - Date.parse(right));
   const outcomes = start < now ? readOutcomes() : new Map<number, never>();
   const resultOf = (row: Row): boolean | null => {
     const outcome = outcomes.get(row.fixture.fixtureId);
@@ -129,8 +137,8 @@ function select(): void {
   };
   console.log(`# Kombi-Tipps ${when(new Date(start).toISOString())} bis ${when(new Date(to).toISOString())}`);
   console.log("");
-  console.log(`Analyse vom ${document.meta?.createdAt ? when(document.meta.createdAt) : "?"} · Tipico-Quoten zuletzt gesehen ${seen.length ? when(seen.at(-1)!) : "unbekannt"}`);
-  console.log(`Regel: Quote ab ${odds(rule.minOdds)}, bevorzugt ab ${odds(rule.preferredOdds)} (außer der beste Tipp darunter ist mehr als ${(rule.preferMargin * 100).toFixed(1).replace(".", ",")} Punkte besser), je Spiel ein Tipp, Rangfolge nach fairem Tipico-Preis${onlyMarkets ? `, nur Markt ${onlyMarkets.join(", ")}` : ""}.`);
+  console.log(`Analyse vom ${document.meta?.createdAt ? when(document.meta.createdAt) : "?"} · ${apiSource ? `Quoten (${priceSource}) vom` : "Tipico-Quoten zuletzt gesehen"} ${seen.length ? when(seen.at(-1)!) : "unbekannt"}`);
+  console.log(`Regel: Quote ab ${odds(rule.minOdds)}, bevorzugt ab ${odds(rule.preferredOdds)} (außer der beste Tipp darunter ist mehr als ${(rule.preferMargin * 100).toFixed(1).replace(".", ",")} Punkte besser), je Spiel ein Tipp, Rangfolge nach fairem ${priceSource}-Preis${onlyMarkets ? `, nur Markt ${onlyMarkets.join(", ")}` : ""}.`);
   console.log(`${window.length} Spiele im Zeitraum · ${clean.length} mit Tipp · ${flagged.length} auffällig (ausgeschlossen) · ${withoutTip} ohne Tipp ab ${odds(rule.minOdds)}`);
   console.log("");
 

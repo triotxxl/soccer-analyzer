@@ -1,5 +1,6 @@
 import { leagueName, teamName, useNames } from "../../../shared/src/names";
 import { eloAgainstOf, eloAgainstText } from "../../../shared/src/eloAgainst";
+import { quoteSourceName } from "../../../shared/src/quoteSource";
 import type { DashboardFixture } from "../../../shared/src/types";
 import {
   competitionId, dayKey, formatDay, formatTime, goalsFormat, oddsFormat, oddsTriple, oneXTwo, percent, scopeLabel, scopePhrase,
@@ -56,7 +57,7 @@ function FixtureRow({ fixture, competition, withLeague, on, timezone, onSelect }
         </span>
         <span className="fx-xg"><small>Erw. Tore</small>{goalsFormat(fixture.expectedGoals.home)} : {goalsFormat(fixture.expectedGoals.away)}</span>
         <span>
-          <span className="sr">{said} Tipico-Quoten {odds.map(oddsFormat).join(", ")}.</span>
+          <span className="sr">{said} Quoten von {quoteSourceName(fixture)}: {odds.map(oddsFormat).join(", ")}.</span>
           {triple
             ? <span className="split" aria-hidden="true"><i className="h" style={{ width: `${triple.home * 100}%` }} /><i className="d" style={{ width: `${triple.draw * 100}%` }} /><i className="a" style={{ width: `${triple.away * 100}%` }} /></span>
             : <span className="split none" aria-hidden="true" title={NOT_COMPARABLE} />}
@@ -64,7 +65,7 @@ function FixtureRow({ fixture, competition, withLeague, on, timezone, onSelect }
             {parts.map(([k, v], i) => (
               <span key={k} className={v != null && v === top ? "max" : undefined}>
                 <span title={v == null ? NOT_COMPARABLE : undefined}><em>{k}</em> {v == null ? "–" : percent(v)}</span>
-                <span className="oc-o fx-q" title="Tipico-Quote">{oddsFormat(odds[i]!)}</span>
+                <span className="oc-o fx-q" title={`Quote von ${quoteSourceName(fixture)}`}>{oddsFormat(odds[i]!)}</span>
               </span>
             ))}
           </span>

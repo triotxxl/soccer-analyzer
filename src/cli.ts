@@ -43,9 +43,11 @@ import type {
   GoalLineAnalysisResult,
   LeagueSelection,
   LiveMatchSelection,
+  MarketOdds,
   TipicoOdds
 } from "./types.ts";
-import { aliasKey, parseMarkets, percent } from "./util.ts";
+import { aliasKey, datesForRange, isAnalyzableStatus, isScheduledStatus, parseMarkets, percent } from "./util.ts";
+import { importApiOdds } from "./bookmaker-odds.ts";
 
 interface ParsedArgs {
   positional: string[];
@@ -528,27 +530,153 @@ async function withoutUnresolvedLeagues(
   };
 }
 
-async function dashboard(args: ParsedArgs): Promise<void> {
+/** Woher Spiele und Quoten kommen und was davon nach der Analyse ins Dashboard geht. */
+interface DashboardSource {
+  client: ApiFootballClient | null;
+  input: AnalysisInput;
+  sourceFile: string;
+  totalEvents: number;
+  selectedEvents: number;
+  selectedCompetitions: number;
+  /** Quoten, Namen und Anbieter je Fixture-ID - bei Tipico erst nach der Analyse bekannt. */
+  attach: () => {
+    oddsByFixture: Map<number, MarketOdds>;
+    tipicoNamesByFixture?: Map<number, TipicoNames>;
+    bookmakerByFixture?: Map<number, { name: string; updatedAt: string | null }>;
+    tipicoOdds: TipicoOdds[];
+  };
+  summary: string;
+}
+
+/**
+ * Quelle "api" (Vorgabe seit 09.11.2026): Spiele und Quoten aus `/odds` von API-Football. Bricht ohne
+ * ein einziges Spiel ab, statt ein leeres Dashboard über das letzte gute zu schreiben.
+ */
+async function apiDashboardSource(dates: DateRange): Promise<DashboardSource> {
+  const client = new ApiFootballClient();
+  const now = new Date();
+  const imported = await importApiOdds(client, dates, now);
+  for (const failed of imported.failedBookmakers) {
+    console.warn(`Quoten von Anbieter ${failed.bookmakerId} nicht geladen: ${failed.message}`);
+  }
+  if (imported.events.length === 0) {
+    throw new Error(
+      `Keine Spiele mit Quote im Umfang ${dates} (${imported.listed} Spiele in den Listen, ${imported.apiRequests} Aufrufe). `
+      + "Es wurde nichts geschrieben; das letzte Dashboard bleibt."
+    );
+  }
+  // Die Tagesliste einmal frisch, damit sie nicht älter ist als die Quoten: Die Analysen lesen sie
+  // danach aus dem Cache. Nebenbei zählt sie, was aus der Quotenliste nicht analysiert wird.
+  const daily = new Map<number, { status: string; timestamp: number }>();
+  for (const date of datesForRange(dates, config.timezone, now)) {
+    for (const fixture of await client.getFixturesForDate(date, config.timezone, true)) {
+      daily.set(fixture.fixture.id, { status: fixture.fixture.status.short, timestamp: fixture.fixture.timestamp * 1000 });
+    }
+  }
+  let missing = 0;
+  let notPlayable = 0;
+  let stalePlaceholder = 0;
+  for (const event of imported.events) {
+    const fixture = daily.get(event.fixtureId);
+    if (!fixture) missing += 1;
+    else if (!isAnalyzableStatus(fixture.status)) notPlayable += 1;
+    // API-Football führt manche Spiele bis kurz vorher auf einem Platzhaltertermin. Über die
+    // Tipico-Anstoßzeit ließ sich das korrigieren, hier nicht - es wird nur gezählt.
+    else if (isScheduledStatus(fixture.status) && fixture.timestamp < now.getTime() - 30 * 60 * 1000) stalePlaceholder += 1;
+  }
+  const oddsByFixture = new Map<number, MarketOdds>();
+  const bookmakerByFixture = new Map<number, { name: string; updatedAt: string | null }>();
+  for (const event of imported.events) {
+    oddsByFixture.set(event.fixtureId, event.odds);
+    bookmakerByFixture.set(event.fixtureId, { name: event.bookmaker, updatedAt: event.updatedAt });
+  }
+  const perBookmaker = [...imported.byBookmaker].map(([name, count]) => `${name} ${count}`).join(", ");
+  return {
+    client,
+    input: imported.input,
+    sourceFile: "API-Football",
+    totalEvents: imported.listed,
+    selectedEvents: imported.events.length,
+    selectedCompetitions: imported.input.selections.length,
+    attach: () => ({ oddsByFixture, bookmakerByFixture, tipicoOdds: [] }),
+    summary: `Quoten: ${perBookmaker} Spiele · ${imported.input.selections.length} Wettbewerbe`
+      + ` · ${client.requestCount} Aufrufe für Quoten und Tageslisten`
+      + ` · ${missing} ohne Ansetzung · ${notPlayable} laut API nicht spielbar`
+      + (stalePlaceholder ? ` · ${stalePlaceholder} Anstoß vorbei, Status noch NS` : "")
+  };
+}
+
+/** Quelle "tipico": der bisherige Weg über die data.json, unverändert. */
+async function tipicoDashboardSource(
+  args: ParsedArgs,
+  dates: DateRange,
+  database: AnalyzerDatabase
+): Promise<DashboardSource> {
   const sourceFile = path.resolve(option(args, "input") ?? path.join(ROOT_DIR, "data.json"));
+  const imported = await importTipicoData(sourceFile, dates);
+  database.saveTipicoImport({
+    sourceFile,
+    dateRange: dates,
+    totalEvents: imported.totalEvents,
+    selectedEvents: imported.selectedEvents,
+    selectedCompetitions: imported.selectedCompetitions,
+    events: imported.events
+  });
+  const client = imported.selectedEvents > 0 ? new ApiFootballClient() : null;
+  const input = client && args.options.has("skip-unresolved")
+    ? await withoutUnresolvedLeagues(imported.input, client, database)
+    : imported.input;
+  return {
+    client,
+    input,
+    sourceFile,
+    totalEvents: imported.totalEvents,
+    selectedEvents: imported.selectedEvents,
+    selectedCompetitions: imported.selectedCompetitions,
+    attach: () => {
+      // Die Analyse hat jedes Tipico-Ereignis schon seiner Fixture zugeordnet - diese Zuordnung
+      // trägt die Quoten, nicht noch einmal der Namensvergleich.
+      const fixtureByEvent = database.apiFixtureIdsForTipicoEvents(imported.events.map((event) => event.tipicoEventId));
+      const oddsByFixture = new Map<number, MarketOdds>();
+      const tipicoNamesByFixture = new Map<number, TipicoNames>();
+      for (const event of imported.events) {
+        const fixtureId = fixtureByEvent.get(event.tipicoEventId);
+        if (fixtureId === undefined) continue;
+        oddsByFixture.set(fixtureId, event.odds);
+        tipicoNamesByFixture.set(fixtureId, {
+          homeTeam: event.homeTeam,
+          awayTeam: event.awayTeam,
+          country: event.competition.country,
+          league: event.competition.league,
+          eventId: event.tipicoEventId
+        });
+      }
+      return { oddsByFixture, tipicoNamesByFixture, tipicoOdds: imported.input.tipicoOdds ?? [] };
+    },
+    summary: `Tipico: ${imported.selectedEvents}/${imported.totalEvents} Events · ${imported.selectedCompetitions} Wettbewerbe`
+  };
+}
+
+async function dashboard(args: ParsedArgs): Promise<void> {
   const dates = (option(args, "dates") ?? "next48") as DateRange;
   if (!["today", "tomorrow", "tomorrow2", "both", "next48", "three", "five", "seven", "fourteen", "twentyone"].includes(dates)) {
     throw new Error("--dates muss today, tomorrow, tomorrow2, both, next48, three, five, seven, fourteen oder twentyone sein.");
   }
-  const imported = await importTipicoData(sourceFile, dates);
+  // Seit 09.11.2026 kommen Spiele und Quoten ab Werk von API-Football. --input meint die Tipico-data.json
+  // und setzt deshalb --source tipico voraus.
+  const oddsSource = option(args, "source") ?? (option(args, "input") ? "tipico" : "api");
+  if (oddsSource !== "api" && oddsSource !== "tipico") {
+    throw new Error("--source muss api oder tipico sein.");
+  }
+  if (oddsSource === "api" && option(args, "input")) {
+    throw new Error("--input gehört zur Tipico-data.json und geht nur mit --source tipico.");
+  }
   const database = new AnalyzerDatabase();
   try {
-    database.saveTipicoImport({
-      sourceFile,
-      dateRange: dates,
-      totalEvents: imported.totalEvents,
-      selectedEvents: imported.selectedEvents,
-      selectedCompetitions: imported.selectedCompetitions,
-      events: imported.events
-    });
-    const client = imported.selectedEvents > 0 ? new ApiFootballClient() : null;
-    const input = client && args.options.has("skip-unresolved")
-      ? await withoutUnresolvedLeagues(imported.input, client, database)
-      : imported.input;
+    const source = oddsSource === "api"
+      ? await apiDashboardSource(dates)
+      : await tipicoDashboardSource(args, dates, database);
+    const { client, input, sourceFile } = source;
     const emptyBase = {
       createdAt: new Date().toISOString(),
       dates: [],
@@ -627,38 +755,21 @@ async function dashboard(args: ParsedArgs): Promise<void> {
         ...(level ? { leagueLevel: level.level, leagueClubs: level.clubs } : {})
       });
     }
-    // Die Analyse hat jedes Tipico-Ereignis schon seiner Fixture zugeordnet - diese Zuordnung
-    // trägt die Quoten, nicht noch einmal der Namensvergleich.
-    const fixtureByEvent = database.apiFixtureIdsForTipicoEvents(imported.events.map((event) => event.tipicoEventId));
-    const tipicoOddsByFixture = new Map<number, TipicoOdds>();
-    const tipicoNamesByFixture = new Map<number, TipicoNames>();
-    for (const event of imported.events) {
-      const fixtureId = fixtureByEvent.get(event.tipicoEventId);
-      if (fixtureId === undefined) continue;
-      tipicoOddsByFixture.set(fixtureId, event.odds);
-      tipicoNamesByFixture.set(fixtureId, {
-        homeTeam: event.homeTeam,
-        awayTeam: event.awayTeam,
-        country: event.competition.country,
-        league: event.competition.league,
-        eventId: event.tipicoEventId
-      });
-    }
+    const attached = source.attach();
     const files = await writeDashboard({
-      tipicoOddsByFixture,
-      tipicoNamesByFixture,
+      ...attached,
+      oddsSource,
       recentStats,
       elo,
       cardData: database.cardDataByLeague(),
       createdAt: goalsResult.createdAt,
       sourceFile,
-      totalTipicoEvents: imported.totalEvents,
-      selectedTipicoEvents: imported.selectedEvents,
-      selectedCompetitions: imported.selectedCompetitions,
+      totalTipicoEvents: source.totalEvents,
+      selectedTipicoEvents: source.selectedEvents,
+      selectedCompetitions: source.selectedCompetitions,
       draw: drawResult,
       favorites: favoriteResult,
-      goals: goalsResult,
-      tipicoOdds: imported.input.tipicoOdds ?? []
+      goals: goalsResult
     });
     if (client && config.settleRequestBudget > 0) {
       try {
@@ -686,7 +797,7 @@ async function dashboard(args: ParsedArgs): Promise<void> {
     }
     console.log(`Dashboard-Daten erstellt: ${files.latest}`);
     console.log(`JSON-Snapshot gespeichert: ${files.snapshot}`);
-    console.log(`Tipico: ${imported.selectedEvents}/${imported.totalEvents} Events · ${imported.selectedCompetitions} Wettbewerbe`);
+    console.log(source.summary);
     if (client) {
       console.log(`API-Aufrufe: ${client.requestCount}${client.requestsRemaining === null ? "" : ` · heute verbleibend: ${client.requestsRemaining}`}`);
     }

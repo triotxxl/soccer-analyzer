@@ -10,18 +10,20 @@ Form, Liga-Basiswerten und einer Poisson-Tormatrix.
 
 ## Empfohlener Komplettlauf
 
-Lege die aktuelle Tipico-Datei als `data.json` im Projektstamm ab und starte:
+Seit 09.11.2026 kommen Spiele und Quoten direkt von API-Football (`/odds`, Anbieter Betano):
 
 ```powershell
 npm run dashboard -- --dates next48
 ```
 
-Der Befehl importiert ausschließlich die passenden Tipico-Fixtures, speichert stabile
-Tipico-/API-Football-Zuordnungen und Prognosesnapshots in `data/analyzer.sqlite`, lädt
-fehlende historische Daten nur einmal und erzeugt:
+Der Befehl analysiert jedes Spiel, für das Betano im Zeitraum Quoten führt, speichert
+Prognosesnapshots in `data/analyzer.sqlite`, lädt fehlende historische Daten nur einmal und erzeugt:
 
 - `output/dashboard-latest.json`
 - einen zusätzlichen datierten JSON-Snapshot
+
+Der frühere Weg über eine Tipico-`data.json` bleibt als
+`npm run dashboard -- --source tipico --input data.json` (mit Tipico-/API-Football-Zuordnungen).
 
 Die Darstellung übernimmt das **Neo Dashboard**, eine lokale React-/Vite-App unter `apps/neo`
 (gemeinsame Bausteine in `apps/shared`). Starte es in einem zweiten Terminal:

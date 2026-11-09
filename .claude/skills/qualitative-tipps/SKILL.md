@@ -20,7 +20,8 @@ Spiele zu verstehen. Sie ist kein Beleg für Gewinn.
 1. **Datenstand prüfen.**
    - `data/analyzer.sqlite` muss da sein, sonst nach AGENTS.md „Neuer PC“ vorgehen.
    - `output/dashboard-latest.json` muss den Zeitraum abdecken. Sonst erst `prepare-analysis` und
-     `dashboard` nach dem „Primären data.json-Workflow“ laufen lassen.
+     `dashboard` nach dem „Primären Ablauf“ in AGENTS.md laufen lassen (Quoten seit 09.11.2026 von
+     Betano über API-Football, je Spiel in `fixture.bookmaker`; „Tipico-Preis“ heißt dann dieser Preis).
    - Die Quoten stammen aus dem Snapshot. Sein Alter wird im Bericht genannt; das Skript warnt ab
      6 Stunden.
 2. **Fenster und Spiele bestimmen.**
