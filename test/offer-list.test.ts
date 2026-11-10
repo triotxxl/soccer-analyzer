@@ -147,7 +147,9 @@ test("Analyse: was mindestens eine Seite anbietet, mit den Seiten je Spiel; ohne
   assert.deepEqual(result.input.fixtureIds, [1, 2]);
   assert.deepEqual([...offer.offeredBy()!], [[1, ["betano.de", "tipico"]], [2, ["tipico"]]]);
   assert.equal(offerReportLine(offer.report()),
-    "Angebot (OddsPapi): betano.de 1 (1 zugeordnet), tipico 2 (2 zugeordnet) · zusammen 2, 0 bei keiner Seite · 2 OddsPapi-Aufrufe · Stand 6 von 250");
+    "Angebot (OddsPapi): betano.de 1 (1 zugeordnet), tipico 2 (2 zugeordnet) · zusammen 2, 0 bei keiner Seite · 2 OddsPapi-Aufrufe · Stand 8 von 250");
+  // Der Kontostand wurde einmal gefragt und dann mitgezählt (6 + 2), nicht nach jedem Abruf neu.
+  assert.equal(fake.calls.filter((call) => call === "/v4/account").length, 1);
 
   // Keine Seite führt das U19-Spiel: Es fällt weg.
   const betanoOnly = offerSelection({ client: afClient(), tipicoLeagueIds: () => new Set(), corrections, oddsPapi, timezone: "Europe/Berlin", bookmakers: ["betano.de"] });
@@ -163,3 +165,33 @@ test("Analyse: was mindestens eine Seite anbietet, mit den Seiten je Spiel; ohne
   assert.equal(fallback.offeredBy(), null, "bei der Näherung weiß niemand, welche Seite");
 });
 
+
+test("OddsPapi: Sperrzeit (429) wird abgewartet, ein leeres Kontingent nicht", async () => {
+  const raw = [{ fixtureId: "id1", participant1Name: "A", participant2Name: "B", startTime: "2026-11-14T19:30:00.000Z" }];
+  let fixturesCalls = 0;
+  const flaky = (async (input: URL | string) => {
+    const url = new URL(String(input));
+    if (url.pathname === "/v4/account") {
+      // Wie am 10.11.2026: Kontostand direkt nach einem Abruf - erst 429, dann 200.
+      return (flaky as unknown as { n: number }).n++ === 0
+        ? new Response(JSON.stringify({ message: "Too many requests" }), { status: 429 })
+        : new Response(JSON.stringify({ subscriptions: [{ request_count: 12, request_limit: 250 }] }));
+    }
+    fixturesCalls += 1;
+    return new Response(JSON.stringify(raw));
+  }) as typeof fetch & { n: number };
+  flaky.n = 0;
+  const client = new OddsPapiClient({ apiKey: "k", cache: new FileCache(await mkdtemp(path.join(os.tmpdir(), "oddspapi-"))), fetchImpl: flaky, pauseMs: 0, retryMs: 0 });
+  assert.equal((await client.offerFixtures(T, T, "betano.de")).length, 1);
+  assert.equal(fixturesCalls, 1);
+  assert.deepEqual(client.currentQuota(), { requestCount: 13, requestLimit: 250 });
+
+  let attempts = 0;
+  const exhausted = (async () => {
+    attempts += 1;
+    return new Response(JSON.stringify({ code: "REQUEST_LIMIT_EXCEEDED" }), { status: 429 });
+  }) as unknown as typeof fetch;
+  const empty = new OddsPapiClient({ apiKey: "k", cache: new FileCache(await mkdtemp(path.join(os.tmpdir(), "oddspapi-"))), fetchImpl: exhausted, pauseMs: 0, retryMs: 0 });
+  await assert.rejects(empty.offerFixtures(T, T, "betano.de"), /HTTP 429 REQUEST_LIMIT_EXCEEDED/);
+  assert.equal(attempts, 1, "kein Neuversuch, wenn das Monatskontingent leer ist");
+});

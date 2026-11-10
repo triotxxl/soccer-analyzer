@@ -115,7 +115,8 @@ export function offerSelection(options: {
         }
         perBookmaker.push({ bookmaker, offered, direct: decision.matched.size });
       }
-      const quota = await oddsPapi.quota().catch(() => null);
+      // Mitgezählt statt neu gefragt; nur wenn alles aus dem Cache kam, einmal nachsehen.
+      const quota = oddsPapi.currentQuota() ?? await oddsPapi.quota().catch(() => null);
       report = {
         source: "oddspapi",
         bookmakers,

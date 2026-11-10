@@ -28,6 +28,13 @@ const HOST = "https://api.oddspapi.io";
 const DAY_MS = 24 * 60 * 60 * 1000;
 /** Pause zwischen zwei Abrufen der Spielliste laut Doku (2000 ms) mit etwas Luft. */
 const FIXTURES_COOLDOWN_MS = 2_100;
+/**
+ * HTTP 429 ohne REQUEST_LIMIT_EXCEEDED ist die Sperrzeit eines Endpunkts, nicht das Monatskontingent: Am
+ * 10.11.2026 lehnte `/v4/account` direkt nach einem Abruf der Spielliste so ab, und die Analyse fiel auf die
+ * Näherung zurück. Kurz warten und neu versuchen.
+ */
+const RETRY_AFTER_429_MS = 2_500;
+const RETRIES_AFTER_429 = 2;
 
 interface RawOddsPapiFixture {
   fixtureId: string;
@@ -71,13 +78,17 @@ export class OddsPapiClient {
   private readonly fetchImpl: typeof fetch;
   private readonly apiKey: string;
   private readonly pauseMs: number;
+  private readonly retryMs: number;
   private lastCall = 0;
+  /** Kontostand der ersten Abfrage dieses Laufs; danach zählt der Client selbst (`requestCount`). */
+  private quotaAtStart: { quota: OddsPapiQuota | null; requestsBefore: number } | undefined;
 
-  constructor(options: { apiKey?: string; cache?: FileCache; fetchImpl?: typeof fetch; pauseMs?: number } = {}) {
+  constructor(options: { apiKey?: string; cache?: FileCache; fetchImpl?: typeof fetch; pauseMs?: number; retryMs?: number } = {}) {
     this.apiKey = options.apiKey ?? oddsPapiKey();
     this.cache = options.cache ?? new FileCache(ODDSPAPI_CACHE_DIR);
     this.fetchImpl = options.fetchImpl ?? fetch;
     this.pauseMs = options.pauseMs ?? FIXTURES_COOLDOWN_MS;
+    this.retryMs = options.retryMs ?? RETRY_AFTER_429_MS;
     if (!this.apiKey) throw new Error("ODDSPAPI_KEY fehlt in .env");
   }
 
@@ -85,13 +96,27 @@ export class OddsPapiClient {
     const url = new URL(pathname, HOST);
     for (const [key, value] of Object.entries(params)) url.searchParams.set(key, value);
     url.searchParams.set("apiKey", this.apiKey);
-    const response = await this.fetchImpl(url, { signal: AbortSignal.timeout(config.timeoutMs) });
-    const body = await response.json().catch(() => null) as T & { message?: string; code?: string };
+    let response: Response;
+    let body: T & { message?: string; code?: string };
+    for (let attempt = 0; ; attempt += 1) {
+      response = await this.fetchImpl(url, { signal: AbortSignal.timeout(config.timeoutMs) });
+      body = await response.json().catch(() => null) as T & { message?: string; code?: string };
+      const cooldown = response.status === 429 && body?.code !== "REQUEST_LIMIT_EXCEEDED";
+      if (!cooldown || attempt >= RETRIES_AFTER_429) break;
+      await sleep(this.retryMs * (attempt + 1));
+    }
     if (!response.ok) {
       // Die URL trägt den Schlüssel - sie gehört nicht in die Meldung.
       throw new Error(`OddsPapi ${pathname}: HTTP ${response.status}${body?.code ? ` ${body.code}` : ""}`);
     }
     return body;
+  }
+
+  /** Stand nach diesem Lauf, ohne neue Abfrage: erste Abfrage plus die seither selbst gezählten Aufrufe. */
+  currentQuota(): OddsPapiQuota | null {
+    const start = this.quotaAtStart;
+    if (!start?.quota) return null;
+    return { ...start.quota, requestCount: start.quota.requestCount + this.requestCount - start.requestsBefore };
   }
 
   /** Kontostand; `/v4/account` zählt nicht gegen das Kontingent. */
@@ -121,7 +146,9 @@ export class OddsPapiClient {
       else missing.push(block);
     }
     if (missing.length > 0) {
-      const quota = await this.quota();
+      // Einmal je Lauf fragen, danach selbst mitzählen - jede weitere Abfrage riskiert die Sperrzeit.
+      this.quotaAtStart ??= { quota: await this.quota(), requestsBefore: this.requestCount };
+      const quota = this.currentQuota();
       if (quota && quota.requestLimit - quota.requestCount < missing.length + config.oddsPapiReserve) {
         throw new Error(`OddsPapi-Kontingent fast aufgebraucht (${quota.requestCount} von ${quota.requestLimit}, `
           + `Reserve ${config.oddsPapiReserve})`);
