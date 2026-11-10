@@ -24,6 +24,9 @@ test("Teamnamen: Rechtsform, Bundesstaat, Jahreszahl und Kürzel trennen nicht (
   assert.equal(offerTeamSimilarity("Atletico Goianiense", "AC Goianiense GO"), 1);
   assert.equal(offerTeamSimilarity("Juventus U23", "Juventus Next Gen"), 1);
   assert.equal(offerTeamSimilarity("Real Sociedad II", "Real Sociedad San Sebastian B"), 1);
+  // ø wie OddsPapi als „oe“ (vorher wurde „Køge“ zu „k ge“ und fand nichts).
+  assert.equal(offerTeamSimilarity("Køge W", "HB Koege Women"), 1);
+  assert.equal(offerTeamSimilarity("Brøndby W", "Broendby IF Women"), 1);
 });
 
 test("Teamnamen: Frauen gegen Männer und erste gegen zweite Mannschaft passen nie", () => {
@@ -194,4 +197,36 @@ test("OddsPapi: Sperrzeit (429) wird abgewartet, ein leeres Kontingent nicht", a
   const empty = new OddsPapiClient({ apiKey: "k", cache: new FileCache(await mkdtemp(path.join(os.tmpdir(), "oddspapi-"))), fetchImpl: exhausted, pauseMs: 0, retryMs: 0 });
   await assert.rejects(empty.offerFixtures(T, T, "betano.de"), /HTTP 429 REQUEST_LIMIT_EXCEEDED/);
   assert.equal(attempts, 1, "kein Neuversuch, wenn das Monatskontingent leer ist");
+});
+
+test("Spiele ohne Quote bei API-Football: aufgenommen, wenn eine Seite sie anbietet - nur mit eigenem Treffer", async () => {
+  const now = new Date("2026-11-14T10:00:00Z");
+  const withExtras = () => {
+    const client = {
+      requestCount: 0,
+      async getOddsByDate() { return [oddsItem(1, 72)]; },
+      async getFixturesForDate() {
+        return [
+          dailyFixture(1, "Avai", "America Mineiro", 72),
+          dailyFixture(3, "Vissel Kobe", "Machida Zelvia", 101), // Tipico führt es, Betano bei API-Football nicht
+          dailyFixture(4, "Kawasaki Frontale", "Kashiwa Reysol", 101), // keine Seite führt es
+          { ...dailyFixture(5, "Kimberley Mar del Plata", "Olimpo Bahia Blanca", 134), fixture: { ...dailyFixture(5, "x", "y", 134).fixture, status: { long: "Postponed", short: "PST", elapsed: null } } }
+        ];
+      }
+    };
+    return client as unknown as ApiFootballClient;
+  };
+  const KOBE = { fixtureId: "id3", participant1Name: "Vissel Kobe", participant2Name: "Machida Zelvia", startTime: "2026-11-14T19:30:00.000Z", tournamentName: "J.League Cup" };
+  const OLIMPO = { fixtureId: "id5", participant1Name: "Kimberley de Mar Del Plata", participant2Name: "Club Olimpo", startTime: "2026-11-14T19:30:00.000Z", tournamentName: "Torneo Federal A" };
+  const fake = fakeOddsPapi({ fixtures: { "betano.de": [AVAI], tipico: [AVAI, KOBE, OLIMPO] } });
+  const oddsPapi = new OddsPapiClient({ apiKey: "k", cache: new FileCache(await mkdtemp(path.join(os.tmpdir(), "oddspapi-"))), fetchImpl: fake.fetchImpl, pauseMs: 0 });
+  const offer = offerSelection({ client: withExtras(), tipicoLeagueIds: () => new Set(), corrections: { include: [], exclude: [] }, oddsPapi, timezone: "Europe/Berlin", bookmakers: ["betano.de", "tipico"] });
+  const result = await importApiOdds(withExtras(), "today", now, { bookmakers: [32], timezone: "Europe/Berlin", offerFilter: offer.filter, offerExtras: offer.extras });
+  // 3 ohne Quote dazu; 4 bietet niemand an, 5 ist verlegt.
+  assert.deepEqual(result.input.fixtureIds, [1, 3]);
+  assert.equal(result.withoutOdds, 1);
+  assert.deepEqual(result.events.find((event) => event.fixtureId === 3)?.odds, {});
+  assert.deepEqual([...result.byBookmaker], [["Betano", 1]], "ein Spiel ohne Quote zählt bei keinem Anbieter");
+  assert.deepEqual(offer.offeredBy()!.get(3), ["tipico"]);
+  assert.match(offerReportLine(offer.report()) ?? "", /dazu 1 angeboten ohne Quote bei API-Football/);
 });

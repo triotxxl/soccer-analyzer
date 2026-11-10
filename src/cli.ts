@@ -573,7 +573,7 @@ async function apiDashboardSource(
       corrections: await readOfferCorrections(),
       freshDaily: true
     });
-  const imported = await importApiOdds(client, dates, now, { offerFilter: offer?.filter });
+  const imported = await importApiOdds(client, dates, now, { offerFilter: offer?.filter, offerExtras: offer?.extras });
   const offerReport = offer?.report() ?? null;
   const offerLine = offerReportLine(offerReport);
   if (offerLine) (offerReport?.source === "tipico-ligen" ? console.warn : console.log)(offerLine);
@@ -617,6 +617,9 @@ async function apiDashboardSource(
   const oddsByFixture = new Map<number, MarketOdds>();
   const bookmakerByFixture = new Map<number, { name: string; updatedAt: string | null }>();
   for (const event of imported.events) {
+    // Spiele ohne Quote (nur aus der Angebotsliste) tragen weder Quoten noch Anbieter - die Apps sagen dann
+    // „ohne Quote“ statt einen Anbieter zu nennen.
+    if (!event.bookmaker) continue;
     oddsByFixture.set(event.fixtureId, event.odds);
     bookmakerByFixture.set(event.fixtureId, { name: event.bookmaker, updatedAt: event.updatedAt });
   }
@@ -639,6 +642,7 @@ async function apiDashboardSource(
       + ` · ${client.requestCount} Aufrufe für Quoten und Tageslisten`
       + ` · ${missing} ohne Ansetzung · ${notPlayable} laut API nicht spielbar`
       + (stalePlaceholder ? ` · ${stalePlaceholder} Anstoß vorbei, Status noch NS` : "")
+      + (imported.withoutOdds ? ` · ${imported.withoutOdds} angeboten ohne Quote` : "")
       + (skipped ? ` · ${skipped} nicht im deutschen Angebot` : "")
       + (offerReport?.source === "oddspapi" ? " (Angebotsliste OddsPapi)" : offerReport ? " (Angebot geschätzt über Tipico-Ligen)" : "")
   };

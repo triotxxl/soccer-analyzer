@@ -1,6 +1,6 @@
 import { leagueName, teamName, useNames } from "../../../shared/src/names";
 import { eloAgainstOf, eloAgainstText } from "../../../shared/src/eloAgainst";
-import { quoteSourceName } from "../../../shared/src/quoteSource";
+import { quoteSourceName, withoutQuotes } from "../../../shared/src/quoteSource";
 import type { DashboardFixture } from "../../../shared/src/types";
 import {
   dayKey, eloFormat, eloThin, formatDay, formatTime, goalsFormat, likelyTips, percent, strengthOf, type TeamRow, type Tip,
@@ -87,7 +87,9 @@ export function DetailPanel({ fixture, fixtures, team, tip, timezone, view, ui, 
                   {tip.probability != null && <> <span className="num">{percent(tip.probability)}</span></>}</span>}
                 {showFixture && !h2h && <>
                   <span>Erwartete Tore <b>{goalsFormat(fixture.expectedGoals.home)} : {goalsFormat(fixture.expectedGoals.away)}</b></span>
-                  <span>Quoten: {quoteSourceName(fixture)}</span>
+                  {withoutQuotes(fixture)
+                    ? <span title="Betano oder Tipico bieten das Spiel an, API-Football führt aber keine Quote dafür. Den Preis in der App des Anbieters prüfen.">Ohne Quote</span>
+                    : <span>Quoten: {quoteSourceName(fixture)}</span>}
                 </>}
               </div>
             </div>

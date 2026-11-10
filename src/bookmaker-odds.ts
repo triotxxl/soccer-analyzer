@@ -92,6 +92,7 @@ export interface ApiOddsEvent {
   league: string;
   season: number;
   kickoff: string;
+  /** 0 und "" bei einem Spiel ohne Quote, das nur die Angebotsliste kennt (`offerExtras`, seit 10.11.2026). */
   bookmakerId: number;
   bookmaker: string;
   /** Wann API-Football die Quoten zuletzt aktualisiert hat; null, wenn die Antwort es nicht sagt. */
@@ -111,6 +112,8 @@ export interface ApiOddsImportResult {
   failedBookmakers: Array<{ bookmakerId: number; message: string }>;
   /** Spiele je Liga („Land | Liga (ID)“), die außerhalb des deutschen Angebots weggelassen wurden. */
   outsideOffer: Map<string, number>;
+  /** Spiele aus der Angebotsliste, für die API-Football keine Quote führt (ohne Quote analysiert). */
+  withoutOdds: number;
 }
 
 interface Candidate {
@@ -124,6 +127,16 @@ function kickoffMs(item: ApiFixtureOdds): number | null {
   if (typeof item.fixture.timestamp === "number") return item.fixture.timestamp * 1000;
   const parsed = item.fixture.date ? Date.parse(item.fixture.date) : Number.NaN;
   return Number.isFinite(parsed) ? parsed : null;
+}
+
+/**
+ * Liegt ein Anstoß im Umfang? Anpfiff höchstens `liveCandidateTrailMs` her, der Berliner Tag des Anpfiffs
+ * im Umfang, bei `next48` harte Grenze 48 Stunden - für Spiele mit und ohne Quote dieselbe Regel.
+ */
+export function kickoffInScope(kickoff: number, dates: DateRange, now: Date, timezone = config.timezone): boolean {
+  if (kickoff <= now.getTime() - config.liveCandidateTrailMs) return false;
+  if (dates === "next48" && kickoff > now.getTime() + 48 * 60 * 60 * 1000) return false;
+  return datesForRange(dates, timezone, now).includes(zonedDate(new Date(kickoff), timezone));
 }
 
 /**
@@ -232,7 +245,13 @@ export async function importApiOdds(
      * Angebot eines deutschen Anbieters je Spiel (seit 10.11.2026, `offerSelection` in
      * src/offer-filter.ts). Bekommt die gewählten Spiele und gibt zurück, welche bleiben.
      */
-    offerFilter?: (events: ApiOddsEvent[]) => Promise<(event: ApiOddsEvent) => boolean>;
+    offerFilter?: (events: ApiOddsEvent[], context: { days: string[] }) => Promise<(event: ApiOddsEvent) => boolean>;
+    /**
+     * Nach `offerFilter`: Spiele, die eine Seite anbietet, für die API-Football aber keine Quote führt
+     * (Davids Wunsch vom 10.11.2026: J.League Cup, Copa del Rey, CONCACAF Nations League …). Sie werden
+     * ohne Quote analysiert; das Modell braucht keine.
+     */
+    offerExtras?: () => ApiOddsEvent[];
   } = {}
 ): Promise<ApiOddsImportResult> {
   const timezone = options.timezone ?? config.timezone;
@@ -259,7 +278,7 @@ export async function importApiOdds(
   const { listed, outsideOffer } = selected;
   let events = selected.events;
   if (options.offerFilter) {
-    const allow = await options.offerFilter(events);
+    const allow = await options.offerFilter(events, { days: datesForRange(dates, timezone, now) });
     events = events.filter((event) => {
       if (allow(event)) return true;
       const key = `${event.country} | ${event.league} (${event.leagueId})`;
@@ -267,6 +286,11 @@ export async function importApiOdds(
       return false;
     });
   }
+  const known = new Set(events.map((event) => event.fixtureId));
+  const extras = (options.offerExtras?.() ?? [])
+    .filter((event) => !known.has(event.fixtureId) && kickoffInScope(Date.parse(event.kickoff), dates, now, timezone));
+  events = [...events, ...extras]
+    .sort((left, right) => Date.parse(left.kickoff) - Date.parse(right.kickoff) || left.fixtureId - right.fixtureId);
   const selections = new Map<number, LeagueSelection>();
   for (const event of events) {
     if (!selections.has(event.leagueId)) {
@@ -274,7 +298,7 @@ export async function importApiOdds(
     }
   }
   const byBookmaker = new Map<string, number>();
-  for (const event of events) byBookmaker.set(event.bookmaker, (byBookmaker.get(event.bookmaker) ?? 0) + 1);
+  for (const event of events) if (event.bookmaker) byBookmaker.set(event.bookmaker, (byBookmaker.get(event.bookmaker) ?? 0) + 1);
   return {
     input: {
       selections: [...selections.values()],
@@ -287,6 +311,7 @@ export async function importApiOdds(
     listed,
     apiRequests: client.requestCount - before,
     failedBookmakers,
-    outsideOffer
+    outsideOffer,
+    withoutOdds: extras.length
   };
 }

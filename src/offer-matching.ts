@@ -71,8 +71,14 @@ interface TeamKey {
   reserve: boolean;
 }
 
+/**
+ * Buchstaben, die `normalizeText` nicht zerlegt und deshalb zu Leerzeichen macht („Køge“ → „k ge“).
+ * OddsPapi schreibt sie ausgeschrieben („Koege“, „Broendby“) - so auch hier (Befund vom 10.11.2026).
+ */
+const TRANSLITERATE: Array<[RegExp, string]> = [[/[øØ]/g, "oe"], [/[æÆ]/g, "ae"], [/[œŒ]/g, "oe"], [/[łŁ]/g, "l"], [/[đĐ]/g, "d"], [/ı/g, "i"]];
+
 export function teamKey(name: string): TeamKey {
-  const text = normalizeText(name);
+  const text = normalizeText(TRANSLITERATE.reduce((value, [pattern, replacement]) => value.replace(pattern, replacement), name));
   const women = WOMEN_PATTERN.test(text);
   const reserve = RESERVE_PATTERN.test(text);
   const raw = text.split(" ").filter(Boolean);

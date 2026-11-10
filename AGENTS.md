@@ -75,8 +75,15 @@ Spiele; geprüft wurden alle deutschen Anbieter, nur Betano (32) und Bet365 (8) 
    angeboten hat (`tipicoLeagueIds`, `germanOfferFilter`) - mit Warnzeile und „Angebot geschätzt“ in der
    Zählerzeile; dann fehlt `offeredBy`, und die Apps zeigen keinen Umschalter. Auf beiden Wegen gilt `data/angebot-ligen.json` (Davids Korrekturen je API-Liga-ID,
    `include` und `exclude` gehen vor); `--alle-ligen` schaltet den Filter ab. Spiele, die betano.de
-   führt, Betano bei API-Football aber nicht (J.League Cup, ägyptische 2. Liga am 11./12.11.), fehlen
-   weiter - dafür bräuchte es Quoten aus einer zweiten Quelle.
+   führt, für die API-Football aber keine Quote hat, **werden seit 10.11.2026 ohne Quote analysiert** (Davids
+   Wunsch: in seiner Tipico-App standen 63 Spiele in 48 Stunden, im Analyzer 55; 15 davon fehlten nur wegen der
+   Quote - J.League Cup, Copa del Rey, Coupe de France, CONCACAF Nations League). `offerExtras` in
+   `src/offer-filter.ts`: Spiele der Tageslisten mit **eigenem** Treffer in einer Angebotsliste, nie über die Liga
+   (sonst zöge eine angebotene Liga jedes Spiel mit), nur spielbare, im selben Zeitfenster wie die übrigen. Sie
+   tragen `offeredBy`, aber weder Quote noch `bookmaker`; die Apps sagen „Ohne Quote“ (`withoutQuotes` in
+   `apps/shared/src/quoteSource.ts`), Value, Kombi-Tipps, Kelly und Quickpick-Filter mit Quotenband greifen dort
+   nicht. Bet365 hätte am 10.11. nur 5 von 16 solcher Spiele gedeckt. Am 10.11.2026 (heute bis Freitag): 31
+   Spiele ohne Quote dazu.
 2. **Umfang gemessen (Phase 0, 08./09.11.2026):** Betano führte am Sonntag 08.11. 762 Spiele in 243
    Ligen (77 Seiten), davon 482 in Ligen, die Tipico zuletzt geführt hatte; vom letzten Tipico-Lauf
    deckt Betano 290 von 299 Spielen ab. Quoten gibt es nur etwa 4-5 Tage im Voraus, `twentyone`
