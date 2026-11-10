@@ -36,7 +36,8 @@ import { getEloByTeam } from "../src/elo-store.ts";
 import { resolveLeagues } from "../src/resolver.ts";
 import { teamNameSimilarity } from "../src/team-resolver.ts";
 import { importTipicoData } from "../src/tipico.ts";
-import { germanOfferFilter, importApiOdds, readOfferCorrections } from "../src/bookmaker-odds.ts";
+import { importApiOdds, readOfferCorrections } from "../src/bookmaker-odds.ts";
+import { offerReportLine, offerSelection } from "../src/offer-filter.ts";
 import type { ApiFixture, DateRange, LiveMatchSelection } from "../src/types.ts";
 import { datesForRange, isAnalyzableStatus } from "../src/util.ts";
 
@@ -142,11 +143,14 @@ async function prepareTipico(): Promise<ApiFixture[]> {
 
 /** Quelle API: die Spiele der Quotenliste, wie die Analyse sie danach wählt. */
 async function prepareApi(): Promise<ApiFixture[]> {
-  // Dieselbe Auswahl wie die Analyse: nur Ligen eines deutschen Anbieters (außer mit --alle-ligen).
-  const allowLeague = process.argv.includes("--alle-ligen")
-    ? undefined
-    : germanOfferFilter(database.tipicoLeagueIds(), await readOfferCorrections());
-  const imported = await importApiOdds(client, dates, undefined, { allowLeague });
+  // Dieselbe Auswahl wie die Analyse: nur Spiele eines deutschen Anbieters (außer mit --alle-ligen).
+  // Die Angebotsliste landet im Cache, die Analyse kurz danach zahlt sie nicht noch einmal.
+  const offer = process.argv.includes("--alle-ligen")
+    ? null
+    : offerSelection({ client, tipicoLeagueIds: () => database.tipicoLeagueIds(), corrections: await readOfferCorrections() });
+  const imported = await importApiOdds(client, dates, undefined, { offerFilter: offer?.filter });
+  const offerLine = offerReportLine(offer?.report() ?? null);
+  if (offerLine) console.log(offerLine);
   const skipped = [...imported.outsideOffer.values()].reduce((sum, count) => sum + count, 0);
   if (skipped > 0) console.log(`Nicht im deutschen Angebot, weggelassen: ${skipped} Spiele in ${imported.outsideOffer.size} Ligen`);
   const wanted = new Set(imported.input.fixtureIds);

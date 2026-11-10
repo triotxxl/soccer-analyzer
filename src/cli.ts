@@ -47,7 +47,8 @@ import type {
   TipicoOdds
 } from "./types.ts";
 import { aliasKey, datesForRange, isAnalyzableStatus, isScheduledStatus, parseMarkets, percent } from "./util.ts";
-import { germanOfferFilter, importApiOdds, readOfferCorrections } from "./bookmaker-odds.ts";
+import { importApiOdds, readOfferCorrections } from "./bookmaker-odds.ts";
+import { offerReportLine, offerSelection } from "./offer-filter.ts";
 
 interface ParsedArgs {
   positional: string[];
@@ -559,12 +560,21 @@ async function apiDashboardSource(
 ): Promise<DashboardSource> {
   const client = new ApiFootballClient();
   const now = new Date();
-  // Nur Ligen, die es bei einem deutschen Anbieter gibt (Davids Wunsch vom 09.11.2026); mit
-  // --alle-ligen jedes Spiel, das API-Football unter dem Anbieter führt.
-  const allowLeague = allLeagues
-    ? undefined
-    : germanOfferFilter(database.tipicoLeagueIds(), await readOfferCorrections());
-  const imported = await importApiOdds(client, dates, now, { allowLeague });
+  // Nur Spiele, die es bei einem deutschen Anbieter gibt (Davids Wunsch vom 09.11.2026), seit 10.11.2026
+  // über die Angebotsliste von OddsPapi; mit --alle-ligen jedes Spiel, das API-Football unter dem
+  // Anbieter führt.
+  const offer = allLeagues
+    ? null
+    : offerSelection({
+      client,
+      tipicoLeagueIds: () => database.tipicoLeagueIds(),
+      corrections: await readOfferCorrections(),
+      freshDaily: true
+    });
+  const imported = await importApiOdds(client, dates, now, { offerFilter: offer?.filter });
+  const offerReport = offer?.report() ?? null;
+  const offerLine = offerReportLine(offerReport);
+  if (offerLine) (offerReport?.source === "tipico-ligen" ? console.warn : console.log)(offerLine);
   for (const failed of imported.failedBookmakers) {
     console.warn(`Quoten von Anbieter ${failed.bookmakerId} nicht geladen: ${failed.message}`);
   }
@@ -586,7 +596,8 @@ async function apiDashboardSource(
   // danach aus dem Cache. Nebenbei zählt sie, was aus der Quotenliste nicht analysiert wird.
   const daily = new Map<number, { status: string; timestamp: number }>();
   for (const date of datesForRange(dates, config.timezone, now)) {
-    for (const fixture of await client.getFixturesForDate(date, config.timezone, true)) {
+    // Mit Angebotsliste hat der Abgleich die Tageslisten der Spiele eben frisch geladen.
+    for (const fixture of await client.getFixturesForDate(date, config.timezone, offer === null)) {
       daily.set(fixture.fixture.id, { status: fixture.fixture.status.short, timestamp: fixture.fixture.timestamp * 1000 });
     }
   }
@@ -621,6 +632,7 @@ async function apiDashboardSource(
       + ` · ${missing} ohne Ansetzung · ${notPlayable} laut API nicht spielbar`
       + (stalePlaceholder ? ` · ${stalePlaceholder} Anstoß vorbei, Status noch NS` : "")
       + (skipped ? ` · ${skipped} nicht im deutschen Angebot` : "")
+      + (offerReport?.source === "oddspapi" ? " (Angebotsliste OddsPapi)" : offerReport ? " (Angebot geschätzt über Tipico-Ligen)" : "")
   };
 }
 

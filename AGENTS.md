@@ -45,14 +45,32 @@ Spiele; geprüft wurden alle deutschen Anbieter, nur Betano (32) und Bet365 (8) 
    mehr bei rund 70 Aufrufen je vollem Tag. Ein Spiel bekommt **alle** Quoten vom ersten Anbieter der
    Liste, der 1X2 führt - nie den besseren Preis je Markt, sonst stimmt der faire Preis nicht. Ob eine
    Quote *vorhanden* ist, entscheidet über die Auswahl, ihr Preis nie.
-   **Nur Ligen eines deutschen Anbieters** (Davids Wunsch vom 09.11.2026, „nur die Spiele, die es bei
+   **Nur Spiele eines deutschen Anbieters** (Davids Wunsch vom 09.11.2026, „nur die Spiele, die es bei
    Betano gibt“): API-Football sagt nicht, von welcher Betano-Seite die Quoten stammen, und führt auch
-   Ligen, die betano.de nicht anbietet - David fand Eastbourne Borough – Dulwich Hamlet (englische 7. Liga)
-   dort nicht. Näherung: nur Ligen, die Tipico je angeboten hat (`tipicoLeagueIds`, `germanOfferFilter`),
-   plus `include`, minus `exclude` aus `data/angebot-ligen.json` (Davids Korrekturen, je API-Liga-ID). Am
-   09.11. waren das 74 von 110 Spielen. Die Analyse nennt die weggelassenen Ligen mit ID; `--alle-ligen`
-   schaltet den Filter ab. Die Tipico-Liste wächst nur noch mit `--source tipico` - neue Ligen kommen
-   über `include`.
+   Spiele, die betano.de nicht anbietet - David fand Eastbourne Borough – Dulwich Hamlet (englische 7. Liga)
+   dort nicht. **Seit 10.11.2026 (Davids Entscheidung) entscheidet die Angebotsliste von OddsPapi**
+   (oddspapi.io, `src/oddspapi.ts`, `src/offer-matching.ts`, `src/offer-filter.ts`): `/v4/fixtures` mit
+   `hasOdds=true&bookmakers=betano.de` (`ODDSPAPI_BOOKMAKERS`; OddsPapi führt die deutschen Seiten einzeln,
+   auch `tipico` = Tipico DE). **Quoten kommen weiter von API-Football** - bei OddsPapi kosten sie einen
+   Aufruf je Spiel oder je drei Ligen und Anbieter (gemessen 10.11.2026: rund 8-50 Aufrufe je Analyse; ein
+   Paket „Normal“ mit rund 5.000 Aufrufen kostete 25 $ je Monat für betano.de, 35 $ mit Tipico). Gratis
+   sind 250 Aufrufe im Monat: Die Liste kommt in festen Zwei-Tage-Blöcken (`offerBlocks`, 3 Stunden im
+   Cache `data/oddspapi-cache/`), eine Analyse `next48` kostet 2-3 Aufrufe, prepare-analysis und eine
+   Analyse kurz danach teilen sie; vor jedem Abruf prüft `/v4/account` (zählt nicht) den Stand und hält
+   `ODDSPAPI_RESERVE` (10) zurück. Zuordnung über Anstoß (±3 Stunden, Platzhaltertermine bis ±4 Tage)
+   und Teamnamen ohne Rechtsform, Bundesstaat und Jahreszahl, Frauen- und zweite Mannschaften getrennt;
+   ein Spiel ohne eigenen Treffer zählt als angeboten, wenn ein anderes seiner Liga zugeordnet wurde
+   (Anbieter führen Ligen als Ganzes). Gemessen am 10.11.2026 über 243 Betano-Spiele: 157 direkt, 14 über
+   die Liga, 72 weggelassen (U19-EM-Qualifikation, WSL Cup, Frauen-Europapokal, argentinische
+   Reserveliga, türkische 3. Liga …), alle 26 unsicheren Zuordnungen von Hand geprüft richtig. Die
+   Analyse druckt „Angebot betano.de (OddsPapi): x zugeordnet, y über ihre Liga, z nicht im Angebot · n
+   OddsPapi-Aufrufe · Stand a von 250“ und die weggelassenen Ligen mit ID. **Ohne `ODDSPAPI_KEY`, bei
+   aufgebrauchtem Kontingent oder einem Fehler** gilt die Näherung vom 09.11.2026 - nur Ligen, die Tipico je
+   angeboten hat (`tipicoLeagueIds`, `germanOfferFilter`) - mit Warnzeile und „Angebot geschätzt“ in der
+   Zählerzeile. Auf beiden Wegen gilt `data/angebot-ligen.json` (Davids Korrekturen je API-Liga-ID,
+   `include` und `exclude` gehen vor); `--alle-ligen` schaltet den Filter ab. Spiele, die betano.de
+   führt, Betano bei API-Football aber nicht (J.League Cup, ägyptische 2. Liga am 11./12.11.), fehlen
+   weiter - dafür bräuchte es Quoten aus einer zweiten Quelle.
 2. **Umfang gemessen (Phase 0, 08./09.11.2026):** Betano führte am Sonntag 08.11. 762 Spiele in 243
    Ligen (77 Seiten), davon 482 in Ligen, die Tipico zuletzt geführt hatte; vom letzten Tipico-Lauf
    deckt Betano 290 von 299 Spielen ab. Quoten gibt es nur etwa 4-5 Tage im Voraus, `twentyone`

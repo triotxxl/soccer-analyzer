@@ -6,6 +6,7 @@ node_modules/
 /Screenshots/
 /UI improvement request.zip
 data/cache/
+data/oddspapi-cache/
 data/analysis-cache/
 data/analyzer.sqlite*
 data/backups/

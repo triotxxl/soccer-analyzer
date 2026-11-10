@@ -207,7 +207,8 @@ export async function readOfferCorrections(file = OFFER_LEAGUES_FILE): Promise<O
 }
 
 /**
- * Welche Ligen ein deutscher Anbieter wahrscheinlich anbietet (seit 09.11.2026, Davids Wunsch „nur die
+ * Näherung, seit 10.11.2026 nur noch Rückfall ohne OddsPapi (`src/offer-filter.ts`): Welche Ligen ein
+ * deutscher Anbieter wahrscheinlich anbietet (seit 09.11.2026, Davids Wunsch „nur die
  * Spiele, die es bei Betano gibt“). API-Football sagt nicht, von welcher Betano-Seite die Quoten
  * stammen; dort stehen auch Ligen, die betano.de nicht führt (Eastbourne Borough – Dulwich Hamlet,
  * englische 7. Liga). Näherung: jede Liga, die Tipico je angeboten hat, plus `include`, minus `exclude`.
@@ -223,7 +224,16 @@ export async function importApiOdds(
   client: ApiFootballClient,
   dates: DateRange,
   now = new Date(),
-  options: { bookmakers?: number[]; timezone?: string; allowLeague?: (leagueId: number) => boolean } = {}
+  options: {
+    bookmakers?: number[];
+    timezone?: string;
+    allowLeague?: (leagueId: number) => boolean;
+    /**
+     * Angebot eines deutschen Anbieters je Spiel (seit 10.11.2026, `offerSelection` in
+     * src/offer-filter.ts). Bekommt die gewählten Spiele und gibt zurück, welche bleiben.
+     */
+    offerFilter?: (events: ApiOddsEvent[]) => Promise<(event: ApiOddsEvent) => boolean>;
+  } = {}
 ): Promise<ApiOddsImportResult> {
   const timezone = options.timezone ?? config.timezone;
   const bookmakers = options.bookmakers ?? config.oddsBookmakers;
@@ -245,7 +255,18 @@ export async function importApiOdds(
     }
     listings.push({ bookmakerId, items });
   }
-  const { events, listed, outsideOffer } = selectApiOddsEvents(listings, dates, now, timezone, options.allowLeague);
+  const selected = selectApiOddsEvents(listings, dates, now, timezone, options.allowLeague);
+  const { listed, outsideOffer } = selected;
+  let events = selected.events;
+  if (options.offerFilter) {
+    const allow = await options.offerFilter(events);
+    events = events.filter((event) => {
+      if (allow(event)) return true;
+      const key = `${event.country} | ${event.league} (${event.leagueId})`;
+      outsideOffer.set(key, (outsideOffer.get(key) ?? 0) + 1);
+      return false;
+    });
+  }
   const selections = new Map<number, LeagueSelection>();
   for (const event of events) {
     if (!selections.has(event.leagueId)) {

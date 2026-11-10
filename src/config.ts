@@ -34,6 +34,14 @@ const oddsBookmakers = (process.env.ODDS_BOOKMAKERS ?? "32")
   .split(",")
   .map((value) => Number(value.trim()))
   .filter((value) => Number.isInteger(value) && value > 0);
+// Angebotsliste deutscher Anbieter über OddsPapi (seit 10.11.2026, src/oddspapi.ts): welche Seiten
+// festlegen, welche Spiele analysiert werden. Vorgabe betano.de (David setzt dort); mehrere mit Komma,
+// ein Spiel gilt dann als angeboten, wenn eine Seite es führt. Jede Seite kostet eigene Aufrufe.
+const offerBookmakers = (process.env.ODDSPAPI_BOOKMAKERS ?? "betano.de")
+  .split(",")
+  .map((value) => value.trim())
+  .filter(Boolean);
+const oddsPapiReserve = Number(process.env.ODDSPAPI_RESERVE ?? 10);
 const livePollMs =Number(process.env.LIVE_POLL_MS ?? 15_000);
 const liveDailyRequestBudget = Number(process.env.LIVE_DAILY_REQUEST_BUDGET ?? 2_000);
 const liveAllThreshold = Number(process.env.LIVE_ALL_THRESHOLD ?? 25);
@@ -48,6 +56,8 @@ export const ALIASES_FILE = path.join(DATA_DIR, "league-aliases.json");
 export const TEAM_ALIASES_FILE = path.join(DATA_DIR, "team-aliases.json");
 /** Davids Korrekturen zur Ligaliste deutscher Anbieter (Quelle "api"): `include`/`exclude` je API-Liga-ID. */
 export const OFFER_LEAGUES_FILE = path.join(DATA_DIR, "angebot-ligen.json");
+/** Antworten von OddsPapi - getrennt von data/cache/, das die Elo-Pflege als API-Football-Antworten liest. */
+export const ODDSPAPI_CACHE_DIR = path.join(DATA_DIR, "oddspapi-cache");
 export const DB_FILE = path.join(DATA_DIR, "analyzer.sqlite");
 export const LIVE_SNAPSHOT_DIR = path.join(DATA_DIR, "live-snapshots");
 export const LIVE_USAGE_FILE = path.join(DATA_DIR, "live-usage.json");
@@ -61,6 +71,9 @@ export const config = {
   timezone: process.env.ANALYZER_TIMEZONE ?? "Europe/Berlin",
   timeoutMs: Number(process.env.API_TIMEOUT_MS ?? 15_000),
   oddsBookmakers: oddsBookmakers.length > 0 ? oddsBookmakers : [32],
+  offerBookmakers: offerBookmakers.length > 0 ? offerBookmakers : ["betano.de"],
+  // So viele OddsPapi-Aufrufe bleiben im Monat unangetastet (Gratis: 250); darunter gilt die Näherung.
+  oddsPapiReserve: Number.isInteger(oddsPapiReserve) && oddsPapiReserve >= 0 ? oddsPapiReserve : 10,
   // Ein voller Spieltag hat bei Betano rund 77 Seiten (08.11.2026: 762 Spiele).
   oddsListingMaxPages: 200,
   apiRequestsPerMinute:
@@ -345,6 +358,9 @@ export const config = {
     // Quotenliste je Tag und Anbieter: kurz, damit prepare-analysis und eine Analyse kurz danach
     // dieselbe Liste teilen, eine spätere Analyse aber frische Preise sieht.
     oddsListing: 60 * 60 * 1000,
+    // Angebotsliste von OddsPapi je Zwei-Tage-Block: länger als die Quoten, weil ein Anbieter seine
+    // Spiele Tage vorher einstellt und das Gratis-Kontingent 250 Aufrufe im Monat hat.
+    offerListing: 3 * 60 * 60 * 1000,
     fixtureExpectedGoals: 24 * 60 * 60 * 1000,
     settledFixtures: 30 * 24 * 60 * 60 * 1000
   }
