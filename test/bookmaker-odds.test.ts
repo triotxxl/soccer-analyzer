@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { ApiFootballClient } from "../src/api.ts";
-import { importApiOdds, marketOddsOf, selectApiOddsEvents } from "../src/bookmaker-odds.ts";
+import { germanOfferFilter, importApiOdds, marketOddsOf, readOfferCorrections, selectApiOddsEvents } from "../src/bookmaker-odds.ts";
 import { FileCache } from "../src/cache.ts";
 import { requestedFixtureScope } from "../src/analyzer.ts";
 import { resolveLeagues } from "../src/resolver.ts";
@@ -100,6 +100,31 @@ test("Zeitfenster: 200 Minuten nach Anpfiff, 48-Stunden-Grenze und Berliner Tag 
   assert.deepEqual(selectApiOddsEvents(listing, "next48", now).events.map((event) => event.fixtureId), [2, 3]);
   // "three" hat keine 48-Stunden-Grenze, aber den Berliner Kalender (09.-11.11.).
   assert.deepEqual(selectApiOddsEvents(listing, "three", now).events.map((event) => event.fixtureId), [2, 3, 4]);
+});
+
+test("nur Ligen eines deutschen Anbieters: Tipico-Ligen plus include, minus exclude", () => {
+  const now = new Date("2026-11-09T10:00:00Z");
+  const kickoff = "2026-11-10T19:45:00Z";
+  const odds = [winner("1.65", "4.05", "4.25")];
+  const inLeague = (id: number, leagueId: number, name: string): ApiFixtureOdds =>
+    ({ ...item(id, kickoff, 32, odds), league: { id: leagueId, name, country: "England", season: 2026 } });
+  const listing = [{ bookmakerId: 32, items: [
+    inLeague(1, 39, "Premier League"),
+    inLeague(2, 58, "Non League Premier - Isthmian"), // Eastbourne Borough – Dulwich Hamlet, nie bei Tipico
+    inLeague(3, 931, "Non League Premier - Southern Central"),
+    inLeague(4, 41, "League One")
+  ] }];
+  const allow = germanOfferFilter(new Set([39, 41]), { include: [{ id: 931 }], exclude: [{ id: 41 }] });
+  const { events, outsideOffer } = selectApiOddsEvents(listing, "three", now, "Europe/Berlin", allow);
+  assert.deepEqual(events.map((event) => event.fixtureId), [1, 3]);
+  assert.deepEqual([...outsideOffer.keys()].sort(), ["England | League One (41)", "England | Non League Premier - Isthmian (58)"]);
+  // Ohne Filter (--alle-ligen) bleibt alles.
+  assert.equal(selectApiOddsEvents(listing, "three", now, "Europe/Berlin").events.length, 4);
+});
+
+test("Korrekturliste: fehlende Datei heißt keine Korrekturen", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "football-offer-"));
+  assert.deepEqual(await readOfferCorrections(path.join(directory, "fehlt.json")), { include: [], exclude: [] });
 });
 
 function fakeClient(pages: Record<string, ApiFixtureOdds[]>, failing: number[] = []) {

@@ -18,8 +18,9 @@
  * - Die Liga kommt als ID mit (`LeagueSelection.apiLeagueId`), die Spiele als Fixture-IDs
  *   (`AnalysisInput.fixtureIds`) - Aliase und Namensvergleich entfallen auf diesem Weg.
  */
+import { readFile } from "node:fs/promises";
 import type { ApiFootballClient } from "./api.ts";
-import { config } from "./config.ts";
+import { config, OFFER_LEAGUES_FILE } from "./config.ts";
 import type {
   AnalysisInput,
   ApiBookmakerOdds,
@@ -108,6 +109,8 @@ export interface ApiOddsImportResult {
   apiRequests: number;
   /** Anbieter, deren Liste nicht geladen werden konnte (nur nach dem ersten, sonst bricht der Import ab). */
   failedBookmakers: Array<{ bookmakerId: number; message: string }>;
+  /** Spiele je Liga („Land | Liga (ID)“), die außerhalb des deutschen Angebots weggelassen wurden. */
+  outsideOffer: Map<string, number>;
 }
 
 interface Candidate {
@@ -131,8 +134,9 @@ export function selectApiOddsEvents(
   listings: Array<{ bookmakerId: number; items: ApiFixtureOdds[] }>,
   dates: DateRange,
   now: Date,
-  timezone = config.timezone
-): { events: ApiOddsEvent[]; listed: number } {
+  timezone = config.timezone,
+  allowLeague?: (leagueId: number) => boolean
+): { events: ApiOddsEvent[]; listed: number; outsideOffer: Map<string, number> } {
   const requestedDates = new Set(datesForRange(dates, timezone, now));
   const rollingLimit = dates === "next48" ? now.getTime() + 48 * 60 * 60 * 1000 : null;
   const earliestKickoff = now.getTime() - config.liveCandidateTrailMs;
@@ -160,6 +164,15 @@ export function selectApiOddsEvents(
       }
     }
   });
+  // Ligen außerhalb des deutschen Angebots fallen erst nach der Wahl je Spiel heraus, damit die
+  // Zählung je Liga jedes Spiel genau einmal führt.
+  const outsideOffer = new Map<string, number>();
+  for (const [fixtureId, candidate] of chosen) {
+    if (!allowLeague || allowLeague(candidate.item.league!.id)) continue;
+    const key = `${candidate.item.league!.country} | ${candidate.item.league!.name} (${candidate.item.league!.id})`;
+    outsideOffer.set(key, (outsideOffer.get(key) ?? 0) + 1);
+    chosen.delete(fixtureId);
+  }
   const events = [...chosen.values()]
     .map(({ item, bookmaker, odds }): ApiOddsEvent => ({
       fixtureId: item.fixture.id,
@@ -174,7 +187,35 @@ export function selectApiOddsEvents(
       odds
     }))
     .sort((left, right) => Date.parse(left.kickoff) - Date.parse(right.kickoff) || left.fixtureId - right.fixtureId);
-  return { events, listed: listedIds.size };
+  return { events, listed: listedIds.size, outsideOffer };
+}
+
+/** Davids Korrekturliste (`data/angebot-ligen.json`): Ligen, die er bei betano.de zusätzlich findet oder nie findet. */
+export interface OfferLeagueCorrections {
+  include: Array<{ id: number; name?: string }>;
+  exclude: Array<{ id: number; name?: string }>;
+}
+
+export async function readOfferCorrections(file = OFFER_LEAGUES_FILE): Promise<OfferLeagueCorrections> {
+  try {
+    const parsed = JSON.parse(await readFile(file, "utf8")) as Partial<OfferLeagueCorrections>;
+    return { include: parsed.include ?? [], exclude: parsed.exclude ?? [] };
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return { include: [], exclude: [] };
+    throw new Error(`${file} ist kein gültiges JSON: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+/**
+ * Welche Ligen ein deutscher Anbieter wahrscheinlich anbietet (seit 09.11.2026, Davids Wunsch „nur die
+ * Spiele, die es bei Betano gibt“). API-Football sagt nicht, von welcher Betano-Seite die Quoten
+ * stammen; dort stehen auch Ligen, die betano.de nicht führt (Eastbourne Borough – Dulwich Hamlet,
+ * englische 7. Liga). Näherung: jede Liga, die Tipico je angeboten hat, plus `include`, minus `exclude`.
+ */
+export function germanOfferFilter(tipicoLeagueIds: Set<number>, corrections: OfferLeagueCorrections): (leagueId: number) => boolean {
+  const include = new Set(corrections.include.map((entry) => entry.id));
+  const exclude = new Set(corrections.exclude.map((entry) => entry.id));
+  return (leagueId) => !exclude.has(leagueId) && (include.has(leagueId) || tipicoLeagueIds.has(leagueId));
 }
 
 /** Lädt die Quotenlisten (Tage und Anbieter strikt nacheinander) und baut daraus die Auswahl. */
@@ -182,7 +223,7 @@ export async function importApiOdds(
   client: ApiFootballClient,
   dates: DateRange,
   now = new Date(),
-  options: { bookmakers?: number[]; timezone?: string } = {}
+  options: { bookmakers?: number[]; timezone?: string; allowLeague?: (leagueId: number) => boolean } = {}
 ): Promise<ApiOddsImportResult> {
   const timezone = options.timezone ?? config.timezone;
   const bookmakers = options.bookmakers ?? config.oddsBookmakers;
@@ -204,7 +245,7 @@ export async function importApiOdds(
     }
     listings.push({ bookmakerId, items });
   }
-  const { events, listed } = selectApiOddsEvents(listings, dates, now, timezone);
+  const { events, listed, outsideOffer } = selectApiOddsEvents(listings, dates, now, timezone, options.allowLeague);
   const selections = new Map<number, LeagueSelection>();
   for (const event of events) {
     if (!selections.has(event.leagueId)) {
@@ -224,6 +265,7 @@ export async function importApiOdds(
     byBookmaker,
     listed,
     apiRequests: client.requestCount - before,
-    failedBookmakers
+    failedBookmakers,
+    outsideOffer
   };
 }

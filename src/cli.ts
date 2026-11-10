@@ -47,7 +47,7 @@ import type {
   TipicoOdds
 } from "./types.ts";
 import { aliasKey, datesForRange, isAnalyzableStatus, isScheduledStatus, parseMarkets, percent } from "./util.ts";
-import { importApiOdds } from "./bookmaker-odds.ts";
+import { germanOfferFilter, importApiOdds, readOfferCorrections } from "./bookmaker-odds.ts";
 
 interface ParsedArgs {
   positional: string[];
@@ -552,12 +552,29 @@ interface DashboardSource {
  * Quelle "api" (Vorgabe seit 09.11.2026): Spiele und Quoten aus `/odds` von API-Football. Bricht ohne
  * ein einziges Spiel ab, statt ein leeres Dashboard über das letzte gute zu schreiben.
  */
-async function apiDashboardSource(dates: DateRange): Promise<DashboardSource> {
+async function apiDashboardSource(
+  dates: DateRange,
+  database: AnalyzerDatabase,
+  allLeagues: boolean
+): Promise<DashboardSource> {
   const client = new ApiFootballClient();
   const now = new Date();
-  const imported = await importApiOdds(client, dates, now);
+  // Nur Ligen, die es bei einem deutschen Anbieter gibt (Davids Wunsch vom 09.11.2026); mit
+  // --alle-ligen jedes Spiel, das API-Football unter dem Anbieter führt.
+  const allowLeague = allLeagues
+    ? undefined
+    : germanOfferFilter(database.tipicoLeagueIds(), await readOfferCorrections());
+  const imported = await importApiOdds(client, dates, now, { allowLeague });
   for (const failed of imported.failedBookmakers) {
     console.warn(`Quoten von Anbieter ${failed.bookmakerId} nicht geladen: ${failed.message}`);
+  }
+  const skipped = [...imported.outsideOffer.values()].reduce((sum, count) => sum + count, 0);
+  if (skipped > 0) {
+    console.log(`Nicht im deutschen Angebot, weggelassen: ${skipped} Spiele in ${imported.outsideOffer.size} Ligen`
+      + " (bei betano.de doch vorhanden? Liga-ID in data/angebot-ligen.json unter include eintragen)");
+    for (const [league, count] of [...imported.outsideOffer].sort((a, b) => b[1] - a[1]).slice(0, 15)) {
+      console.log(`  ${league}: ${count}`);
+    }
   }
   if (imported.events.length === 0) {
     throw new Error(
@@ -603,6 +620,7 @@ async function apiDashboardSource(dates: DateRange): Promise<DashboardSource> {
       + ` · ${client.requestCount} Aufrufe für Quoten und Tageslisten`
       + ` · ${missing} ohne Ansetzung · ${notPlayable} laut API nicht spielbar`
       + (stalePlaceholder ? ` · ${stalePlaceholder} Anstoß vorbei, Status noch NS` : "")
+      + (skipped ? ` · ${skipped} nicht im deutschen Angebot` : "")
   };
 }
 
@@ -674,7 +692,7 @@ async function dashboard(args: ParsedArgs): Promise<void> {
   const database = new AnalyzerDatabase();
   try {
     const source = oddsSource === "api"
-      ? await apiDashboardSource(dates)
+      ? await apiDashboardSource(dates, database, args.options.has("alle-ligen"))
       : await tipicoDashboardSource(args, dates, database);
     const { client, input, sourceFile } = source;
     const emptyBase = {

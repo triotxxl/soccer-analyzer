@@ -45,6 +45,14 @@ Spiele; geprüft wurden alle deutschen Anbieter, nur Betano (32) und Bet365 (8) 
    mehr bei rund 70 Aufrufen je vollem Tag. Ein Spiel bekommt **alle** Quoten vom ersten Anbieter der
    Liste, der 1X2 führt - nie den besseren Preis je Markt, sonst stimmt der faire Preis nicht. Ob eine
    Quote *vorhanden* ist, entscheidet über die Auswahl, ihr Preis nie.
+   **Nur Ligen eines deutschen Anbieters** (Davids Wunsch vom 09.11.2026, „nur die Spiele, die es bei
+   Betano gibt“): API-Football sagt nicht, von welcher Betano-Seite die Quoten stammen, und führt auch
+   Ligen, die betano.de nicht anbietet - David fand Eastbourne Borough – Dulwich Hamlet (englische 7. Liga)
+   dort nicht. Näherung: nur Ligen, die Tipico je angeboten hat (`tipicoLeagueIds`, `germanOfferFilter`),
+   plus `include`, minus `exclude` aus `data/angebot-ligen.json` (Davids Korrekturen, je API-Liga-ID). Am
+   09.11. waren das 74 von 110 Spielen. Die Analyse nennt die weggelassenen Ligen mit ID; `--alle-ligen`
+   schaltet den Filter ab. Die Tipico-Liste wächst nur noch mit `--source tipico` - neue Ligen kommen
+   über `include`.
 2. **Umfang gemessen (Phase 0, 08./09.11.2026):** Betano führte am Sonntag 08.11. 762 Spiele in 243
    Ligen (77 Seiten), davon 482 in Ligen, die Tipico zuletzt geführt hatte; vom letzten Tipico-Lauf
    deckt Betano 290 von 299 Spielen ab. Quoten gibt es nur etwa 4-5 Tage im Voraus, `twentyone`

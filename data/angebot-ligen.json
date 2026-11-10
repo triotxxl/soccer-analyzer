@@ -1,0 +1,5 @@
+{
+  "_hinweis": "Korrekturen zur Ligaliste deutscher Anbieter (seit 09.11.2026). Analysiert werden Ligen, die Tipico je angeboten hat. include: Ligen, die es bei betano.de trotzdem gibt. exclude: Ligen, die es dort nie gibt. Je Eintrag die API-Liga-ID (steht in der Ausgabe der Analyse in Klammern) und ein Name zur Erinnerung.",
+  "include": [],
+  "exclude": []
+}

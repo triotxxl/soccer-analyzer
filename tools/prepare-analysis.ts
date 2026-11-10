@@ -36,7 +36,7 @@ import { getEloByTeam } from "../src/elo-store.ts";
 import { resolveLeagues } from "../src/resolver.ts";
 import { teamNameSimilarity } from "../src/team-resolver.ts";
 import { importTipicoData } from "../src/tipico.ts";
-import { importApiOdds } from "../src/bookmaker-odds.ts";
+import { germanOfferFilter, importApiOdds, readOfferCorrections } from "../src/bookmaker-odds.ts";
 import type { ApiFixture, DateRange, LiveMatchSelection } from "../src/types.ts";
 import { datesForRange, isAnalyzableStatus } from "../src/util.ts";
 
@@ -142,7 +142,13 @@ async function prepareTipico(): Promise<ApiFixture[]> {
 
 /** Quelle API: die Spiele der Quotenliste, wie die Analyse sie danach wählt. */
 async function prepareApi(): Promise<ApiFixture[]> {
-  const imported = await importApiOdds(client, dates);
+  // Dieselbe Auswahl wie die Analyse: nur Ligen eines deutschen Anbieters (außer mit --alle-ligen).
+  const allowLeague = process.argv.includes("--alle-ligen")
+    ? undefined
+    : germanOfferFilter(database.tipicoLeagueIds(), await readOfferCorrections());
+  const imported = await importApiOdds(client, dates, undefined, { allowLeague });
+  const skipped = [...imported.outsideOffer.values()].reduce((sum, count) => sum + count, 0);
+  if (skipped > 0) console.log(`Nicht im deutschen Angebot, weggelassen: ${skipped} Spiele in ${imported.outsideOffer.size} Ligen`);
   const wanted = new Set(imported.input.fixtureIds);
   const days = datesForRange(dates, config.timezone);
   const daily = (await Promise.all(days.map((day) => client.getFixturesForDate(day, config.timezone)))).flat();

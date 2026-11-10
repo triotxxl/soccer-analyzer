@@ -46,6 +46,8 @@ export const CACHE_DIR = path.join(DATA_DIR, "cache");
 export const ANALYSIS_CACHE_DIR = path.join(DATA_DIR, "analysis-cache");
 export const ALIASES_FILE = path.join(DATA_DIR, "league-aliases.json");
 export const TEAM_ALIASES_FILE = path.join(DATA_DIR, "team-aliases.json");
+/** Davids Korrekturen zur Ligaliste deutscher Anbieter (Quelle "api"): `include`/`exclude` je API-Liga-ID. */
+export const OFFER_LEAGUES_FILE = path.join(DATA_DIR, "angebot-ligen.json");
 export const DB_FILE = path.join(DATA_DIR, "analyzer.sqlite");
 export const LIVE_SNAPSHOT_DIR = path.join(DATA_DIR, "live-snapshots");
 export const LIVE_USAGE_FILE = path.join(DATA_DIR, "live-usage.json");

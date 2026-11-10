@@ -2494,6 +2494,18 @@ export class AnalyzerDatabase {
     return row?.api_league_id ?? null;
   }
 
+  /**
+   * Jede API-Liga, die Tipico je angeboten hat. Seit 09.11.2026 die Näherung für „gibt es bei einem
+   * deutschen Anbieter“: API-Football führt unter „Betano“ auch Ligen, die betano.de nicht anbietet
+   * (englische 7. Liga, Eastbourne Borough – Dulwich Hamlet am 10.11.2026). Die Tabelle wächst nur
+   * noch mit `--source tipico`.
+   */
+  tipicoLeagueIds(): Set<number> {
+    const rows = this.db.prepare(`SELECT DISTINCT api_league_id AS id FROM tipico_competitions
+      WHERE api_league_id IS NOT NULL`).all() as Array<{ id: number }>;
+    return new Set(rows.map((row) => row.id));
+  }
+
   /** Die API-Fixture je Tipico-Ereignis, soweit die Analyse sie zugeordnet hat. */
   apiFixtureIdsForTipicoEvents(eventIds: string[]): Map<string, number> {
     const statement = this.db.prepare("SELECT api_fixture_id FROM tipico_fixtures WHERE tipico_event_id = ? AND api_fixture_id IS NOT NULL");
