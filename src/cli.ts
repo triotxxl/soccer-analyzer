@@ -544,6 +544,8 @@ interface DashboardSource {
     oddsByFixture: Map<number, MarketOdds>;
     tipicoNamesByFixture?: Map<number, TipicoNames>;
     bookmakerByFixture?: Map<number, { name: string; updatedAt: string | null }>;
+    offeredByFixture?: Map<number, string[]>;
+    offer?: { source: "oddspapi" | "tipico-ligen"; bookmakers: string[] };
     tipicoOdds: TipicoOdds[];
   };
   summary: string;
@@ -626,7 +628,13 @@ async function apiDashboardSource(
     totalEvents: imported.listed,
     selectedEvents: imported.events.length,
     selectedCompetitions: imported.input.selections.length,
-    attach: () => ({ oddsByFixture, bookmakerByFixture, tipicoOdds: [] }),
+    attach: () => ({
+      oddsByFixture,
+      bookmakerByFixture,
+      tipicoOdds: [],
+      ...(offerReport ? { offer: { source: offerReport.source, bookmakers: offerReport.bookmakers } } : {}),
+      ...(offer?.offeredBy() ? { offeredByFixture: offer.offeredBy()! } : {})
+    }),
     summary: `Quoten: ${perBookmaker} Spiele · ${imported.input.selections.length} Wettbewerbe`
       + ` · ${client.requestCount} Aufrufe für Quoten und Tageslisten`
       + ` · ${missing} ohne Ansetzung · ${notPlayable} laut API nicht spielbar`

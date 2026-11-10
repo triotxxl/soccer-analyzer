@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactElement } from "react";
 import { useDashboardData } from "../../shared/src/data";
 import { loadNameSource, NamesContext } from "../../shared/src/names";
+import { offerCounts, offeredAt, offerSiteLabel, offerSitesOf } from "../../shared/src/offer";
 import type { DashboardDocument } from "../../shared/src/types";
 import { CompetitionPicker } from "./components/CompetitionPicker";
 import { DatePicker } from "./components/DatePicker";
@@ -66,10 +67,16 @@ function Dashboard({ document: snapshot }: { document: DashboardDocument }) {
   // lesen weiter den ganzen Snapshot (Tabellenzeilen anderer Spiele, `tableEntryOf`).
   const now = useMinute();
   const overCount = snapshot.fixtures.filter((f) => isOver(f, now)).length;
+  // Betano | Tipico: nur Spiele der gewählten Seite, wie beendete Spiele aus allem außer Tabellen und
+  // Detailansicht. Ohne Angabe im Snapshot (ältere Analyse, Näherung) kein Schalter und kein Filter.
+  const sites = useMemo(() => offerSitesOf(snapshot), [snapshot]);
+  const site = sites?.includes(ui.offerSite) ? ui.offerSite : null;
   // Neu gefiltert nur, wenn ein weiteres Spiel vorbei ist - nicht jede Minute.
+  const running = useMemo(() => snapshot.fixtures.filter((f) => !isOver(f, Date.now())), [snapshot, overCount]);
+  const siteCounts = useMemo(() => sites ? offerCounts(running, sites) : null, [running, sites]);
   const document = useMemo(
-    () => ({ ...snapshot, fixtures: snapshot.fixtures.filter((f) => !isOver(f, Date.now())) }),
-    [snapshot, overCount]);
+    () => ({ ...snapshot, fixtures: site ? running.filter((f) => offeredAt(f, site)) : running }),
+    [snapshot, running, site]);
 
   const base = useMemo(() => {
     const today = dayKey(new Date().toISOString(), tz);
@@ -139,9 +146,19 @@ function Dashboard({ document: snapshot }: { document: DashboardDocument }) {
           <CompetitionPicker tree={tree} all={base.competitions} deselected={ui.deselected} closedCountries={ui.closedCountries}
             counts={derived.counts} scope={scope} onDeselect={(deselected) => set({ deselected })}
             onToggleCountry={(id) => update((s) => ({ closedCountries: s.closedCountries.includes(id) ? s.closedCountries.filter((c) => c !== id) : [...s.closedCountries, id] }))} />
+          {sites && siteCounts && (
+            <div className="seg offer-seg" role="group" aria-label="Angebot">
+              {sites.map((s) => (
+                <button key={s} aria-pressed={site === s} onClick={() => set({ offerSite: s })}
+                  title={`${siteCounts[s]} Spiele bei ${offerSiteLabel(s)}. Es stehen nur Spiele da, die es dort gibt. Die Quoten kommen in beiden Fällen von Betano.`}>
+                  {offerSiteLabel(s)}<span className="n">{siteCounts[s]}</span>
+                </button>
+              ))}
+            </div>
+          )}
           <div className="top-meta">
             <span className="season">{seasonLabel(document.meta.createdAt)}</span>
-            <span className="pill" title={`Neueste Analyse: ${snapshot.fixtures.length} Spiele, davon ${overCount} vorbei`}><i />Analyse vom {created.toLocaleString("de-DE", { timeZone: tz, day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</span>
+            <span className="pill" title={`Neueste Analyse: ${snapshot.fixtures.length} Spiele, davon ${overCount} vorbei`}><i /><span className="lbl">Analyse vom </span>{created.toLocaleString("de-DE", { timeZone: tz, day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</span>
           </div>
         </div>
       </header>

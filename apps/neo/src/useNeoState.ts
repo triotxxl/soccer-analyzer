@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import type { PerfRange, Venue } from "./components/H2HPanel";
+import { DEFAULT_OFFER_SITE, isOfferSite, type OfferSite } from "../../shared/src/offer";
 import { AUTHOR_FILTERS, type AuthorFilter, type DayScope, type TipMarket, type TipOrder } from "./neoData";
 
 export type NeoView = "fixtures" | "teams" | "preds";
@@ -38,6 +39,8 @@ export interface NeoState {
   perfRange: PerfRange;
   /** Torphasen der Saison: Heimteam nur zu Hause, Gast nur auswärts. */
   phSplit: boolean;
+  /** Nur Spiele, die diese deutsche Seite anbietet (Betano | Tipico, seit 10.11.2026). */
+  offerSite: OfferSite;
 }
 
 export const SPLIT = { min: 0.25, max: 0.65, def: 0.4 };
@@ -46,13 +49,15 @@ const STORAGE_KEY = "neo:state:v1";
 const DEFAULTS: NeoState = {
   view: "fixtures", scope: null, calMonth: null, deselected: [], closedCountries: [], fixture: null, team: null, tip: null,
   fxOrder: "kickoff", teamsByLeague: false, split: SPLIT.def, tipOrder: "chance", tipSource: "model", authorFilters: [...AUTHOR_FILTERS], pmarkets: ["1x2", "ou", "btts"], pmin: 0, pmax: 100, ou: 2.5, moreOpen: false,
-  fxSide: "markets", h2hVenue: "all", perfRange: "10", phSplit: true,
+  fxSide: "markets", h2hVenue: "all", perfRange: "10", phSplit: true, offerSite: DEFAULT_OFFER_SITE,
 };
 
 function load(): NeoState {
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
-    return raw ? { ...DEFAULTS, ...(JSON.parse(raw) as Partial<NeoState>) } : DEFAULTS;
+    if (!raw) return DEFAULTS;
+    const stored = { ...DEFAULTS, ...(JSON.parse(raw) as Partial<NeoState>) };
+    return isOfferSite(stored.offerSite) ? stored : { ...stored, offerSite: DEFAULT_OFFER_SITE };
   } catch {
     return DEFAULTS;
   }

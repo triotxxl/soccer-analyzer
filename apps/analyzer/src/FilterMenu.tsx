@@ -3,6 +3,7 @@ import { useEffect, useId, useRef, useState, type ReactNode, type Ref } from "re
 import { countryFlagCode } from "../../shared/src/countryFlags";
 import type { LiveChanceMin, LivePhase } from "./liveQuestions";
 import { competitionCountry, competitionLeague, competitionMatches, useNames } from "../../shared/src/names";
+import { offerSiteLabel, type OfferSite } from "../../shared/src/offer";
 
 export type LevelFilter = "all" | "strong" | "recommended";
 export type ClassGapFilter = "all" | "only" | "hide";
@@ -197,6 +198,8 @@ export interface FilterMenuValues {
   classGapFilter: ClassGapFilter;
   showCrossLeague: boolean;
   showPast: boolean;
+  /** Betano | Tipico, `null` ohne Angebotsliste im Snapshot (dann keine Karte). */
+  offer: { site: OfferSite; sites: ReadonlyArray<OfferSite> } | null;
   liveRatedOnly: boolean;
   /** Die Anzeige-Filter der Live-Ansicht; sie wirken auf die geladene Tafel und kosten nichts. */
   live: {
@@ -226,6 +229,7 @@ export interface FilterMenuActions {
   setClassGapFilter(value: ClassGapFilter): void;
   setShowCrossLeague(value: boolean): void;
   setShowPast(value: boolean): void;
+  setOfferSite(value: OfferSite): void;
   setLiveRatedOnly(value: boolean): void;
   setLiveChanceMin(value: LiveChanceMin): void;
   setLiveRedOnly(value: boolean): void;
@@ -327,6 +331,13 @@ export function FilterMenu({ values, actions, rangeControl, displayControls }: {
                 <FilterSwitch label="Angepfiffene Spiele zeigen" checked={values.showPast} onChange={actions.setShowPast} />
               </div>
             </FilterCard>
+            {/* Vor den Wettbewerben: Die Seite bestimmt, welche Wettbewerbe es überhaupt gibt. */}
+            {values.offer && <FilterCard title="Angebot">
+              <FilterSegment name="offer-site" legend="Spiele bei" value={values.offer.site}
+                onChange={actions.setOfferSite}
+                options={values.offer.sites.map((site) => ({ value: site, label: offerSiteLabel(site) }))}
+                note="Nur Spiele, die es dort gibt. Die Quoten kommen in beiden Fällen von Betano." />
+            </FilterCard>}
             <FilterCard title="Wettbewerbe">
               {leagueField}
               <div className="filter-card-rule">

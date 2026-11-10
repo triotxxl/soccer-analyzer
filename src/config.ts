@@ -35,9 +35,11 @@ const oddsBookmakers = (process.env.ODDS_BOOKMAKERS ?? "32")
   .map((value) => Number(value.trim()))
   .filter((value) => Number.isInteger(value) && value > 0);
 // Angebotsliste deutscher Anbieter über OddsPapi (seit 10.11.2026, src/oddspapi.ts): welche Seiten
-// festlegen, welche Spiele analysiert werden. Vorgabe betano.de (David setzt dort); mehrere mit Komma,
-// ein Spiel gilt dann als angeboten, wenn eine Seite es führt. Jede Seite kostet eigene Aufrufe.
-const offerBookmakers = (process.env.ODDSPAPI_BOOKMAKERS ?? "betano.de")
+// festlegen, welche Spiele analysiert werden. Analysiert wird, was mindestens eine Seite führt; jedes
+// Spiel trägt im Snapshot die Seiten (`offeredBy`), die Apps schalten zwischen ihnen um (Davids Wunsch
+// vom 10.11.2026). Jede Seite kostet eigene Aufrufe - OddsPapi sagt in einer gemeinsamen Liste nicht,
+// welche Seite ein Spiel führt.
+const offerBookmakers = (process.env.ODDSPAPI_BOOKMAKERS ?? "betano.de,tipico")
   .split(",")
   .map((value) => value.trim())
   .filter(Boolean);
@@ -71,7 +73,7 @@ export const config = {
   timezone: process.env.ANALYZER_TIMEZONE ?? "Europe/Berlin",
   timeoutMs: Number(process.env.API_TIMEOUT_MS ?? 15_000),
   oddsBookmakers: oddsBookmakers.length > 0 ? oddsBookmakers : [32],
-  offerBookmakers: offerBookmakers.length > 0 ? offerBookmakers : ["betano.de"],
+  offerBookmakers: offerBookmakers.length > 0 ? offerBookmakers : ["betano.de", "tipico"],
   // So viele OddsPapi-Aufrufe bleiben im Monat unangetastet (Gratis: 250); darunter gilt die Näherung.
   oddsPapiReserve: Number.isInteger(oddsPapiReserve) && oddsPapiReserve >= 0 ? oddsPapiReserve : 10,
   // Ein voller Spieltag hat bei Betano rund 77 Seiten (08.11.2026: 762 Spiele).

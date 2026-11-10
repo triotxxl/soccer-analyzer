@@ -47,6 +47,7 @@ import { dateFormat } from "./dateFormat";
 import { eloSystemLabel } from "../../../src/elo-config.ts";
 import { gridTemplate, isFirstHalfMarket, isGoalLineMarket, minimumWidth, showsPoints, tableColumns, type TableColumn, type TableColumnId } from "./tableColumns";
 import type { ClassGap, DashboardDocument, DashboardFixture, DashboardMarket, DashboardMarketKey, FormResult, LeagueStats, RecommendationLevel } from "../../shared/src/types";
+import { DEFAULT_OFFER_SITE, isOfferSite, offeredAt, offerSiteLabel, offerSitesOf, type OfferSite } from "../../shared/src/offer";
 
 /** Die Zwischenüberschriften der Marktlisten in dieser Reihenfolge. Reine Anzeige, keine Regel liest sie. */
 export const MARKET_GROUPS = ["Ergebnis", "BTTS (beide treffen)", "Tore im Spiel", "Tore 1. Halbzeit"] as const;
@@ -567,6 +568,28 @@ function saveLayout(layout: TableLayout): void {
     window.localStorage.setItem(LAYOUT_STORAGE_KEY, layout);
   } catch {
     // Storage unavailable - the choice just doesn't persist for this session.
+  }
+}
+
+const OFFER_SITE_STORAGE_KEY = "football-analyzer:offer-site";
+
+/** Betano | Tipico (seit 10.11.2026): gemerkt wie die Darstellung, ab Werk Betano. */
+function loadOfferSite(): OfferSite {
+  if (typeof window === "undefined") return DEFAULT_OFFER_SITE;
+  try {
+    const stored = window.localStorage.getItem(OFFER_SITE_STORAGE_KEY);
+    return isOfferSite(stored) ? stored : DEFAULT_OFFER_SITE;
+  } catch {
+    return DEFAULT_OFFER_SITE;
+  }
+}
+
+function saveOfferSite(site: OfferSite): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(OFFER_SITE_STORAGE_KEY, site);
+  } catch {
+    // Ohne Speicher gilt die Wahl nur bis zum Neuladen.
   }
 }
 
@@ -1429,6 +1452,11 @@ function Dashboard({ document }: { document: DashboardDocument }) {
   const [selectingRangeEnd, setSelectingRangeEnd] = useState(false);
   const [showCrossLeague, setShowCrossLeague] = useState(true);
   const [showPast, setShowPast] = useState(false);
+  const [offerSite, setOfferSiteState] = useState<OfferSite>(loadOfferSite);
+  const setOfferSite = (site: OfferSite) => { setOfferSiteState(site); saveOfferSite(site); };
+  // Ohne Angabe im Snapshot (ältere Analyse, Näherung über die Tipico-Ligen) kein Schalter, kein Filter.
+  const offerSites = useMemo(() => offerSitesOf(document), [document]);
+  const activeOfferSite = offerSites?.includes(offerSite) ? offerSite : null;
   const [deselectedLeagues, setDeselectedLeagues] = useState<Set<string>>(new Set());
   const [leagueFilterOpen, setLeagueFilterOpen] = useState(false);
   const [leagueSearch, setLeagueSearch] = useState("");
@@ -1761,8 +1789,9 @@ function Dashboard({ document }: { document: DashboardDocument }) {
     return document.fixtures.filter((fixture) =>
       inSelectedRange(fixture) &&
       (showCrossLeague || !fixture.crossLeague) &&
+      (!activeOfferSite || offeredAt(fixture, activeOfferSite)) &&
       !deselectedLeagues.has(leagueKey(fixture.country, fixture.league)));
-  }, [document, rangeMode, showPast, now, customStart, customEnd, showCrossLeague, deselectedLeagues]);
+  }, [document, rangeMode, showPast, now, customStart, customEnd, showCrossLeague, deselectedLeagues, activeOfferSite]);
   const counts = useMemo(() => ({
     all: scopedFixtures.length,
     strong: scopedFixtures.filter((fixture) => bestLevel(fixture, marketFilter) === "strong").length,
@@ -1992,6 +2021,7 @@ function Dashboard({ document }: { document: DashboardDocument }) {
       clearLabel: "Zurück auf die nächsten 48 Stunden",
       clear: selectNext48
     });
+    if (activeOfferSite && activeOfferSite !== DEFAULT_OFFER_SITE) activeFilters.push({ key: "offer", label: `Nur bei ${offerSiteLabel(activeOfferSite)}`, clearLabel: `Wieder die Spiele bei ${offerSiteLabel(DEFAULT_OFFER_SITE)} zeigen`, clear: () => setOfferSite(DEFAULT_OFFER_SITE) });
     if (deselectedLeagues.size > 0) activeFilters.push(leagueChip);
     if (!showCrossLeague) activeFilters.push({ key: "cross", label: "Nur Ligaspiele", clearLabel: "Pokalspiele und Spiele zwischen verschiedenen Ligen wieder zeigen", clear: () => setShowCrossLeague(true) });
     if (classGapFilter !== "all") activeFilters.push({ key: "classGap", label: classGapFilter === "only" ? "Nur mit Klassenunterschied" : "Ohne Klassenunterschied", clearLabel: "Klassenfilter aufheben", clear: () => setClassGapFilter("all") });
@@ -2014,6 +2044,7 @@ function Dashboard({ document }: { document: DashboardDocument }) {
     setLevelFilter("all");
     selectNext48();
     setShowCrossLeague(true);
+    setOfferSite(DEFAULT_OFFER_SITE);
     setClassGapFilter("all");
     setShowPast(false);
     setQuickpickActive(false);
@@ -2028,6 +2059,7 @@ function Dashboard({ document }: { document: DashboardDocument }) {
     classGapFilter,
     showCrossLeague,
     showPast,
+    offer: offerSites && activeOfferSite ? { site: activeOfferSite, sites: offerSites } : null,
     liveRatedOnly,
     live: {
       chanceMin: liveChanceMin,
@@ -2057,6 +2089,7 @@ function Dashboard({ document }: { document: DashboardDocument }) {
       if (!value) setClassGapFilter("all");
     },
     setShowPast,
+    setOfferSite,
     setLiveRatedOnly,
     setLiveChanceMin,
     setLiveRedOnly,

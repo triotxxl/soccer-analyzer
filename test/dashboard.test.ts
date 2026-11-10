@@ -98,9 +98,23 @@ test("übernimmt die Tipico-Namen je Fixture und lässt die API-Namen unverände
   assert.equal("tipico" in buildDashboardDocument(dashboardInput()).fixtures[0]!, false);
 });
 
+test("schreibt je Spiel die Seiten aus der Angebotsliste und die Herkunft in meta (schemaVersion 16)", () => {
+  const input = dashboardInput();
+  const fixtureId = input.goals.rows[0]!.fixtureId;
+  input.offeredByFixture = new Map([[fixtureId, ["betano.de", "tipico"]]]);
+  input.offer = { source: "oddspapi", bookmakers: ["betano.de", "tipico"] };
+  const document = buildDashboardDocument(input);
+  assert.deepEqual(document.fixtures[0]!.offeredBy, ["betano.de", "tipico"]);
+  assert.deepEqual(document.meta.offer, { source: "oddspapi", bookmakers: ["betano.de", "tipico"] });
+  // Ohne Angebotsliste (Näherung, Tipico-Weg) fehlen beide - die Apps zeigen dann keinen Umschalter.
+  const plain = buildDashboardDocument(dashboardInput());
+  assert.equal("offeredBy" in plain.fixtures[0]!, false);
+  assert.equal("offer" in plain.meta, false);
+});
+
 test("Dashboard-Dokument führt alle Analysen über fixtureId zusammen", () => {
   const document = buildDashboardDocument(dashboardInput());
-  assert.equal(document.schemaVersion, 15);
+  assert.equal(document.schemaVersion, 16);
   // Beide Seitenquoten gehören in den 1X2-Markt, damit sich auch die Gegenseite bewerten
   // lässt; `odds` bleibt daneben die Quote des getippten Weges.
   const oneXTwo = document.fixtures[0]!.markets.find((market) => market.key === "1x2")!;
@@ -203,7 +217,7 @@ test("Dashboard-Ausgabe schreibt latest und datierten Snapshot als JSON", async 
     assert.equal(path.basename(files.latest), "dashboard-latest.json");
     assert.match(path.basename(files.snapshot), /^dashboard-2026-08-11T16-00-00-000Z\.json$/);
     const latest = JSON.parse(await readFile(files.latest, "utf8")) as { schemaVersion: number };
-    assert.equal(latest.schemaVersion, 15);
+    assert.equal(latest.schemaVersion, 16);
   } finally {
     await rm(directory, { recursive: true, force: true });
   }

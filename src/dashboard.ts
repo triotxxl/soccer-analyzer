@@ -29,6 +29,13 @@ export interface DashboardInput {
   /** Nur Quelle "api": Anbieter und Stand der Quoten je Fixture-ID. */
   bookmakerByFixture?: Map<number, { name: string; updatedAt: string | null }>;
   /**
+   * Nur Quelle "api", seit 10.11.2026: welche deutschen Seiten (OddsPapi-Kennung, etwa "betano.de",
+   * "tipico") ein Spiel anbieten, und woher diese Auskunft stammt. Fehlt die Map, war nur die Näherung
+   * über die Tipico-Ligen da.
+   */
+  offeredByFixture?: Map<number, string[]>;
+  offer?: { source: "oddspapi" | "tipico-ligen"; bookmakers: string[] };
+  /**
    * Tipico-Namen je Fixture-ID, über dieselbe Zuordnung wie `oddsByFixture`. Nur Anzeige:
    * Die App zeigt sie ab Werk statt der Namen von API-Football (Einstellungen, seit 11.10.2026).
    */
@@ -205,6 +212,12 @@ export interface DashboardFixture {
   bookmaker?: string;
   oddsUpdatedAt?: string;
   /**
+   * Ab schemaVersion 16 (10.11.2026): die deutschen Seiten, die das Spiel laut OddsPapi anbieten
+   * ("betano.de", "tipico"). Die Apps schalten darüber zwischen Betano und Tipico um. Fehlt bei der
+   * Näherung über die Tipico-Ligen und in älteren Snapshots. Die Quoten sind davon unberührt (`bookmaker`).
+   */
+  offeredBy?: string[];
+  /**
    * Wappen-URLs von API-Football. Sie fehlen, wenn die Fixture-Antwort sie nicht führt, und
    * in jedem Snapshot vor dieser Ergänzung; die App zeigt dann die Initialen des Teams.
    */
@@ -284,7 +297,7 @@ export interface DashboardFixture {
 }
 
 export interface DashboardDocument {
-  schemaVersion: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15;
+  schemaVersion: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16;
   meta: {
     createdAt: string;
     timezone: string;
@@ -293,6 +306,11 @@ export interface DashboardDocument {
      * 09.11.2026, `fixture.bookmaker` nennt den Anbieter), "tipico" = data.json. Fehlt = Tipico.
      */
     oddsSource?: "api" | "tipico";
+    /**
+     * Ab schemaVersion 16: woher die Angebotsliste stammt. "oddspapi" = je Seite geprüft
+     * (`fixture.offeredBy`), "tipico-ligen" = Näherung, ohne Auskunft je Spiel. Fehlt beim Tipico-Weg.
+     */
+    offer?: { source: "oddspapi" | "tipico-ligen"; bookmakers: string[] };
     /** Quelle "api": "API-Football"; sonst der Pfad der data.json. */
     sourceFile: string;
     /** Quelle "api": Spiele, die der Anbieter führte, und davon im Umfang (statt Tipico-Ereignissen). */
@@ -645,6 +663,7 @@ export function buildDashboardDocument(input: DashboardInput): DashboardDocument
       ...(row.leagueId !== undefined ? { leagueId: row.leagueId } : {}),
       ...(bookmaker ? { bookmaker: bookmaker.name } : {}),
       ...(bookmaker?.updatedAt ? { oddsUpdatedAt: bookmaker.updatedAt } : {}),
+      ...(input.offeredByFixture?.has(row.fixtureId) ? { offeredBy: input.offeredByFixture.get(row.fixtureId)! } : {}),
       ...(row.homeTeamId !== undefined && input.elo?.has(row.homeTeamId) ? { homeElo: input.elo.get(row.homeTeamId)! } : {}),
       ...(row.awayTeamId !== undefined && input.elo?.has(row.awayTeamId) ? { awayElo: input.elo.get(row.awayTeamId)! } : {}),
       ...(row.homeCrest ? { homeCrest: row.homeCrest } : {}),
@@ -694,9 +713,10 @@ export function buildDashboardDocument(input: DashboardInput): DashboardDocument
   const createdAt = Date.parse(input.createdAt);
   const latestKickoff = fixtures.reduce((latest, fixture) => Math.max(latest, Date.parse(fixture.kickoff)), createdAt);
   return {
-    schemaVersion: 15,
+    schemaVersion: 16,
     meta: {
       createdAt: input.createdAt, timezone: config.timezone, oddsSource: input.oddsSource ?? "tipico",
+      ...(input.offer ? { offer: input.offer } : {}),
       sourceFile: input.sourceFile,
       totalTipicoEvents: input.totalTipicoEvents, selectedTipicoEvents: input.selectedTipicoEvents,
       selectedCompetitions: input.selectedCompetitions, fixtureCount: fixtures.length,

@@ -77,7 +77,7 @@ test("OddsPapi: feste Zwei-Tage-Blöcke unter 48 Stunden ab geradem UTC-Tag", ()
   assert.equal(blocks[1]!.from - blocks[0]!.to, 1000, "lückenlos");
 });
 
-function fakeOddsPapi(responses: { fixtures: unknown[]; requestCount?: number; requestLimit?: number }) {
+function fakeOddsPapi(responses: { fixtures: unknown[] | Record<string, unknown[]>; requestCount?: number; requestLimit?: number }) {
   const calls: string[] = [];
   const fetchImpl = (async (input: URL | string) => {
     const url = new URL(String(input));
@@ -85,7 +85,8 @@ function fakeOddsPapi(responses: { fixtures: unknown[]; requestCount?: number; r
     if (url.pathname === "/v4/account") {
       return new Response(JSON.stringify({ subscriptions: [{ is_active: true, request_count: responses.requestCount ?? 6, request_limit: responses.requestLimit ?? 250 }] }));
     }
-    return new Response(JSON.stringify(responses.fixtures));
+    const fixtures = Array.isArray(responses.fixtures) ? responses.fixtures : responses.fixtures[url.searchParams.get("bookmakers") ?? ""] ?? [];
+    return new Response(JSON.stringify(fixtures));
   }) as typeof fetch;
   return { calls, fetchImpl };
 }
@@ -133,21 +134,32 @@ function afClient() {
   return client as unknown as ApiFootballClient;
 }
 
-test("Analyse: nur Spiele aus der Angebotsliste; ohne OddsPapi die Näherung über die Tipico-Ligen", async () => {
+const AVAI = { fixtureId: "id1", participant1Name: "Avai FC SC", participant2Name: "America FC MG", startTime: "2026-11-14T19:30:00.000Z", tournamentName: "Brasileiro Serie B" };
+const U19 = { fixtureId: "id2", participant1Name: "Austria U19", participant2Name: "Belarus U19", startTime: "2026-11-14T19:30:00.000Z", tournamentName: "U19 European Championship, Qualification" };
+
+test("Analyse: was mindestens eine Seite anbietet, mit den Seiten je Spiel; ohne OddsPapi die Näherung", async () => {
   const now = new Date("2026-11-14T10:00:00Z");
-  const fake = fakeOddsPapi({ fixtures: [{ fixtureId: "id1", participant1Name: "Avai FC SC", participant2Name: "America FC MG", startTime: "2026-11-14T19:30:00.000Z", tournamentName: "Brasileiro Serie B" }] });
+  const fake = fakeOddsPapi({ fixtures: { "betano.de": [AVAI], tipico: [AVAI, U19] } });
   const oddsPapi = new OddsPapiClient({ apiKey: "k", cache: new FileCache(await mkdtemp(path.join(os.tmpdir(), "oddspapi-"))), fetchImpl: fake.fetchImpl, pauseMs: 0 });
   const corrections = { include: [], exclude: [] };
-  const offer = offerSelection({ client: afClient(), tipicoLeagueIds: () => new Set([893]), corrections, oddsPapi, timezone: "Europe/Berlin" });
+  const offer = offerSelection({ client: afClient(), tipicoLeagueIds: () => new Set([893]), corrections, oddsPapi, timezone: "Europe/Berlin", bookmakers: ["betano.de", "tipico"] });
   const result = await importApiOdds(afClient(), "today", now, { bookmakers: [32], timezone: "Europe/Berlin", offerFilter: offer.filter });
-  assert.deepEqual(result.input.fixtureIds, [1]);
-  assert.deepEqual([...result.outsideOffer], [["Brazil | Liga 893 (893)", 1]]);
-  assert.match(offerReportLine(offer.report()) ?? "", /1 Spiele zugeordnet, 0 über ihre Liga, 1 nicht im Angebot · 1 OddsPapi-Aufrufe · Stand 6 von 250/);
+  assert.deepEqual(result.input.fixtureIds, [1, 2]);
+  assert.deepEqual([...offer.offeredBy()!], [[1, ["betano.de", "tipico"]], [2, ["tipico"]]]);
+  assert.equal(offerReportLine(offer.report()),
+    "Angebot (OddsPapi): betano.de 1 (1 zugeordnet), tipico 2 (2 zugeordnet) · zusammen 2, 0 bei keiner Seite · 2 OddsPapi-Aufrufe · Stand 6 von 250");
+
+  // Keine Seite führt das U19-Spiel: Es fällt weg.
+  const betanoOnly = offerSelection({ client: afClient(), tipicoLeagueIds: () => new Set(), corrections, oddsPapi, timezone: "Europe/Berlin", bookmakers: ["betano.de"] });
+  const onlyBetano = await importApiOdds(afClient(), "today", now, { bookmakers: [32], timezone: "Europe/Berlin", offerFilter: betanoOnly.filter });
+  assert.deepEqual(onlyBetano.input.fixtureIds, [1]);
+  assert.deepEqual([...onlyBetano.outsideOffer], [["Brazil | Liga 893 (893)", 1]]);
 
   // Ohne Schlüssel: Tipico-Ligen (hier nur 893) - und die Zeile sagt warum.
   const fallback = offerSelection({ client: afClient(), tipicoLeagueIds: () => new Set([893]), corrections, oddsPapi: null, timezone: "Europe/Berlin" });
   const approx = await importApiOdds(afClient(), "today", now, { bookmakers: [32], timezone: "Europe/Berlin", offerFilter: fallback.filter });
   assert.deepEqual(approx.input.fixtureIds, [2]);
   assert.match(offerReportLine(fallback.report()) ?? "", /Näherung über die Tipico-Ligen/);
+  assert.equal(fallback.offeredBy(), null, "bei der Näherung weiß niemand, welche Seite");
 });
 

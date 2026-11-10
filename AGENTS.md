@@ -50,12 +50,17 @@ Spiele; geprüft wurden alle deutschen Anbieter, nur Betano (32) und Bet365 (8) 
    Spiele, die betano.de nicht anbietet - David fand Eastbourne Borough – Dulwich Hamlet (englische 7. Liga)
    dort nicht. **Seit 10.11.2026 (Davids Entscheidung) entscheidet die Angebotsliste von OddsPapi**
    (oddspapi.io, `src/oddspapi.ts`, `src/offer-matching.ts`, `src/offer-filter.ts`): `/v4/fixtures` mit
-   `hasOdds=true&bookmakers=betano.de` (`ODDSPAPI_BOOKMAKERS`; OddsPapi führt die deutschen Seiten einzeln,
-   auch `tipico` = Tipico DE). **Quoten kommen weiter von API-Football** - bei OddsPapi kosten sie einen
+   `hasOdds=true&bookmakers=<Seite>` je Seite aus `ODDSPAPI_BOOKMAKERS` (Vorgabe `betano.de,tipico`; OddsPapi
+   führt die deutschen Seiten einzeln, `tipico` = Tipico DE). **Analysiert wird, was mindestens eine Seite
+   anbietet; jedes Spiel trägt seine Seiten als `offeredBy`** (`schemaVersion: 16`, `meta.offer`), und **beide
+   Apps schalten zwischen Betano und Tipico um** (Davids Wunsch vom 10.11.2026; Neo in der Kopfleiste, die alte
+   App im Filtermenü unter „Umfang“ - gilt dort auch für Kelly und Quickpick -, ab Werk Betano, gemerkt;
+   `apps/shared/src/offer.ts`). Die Quoten bleiben in beiden Fällen die von Betano bei API-Football. Jede Seite
+   braucht eine eigene Liste: Eine gemeinsame Abfrage sagt nicht, welche Seite ein Spiel führt. **Quoten kommen weiter von API-Football** - bei OddsPapi kosten sie einen
    Aufruf je Spiel oder je drei Ligen und Anbieter (gemessen 10.11.2026: rund 8-50 Aufrufe je Analyse; ein
    Paket „Normal“ mit rund 5.000 Aufrufen kostete 25 $ je Monat für betano.de, 35 $ mit Tipico). Gratis
    sind 250 Aufrufe im Monat: Die Liste kommt in festen Zwei-Tage-Blöcken (`offerBlocks`, 3 Stunden im
-   Cache `data/oddspapi-cache/`), eine Analyse `next48` kostet 2-3 Aufrufe, prepare-analysis und eine
+   Cache `data/oddspapi-cache/`), eine Analyse `next48` kostet je Seite 2-3 Aufrufe (beide 4-6), prepare-analysis und eine
    Analyse kurz danach teilen sie; vor jedem Abruf prüft `/v4/account` (zählt nicht) den Stand und hält
    `ODDSPAPI_RESERVE` (10) zurück. Zuordnung über Anstoß (±3 Stunden, Platzhaltertermine bis ±4 Tage)
    und Teamnamen ohne Rechtsform, Bundesstaat und Jahreszahl, Frauen- und zweite Mannschaften getrennt;
@@ -63,11 +68,12 @@ Spiele; geprüft wurden alle deutschen Anbieter, nur Betano (32) und Bet365 (8) 
    (Anbieter führen Ligen als Ganzes). Gemessen am 10.11.2026 über 243 Betano-Spiele: 157 direkt, 14 über
    die Liga, 72 weggelassen (U19-EM-Qualifikation, WSL Cup, Frauen-Europapokal, argentinische
    Reserveliga, türkische 3. Liga …), alle 26 unsicheren Zuordnungen von Hand geprüft richtig. Die
-   Analyse druckt „Angebot betano.de (OddsPapi): x zugeordnet, y über ihre Liga, z nicht im Angebot · n
-   OddsPapi-Aufrufe · Stand a von 250“ und die weggelassenen Ligen mit ID. **Ohne `ODDSPAPI_KEY`, bei
+   Analyse druckt „Angebot (OddsPapi): betano.de x (y zugeordnet), tipico … · zusammen n, m bei keiner Seite ·
+   k OddsPapi-Aufrufe · Stand a von 250“ und die weggelassenen Ligen mit ID. Am 10.11.2026 (next48): betano.de
+   84, tipico 84, zusammen 91 von 181. **Ohne `ODDSPAPI_KEY`, bei
    aufgebrauchtem Kontingent oder einem Fehler** gilt die Näherung vom 09.11.2026 - nur Ligen, die Tipico je
    angeboten hat (`tipicoLeagueIds`, `germanOfferFilter`) - mit Warnzeile und „Angebot geschätzt“ in der
-   Zählerzeile. Auf beiden Wegen gilt `data/angebot-ligen.json` (Davids Korrekturen je API-Liga-ID,
+   Zählerzeile; dann fehlt `offeredBy`, und die Apps zeigen keinen Umschalter. Auf beiden Wegen gilt `data/angebot-ligen.json` (Davids Korrekturen je API-Liga-ID,
    `include` und `exclude` gehen vor); `--alle-ligen` schaltet den Filter ab. Spiele, die betano.de
    führt, Betano bei API-Football aber nicht (J.League Cup, ägyptische 2. Liga am 11./12.11.), fehlen
    weiter - dafür bräuchte es Quoten aus einer zweiten Quelle.
@@ -98,7 +104,9 @@ Spiele; geprüft wurden alle deutschen Anbieter, nur Betano (32) und Bet365 (8) 
 5. **Grenze:** Platzhaltertermine von API-Football (siehe „Pflege“) lassen sich auf diesem Weg nicht
    mehr über die Tipico-Anstoßzeit korrigieren; die Zählerzeile weist sie als „Anstoß vorbei, Status
    noch NS“ aus.
-6. **Snapshot `schemaVersion: 15`:** `meta.oddsSource` (`api`/`tipico`, fehlt = Tipico), je Spiel
+6. **Snapshot `schemaVersion: 15`** (16 seit 10.11.2026: `offeredBy` je Spiel, `meta.offer`; die Apps lesen
+   1 bis `LATEST_SCHEMA_VERSION` in `apps/shared/src/data.ts` - **wer die Fassung hebt, hebt dort mit**, sonst
+   zeigen beide Apps nichts; `apps/shared/src/schemaVersion.test.ts` prüft das)**:** `meta.oddsSource` (`api`/`tipico`, fehlt = Tipico), je Spiel
    `bookmaker` und `oddsUpdatedAt` (Quelle api) und `leagueId` (beide Wege; `coverage` und
    `data-check` lesen die Liga darüber statt über `tipico_competitions`). Die Apps nennen den Anbieter
    (`quoteSourceName` in `apps/shared/src/quoteSource.ts`), bei älteren Snapshots „Tipico“. David setzt
