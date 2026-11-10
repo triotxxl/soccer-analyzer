@@ -64,6 +64,13 @@ test("berechnet sieben aufeinanderfolgende Berliner Kalendertage", () => {
   );
 });
 
+test("„four“ ist heute bis einschließlich drei Tage später (Dienstag bis Freitag)", () => {
+  assert.deepEqual(
+    datesForRange("four", "Europe/Berlin", new Date("2026-11-10T21:00:00.000Z")),
+    ["2026-11-10", "2026-11-11", "2026-11-12", "2026-11-13"]
+  );
+});
+
 test("berechnet vierzehn aufeinanderfolgende Berliner Kalendertage", () => {
   assert.deepEqual(
     datesForRange("fourteen", "Europe/Berlin", new Date("2026-08-10T08:00:00.000Z")),

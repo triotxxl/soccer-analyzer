@@ -83,6 +83,10 @@ export function datesForRange(range: DateRange, timezone: string, now = new Date
   if (range === "three") {
     return Array.from({ length: 3 }, (_, offset) => zonedDate(now, timezone, offset));
   }
+  // Heute plus drei Tage (seit 10.11.2026, Davids Auftrag „heute bis Freitag“ an einem Dienstag).
+  if (range === "four") {
+    return Array.from({ length: 4 }, (_, offset) => zonedDate(now, timezone, offset));
+  }
   if (range === "five") {
     return Array.from({ length: 5 }, (_, offset) => zonedDate(now, timezone, offset));
   }

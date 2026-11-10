@@ -170,7 +170,7 @@ async function analysisInput(args: ParsedArgs): Promise<AnalysisInput> {
     return JSON.parse(await readFile(inputFile, "utf8")) as AnalysisInput;
   }
   const dates = (option(args, "dates") ?? "both") as DateRange;
-  if (!["today", "tomorrow", "tomorrow2", "both", "next48", "three", "five", "seven", "fourteen", "twentyone"].includes(dates)) {
+  if (!["today", "tomorrow", "tomorrow2", "both", "next48", "three", "four", "five", "seven", "fourteen", "twentyone"].includes(dates)) {
     throw new Error("--dates muss today, tomorrow, tomorrow2, both, next48, three, five, seven, fourteen oder twentyone sein.");
   }
   return {
@@ -697,7 +697,7 @@ async function tipicoDashboardSource(
 
 async function dashboard(args: ParsedArgs): Promise<void> {
   const dates = (option(args, "dates") ?? "next48") as DateRange;
-  if (!["today", "tomorrow", "tomorrow2", "both", "next48", "three", "five", "seven", "fourteen", "twentyone"].includes(dates)) {
+  if (!["today", "tomorrow", "tomorrow2", "both", "next48", "three", "four", "five", "seven", "fourteen", "twentyone"].includes(dates)) {
     throw new Error("--dates muss today, tomorrow, tomorrow2, both, next48, three, five, seven, fourteen oder twentyone sein.");
   }
   // Seit 09.11.2026 kommen Spiele und Quoten ab Werk von API-Football. --input meint die Tipico-data.json

@@ -46,7 +46,7 @@ function option(name: string): string | undefined {
   return index >= 0 ? process.argv[index + 1] : undefined;
 }
 
-const RANGES = ["today", "tomorrow", "tomorrow2", "both", "next48", "three", "five", "seven", "fourteen", "twentyone"];
+const RANGES = ["today", "tomorrow", "tomorrow2", "both", "next48", "three", "four", "five", "seven", "fourteen", "twentyone"];
 const dates = (option("dates") ?? "next48") as DateRange;
 if (!RANGES.includes(dates)) throw new Error(`--dates muss ${RANGES.join(", ")} sein.`);
 const source = option("source") ?? (option("input") ? "tipico" : "api");
