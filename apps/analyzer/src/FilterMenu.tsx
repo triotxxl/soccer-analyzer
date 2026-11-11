@@ -126,6 +126,10 @@ export function FilterSegment<T extends string>({ name, legend, options, value, 
   </fieldset>;
 }
 
+const unknownKickoff = (iso: string) => new Date(iso).toLocaleString("de-DE", {
+  timeZone: "Europe/Berlin", weekday: "short", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit"
+});
+
 export interface LeagueEntry {
   key: string;
   country: string;
@@ -199,7 +203,12 @@ export interface FilterMenuValues {
   showCrossLeague: boolean;
   showPast: boolean;
   /** Betano | Tipico, `null` ohne Angebotsliste im Snapshot (dann keine Karte). */
-  offer: { site: OfferSite; sites: ReadonlyArray<OfferSite> } | null;
+  offer: {
+    site: OfferSite;
+    sites: ReadonlyArray<OfferSite>;
+    /** Angeboten, aber API-Football kennt das Spiel nicht - zugeklappt unter der Karte (seit 10.11.2026). */
+    unknown: ReadonlyArray<{ home: string; away: string; kickoff: string; tournament: string; sites: string[] }>;
+  } | null;
   liveRatedOnly: boolean;
   /** Die Anzeige-Filter der Live-Ansicht; sie wirken auf die geladene Tafel und kosten nichts. */
   live: {
@@ -334,6 +343,14 @@ export function FilterMenu({ values, actions, rangeControl, displayControls }: {
                 onChange={actions.setOfferSite}
                 options={values.offer.sites.map((site) => ({ value: site, label: offerSiteLabel(site) }))}
                 note="Nur Spiele, die es dort gibt. Die Quoten kommen in beiden Fällen von Betano." />
+              {values.offer.unknown.length > 0 && <details className="offer-unknown">
+                <summary>{values.offer.unknown.length} {values.offer.unknown.length === 1 ? "Spiel" : "Spiele"}, die die Daten-API nicht kennt</summary>
+                <p className="filter-note">Bei Betano oder Tipico im Angebot, aber ohne Daten - das Modell kann sie nicht rechnen.</p>
+                <ul>{values.offer.unknown.map((game) => <li key={`${game.kickoff}|${game.home}|${game.away}`}>
+                  <span className="offer-unknown-time">{unknownKickoff(game.kickoff)}</span>
+                  <span>{game.home} – {game.away}<small>{game.tournament} · {game.sites.map((site) => offerSiteLabel(site as OfferSite)).join(", ")}</small></span>
+                </li>)}</ul>
+              </details>}
             </FilterCard>}
             <FilterCard title="Wettbewerbe">
               {leagueField}

@@ -230,3 +230,107 @@ test("Spiele ohne Quote bei API-Football: aufgenommen, wenn eine Seite sie anbie
   assert.deepEqual(offer.offeredBy()!.get(3), ["tipico"]);
   assert.match(offerReportLine(offer.report()) ?? "", /dazu 1 angeboten ohne Quote bei API-Football/);
 });
+
+test("Platzhaltertermin: Anstoß vom Anbieter; unbekannte Spiele werden nur gesammelt", async () => {
+  const at = (iso: string) => Date.parse(iso);
+  const daily = (id: number, home: string, away: string, leagueId: number, kickoff: string, short = "NS"): ApiFixture => ({
+    fixture: { id, date: kickoff, timestamp: at(kickoff) / 1000, timezone: "UTC", status: { long: short, short, elapsed: null } },
+    league: { id: leagueId, name: `Liga ${leagueId}`, country: "Colombia", season: 2026 },
+    teams: { home: { id: id * 10, name: home }, away: { id: id * 10 + 1, name: away } },
+    goals: { home: null, away: null }, score: {}
+  });
+  const odds = (id: number, leagueId: number, kickoff: string): ApiFixtureOdds => ({
+    league: { id: leagueId, name: `Liga ${leagueId}`, country: "Colombia", season: 2026 },
+    fixture: { id, date: kickoff, timestamp: at(kickoff) / 1000 },
+    bookmakers: [{ id: 32, name: "Betano", bets: [{ id: 1, name: "Match Winner", values: [{ value: "Home", odd: "2.0" }, { value: "Draw", odd: "3.2" }, { value: "Away", odd: "3.5" }] }] }]
+  });
+  // API-Football: beide kolumbianischen Spiele auf Donnerstag 22:00 (Platzhalter), dazu ein beendetes CRB - Ceará.
+  const client = {
+    requestCount: 0,
+    async getOddsByDate() { return [odds(1, 239, "2026-11-12T21:00:00Z"), odds(2, 239, "2026-11-12T21:00:00Z")]; },
+    async getFixturesForDate() {
+      return [daily(1, "Millonarios", "Alianza Valledupar", 239, "2026-11-12T21:00:00Z"),
+        daily(2, "Deportivo Cali", "Deportes Tolima", 239, "2026-11-12T21:00:00Z"),
+        daily(3, "CRB", "Ceara", 72, "2026-11-12T19:00:00Z", "FT")];
+    }
+  } as unknown as ApiFootballClient;
+  const offer = (id: string, home: string, away: string, kickoff: string, tournament: string) =>
+    ({ fixtureId: id, participant1Name: home, participant2Name: away, startTime: kickoff, tournamentName: tournament });
+  const fake = fakeOddsPapi({ fixtures: { tipico: [
+    // Bei Tipico der echte Termin: Millonarios am Freitag (im Umfang), Cali erst am Samstag (außerhalb, aber im selben Block).
+    offer("m", "Millonarios FC", "Alianza FC Valledupar", "2026-11-13T20:30:00.000Z", "Liga DIMAYOR"),
+    offer("c", "Deportivo Cali", "CD Tolima", "2026-11-14T20:30:00.000Z", "Liga DIMAYOR"),
+    offer("crb", "CR Brasil AL", "Ceara SC CE", "2026-11-12T19:00:00.000Z", "Brasileiro Serie B"),
+    offer("sv", "Neo Pipil San Juan Nonualco", "CD Dragon", "2026-11-12T03:00:00.000Z", "Liga de Ascenso")
+  ] } });
+  const oddsPapi = new OddsPapiClient({ apiKey: "k", cache: new FileCache(await mkdtemp(path.join(os.tmpdir(), "oddspapi-"))), fetchImpl: fake.fetchImpl, pauseMs: 0 });
+  const selection = offerSelection({ client, tipicoLeagueIds: () => new Set(), corrections: { include: [], exclude: [] }, oddsPapi, timezone: "Europe/Berlin", bookmakers: ["tipico"] });
+  const result = await importApiOdds(client, "three", new Date("2026-11-11T22:00:00Z"), {
+    bookmakers: [32], timezone: "Europe/Berlin", offerFilter: selection.filter, offerExtras: selection.extras, offerKickoffs: selection.kickoffs
+  });
+  // Millonarios mit dem Tipico-Anstoß analysiert, Cali fällt mit dem echten Termin aus dem Umfang.
+  assert.deepEqual(result.input.fixtureIds, [1]);
+  assert.deepEqual(result.input.kickoffOverrides, { 1: "2026-11-13T20:30:00.000Z" });
+  assert.equal(result.events[0]?.kickoff, "2026-11-13T20:30:00.000Z");
+  assert.equal(result.movedOut, 1);
+  // Unbekannt ist nur das Spiel aus El Salvador; „CR Brasil AL“ kennt API-Football als „CRB“.
+  assert.deepEqual(selection.unknown().map((game) => `${game.home} - ${game.away}`), ["Neo Pipil San Juan Nonualco - CD Dragon"]);
+  // Gezählt wird nur, was im Zeitraum liegt: Cali fällt mit dem Anstoß des Anbieters heraus.
+  assert.match(offerReportLine(selection.report()) ?? "", /1 mit Anstoß vom Anbieter .* 1 angeboten, aber API-Football unbekannt/);
+});
+
+test("Platzhaltertermin außerhalb des Zeitraums und U21 ohne Altersangabe (echte Fälle vom 11.11.2026)", async () => {
+  const at = (iso: string) => Date.parse(iso);
+  const daily = (id: number, home: string, away: string, leagueId: number, kickoff: string): ApiFixture => ({
+    fixture: { id, date: kickoff, timestamp: at(kickoff) / 1000, timezone: "UTC", status: { long: "NS", short: "NS", elapsed: null } },
+    league: { id: leagueId, name: `Liga ${leagueId}`, country: "Brazil", season: 2026 },
+    teams: { home: { id: id * 10, name: home }, away: { id: id * 10 + 1, name: away } },
+    goals: { home: null, away: null }, score: {}
+  });
+  const byDay: Record<string, ApiFixture[]> = {
+    "2026-11-12": [daily(1, "Iceland U21", "Greece U21", 38, "2026-11-12T13:00:00Z"), daily(2, "Iceland", "Greece", 5, "2026-11-12T19:45:00Z")],
+    // API-Football führt Ponte Preta - Operário einen Tag später als Betano, außerhalb des Zeitraums.
+    "2026-11-14": [daily(3, "Ponte Preta", "Operario-PR", 72, "2026-11-14T19:30:00Z")]
+  };
+  const days: string[] = [];
+  const client = {
+    requestCount: 0,
+    async getOddsByDate() { return []; },
+    async getFixturesForDate(day: string) { days.push(day); return byDay[day] ?? []; }
+  } as unknown as ApiFootballClient;
+  const offer = (id: string, home: string, away: string, kickoff: string, tournament: string) =>
+    ({ fixtureId: id, participant1Name: home, participant2Name: away, startTime: kickoff, tournamentName: tournament });
+  const fake = fakeOddsPapi({ fixtures: { "betano.de": [
+    offer("u21", "Iceland", "Greece", "2026-11-12T13:00:00.000Z", "U21 UEFA European Championship, Qualification"),
+    offer("pp", "AA Ponte Preta SP", "Operario Ferroviario EC PR", "2026-11-13T22:00:00.000Z", "Brasileiro Serie B")
+  ] } });
+  const oddsPapi = new OddsPapiClient({ apiKey: "k", cache: new FileCache(await mkdtemp(path.join(os.tmpdir(), "oddspapi-"))), fetchImpl: fake.fetchImpl, pauseMs: 0 });
+  const selection = offerSelection({ client, tipicoLeagueIds: () => new Set(), corrections: { include: [], exclude: [] }, oddsPapi, timezone: "Europe/Berlin", bookmakers: ["betano.de"] });
+  const result = await importApiOdds(client, "three", new Date("2026-11-11T22:00:00Z"), {
+    bookmakers: [32], timezone: "Europe/Berlin", offerFilter: selection.filter, offerExtras: selection.extras, offerKickoffs: selection.kickoffs
+  });
+  // Die U21 statt des A-Teams, Ponte Preta mit dem Anstoß von Betano - beide ohne Quote analysiert.
+  assert.deepEqual(result.input.fixtureIds, [1, 3]);
+  assert.deepEqual(result.input.kickoffOverrides, { 3: "2026-11-13T22:00:00.000Z" });
+  // Die Analyse lädt die Tagesliste, in der API-Football das Spiel führt.
+  assert.deepEqual(result.input.placeholderDates, ["2026-11-14"]);
+  assert.ok(days.includes("2026-11-14"));
+  assert.deepEqual(selection.unknown(), []);
+  assert.deepEqual(selection.offeredBy()?.get(3), ["betano.de"]);
+});
+
+test("OddsPapi: ein leerer Block (404 FIXTURE_NOT_FOUND) ist eine leere Liste, kein Fehler", async () => {
+  let fixtureCalls = 0;
+  const empty = (async (input: URL | string) => {
+    const url = new URL(String(input));
+    if (url.pathname === "/v4/account") return new Response(JSON.stringify({ subscriptions: [{ request_count: 14, request_limit: 250 }] }));
+    fixtureCalls += 1;
+    return new Response(JSON.stringify({ error: { message: "No fixtures found for the specified criteria.", code: "FIXTURE_NOT_FOUND" } }), { status: 404 });
+  }) as typeof fetch;
+  const directory = await mkdtemp(path.join(os.tmpdir(), "oddspapi-"));
+  const client = () => new OddsPapiClient({ apiKey: "k", cache: new FileCache(directory), fetchImpl: empty, pauseMs: 0, retryMs: 0 });
+  assert.deepEqual(await client().offerFixtures(T, T, "betano.de"), []);
+  // Gespeichert: Die nächste Analyse fragt den leeren Block nicht noch einmal.
+  assert.deepEqual(await client().offerFixtures(T, T, "betano.de"), []);
+  assert.equal(fixtureCalls, 1);
+});

@@ -139,6 +139,11 @@ function tipicoOddsForTeams(
   );
 }
 
+/** Tage der Tageslisten: der Umfang, dazu die Tage der Platzhaltertermine außerhalb davon. */
+function fixtureDays(dates: string[], input: AnalysisInput): string[] {
+  return [...new Set([...dates, ...(input.placeholderDates ?? [])])];
+}
+
 export async function requestedFixtureScope(
   fixtures: ApiFixture[],
   input: AnalysisInput,
@@ -150,7 +155,13 @@ export async function requestedFixtureScope(
   // ein leeres Feld heißt "kein Spiel", nicht "alle Spiele der Ligen".
   if (input.fixtureIds !== undefined) {
     const wanted = new Set(input.fixtureIds);
-    const selected = fixtures.filter((fixture) => wanted.has(fixture.fixture.id));
+    // Platzhaltertermin bei API-Football: der Anstoß des Anbieters (Angebotsliste, seit 10.11.2026) - wie der
+    // zweite Durchgang des Tipico-Wegs unten.
+    const overrides = input.kickoffOverrides ?? {};
+    const selected = fixtures.filter((fixture) => wanted.has(fixture.fixture.id)).map((fixture) => {
+      const kickoff = overrides[fixture.fixture.id];
+      return kickoff ? { ...fixture, fixture: { ...fixture.fixture, date: kickoff, timestamp: Math.floor(Date.parse(kickoff) / 1000) } } : fixture;
+    });
     const found = new Set(selected.map((fixture) => fixture.fixture.id));
     return {
       fixtures: selected,
@@ -461,7 +472,7 @@ export async function runAnalysis(
   );
   const dates = datesForRange(input.dates, config.timezone, now);
   const dailyFixtures = (await Promise.all(
-    dates.map((date) => client.getFixturesForDate(date, config.timezone))
+    fixtureDays(dates, input).map((date) => client.getFixturesForDate(date, config.timezone))
   )).flat();
   const selectedIds = new Set(resolution.resolved.map((league) => league.leagueId));
   const scope = await requestedFixtureScope(
@@ -569,7 +580,7 @@ export async function runGoalLineAnalysis(
     );
     const dates = datesForRange(input.dates, config.timezone, now);
     const dailyFixtures = (await Promise.all(
-      dates.map((date) => client.getFixturesForDate(date, config.timezone))
+      fixtureDays(dates, input).map((date) => client.getFixturesForDate(date, config.timezone))
     )).flat();
     const selectedIds = new Set(resolution.resolved.map((league) => league.leagueId));
     const scope = await requestedFixtureScope(
@@ -1051,7 +1062,7 @@ export async function runDrawCriteriaAnalysis(
   );
   const dates = datesForRange(input.dates, config.timezone, now);
   const dailyFixtures = (await Promise.all(
-    dates.map((date) => client.getFixturesForDate(date, config.timezone))
+    fixtureDays(dates, input).map((date) => client.getFixturesForDate(date, config.timezone))
   )).flat();
   const selectedIds = new Set(resolution.resolved.map((league) => league.leagueId));
   const scope = await requestedFixtureScope(
@@ -1256,7 +1267,7 @@ export async function runFavoriteAnalysis(
   );
   const dates = datesForRange(input.dates, config.timezone, now);
   const dailyFixtures = (await Promise.all(
-    dates.map((date) => client.getFixturesForDate(date, config.timezone))
+    fixtureDays(dates, input).map((date) => client.getFixturesForDate(date, config.timezone))
   )).flat();
   const selectedIds = new Set(resolution.resolved.map((league) => league.leagueId));
   const scope = await requestedFixtureScope(

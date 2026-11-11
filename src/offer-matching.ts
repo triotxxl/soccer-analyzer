@@ -77,11 +77,33 @@ interface TeamKey {
  */
 const TRANSLITERATE: Array<[RegExp, string]> = [[/[øØ]/g, "oe"], [/[æÆ]/g, "ae"], [/[œŒ]/g, "oe"], [/[łŁ]/g, "l"], [/[đĐ]/g, "d"], [/ı/g, "i"]];
 
+/**
+ * Städte, die OddsPapi englisch und API-Football in Landessprache führt („Sparta Prague“ / „Sparta Praha“, 11.11.2026).
+ * Abgebildet auf eine Schreibweise; die Ähnlichkeit der Wörter allein reicht dafür nicht.
+ */
+const CITY_NAMES = new Map<string, string>([
+  ["prague", "praha"], ["belgrade", "beograd"], ["moscow", "moskva"], ["lisbon", "lisboa"], ["munich", "munchen"],
+  ["cologne", "koln"], ["turin", "torino"], ["milan", "milano"], ["rome", "roma"], ["copenhagen", "kobenhavn"],
+  ["bucharest", "bucuresti"], ["kiev", "kyiv"], ["athens", "athina"], ["warsaw", "warszawa"], ["vienna", "wien"]
+]);
+
+/** Teamnamen wiederholen sich in jedem Abgleich tausendfach - einmal zerlegt reicht. */
+const TEAM_KEYS = new Map<string, TeamKey>();
+
 export function teamKey(name: string): TeamKey {
+  const cached = TEAM_KEYS.get(name);
+  if (cached) return cached;
+  const key = buildTeamKey(name);
+  if (TEAM_KEYS.size > 50_000) TEAM_KEYS.clear();
+  TEAM_KEYS.set(name, key);
+  return key;
+}
+
+function buildTeamKey(name: string): TeamKey {
   const text = normalizeText(TRANSLITERATE.reduce((value, [pattern, replacement]) => value.replace(pattern, replacement), name));
   const women = WOMEN_PATTERN.test(text);
   const reserve = RESERVE_PATTERN.test(text);
-  const raw = text.split(" ").filter(Boolean);
+  const raw = text.split(" ").filter(Boolean).map((token) => CITY_NAMES.get(token) ?? token);
   const tokens = raw.filter((token, index) => {
     if (NOISE.has(token)) return false;
     if (/^\d+$/.test(token)) return false;
@@ -151,12 +173,53 @@ const SAME_KICKOFF_MS = 20 * 60 * 1000;
 const SHIFTED_MS = 4 * 24 * 60 * 60 * 1000;
 
 /**
- * OddsPapi führt Frauenteams ohne „W“ („Juventus Turin“ in „UEFA Champions League Women“); die
- * Markierung kommt dann aus dem Wettbewerb.
+ * OddsPapi führt Frauenteams ohne „W“ („Juventus Turin“ in „UEFA Champions League Women“) und Jugend-Nationalteams
+ * ohne Altersangabe („Iceland“ in „U21 UEFA European Championship, Qualification“, 11.11.2026); die Markierung kommt
+ * dann aus dem Wettbewerb.
  */
 function offerSide(name: string, tournament: string): string {
-  const womenTournament = WOMEN_PATTERN.test(normalizeText(tournament));
-  return womenTournament && !WOMEN_PATTERN.test(normalizeText(name)) ? `${name} Women` : name;
+  const event = normalizeText(tournament);
+  const own = normalizeText(name);
+  let side = name;
+  if (WOMEN_PATTERN.test(event) && !WOMEN_PATTERN.test(own)) side = `${side} Women`;
+  const age = /\bu(\d{2})\b/.exec(event)?.[1];
+  if (age && !/\bu\d{2}\b/.test(own)) side = `${side} U${age}`;
+  return side;
+}
+
+/**
+ * Das Spiel von API-Football zu einem Angebotsspiel auf einem Platzhaltertermin außerhalb des Zeitraums (seit
+ * 11.11.2026: Ponte Preta – Operário bei Betano am 12.11., bei API-Football am 14.11.), bis ±4 Tage, eindeutig: beide
+ * Teams sicher, sonst ein Team sicher und das andere mit gemeinsamem Wort („Athletic Club Sjdr MG“ / „Athletic Club“ -
+ * „Athletic“ allein trägt keine Zuordnung). Sonst null.
+ */
+export function findShiftedFixture(offer: OfferFixture, fixtures: AfFixture[]): AfFixture | null {
+  const near = fixtures
+    .filter((fixture) => Math.abs(fixture.kickoff - offer.kickoff) <= SHIFTED_MS)
+    .map((fixture) => ({ fixture, ...pairScore(fixture, offer) }));
+  const sure = near.filter((entry) => entry.low >= 0.75);
+  if (sure.length > 0) return sure.length === 1 ? sure[0]!.fixture : null;
+  const loose = near.filter((entry) => entry.high >= 1 && entry.low >= 0.4);
+  return loose.length === 1 ? loose[0]!.fixture : null;
+}
+
+/**
+ * Kennt API-Football dieses Angebotsspiel überhaupt (seit 10.11.2026)? Großzügiger als `matchOfferFixture`, weil
+ * hier ein falsches „unbekannt“ schlimmer wäre als ein übersehenes: beide Teams passen (bis ±4 Tage), oder ein
+ * Team passt sicher bei fast gleichem Anstoß („CR Brasil AL“ gegen „CRB“, Ceará passt). Die Tagesliste trägt dafür
+ * jedes Spiel, auch beendete und verlegte.
+ */
+export function offerKnown(offer: OfferFixture, fixtures: AfFixture[]): boolean {
+  const home = offerSide(offer.home, offer.tournament);
+  const away = offerSide(offer.away, offer.tournament);
+  return fixtures.some((fixture) => {
+    const dt = Math.abs(fixture.kickoff - offer.kickoff);
+    if (dt > SHIFTED_MS) return false;
+    const sims = [offerTeamSimilarity(fixture.home, home), offerTeamSimilarity(fixture.away, away),
+      offerTeamSimilarity(fixture.home, away), offerTeamSimilarity(fixture.away, home)];
+    if (Math.max(Math.min(sims[0]!, sims[1]!), Math.min(sims[2]!, sims[3]!)) >= 0.75) return true;
+    return dt <= NEAR_MS && Math.max(...sims) >= 1;
+  });
 }
 
 function pairScore(fixture: AfFixture, offer: OfferFixture): { score: number; swapped: boolean; low: number; high: number } {

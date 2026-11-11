@@ -2050,7 +2050,12 @@ function Dashboard({ document }: { document: DashboardDocument }) {
     classGapFilter,
     showCrossLeague,
     showPast,
-    offer: offerSites && activeOfferSite ? { site: activeOfferSite, sites: offerSites } : null,
+    offer: offerSites && activeOfferSite ? {
+      site: activeOfferSite,
+      sites: offerSites,
+      // Angeboten, aber API-Football kennt das Spiel nicht - nur versteckt, nur was noch nicht lange vorbei ist.
+      unknown: (document.meta.offer?.unknown ?? []).filter((game) => Date.parse(game.kickoff) > now - 2 * 3_600_000)
+    } : null,
     liveRatedOnly,
     live: {
       chanceMin: liveChanceMin,

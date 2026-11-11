@@ -90,6 +90,14 @@
 .filter-card-rule { display: grid; gap: 8px; padding-top: 12px; border-top: 1px solid var(--line); }
 /* Auf --surface reicht --dim fuer 11 px nicht - Hinweise und Warnung stehen in --muted. */
 .filter-note { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.45; }
+/* Angeboten, aber der Daten-API unbekannt (seit 10.11.2026): bewusst zugeklappt und leise. */
+.offer-unknown { margin-top: 10px; font-size: 11px; color: var(--muted); }
+.offer-unknown summary { cursor: pointer; }
+.offer-unknown summary:hover, .offer-unknown[open] summary { color: var(--text); }
+.offer-unknown ul { display: grid; gap: 6px; margin: 8px 0 0; padding: 0; list-style: none; max-height: 220px; overflow-y: auto; }
+.offer-unknown li { display: grid; grid-template-columns: 92px minmax(0, 1fr); gap: 8px; color: var(--text); }
+.offer-unknown li small { display: block; color: var(--muted); font-size: 10px; }
+.offer-unknown-time { color: var(--muted); font-variant-numeric: tabular-nums; }
 .filter-note.warning { display: flex; align-items: flex-start; gap: 6px; }
 .filter-note.warning svg { flex: 0 0 auto; margin-top: 1px; }
 

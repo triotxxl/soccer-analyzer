@@ -545,7 +545,7 @@ interface DashboardSource {
     tipicoNamesByFixture?: Map<number, TipicoNames>;
     bookmakerByFixture?: Map<number, { name: string; updatedAt: string | null }>;
     offeredByFixture?: Map<number, string[]>;
-    offer?: { source: "oddspapi" | "tipico-ligen"; bookmakers: string[] };
+    offer?: { source: "oddspapi" | "tipico-ligen"; bookmakers: string[]; unknown?: Array<{ home: string; away: string; kickoff: string; tournament: string; sites: string[] }> };
     tipicoOdds: TipicoOdds[];
   };
   summary: string;
@@ -573,7 +573,7 @@ async function apiDashboardSource(
       corrections: await readOfferCorrections(),
       freshDaily: true
     });
-  const imported = await importApiOdds(client, dates, now, { offerFilter: offer?.filter, offerExtras: offer?.extras });
+  const imported = await importApiOdds(client, dates, now, { offerFilter: offer?.filter, offerExtras: offer?.extras, offerKickoffs: offer?.kickoffs });
   const offerReport = offer?.report() ?? null;
   const offerLine = offerReportLine(offerReport);
   if (offerLine) (offerReport?.source === "tipico-ligen" ? console.warn : console.log)(offerLine);
@@ -635,7 +635,7 @@ async function apiDashboardSource(
       oddsByFixture,
       bookmakerByFixture,
       tipicoOdds: [],
-      ...(offerReport ? { offer: { source: offerReport.source, bookmakers: offerReport.bookmakers } } : {}),
+      ...(offerReport ? { offer: { source: offerReport.source, bookmakers: offerReport.bookmakers, ...(offer?.unknown().length ? { unknown: offer.unknown() } : {}) } } : {}),
       ...(offer?.offeredBy() ? { offeredByFixture: offer.offeredBy()! } : {})
     }),
     summary: `Quoten: ${perBookmaker} Spiele · ${imported.input.selections.length} Wettbewerbe`
@@ -643,6 +643,8 @@ async function apiDashboardSource(
       + ` · ${missing} ohne Ansetzung · ${notPlayable} laut API nicht spielbar`
       + (stalePlaceholder ? ` · ${stalePlaceholder} Anstoß vorbei, Status noch NS` : "")
       + (imported.withoutOdds ? ` · ${imported.withoutOdds} angeboten ohne Quote` : "")
+      + (imported.rescheduled ? ` · ${imported.rescheduled} mit Anstoß vom Anbieter` : "")
+      + (imported.movedOut ? ` · ${imported.movedOut} mit echtem Anstoß außerhalb des Zeitraums` : "")
       + (skipped ? ` · ${skipped} nicht im deutschen Angebot` : "")
       + (offerReport?.source === "oddspapi" ? " (Angebotsliste OddsPapi)" : offerReport ? " (Angebot geschätzt über Tipico-Ligen)" : "")
   };

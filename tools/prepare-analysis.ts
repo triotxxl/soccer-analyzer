@@ -148,7 +148,7 @@ async function prepareApi(): Promise<ApiFixture[]> {
   const offer = process.argv.includes("--alle-ligen")
     ? null
     : offerSelection({ client, tipicoLeagueIds: () => database.tipicoLeagueIds(), corrections: await readOfferCorrections() });
-  const imported = await importApiOdds(client, dates, undefined, { offerFilter: offer?.filter, offerExtras: offer?.extras });
+  const imported = await importApiOdds(client, dates, undefined, { offerFilter: offer?.filter, offerExtras: offer?.extras, offerKickoffs: offer?.kickoffs });
   const offerLine = offerReportLine(offer?.report() ?? null);
   if (offerLine) console.log(offerLine);
   const skipped = [...imported.outsideOffer.values()].reduce((sum, count) => sum + count, 0);

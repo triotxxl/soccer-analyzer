@@ -100,14 +100,15 @@ export class OddsPapiClient {
     let body: T & { message?: string; code?: string };
     for (let attempt = 0; ; attempt += 1) {
       response = await this.fetchImpl(url, { signal: AbortSignal.timeout(config.timeoutMs) });
-      body = await response.json().catch(() => null) as T & { message?: string; code?: string };
+      body = await response.json().catch(() => null) as T & { message?: string; code?: string; error?: { code?: string } };
       const cooldown = response.status === 429 && body?.code !== "REQUEST_LIMIT_EXCEEDED";
       if (!cooldown || attempt >= RETRIES_AFTER_429) break;
       await sleep(this.retryMs * (attempt + 1));
     }
     if (!response.ok) {
+      const code = body?.code ?? (body as { error?: { code?: string } } | null)?.error?.code;
       // Die URL trägt den Schlüssel - sie gehört nicht in die Meldung.
-      throw new Error(`OddsPapi ${pathname}: HTTP ${response.status}${body?.code ? ` ${body.code}` : ""}`);
+      throw Object.assign(new Error(`OddsPapi ${pathname}: HTTP ${response.status}${code ? ` ${code}` : ""}`), { status: response.status, code });
     }
     return body;
   }
@@ -130,8 +131,10 @@ export class OddsPapiClient {
   }
 
   /**
-   * Alle Spiele mit Quote bei `bookmaker`, deren Anstoß in [fromMs, toMs] liegt. Blöcke aus dem Cache
-   * kosten nichts; für die übrigen wird vorher das Kontingent geprüft.
+   * Alle Spiele mit Quote bei `bookmaker` aus den Zwei-Tage-Blöcken, die [fromMs, toMs] abdecken - ganze Blöcke,
+   * also bis zu zwei Tage über `toMs` hinaus (seit 10.11.2026: Bei einem Platzhaltertermin liegt der echte Termin
+   * oft dahinter, und der Block ist ohnehin bezahlt). Blöcke aus dem Cache kosten nichts; für die übrigen wird
+   * vorher das Kontingent geprüft.
    */
   async offerFixtures(fromMs: number, toMs: number, bookmaker: string): Promise<OfferFixture[]> {
     const blocks = offerBlocks(fromMs, toMs).map((block) => ({
@@ -159,12 +162,17 @@ export class OddsPapiClient {
       if (this.lastCall > 0 && wait > 0) await sleep(wait);
       this.lastCall = Date.now();
       this.requestCount += 1;
+      // Ein leerer Block kommt als HTTP 404 FIXTURE_NOT_FOUND (gemessen 11.11.2026) und zählt trotzdem als Aufruf:
+      // eine leere Liste, gespeichert wie jede andere - kein Rückfall auf die Näherung.
       const body = await this.getJson<RawOddsPapiFixture[] | { data?: RawOddsPapiFixture[] }>("/v4/fixtures", {
         sportId: "10",
         from: isoSeconds(block.from),
         to: isoSeconds(block.to),
         hasOdds: "true",
         bookmakers: bookmaker
+      }).catch((error: Error & { status?: number; code?: string }) => {
+        if (error.status === 404 && error.code === "FIXTURE_NOT_FOUND") return [] as RawOddsPapiFixture[];
+        throw error;
       });
       const list = Array.isArray(body) ? body : body.data ?? [];
       await this.cache.set(block.key, list);
@@ -174,7 +182,7 @@ export class OddsPapiClient {
     const fixtures: OfferFixture[] = [];
     for (const item of lists.flat()) {
       const kickoff = Date.parse(item.startTime);
-      if (seen.has(item.fixtureId) || !Number.isFinite(kickoff) || kickoff < fromMs || kickoff > toMs) continue;
+      if (seen.has(item.fixtureId) || !Number.isFinite(kickoff)) continue;
       seen.add(item.fixtureId);
       fixtures.push({
         id: item.fixtureId,

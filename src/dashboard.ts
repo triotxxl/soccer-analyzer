@@ -34,7 +34,7 @@ export interface DashboardInput {
    * über die Tipico-Ligen da.
    */
   offeredByFixture?: Map<number, string[]>;
-  offer?: { source: "oddspapi" | "tipico-ligen"; bookmakers: string[] };
+  offer?: { source: "oddspapi" | "tipico-ligen"; bookmakers: string[]; unknown?: Array<{ home: string; away: string; kickoff: string; tournament: string; sites: string[] }> };
   /**
    * Tipico-Namen je Fixture-ID, über dieselbe Zuordnung wie `oddsByFixture`. Nur Anzeige:
    * Die App zeigt sie ab Werk statt der Namen von API-Football (Einstellungen, seit 11.10.2026).
@@ -309,8 +309,9 @@ export interface DashboardDocument {
     /**
      * Ab schemaVersion 16: woher die Angebotsliste stammt. "oddspapi" = je Seite geprüft
      * (`fixture.offeredBy`), "tipico-ligen" = Näherung, ohne Auskunft je Spiel. Fehlt beim Tipico-Weg.
+     * `unknown` (seit 10.11.2026): angebotene Spiele, die API-Football nicht kennt - nur versteckt gezeigt.
      */
-    offer?: { source: "oddspapi" | "tipico-ligen"; bookmakers: string[] };
+    offer?: { source: "oddspapi" | "tipico-ligen"; bookmakers: string[]; unknown?: Array<{ home: string; away: string; kickoff: string; tournament: string; sites: string[] }> };
     /** Quelle "api": "API-Football"; sonst der Pfad der data.json. */
     sourceFile: string;
     /** Quelle "api": Spiele, die der Anbieter führte, und davon im Umfang (statt Tipico-Ereignissen). */

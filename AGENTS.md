@@ -84,6 +84,16 @@ Spiele; geprüft wurden alle deutschen Anbieter, nur Betano (32) und Bet365 (8) 
    `apps/shared/src/quoteSource.ts`), Value, Kombi-Tipps, Kelly und Quickpick-Filter mit Quotenband greifen dort
    nicht. Bet365 hätte am 10.11. nur 5 von 16 solcher Spiele gedeckt. Am 10.11.2026 (heute bis Freitag): 31
    Spiele ohne Quote dazu.
+   **Angeboten, aber API-Football unbekannt** (seit 11.11.2026, Davids Wunsch: „nicht auflisten, aber gern versteckt“):
+   Angebotsspiele im Umfang ohne Gegenstück bei API-Football (auch nicht beendet, verlegt oder ±2 Tage daneben,
+   `offerKnown`) werden nicht analysiert, stehen aber in `meta.offer.unknown` (Teams, Anstoß, Wettbewerb, Seiten).
+   Die alte App zeigt sie zugeklappt unter der Karte „Angebot“ im Filtermenü („n Spiele, die die Daten-API nicht
+   kennt“, nur bis 2 Stunden nach Anstoß); Neo nicht. Am 11.11.2026 (next48) 4: Venezuela Segunda División, El
+   Salvador Liga de Ascenso, Ägypten 2. Division A, Mexiko Liga de Expansión. Die Analyse zählt sie in der Zeile
+   „Angebot (OddsPapi)“. OddsPapi führt Jugend-Nationalteams ohne Altersangabe („Iceland“ in der U21-EM-Qualifikation)
+   - die Angabe kommt wie bei Frauen aus dem Wettbewerb (`offerSide`); Städte englisch („Sparta Prague“) über
+   `CITY_NAMES`. Ein leerer Block kommt bei OddsPapi als HTTP 404 `FIXTURE_NOT_FOUND` und zählt trotzdem als
+   Aufruf: Er gilt als leere Liste (gespeichert), Blöcke vor dem frühesten zählenden Anstoß werden nicht gefragt.
 2. **Umfang gemessen (Phase 0, 08./09.11.2026):** Betano führte am Sonntag 08.11. 762 Spiele in 243
    Ligen (77 Seiten), davon 482 in Ligen, die Tipico zuletzt geführt hatte; vom letzten Tipico-Lauf
    deckt Betano 290 von 299 Spielen ab. Quoten gibt es nur etwa 4-5 Tage im Voraus, `twentyone`
@@ -108,9 +118,17 @@ Spiele; geprüft wurden alle deutschen Anbieter, nur Betano (32) und Bet365 (8) 
    die Analyse ab und schreibt nichts - das letzte Dashboard bleibt (vorher schrieb ein leerer Import
    ein leeres Dashboard). Die Zählerzeile am Ende: `Quoten: Betano n Spiele · m Wettbewerbe · x Aufrufe ·
    a ohne Ansetzung · b laut API nicht spielbar · c Anstoß vorbei, Status noch NS`.
-5. **Grenze:** Platzhaltertermine von API-Football (siehe „Pflege“) lassen sich auf diesem Weg nicht
-   mehr über die Tipico-Anstoßzeit korrigieren; die Zählerzeile weist sie als „Anstoß vorbei, Status
-   noch NS“ aus.
+5. **Platzhaltertermine: Anstoß vom Anbieter** (seit 11.11.2026, Davids Entscheidung). Ordnet die Angebotsliste ein
+   Spiel nur über einen verschobenen Termin zu (mehr als 3 Stunden daneben, beide Teams sicher, bis ±4 Tage), gilt
+   der Anstoß von Betano bzw. Tipico für Umfang und Analyse (`kickoffs` in `offerSelection`,
+   `AnalysisInput.kickoffOverrides`, angewandt in `requestedFixtureScope`); fällt das Spiel damit aus dem Umfang,
+   wird es nicht analysiert. Für nicht zugeordnete Angebotsspiele lädt der Filter die Tageslisten ±2 Tage daneben
+   (`PLACEHOLDER_DAYS`, ein Aufruf je Tag, Cache) und sucht das Spiel dort (`findShiftedFixture`: beide Teams
+   sicher, sonst eines sicher und eines mit gemeinsamem Wort, eindeutig); die Analyse lädt den Tag mit
+   (`AnalysisInput.placeholderDates`). Am 11.11.2026 (next48) 5 Spiele: Ponte Preta – Operário und São Bernardo –
+   Athletic Club (API 14.11., Betano 12.11.), Irland U19 – Griechenland U19, Benfica W – Austria Wien W, Torreense W –
+   Sparta Praha W; 7 fielen mit dem echten Termin aus dem Umfang. Die Zählerzeile nennt „mit Anstoß vom Anbieter“;
+   ohne Angebotsliste weist sie Platzhalter weiter als „Anstoß vorbei, Status noch NS“ aus.
 6. **Snapshot `schemaVersion: 15`** (16 seit 10.11.2026: `offeredBy` je Spiel, `meta.offer`; die Apps lesen
    1 bis `LATEST_SCHEMA_VERSION` in `apps/shared/src/data.ts` - **wer die Fassung hebt, hebt dort mit**, sonst
    zeigen beide Apps nichts; `apps/shared/src/schemaVersion.test.ts` prüft das)**:** `meta.oddsSource` (`api`/`tipico`, fehlt = Tipico), je Spiel

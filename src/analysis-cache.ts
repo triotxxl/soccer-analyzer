@@ -39,6 +39,7 @@ function canonicalInput(input: AnalysisInput): object {
       ),
     // Nur wenn gesetzt, damit die Schlüssel bisheriger Aufrufe gleich bleiben.
     ...(input.fixtureIds ? { fixtureIds: [...input.fixtureIds].sort((left, right) => left - right) } : {}),
+    ...(input.kickoffOverrides ? { kickoffOverrides: Object.entries(input.kickoffOverrides).sort(([left], [right]) => left.localeCompare(right)) } : {}),
     tipicoOdds: [...(input.tipicoOdds ?? [])]
       .map((item) => ({ ...item }))
       .sort((left, right) =>

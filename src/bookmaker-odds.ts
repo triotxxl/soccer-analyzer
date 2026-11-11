@@ -114,6 +114,10 @@ export interface ApiOddsImportResult {
   outsideOffer: Map<string, number>;
   /** Spiele aus der Angebotsliste, für die API-Football keine Quote führt (ohne Quote analysiert). */
   withoutOdds: number;
+  /** Mit dem Anstoß des Anbieters analysiert (Platzhaltertermin bei API-Football). */
+  rescheduled: number;
+  /** Mit dem echten Anstoß außerhalb des Umfangs - nicht analysiert. */
+  movedOut: number;
 }
 
 interface Candidate {
@@ -245,13 +249,19 @@ export async function importApiOdds(
      * Angebot eines deutschen Anbieters je Spiel (seit 10.11.2026, `offerSelection` in
      * src/offer-filter.ts). Bekommt die gewählten Spiele und gibt zurück, welche bleiben.
      */
-    offerFilter?: (events: ApiOddsEvent[], context: { days: string[] }) => Promise<(event: ApiOddsEvent) => boolean>;
+    offerFilter?: (events: ApiOddsEvent[], context: { days: string[]; inScope: (kickoff: number) => boolean; earliest: number }) => Promise<(event: ApiOddsEvent) => boolean>;
     /**
      * Nach `offerFilter`: Spiele, die eine Seite anbietet, für die API-Football aber keine Quote führt
      * (Davids Wunsch vom 10.11.2026: J.League Cup, Copa del Rey, CONCACAF Nations League …). Sie werden
      * ohne Quote analysiert; das Modell braucht keine.
      */
     offerExtras?: () => ApiOddsEvent[];
+    /**
+     * Nach `offerFilter`: der Anstoß des Anbieters für Spiele auf einem Platzhaltertermin bei API-Football
+     * (seit 10.11.2026, Davids Entscheidung). Er gilt für Umfang und Analyse; fällt das Spiel damit aus dem
+     * Umfang, wird es nicht analysiert.
+     */
+    offerKickoffs?: () => Map<number, number>;
   } = {}
 ): Promise<ApiOddsImportResult> {
   const timezone = options.timezone ?? config.timezone;
@@ -278,7 +288,11 @@ export async function importApiOdds(
   const { listed, outsideOffer } = selected;
   let events = selected.events;
   if (options.offerFilter) {
-    const allow = await options.offerFilter(events, { days: datesForRange(dates, timezone, now) });
+    const allow = await options.offerFilter(events, {
+      days: datesForRange(dates, timezone, now),
+      inScope: (kickoff) => kickoffInScope(kickoff, dates, now, timezone),
+      earliest: now.getTime() - config.liveCandidateTrailMs
+    });
     events = events.filter((event) => {
       if (allow(event)) return true;
       const key = `${event.country} | ${event.league} (${event.leagueId})`;
@@ -287,9 +301,31 @@ export async function importApiOdds(
     });
   }
   const known = new Set(events.map((event) => event.fixtureId));
+  // Platzhaltertermine: Anstoß vom Anbieter; wer damit aus dem Umfang fällt, wird nicht analysiert.
+  const corrected = options.offerKickoffs?.() ?? new Map<number, number>();
+  const kickoffOf = (event: ApiOddsEvent) => corrected.get(event.fixtureId) ?? Date.parse(event.kickoff);
+  // Spiele ohne Quote: am Anstoß des Anbieters gemessen - API-Football kann sie außerhalb des Umfangs führen.
   const extras = (options.offerExtras?.() ?? [])
-    .filter((event) => !known.has(event.fixtureId) && kickoffInScope(Date.parse(event.kickoff), dates, now, timezone));
+    .filter((event) => !known.has(event.fixtureId) && kickoffInScope(kickoffOf(event), dates, now, timezone));
+  let movedOut = 0;
+  const kickoffOverrides: Record<string, string> = {};
+  const scopeDays = new Set(datesForRange(dates, timezone, now));
+  const placeholderDates = new Set<string>();
   events = [...events, ...extras]
+    .filter((event) => {
+      if (!corrected.has(event.fixtureId)) return true;
+      if (kickoffInScope(kickoffOf(event), dates, now, timezone)) return true;
+      movedOut += 1;
+      return false;
+    })
+    .map((event) => {
+      if (!corrected.has(event.fixtureId)) return event;
+      const day = zonedDate(new Date(event.kickoff), timezone);
+      if (!scopeDays.has(day)) placeholderDates.add(day);
+      const kickoff = new Date(kickoffOf(event)).toISOString();
+      kickoffOverrides[event.fixtureId] = kickoff;
+      return { ...event, kickoff };
+    })
     .sort((left, right) => Date.parse(left.kickoff) - Date.parse(right.kickoff) || left.fixtureId - right.fixtureId);
   const selections = new Map<number, LeagueSelection>();
   for (const event of events) {
@@ -304,7 +340,9 @@ export async function importApiOdds(
       selections: [...selections.values()],
       markets: ["1x2", "draw", "btts", "over25"],
       dates,
-      fixtureIds: events.map((event) => event.fixtureId)
+      fixtureIds: events.map((event) => event.fixtureId),
+      ...(Object.keys(kickoffOverrides).length ? { kickoffOverrides } : {}),
+      ...(placeholderDates.size ? { placeholderDates: [...placeholderDates].sort() } : {})
     },
     events,
     byBookmaker,
@@ -312,6 +350,8 @@ export async function importApiOdds(
     apiRequests: client.requestCount - before,
     failedBookmakers,
     outsideOffer,
-    withoutOdds: extras.length
+    withoutOdds: extras.length,
+    rescheduled: Object.keys(kickoffOverrides).length,
+    movedOut
   };
 }

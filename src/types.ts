@@ -25,6 +25,16 @@ export interface AnalysisInput {
    * Ist das Feld gesetzt, gilt nur diese Liste - ein leeres Feld heißt "kein Spiel", nicht "alle".
    */
   fixtureIds?: number[];
+  /**
+   * Fixture-ID → Anstoß (ISO) des Anbieters, wo API-Football einen Platzhaltertermin führt (seit 10.11.2026, aus
+   * der Angebotsliste). `requestedFixtureScope` setzt ihn ein; Liga, Teams, Status und Ergebnis bleiben von der API.
+   */
+  kickoffOverrides?: Record<string, string>;
+  /**
+   * Tage (Europe/Berlin), an denen API-Football Spiele mit `kickoffOverrides` führt, wenn sie außerhalb des Umfangs
+   * liegen - die Analyse lädt deren Tagesliste mit (seit 11.11.2026).
+   */
+  placeholderDates?: string[];
 }
 
 /** Quoten der Märkte eines Spiels, gleich von welchem Anbieter. */

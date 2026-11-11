@@ -10,12 +10,19 @@ import type { ApiFootballClient } from "./api.ts";
 import { germanOfferFilter, type ApiOddsEvent, type OfferLeagueCorrections } from "./bookmaker-odds.ts";
 import { config } from "./config.ts";
 import { OddsPapiClient, type OddsPapiQuota } from "./oddspapi.ts";
-import { decideOffer, type AfFixture, type OfferFixture } from "./offer-matching.ts";
+import { decideOffer, findShiftedFixture, offerKnown, type AfFixture, type OfferFixture } from "./offer-matching.ts";
 import type { ApiFixture } from "./types.ts";
 import { isAnalyzableStatus, zonedDate } from "./util.ts";
 
 /** Spielraum um den frühesten und spätesten Anstoß, damit der Abgleich ±3 Stunden findet. */
 const MARGIN_MS = 3 * 60 * 60 * 1000;
+const DAY_MS = 24 * 60 * 60 * 1000;
+/**
+ * Wie weit neben einem nicht zugeordneten Angebotsspiel die Tageslisten von API-Football nachgeladen werden, um einen
+ * Platzhaltertermin außerhalb des Zeitraums zu finden (ein Aufruf je Tag, 6 Stunden im Cache). Die Zuordnung selbst
+ * erlaubt ±4 Tage; gesehen wurde bisher ein Tag (Serie B am 11.11.2026, Olympiakos – Panathinaikos am 05.10.2026).
+ */
+const PLACEHOLDER_DAYS = 2;
 
 export interface OfferReport {
   /** `oddspapi`: echte Angebotsliste; `tipico-ligen`: Näherung, `note` sagt warum. */
@@ -28,13 +35,38 @@ export interface OfferReport {
   /** Dazu: angeboten, aber bei API-Football ohne Quote (seit 10.11.2026 ohne Quote analysiert). */
   withoutOdds: number;
   dropped: number;
+  /** Angeboten, aber API-Football kennt das Spiel gar nicht (nur gezählt, die Liste steht versteckt im Snapshot). */
+  unknown: number;
+  /** Bei API-Football auf einem Platzhaltertermin; der Anstoß kommt von Betano bzw. Tipico. */
+  rescheduled: number;
   oddsPapiRequests: number;
   quota: OddsPapiQuota | null;
   note?: string;
 }
 
+/** Ein angebotenes Spiel, das API-Football nicht kennt (seit 10.11.2026, Davids Wunsch: „versteckt auflisten“). */
+export interface UnknownOffer {
+  home: string;
+  away: string;
+  kickoff: string;
+  tournament: string;
+  sites: string[];
+}
+
+export interface OfferContext {
+  days: string[];
+  /** Liegt ein Anstoß im Umfang der Analyse? Für die Liste der unbekannten Spiele. */
+  inScope?: (kickoff: number) => boolean;
+  /**
+   * Früheste Anstoßzeit, die noch zählt (laufende Spiele, 200 Minuten). Davor fragt der Filter keinen Block ab:
+   * Kurz nach Mitternacht lag der Tagesbeginn im Block des Vortags, der ohne Quoten leer ist und trotzdem einen
+   * Aufruf kostet (11.11.2026).
+   */
+  earliest?: number;
+}
+
 export interface OfferSelection {
-  filter: (events: ApiOddsEvent[], context?: { days: string[] }) => Promise<(event: ApiOddsEvent) => boolean>;
+  filter: (events: ApiOddsEvent[], context?: OfferContext) => Promise<(event: ApiOddsEvent) => boolean>;
   /** Nach `filter`: angebotene Spiele ohne Quote bei API-Football, als Ereignis ohne Quoten (`odds: {}`). */
   extras: () => ApiOddsEvent[];
   /** Nach `filter` gefüllt. */
@@ -44,6 +76,14 @@ export interface OfferSelection {
    * seit 10.11.2026). `null` bei der Näherung über die Tipico-Ligen - dann weiß niemand, wo.
    */
   offeredBy: () => Map<number, string[]> | null;
+  /**
+   * Nach `filter`: Fixture-ID → Anstoß von Betano bzw. Tipico, wo API-Football das Spiel auf einem Platzhaltertermin
+   * führt (zugeordnet nur über einen verschobenen Termin, mehr als 3 Stunden daneben). Der Buchmacher bietet auf den
+   * echten Termin an - wie früher beim Tipico-Weg (`requestedFixtureScope`).
+   */
+  kickoffs: () => Map<number, number>;
+  /** Nach `filter`: angebotene Spiele, die API-Football gar nicht kennt. */
+  unknown: () => UnknownOffer[];
 }
 
 export function offerSelection(options: {
@@ -62,16 +102,20 @@ export function offerSelection(options: {
   let report: OfferReport | null = null;
   let offeredBy: Map<number, string[]> | null = null;
   let extras: ApiOddsEvent[] = [];
+  let kickoffs = new Map<number, number>();
+  let unknown: UnknownOffer[] = [];
 
   const fallback = (note: string, requests = 0): ((event: ApiOddsEvent) => boolean) => {
     const allowLeague = germanOfferFilter(options.tipicoLeagueIds(), options.corrections);
-    report = { source: "tipico-ligen", bookmakers, perBookmaker: [], offered: 0, withoutOdds: 0, dropped: 0, oddsPapiRequests: requests, quota: null, note };
+    report = { source: "tipico-ligen", bookmakers, perBookmaker: [], offered: 0, withoutOdds: 0, dropped: 0, unknown: 0, rescheduled: 0, oddsPapiRequests: requests, quota: null, note };
     offeredBy = null;
     return (event) => allowLeague(event.leagueId);
   };
 
-  const filter = async (events: ApiOddsEvent[], context?: { days: string[] }): Promise<(event: ApiOddsEvent) => boolean> => {
+  const filter = async (events: ApiOddsEvent[], context?: OfferContext): Promise<(event: ApiOddsEvent) => boolean> => {
     extras = [];
+    kickoffs = new Map();
+    unknown = [];
     let oddsPapi: OddsPapiClient | null;
     try {
       oddsPapi = options.oddsPapi === undefined ? new OddsPapiClient() : options.oddsPapi;
@@ -81,7 +125,7 @@ export function offerSelection(options: {
     if (!oddsPapi) return fallback("OddsPapi abgeschaltet");
     const days = [...new Set([...events.map((event) => zonedDate(new Date(event.kickoff), timezone)), ...(context?.days ?? [])])].sort();
     if (days.length === 0) {
-      report = { source: "oddspapi", bookmakers, perBookmaker: [], offered: 0, withoutOdds: 0, dropped: 0, oddsPapiRequests: 0, quota: null };
+      report = { source: "oddspapi", bookmakers, perBookmaker: [], offered: 0, withoutOdds: 0, dropped: 0, unknown: 0, rescheduled: 0, oddsPapiRequests: 0, quota: null };
       offeredBy = new Map();
       return () => true;
     }
@@ -107,7 +151,10 @@ export function offerSelection(options: {
       // (Mitternacht Berlin = 22:00 oder 23:00 UTC; mit 22:00 und 22:59 UTC bleibt es in denselben Zwei-Tage-
       // Blöcken - ein Spielraum über Mitternacht UTC hinaus kostete je Seite einen Block mehr).
       const eventKickoffs = withOdds.map((fixture) => fixture.kickoff);
-      const from = Math.min(...eventKickoffs.map((kickoff) => kickoff - MARGIN_MS), Date.parse(`${days[0]}T00:00:00Z`) - 2 * 60 * 60 * 1000);
+      const from = Math.max(
+        Math.min(...eventKickoffs.map((kickoff) => kickoff - MARGIN_MS), Date.parse(`${days[0]}T00:00:00Z`) - 2 * 60 * 60 * 1000),
+        (context?.earliest ?? Number.NEGATIVE_INFINITY) - MARGIN_MS
+      );
       const to = Math.max(...eventKickoffs.map((kickoff) => kickoff + MARGIN_MS), Date.parse(`${days.at(-1)}T22:59:59Z`));
       // Je Seite eine eigene Liste: Die Antwort von OddsPapi sagt nicht, welche Seite ein Spiel führt.
       const offersBy: Array<[string, OfferFixture[]]> = [];
@@ -124,9 +171,17 @@ export function offerSelection(options: {
       const sites = new Map<number, string[]>();
       const extraSites = new Map<number, string[]>();
       const perBookmaker: OfferReport["perBookmaker"] = [];
+      const matchedOffers = new Set<string>();
+      const afKickoff = new Map([...withOdds, ...candidateFixtures].map((fixture) => [fixture.fixtureId, fixture.kickoff]));
       for (const [bookmaker, offers] of offersBy) {
         // Gemeinsam abgleichen: Ein Angebotsspiel gehört höchstens zu einem Fixture, mit oder ohne Quote.
         const decision = decideOffer([...withOdds, ...candidateFixtures], offers, { include, exclude });
+        for (const [fixtureId, match] of decision.matched) {
+          matchedOffers.add(match.offer.id);
+          // Platzhaltertermin: nur über den verschobenen Termin zugeordnet - der Anstoß des Anbieters gilt.
+          const gap = Math.abs(match.offer.kickoff - (afKickoff.get(fixtureId) ?? match.offer.kickoff));
+          if (gap > MARGIN_MS && !kickoffs.has(fixtureId)) kickoffs.set(fixtureId, match.offer.kickoff);
+        }
         // Spiele ohne Eintrag in der Tagesliste (kein Teamname): nur über Liga oder Korrekturliste.
         const offeredHere = (event: ApiOddsEvent): boolean => daily.has(event.fixtureId)
           ? decision.allowed.has(event.fixtureId)
@@ -143,6 +198,53 @@ export function offerSelection(options: {
         }
         perBookmaker.push({ bookmaker, offered, direct: [...decision.matched.keys()].filter((id) => eventIds.has(id)).length });
       }
+      // Angeboten, aber im Zeitraum keinem Spiel zugeordnet. Geprüft gegen die ganze Tagesliste, auch beendete
+      // Spiele, damit nichts als unbekannt gilt, was API-Football nur anders führt.
+      const allDaily = [...daily.values()].map(asAf);
+      const inScope = context?.inScope ?? (() => true);
+      const pending = new Map<string, { offer: OfferFixture; sites: string[] }>();
+      for (const [bookmaker, offers] of offersBy) {
+        for (const offer of offers) {
+          if (matchedOffers.has(offer.id) || !inScope(offer.kickoff)) continue;
+          const seen = pending.get(offer.id);
+          if (seen) { seen.sites.push(bookmaker); continue; }
+          if (offerKnown(offer, allDaily)) { matchedOffers.add(offer.id); continue; }
+          pending.set(offer.id, { offer, sites: [bookmaker] });
+        }
+      }
+      // Platzhaltertermin außerhalb des Zeitraums (seit 11.11.2026, Davids Entscheidung „Anstoß vom Anbieter“): die
+      // Tageslisten daneben nachladen. Ein Treffer wird wie ein Spiel ohne Quote analysiert, mit dem Anstoß des Anbieters.
+      const loaded = new Set(days);
+      const nearDays = new Set<string>();
+      for (const { offer } of pending.values()) {
+        for (let shift = -PLACEHOLDER_DAYS; shift <= PLACEHOLDER_DAYS; shift += 1) {
+          const day = zonedDate(new Date(offer.kickoff + shift * DAY_MS), timezone);
+          if (!loaded.has(day)) nearDays.add(day);
+        }
+      }
+      const nearby: ApiFixture[] = [];
+      for (const day of [...nearDays].sort()) nearby.push(...await options.client.getFixturesForDate(day, timezone));
+      const nearbyAf = nearby.filter((fixture) => !daily.has(fixture.fixture.id)).map(asAf);
+      const placeable = nearbyAf.filter((fixture) => !exclude.has(fixture.leagueId)
+        && isAnalyzableStatus(nearby.find((item) => item.fixture.id === fixture.fixtureId)!.fixture.status.short));
+      // Angeboten, aber API-Football kennt das Spiel nicht (El Salvador Liga de Ascenso am 10.11.2026): nicht
+      // analysierbar - ohne Ansetzung gibt es weder Teams noch Historie.
+      const byOffer: UnknownOffer[] = [];
+      for (const { offer, sites: offerSites } of pending.values()) {
+        const shifted = findShiftedFixture(offer, placeable);
+        if (shifted && !extraSites.has(shifted.fixtureId)) {
+          daily.set(shifted.fixtureId, nearby.find((item) => item.fixture.id === shifted.fixtureId)!);
+          extraSites.set(shifted.fixtureId, offerSites);
+          kickoffs.set(shifted.fixtureId, offer.kickoff);
+          continue;
+        }
+        if (offerKnown(offer, nearbyAf)) continue;
+        byOffer.push({
+          home: offer.home, away: offer.away, kickoff: new Date(offer.kickoff).toISOString(),
+          tournament: offer.tournament, sites: offerSites
+        });
+      }
+      unknown = byOffer.sort((left, right) => left.kickoff.localeCompare(right.kickoff));
       extras = [...extraSites.keys()].map((fixtureId): ApiOddsEvent => {
         const fixture = daily.get(fixtureId)!;
         return {
@@ -151,6 +253,8 @@ export function offerSelection(options: {
           bookmakerId: 0, bookmaker: "", updatedAt: null, odds: {}
         };
       });
+      // Gezählt wird, was im Zeitraum liegt - am Anstoß des Anbieters, wo er gilt.
+      const kickoffOf = (event: ApiOddsEvent) => kickoffs.get(event.fixtureId) ?? Date.parse(event.kickoff);
       // Mitgezählt statt neu gefragt; nur wenn alles aus dem Cache kam, einmal nachsehen.
       const quota = oddsPapi.currentQuota() ?? await oddsPapi.quota().catch(() => null);
       report = {
@@ -158,8 +262,10 @@ export function offerSelection(options: {
         bookmakers,
         perBookmaker,
         offered: sites.size,
-        withoutOdds: extras.length,
+        withoutOdds: extras.filter((event) => inScope(kickoffOf(event))).length,
         dropped: events.length - sites.size,
+        unknown: unknown.length,
+        rescheduled: [...kickoffs.values()].filter(inScope).length,
         oddsPapiRequests: oddsPapi.requestCount,
         quota
       };
@@ -170,7 +276,7 @@ export function offerSelection(options: {
     }
   };
 
-  return { filter, extras: () => extras, report: () => report, offeredBy: () => offeredBy };
+  return { filter, extras: () => extras, report: () => report, offeredBy: () => offeredBy, kickoffs: () => kickoffs, unknown: () => unknown };
 }
 
 /** Eine Zeile für die Ausgabe der Analyse. */
@@ -184,5 +290,7 @@ export function offerReportLine(report: OfferReport | null): string | null {
   const each = report.perBookmaker.map((entry) => `${entry.bookmaker} ${entry.offered} (${entry.direct} zugeordnet)`).join(", ");
   return `Angebot (OddsPapi): ${each} · zusammen ${report.offered}, ${report.dropped} bei keiner Seite`
     + (report.withoutOdds ? ` · dazu ${report.withoutOdds} angeboten ohne Quote bei API-Football` : "")
+    + (report.rescheduled ? ` · ${report.rescheduled} mit Anstoß vom Anbieter (Platzhaltertermin bei API-Football)` : "")
+    + (report.unknown ? ` · ${report.unknown} angeboten, aber API-Football unbekannt` : "")
     + ` · ${report.oddsPapiRequests} OddsPapi-Aufrufe${quota}`;
 }
