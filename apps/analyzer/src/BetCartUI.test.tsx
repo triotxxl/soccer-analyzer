@@ -67,12 +67,18 @@ describe("BetSlipWindow", () => {
     expect(screen.queryByRole("spinbutton")).not.toBeInTheDocument();
   });
 
-  it("zählt angepfiffene Tipps und Tipps ohne Quote nicht als mischbar", () => {
+  it("zählt angepfiffene Tipps nicht als mischbar, Tipps ohne Quote schon (Davids 4er vom 10.11.2026)", () => {
     slip([tip(1), tip(2), tip(3, "2026-08-16T11:00:00.000Z"), tip(4, undefined, null)], { counts: { 2: 1 }, mode: "einmalig" });
     expect(screen.getByText("1 angepfiffen – kommt in keine Kombi")).toBeInTheDocument();
-    expect(screen.getByText("ohne Quote – kommt in keine Kombi")).toBeInTheDocument();
-    expect(screen.getByText("1 Kombi · 2 Plätze · 2 Tipps aus 2 Spielen mischbar")).toBeInTheDocument();
+    expect(screen.getByText("ohne Quote – Preis bei Betano prüfen")).toBeInTheDocument();
+    expect(screen.getByText("1 Kombi · 2 Plätze · 3 Tipps aus 3 Spielen mischbar")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Kombis? mischen/ })).toBeEnabled();
+  });
+
+  it("zeigt bei einer Kombi mit Tipp ohne Quote „Quote offen“", () => {
+    const entries = [tip(1), tip(4, undefined, null)];
+    slip(entries, undefined, [{ id: "x", entries, combinedOdds: null, transferred: false }]);
+    expect(within(screen.getByRole("region", { name: "Kombi 1" })).getByText("Quote offen")).toBeInTheDocument();
   });
 
   /** Davids Wunsch vom 14.10.2026: Kombis per Knopf in die Zwischenablage. */
@@ -81,7 +87,8 @@ describe("BetSlipWindow", () => {
     const ready = combo("a", [tip(1), tip(2, "2026-08-16T19:30:00.000Z", 2)]);
     const running = combo("b", [tip(3, "2026-08-16T11:00:00.000Z"), tip(4)]);
 
-    it("kopiert eine Kombi mit Datum, Spiel, Tipp, Quote und der Warnung, ohne sie als übertragen zu markieren", async () => {
+    // Davids Wunsch vom 10.11.2026: ohne Formatierung, Spiele und Tipps mit Komma - zum Einfügen bei der KI von Betano.
+    it("kopiert eine Kombi als reinen Auftrag für die KI bei Betano, ohne sie als übertragen zu markieren", async () => {
       const user = userEvent.setup();
       const onCombosChange = vi.fn();
       render(<BetSlipWindow cart={[tip(1), tip(2)]} now={NOW} timezone="Europe/Berlin" lastChange={null}
@@ -90,22 +97,14 @@ describe("BetSlipWindow", () => {
         onCombosChange={onCombosChange} onClose={vi.fn()} />);
       const region = screen.getByRole("region", { name: "Kombi 1" });
       await user.click(within(region).getByRole("button", { name: "Kombi 1 kopieren" }));
-      expect(await navigator.clipboard.readText()).toBe([
-        "## Kombi 1 · 2 Spiele · Quote 3,60",
-        "",
-        "| Anstoß | Spiel | Tipp | Quote |",
-        "|---|---|---|--:|",
-        "| So 16.08. 20:00 | Heim 1 – Gast 1 | Heimsieg Heim 1 | 1,80 |",
-        "| So 16.08. 21:30 | Heim 2 – Gast 2 | Heimsieg Heim 2 | 2,00 |",
-        "",
-        `> ${COMBO_WARNING}`
-      ].join("\n"));
+      expect(await navigator.clipboard.readText())
+        .toBe("Erstelle mir folgende Kombiwette: Heim 1 - Gast 1: Sieg Heim 1, Heim 2 - Gast 2: Sieg Heim 2");
       expect(within(region).getByRole("button", { name: "Kombi 1 kopieren" })).toHaveTextContent("Kopiert");
       expect(screen.getByText("Kombi 1 kopiert (2 Tipps)")).toBeInTheDocument();
       expect(onCombosChange).not.toHaveBeenCalled();
     });
 
-    it("schreibt die Kopie zusätzlich in die Markdown-Datei und nennt sie", async () => {
+    it("schreibt die Kombi zusätzlich als Tabelle mit Quoten und Warnung in die Markdown-Datei und nennt sie", async () => {
       const user = userEvent.setup();
       const save = vi.fn().mockResolvedValue(new Response(JSON.stringify({ file: "data/tmp/kombis.md" }), { status: 200 }));
       vi.stubGlobal("fetch", save);
@@ -113,7 +112,16 @@ describe("BetSlipWindow", () => {
         slip([tip(1), tip(2)], undefined, [ready]);
         await user.click(screen.getByRole("button", { name: "Kombi 1 kopieren" }));
         expect(save).toHaveBeenCalledWith("/api/combos/markdown", expect.objectContaining({
-          method: "POST", body: await navigator.clipboard.readText()
+          method: "POST", body: [
+            "## Kombi 1 · 2 Spiele · Quote 3,60",
+            "",
+            "| Anstoß | Spiel | Tipp | Quote |",
+            "|---|---|---|--:|",
+            "| So 16.08. 20:00 | Heim 1 – Gast 1 | Heimsieg Heim 1 | 1,80 |",
+            "| So 16.08. 21:30 | Heim 2 – Gast 2 | Heimsieg Heim 2 | 2,00 |",
+            "",
+            `> ${COMBO_WARNING}`
+          ].join("\n")
         }));
         expect(await screen.findByText("Kombi 1 kopiert (2 Tipps) · auch in data/tmp/kombis.md")).toBeInTheDocument();
       } finally {
@@ -127,8 +135,8 @@ describe("BetSlipWindow", () => {
       expect(within(screen.getByRole("region", { name: "Kombi 2" })).getByRole("button", { name: "Kombi 2 kopieren" })).toBeDisabled();
       await user.click(screen.getByRole("button", { name: "Alle Kombis kopieren" }));
       const text = await navigator.clipboard.readText();
-      expect(text).toMatch(/^## Kombi 1 · /);
-      expect(text).not.toContain("Kombi 2");
+      expect(text).toBe("Erstelle mir folgende Kombiwette: Heim 1 - Gast 1: Sieg Heim 1, Heim 2 - Gast 2: Sieg Heim 2");
+      expect(text).not.toContain("Heim 3");
       expect(screen.getByText("1 Kombi kopiert · 1 mit angepfiffenem Spiel ausgelassen")).toBeInTheDocument();
     });
 
@@ -155,7 +163,7 @@ describe("BetSlipWindow", () => {
       expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
       await user.click(screen.getByRole("button", { name: "Kombi 1 kopieren" }));
       const field = screen.getByRole("textbox", { name: "Text zum Kopieren: Kombi 1" });
-      expect((field as HTMLTextAreaElement).value).toContain("Heim 1 – Gast 1 | Heimsieg Heim 1 | 1,80");
+      expect((field as HTMLTextAreaElement).value).toBe("Erstelle mir folgende Kombiwette: Heim 1 - Gast 1: Sieg Heim 1, Heim 2 - Gast 2: Sieg Heim 2");
       expect(field).toHaveFocus();
       expect(screen.getByText("Kopieren ging nicht. Der Text ist markiert – kopiere ihn mit Strg+C.")).toBeInTheDocument();
       await user.click(screen.getByRole("button", { name: "Textfeld schließen" }));

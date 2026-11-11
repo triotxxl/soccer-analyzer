@@ -19,17 +19,10 @@ import { HeatmapTable, type HeatmapSort } from "./HeatmapTable";
 import { useLiveBoard } from "../../shared/src/liveData";
 import { LiveView } from "./LiveView";
 import {
-  effectiveLiveSort,
   LIVE_PHASE_LABELS,
-  LIVE_QUESTION_GROUPS,
-  liveQuestionLabel,
-  loadLiveQuestion,
-  questionHasChance,
-  saveLiveQuestion,
   visibleLiveMatches,
   type LiveChanceMin,
   type LivePhase,
-  type LiveQuestion,
   type LiveSort
 } from "./liveQuestions";
 import { edgeOf, loadKellyAuto, loadKellySettings, loadKellyVisible, saveKellyAuto, saveKellySettings, saveKellyVisible, selectKelly, type KellySettings } from "./kelly";
@@ -1501,7 +1494,6 @@ function Dashboard({ document }: { document: DashboardDocument }) {
   const [liveRatedOnly, setLiveRatedOnly] = useState(false);
   // Live hat eine eigene Frage statt des Marktes der Tabelle: „Noch ein Tor“ oder „Nächstes Tor“
   // gibt es vor dem Anpfiff nicht, und ein Wechsel in Live stellte sonst die Tabelle mit um.
-  const [liveQuestion, setLiveQuestion] = useState<LiveQuestion>(loadLiveQuestion);
   const [liveSort, setLiveSort] = useState<LiveSort>("kickoff");
   // Die Anzeige-Filter werden wie alle Filter nicht gespeichert.
   const [liveChanceMin, setLiveChanceMin] = useState<LiveChanceMin>("all");
@@ -1983,9 +1975,8 @@ function Dashboard({ document }: { document: DashboardDocument }) {
   const isLeagueVisible = (country: string, league: string) =>
     !deselectedLeagues.has(leagueKey(country, league));
   const liveMatches = (live.board?.matches ?? []).filter((match) => isLeagueVisible(match.country, match.league));
-  const liveChanceApplies = questionHasChance(liveQuestion);
   const liveVisible = visibleLiveMatches(liveMatches, {
-    question: liveQuestion, chanceMin: liveChanceMin, redOnly: liveRedOnly, phase: livePhase, sort: liveSort
+    chanceMin: liveChanceMin, redOnly: liveRedOnly, phase: livePhase, sort: liveSort, names: nameSource
   });
 
   const marketLabelOf = (key: MarketFilter) => availableMarketOptions.find((option) => option.key === key)?.label ?? key;
@@ -2010,7 +2001,7 @@ function Dashboard({ document }: { document: DashboardDocument }) {
     if (liveRatedOnly) activeFilters.push({ key: "rated", label: "Nur Spiele mit Empfehlung vor Anpfiff", clearLabel: "Wieder alle Spiele beobachten", clear: () => setLiveRatedOnly(false) });
     // Ein Chancenfilter, der bei der gewählten Frage nicht greift, blendet nichts aus und steht
     // deshalb auch nicht als Schildchen da.
-    if (liveChanceMin !== "all" && liveChanceApplies) activeFilters.push({ key: "chance", label: `Chance ab ${liveChanceMin} %`, clearLabel: "Chancenfilter aufheben", clear: () => setLiveChanceMin("all") });
+    if (liveChanceMin !== "all") activeFilters.push({ key: "chance", label: `Chance ab ${liveChanceMin} %`, clearLabel: "Chancenfilter aufheben", clear: () => setLiveChanceMin("all") });
     if (liveRedOnly) activeFilters.push({ key: "red", label: "Rote Karte im Spiel", clearLabel: "Wieder alle laufenden Spiele zeigen", clear: () => setLiveRedOnly(false) });
     if (livePhase !== "all") activeFilters.push({ key: "phase", label: LIVE_PHASE_LABELS[livePhase], clearLabel: "Phasenfilter aufheben", clear: () => setLivePhase("all") });
   } else {
@@ -2063,8 +2054,6 @@ function Dashboard({ document }: { document: DashboardDocument }) {
     liveRatedOnly,
     live: {
       chanceMin: liveChanceMin,
-      chanceApplies: liveChanceApplies,
-      questionLabel: liveQuestionLabel(liveQuestion),
       redOnly: liveRedOnly,
       phase: livePhase,
       shown: liveVisible.length
@@ -2314,30 +2303,17 @@ function Dashboard({ document }: { document: DashboardDocument }) {
     {live.board && <>{" · "}Aktualisiert: {formatDataTimestamp(live.board.createdAt, document.meta.timezone)}</>}
   </p>;
 
-  const selectLiveQuestion = (question: LiveQuestion) => {
-    setLiveQuestion(question);
-    saveLiveQuestion(question);
-  };
-  const liveQuestionControl = <label className="toolbar-field">
-    <span>Markt</span>
-    <select title="Markt" value={liveQuestion} onChange={(event) => selectLiveQuestion(event.target.value as LiveQuestion)}>
-      {LIVE_QUESTION_GROUPS.map(({ group, options }) => {
-        const items = options.map((option) => <option value={option.key} key={option.key}>{option.label}</option>);
-        return group ? <optgroup label={group} key={group}>{items}</optgroup> : <Fragment key="ungrouped">{items}</Fragment>;
-      })}
-    </select>
-  </label>;
-  // Sortierbar nur, was zu sehen ist. Vorgabe ist der Anstoß: Nach Chance springen die Zeilen
-  // bei jedem Abruf, und ein offenes Kennzahlen-Fenster säße über der falschen Zeile.
+  // Vorgabe ist der Anstoß: Nach Chance springen die Zeilen bei jedem Abruf, und ein offenes
+  // Kennzahlen-Fenster säße über der falschen Zeile. „Chance“ = der stärkste noch offene Ausgang.
   const liveSortOptions: Array<[LiveSort, string]> = [
     ["kickoff", "Anstoß"],
     ["minute", "Spielminute"],
-    ...(liveChanceApplies ? [["chance", "Chance"] as [LiveSort, string]] : []),
-    ...(liveQuestion === "cards" ? [["cards", "Karten"] as [LiveSort, string]] : [])
+    ["chance", "Chance"],
+    ["cards", "Karten"]
   ];
   const liveSortControl = <div className="toolbar-field sort-field">
     <label htmlFor="live-sort-select">Sortierung</label>
-    <select id="live-sort-select" title="Sortierung" value={effectiveLiveSort(liveSort, liveQuestion)}
+    <select id="live-sort-select" title="Sortierung" value={liveSort}
       onChange={(event) => setLiveSort(event.target.value as LiveSort)}>
       {liveSortOptions.map(([key, label]) => <option value={key} key={key}>{label}</option>)}
     </select>
@@ -2573,12 +2549,11 @@ function Dashboard({ document }: { document: DashboardDocument }) {
       })()}
       </div>
       </> : view === "profile" ? <MarketProfileView /> : <>
-      {/* Live hat eine eigene Frage statt des Marktes der Tabelle; sie steuert, was jede Zeile zeigt. */}
+      {/* Seit 10.11.2026 ohne Frage: Jede Zeile zeigt, was noch möglich ist. */}
       <div className="view-toolbar">
         <div className="toolbar-row">
           <div className="toolbar-group toolbar-filters">{filterControl}</div>
           <span className="toolbar-divider" aria-hidden />
-          {liveQuestionControl}
           {liveSortControl}
         </div>
         {filterStatusRow(liveStatus)}
@@ -2588,7 +2563,7 @@ function Dashboard({ document }: { document: DashboardDocument }) {
         matches={liveVisible}
         fixtures={fixtureById}
         runningCount={liveMatches.length}
-        question={liveQuestion}
+        chanceMin={liveChanceMin}
         onResetFilters={resetFilters}
       />
       </>}

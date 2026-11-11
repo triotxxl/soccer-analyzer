@@ -4,7 +4,7 @@ import {
 } from "react";
 import { MARKET_GROUPS, formatOdd, levelGlyph, marketGroupOf } from "./App";
 import {
-  COMBO_WARNING, canGenerate, cartEntryId, comboCopyText, fixtureCount, generateCombos, isPlayable, requestedTotal,
+  BETANO_PROMPT_LIMIT, COMBO_WARNING, canGenerate, cartEntryId, comboCopyText, comboPromptText, fixtureCount, generateCombos, isPlayable, requestedTotal,
   selectionLabel, shortTipLabel, toCounterCartEntry,
   type CartChange, type CartEntry, type Combo, type ComboFillMode, type ComboSetup, type ComboSizeConfig
 } from "./betCart";
@@ -12,6 +12,7 @@ import { FilterCard, FilterSegment, type SegmentOption } from "./FilterMenu";
 import { QUICKPICK_PRESETS } from "./quickpick";
 import { leagueName, selectionText, teamName, useNames, type NameSource } from "../../shared/src/names";
 import type { DashboardFixture, DashboardMarket } from "../../shared/src/types";
+import { withoutQuotes } from "../../shared/src/quoteSource";
 import { dateFormat } from "./dateFormat";
 
 /**
@@ -239,8 +240,10 @@ export function CartAddMenu({ fixture, cart, open, started = false, onOpen, onCl
         {markets.flatMap((market) => menuItems(fixture, market, names)).map((item) => {
           const { market, counterSide, selection } = item;
           const added = inCart(item);
-          // Ohne Quote kein Preis - hinein kommt so ein Tipp nicht, heraus darf er immer.
-          const blocked = !added && item.odds === null;
+          // Fehlt in einem Spiel mit Quoten nur dieser Markt, führt Betano ihn wohl nicht - hinein kommt so ein
+          // Tipp nicht, heraus darf er immer. Ein Spiel ganz ohne Quote (nur aus der Angebotsliste) gibt es bei
+          // Betano oder Tipico trotzdem; dessen Tipps sind frei (seit 10.11.2026).
+          const blocked = !added && item.odds === null && !withoutQuotes(fixture);
           const level = counterSide === null ? market.recommendation.level : "none";
           const text = counterSide === null
             ? `${item.label} · ${selection}, Quote ${formatOdd(item.odds)}`
@@ -522,8 +525,14 @@ export function BetSlipWindow({
   const numbered = combos.map((combo, index) => ({ combo, number: index + 1 }));
   const copyable = numbered.filter(({ combo }) => !combo.entries.some(isStarted));
   const copy = async (key: string, label: string, items: typeof numbered, done: string) => {
-    const text = comboCopyText(items, names, timezone, tipicoEventIds);
-    const saved = saveComboMarkdown(text);
+    // In die Zwischenablage der Auftrag für die KI bei Betano, in die Sammeldatei weiter die Tabelle mit Quoten.
+    const text = comboPromptText(items, names);
+    const saved = saveComboMarkdown(comboCopyText(items, names, timezone, tipicoEventIds));
+    // Auch gekürzt zu lang (sehr viele Tipps): sagen statt still abschneiden lassen.
+    const tooLong = text.split("\n\n").filter((paragraph) => [...paragraph].length > BETANO_PROMPT_LIMIT).length;
+    const message = tooLong > 0
+      ? `${done} · ${tooLong === 1 ? "eine Kombi ist" : `${tooLong} Kombis sind`} auch gekürzt länger als ${BETANO_PROMPT_LIMIT} Zeichen – für Betano teilen`
+      : done;
     try {
       if (!navigator.clipboard?.writeText) throw new Error("Keine Zwischenablage");
       await navigator.clipboard.writeText(text);
@@ -531,9 +540,9 @@ export function BetSlipWindow({
       setCopied(key);
       window.clearTimeout(copiedTimer.current);
       copiedTimer.current = window.setTimeout(() => setCopied(null), COPIED_MS);
-      setAnnouncement(done);
+      setAnnouncement(message);
       const file = await saved;
-      if (file) setAnnouncement(`${done} · auch in ${file}`);
+      if (file) setAnnouncement(`${message} · auch in ${file}`);
     } catch {
       setCopied(null);
       setCopyFallback({ key, label, text });
@@ -654,7 +663,7 @@ export function BetSlipWindow({
                       return <li key={entry.id} className={`cart-tip${isPlayable(entry, now) ? "" : " muted"}`}>
                         <span className="cart-tip-label">
                           <span>{label}</span>
-                          {!started && entry.odds === null && <small>ohne Quote – kommt in keine Kombi</small>}
+                          {!started && entry.odds === null && <small>ohne Quote – Preis bei Betano prüfen</small>}
                           {/* Herkunft nur als Anzeige: Gemischt wird über alle Filter zusammen
                               (Davids Entscheidung vom 19.10.2026). */}
                           {entry.source && QUICKPICK_PRESETS[entry.source] && <small className="cart-tip-source">
@@ -693,7 +702,7 @@ export function BetSlipWindow({
             <h4>Kombis{combos.length > 0 ? ` (${combos.length})` : ""}</h4>
             {combos.length > 0 && <button type="button" className="filter-reset cart-copy" aria-label="Alle Kombis kopieren"
               disabled={copyable.length === 0}
-              title={copyable.length < combos.length ? "Kombis mit angepfiffenem Spiel werden ausgelassen." : "Alle Kombis als Markdown in die Zwischenablage und nach data/tmp/kombis.md"}
+              title={copyable.length < combos.length ? "Kombis mit angepfiffenem Spiel werden ausgelassen." : "Alle Kombis als Auftrag für die KI bei Betano in die Zwischenablage, als Tabelle nach data/tmp/kombis.md"}
               onClick={() => void copyAll()}>
               <Copy size={13} weight="bold" aria-hidden />{copied === "all" ? "Kopiert" : "Alle kopieren"}
             </button>}
@@ -709,9 +718,11 @@ export function BetSlipWindow({
             return <section key={combo.id} className={`cart-combo${combo.transferred ? " transferred" : ""}`} aria-label={`Kombi ${number}`}>
               <div className="cart-combo-head">
                 <strong>Kombi {number} · {entries.length} Spiele · ab {time(entries[0]!.kickoff)}</strong>
-                <span className="cart-combo-odds">Quote {formatOdd(combo.combinedOdds)}</span>
+                {combo.combinedOdds === null
+                  ? <span className="cart-combo-odds" title="Mindestens ein Tipp hat keine Quote – die Quote der Kombi zeigt Betano beim Eintragen.">Quote offen</span>
+                  : <span className="cart-combo-odds">Quote {formatOdd(combo.combinedOdds)}</span>}
                 <button type="button" className="filter-reset cart-copy" aria-label={`Kombi ${number} kopieren`} disabled={started}
-                  title={started ? "Ein Spiel läuft schon – die Quote gilt nicht mehr. Neu mischen." : "Als Markdown in die Zwischenablage und nach data/tmp/kombis.md"}
+                  title={started ? "Ein Spiel läuft schon – die Quote gilt nicht mehr. Neu mischen." : "Als Auftrag für die KI bei Betano in die Zwischenablage, als Tabelle nach data/tmp/kombis.md"}
                   onClick={() => void copyOne(combo, number)}>
                   <Copy size={13} weight="bold" aria-hidden />{copied === combo.id ? "Kopiert" : "Kopieren"}
                 </button>

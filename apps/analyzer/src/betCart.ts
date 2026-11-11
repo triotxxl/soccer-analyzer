@@ -177,11 +177,13 @@ export function toCounterCartEntry(fixture: DashboardFixture, market: DashboardM
 }
 
 /**
- * Mischbar ist ein Tipp vor dem Anpfiff und mit Quote. Nach dem Anpfiff stammt die Quote von
- * vorher und gilt nicht mehr (wie bei Kelly und im Quickpicker); ohne Quote gibt es keinen Preis.
+ * Mischbar ist ein Tipp vor dem Anpfiff. Nach dem Anpfiff stammt die Quote von vorher und gilt nicht
+ * mehr (wie bei Kelly und im Quickpicker). Seit 10.11.2026 auch ohne Quote (Davids Wunsch: eine 4er-Kombi
+ * mit Vissel Kobe – Machida Zelvia ging nicht): Spiele aus der Angebotsliste ohne Quote bei API-Football
+ * gibt es bei Betano trotzdem, den Preis zeigt Betano beim Eintragen. Die Kombi-Quote ist dann offen.
  */
 export function isPlayable(entry: CartEntry, now: number): boolean {
-  return Date.parse(entry.kickoff) > now && entry.odds !== null;
+  return Date.parse(entry.kickoff) > now;
 }
 
 /**
@@ -540,6 +542,94 @@ export function comboCopyText(
     return [head, "", "| Anstoß | Spiel | Tipp | Quote |", "|---|---|---|--:|", ...rows].join("\n");
   });
   return [...blocks, `> ${COMBO_WARNING}`].join("\n\n");
+}
+
+/** Der Tipp so, wie man ihn einem Wettanbieter sagt („Über 2,5 Tore“), nicht wie die Tabelle ihn kürzt. */
+const PROMPT_TIPS: Partial<Record<string, string>> = {
+  draw: "Unentschieden",
+  btts: "Beide Teams treffen: Ja",
+  bttsNo: "Beide Teams treffen: Nein",
+  over15: "Über 1,5 Tore",
+  under15: "Unter 1,5 Tore",
+  over25: "Über 2,5 Tore",
+  under25: "Unter 2,5 Tore",
+  over35: "Über 3,5 Tore",
+  under35: "Unter 3,5 Tore",
+  firstHalfOver05: "1. Halbzeit über 0,5 Tore",
+  firstHalfUnder05: "1. Halbzeit unter 0,5 Tore",
+  firstHalfOver15: "1. Halbzeit über 1,5 Tore",
+  firstHalfUnder15: "1. Halbzeit unter 1,5 Tore"
+};
+
+/** Die Kurzform, wenn der Text sonst zu lang würde („Unter 3,5“ statt „Unter 3,5 Tore“). */
+const SHORT_PROMPT_TIPS: Partial<Record<string, string>> = {
+  btts: "Beide treffen: Ja",
+  bttsNo: "Beide treffen: Nein",
+  over15: "Über 1,5", under15: "Unter 1,5",
+  over25: "Über 2,5", under25: "Unter 2,5",
+  over35: "Über 3,5", under35: "Unter 3,5",
+  firstHalfOver05: "1. HZ über 0,5", firstHalfUnder05: "1. HZ unter 0,5",
+  firstHalfOver15: "1. HZ über 1,5", firstHalfUnder15: "1. HZ unter 1,5"
+};
+
+/** So viele Zeichen nimmt die KI im Wettschein von Betano höchstens (Davids Messung vom 10.11.2026). */
+export const BETANO_PROMPT_LIMIT = 399;
+
+/** Füllwörter, ohne die ein Team noch zu finden ist. Kennungen wie „W“, „U21“ oder „II“ bleiben immer. */
+const NAME_FILLERS = new Set(["fc", "cf", "sc", "ac", "afc", "cd", "ca", "sd", "ud", "club", "de", "del", "la", "el", "der"]);
+const KEEP_TOKEN = /^(w|ii|iii|b|u\d{2})$/i;
+
+/** Ein Teamname in drei Stufen: voll, ohne Füllwörter, höchstens `words` Wörter (Kennungen wie „W“ zählen nicht). */
+function compactName(name: string, level: number, words: number): string {
+  if (level === 0) return name;
+  const tokens = name.split(/\s+/).filter(Boolean);
+  const stripped = tokens.filter((token) => KEEP_TOKEN.test(token) || !NAME_FILLERS.has(token.toLowerCase()));
+  // „FC“ allein bliebe kein Name: Nur wenn sonst nichts übrig ist, bleiben die Füllwörter.
+  const kept = stripped.some((token) => !KEEP_TOKEN.test(token)) ? stripped : tokens;
+  if (level === 1) return kept.join(" ");
+  const core = kept.filter((token, index) => index === 0 || !KEEP_TOKEN.test(token));
+  const marks = kept.filter((token, index) => index > 0 && KEEP_TOKEN.test(token));
+  return [...core.slice(0, Math.max(1, words)), ...marks].join(" ");
+}
+
+function promptTip(entry: CartEntry, names: NameSource, short = false, team: (name: string) => string = (name) => name): string {
+  if (entry.marketKey === "1x2" && entry.pick !== null) {
+    return `Sieg ${team(teamName(entry, entry.pick === "1" ? "home" : "away", names))}`;
+  }
+  return (short ? SHORT_PROMPT_TIPS[entry.marketKey] : undefined) ?? PROMPT_TIPS[entry.marketKey] ?? selectionLabel(entry, names);
+}
+
+/**
+ * Eine Kombi als Auftrag, höchstens `BETANO_PROMPT_LIMIT` Zeichen: erst voll, dann kurze Tipps, dann Teamnamen
+ * ohne Füllwörter, dann Teamnamen auf 3, 2 und zuletzt 1 Wort gekürzt. Passt es auch so nicht (sehr viele Tipps),
+ * kommt die kürzeste Fassung.
+ */
+function comboPrompt(combo: Combo, names: NameSource): string {
+  const entries = [...combo.entries].sort((left, right) => Date.parse(left.kickoff) - Date.parse(right.kickoff));
+  const build = (short: boolean, level: number, words: number) => {
+    const team = (name: string) => compactName(name, level, words);
+    const tips = entries.map((entry) =>
+      `${team(teamName(entry, "home", names))} - ${team(teamName(entry, "away", names))}: ${promptTip(entry, names, short, team)}`);
+    return `Erstelle mir folgende Kombiwette: ${tips.join(", ")}`;
+  };
+  const steps: Array<[boolean, number, number]> = [[false, 0, 99], [true, 0, 99], [true, 1, 99], [true, 2, 3], [true, 2, 2], [true, 2, 1]];
+  let text = "";
+  for (const [short, level, words] of steps) {
+    text = build(short, level, words);
+    if ([...text].length <= BETANO_PROMPT_LIMIT) return text;
+  }
+  return text;
+}
+
+/**
+ * Kombis als reiner Text für die KI im Wettschein von Betano (seit 10.11.2026, Davids Wunsch: „ohne
+ * Formatierung einfach nur: Erstelle mir folgende Kombiwette“, dann Spiele und Tipps mit Komma). Je Kombi ein
+ * Absatz, jeder höchstens 399 Zeichen - mehr nimmt die KI nicht (dann wird gekürzt, `comboPrompt`). Ohne Quote,
+ * Datum und Warnung - die KI soll nur die Tipps eintragen; die Warnung steht im Wettschein, die Tabelle mit
+ * Quoten weiter in data/tmp/kombis.md (`comboCopyText`).
+ */
+export function comboPromptText(items: Array<{ combo: Combo; number: number }>, names: NameSource): string {
+  return items.map(({ combo }) => comboPrompt(combo, names)).join("\n\n");
 }
 
 function comboId(size: number, index: number): string {

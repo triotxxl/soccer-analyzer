@@ -204,9 +204,6 @@ export interface FilterMenuValues {
   /** Die Anzeige-Filter der Live-Ansicht; sie wirken auf die geladene Tafel und kosten nichts. */
   live: {
     chanceMin: LiveChanceMin;
-    /** Hat die gewählte Frage eine Live-Chance? Sonst greift „Chance ab“ nicht. */
-    chanceApplies: boolean;
-    questionLabel: string;
     redOnly: boolean;
     phase: LivePhase;
     /** Zahl der laufenden Spiele, die die Filter übrig lassen. */
@@ -401,12 +398,10 @@ export function FilterMenu({ values, actions, rangeControl, displayControls }: {
             ist, und ändern keinen Abruf. */}
         <section className="filter-group">
           <div className="filter-group-head"><h3>Nur Anzeige</h3><span>kostet nichts</span></div>
-          <FilterCard title="Chance" aside={`Markt: ${values.live.questionLabel}`}>
+          <FilterCard title="Chance">
             <FilterSegment name="live-chance" legend="Chance ab" value={values.live.chanceMin}
-              onChange={actions.setLiveChanceMin} disabled={!values.live.chanceApplies} options={CHANCE_OPTIONS}
-              note={values.live.chanceApplies
-                ? "Spiele ohne Live-Chance (etwa in der Verlängerung) fallen dabei heraus."
-                : "Greift bei diesem Markt nicht – er hat keine Live-Chance."} />
+              onChange={actions.setLiveChanceMin} options={CHANCE_OPTIONS}
+              note="Zeigt nur offene Ausgänge ab dieser Chance; Spiele ohne einen solchen fallen heraus." />
           </FilterCard>
           <FilterCard title="Spiel">
             <FilterSwitch label="Rote Karte im Spiel" note="Spiele ohne Kartendaten fallen dabei heraus."

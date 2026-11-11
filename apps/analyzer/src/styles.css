@@ -1029,7 +1029,7 @@ fieldset.filter-field { min-width: 0; margin-inline: 0; padding: 0; border: 0; }
    beantwortet eine gewählte Frage, Quote und Stufe vor dem Anpfiff stehen im Fenster. Keine
    Streifen - wie die Tabelle seit 28.09. */
 /* Seit 03.11.2026: Min. | Spiel | Stand | Frage | Dein Tipp · jetzt | Aufs Tor (+ Ballbesitz) | Karten. Ballbesitz und Pässe hatten eigene Spalten. */
-.live-row { display: grid; grid-template-columns: 64px minmax(170px,1.3fr) 40px minmax(180px,1.2fr) minmax(220px,1.45fr) 70px 70px; gap: 14px; align-items: center; min-width: 900px; min-height: 76px; padding: 10px 12px; border-bottom: 1px solid var(--line-soft); cursor: pointer; }
+.live-row { display: grid; grid-template-columns: 64px minmax(170px,1.3fr) 40px minmax(320px,2.65fr) 70px 70px; gap: 14px; align-items: center; min-width: 900px; min-height: 76px; padding: 10px 12px; border-bottom: 1px solid var(--line-soft); cursor: pointer; }
 .live-row:hover, .live-row:focus-visible { background: rgba(255,255,255,.05); }
 .live-row.open { background: rgba(255,255,255,.08); }
 .live-row > span { min-width: 0; }
@@ -1063,7 +1063,7 @@ fieldset.filter-field { min-width: 0; margin-inline: 0; padding: 0; border: 0; }
 /* Kopfzeile wie in der Tabelle: bleibt beim Scrollen stehen, blendet nichts aus. */
 .live-head { position: sticky; top: -14px; z-index: 2; min-height: 0; padding-block: 8px; background: var(--bg); color: #969696; font-size: 10px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; cursor: default; }
 .live-head:hover { background: var(--bg); }
-.live-head > span:nth-child(n+6) { text-align: center; }
+.live-head > span:nth-child(n+5) { text-align: center; }
 /* Heim oben, Gast unten - auf Höhe der Teamnamen und des Stands. */
 .live-stat { display: grid; gap: 6px; text-align: center; font-size: 12px; font-variant-numeric: tabular-nums; }
 .live-stat .home, .live-stat .away { display: flex; justify-content: center; align-items: center; gap: 6px; min-height: 17px; white-space: nowrap; }
@@ -1122,6 +1122,19 @@ fieldset.filter-field { min-width: 0; margin-inline: 0; padding: 0; border: 0; }
 .live-clock { position: relative; display: block; height: 3px; overflow: hidden; border-radius: 2px; background: #333333; }
 .live-clock i { position: absolute; top: 0; bottom: 0; left: 0; background: var(--red); opacity: .7; }
 .live-clock::after { position: absolute; top: 0; bottom: 0; left: 50%; width: 1px; background: var(--bg); content: ""; }
+/* Noch möglich · laut Modell (seit 10.11.2026, Davids Entwurf): je Ausgang ein Chip, Chance als Zahl und Strich. */
+.live-open { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 0; }
+.live-open-chip { position: relative; display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px 5px; overflow: hidden; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); color: var(--text); font-size: 11px; white-space: nowrap; }
+.live-open-pct { font-weight: 700; font-variant-numeric: tabular-nums; }
+.live-open-meter { position: absolute; left: 0; bottom: 0; height: 2px; background: currentColor; opacity: .85; }
+.live-open-chip.high { border-color: rgba(137,209,133,.5); background: rgba(137,209,133,.08); }
+.live-open-chip.high .live-open-pct, .live-open-chip.high .live-open-meter { color: var(--green); }
+.live-open-chip.low { background: transparent; color: #b9b9b9; }
+.live-open-chip.low .live-open-pct, .live-open-chip.low .live-open-meter { color: #9a9a9a; }
+.live-open-chip .level-glyph { width: auto; }
+.live-open-chip .level-glyph.recommended { color: var(--green); }
+.live-open-chip .level-glyph.strong { color: var(--gold); }
+.live-open-note { color: #969696; font-size: 10px; }
 .live-tips { display: grid; gap: 4px; justify-items: start; min-width: 0; }
 .live-tips small { padding-left: 2px; color: #969696; font-size: 10px; }
 .live-tip { display: inline-flex; align-items: center; gap: 5px; max-width: 100%; padding: 3px 7px; overflow: hidden; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); color: var(--text); font-size: 11px; white-space: nowrap; }

@@ -419,7 +419,14 @@ Spiele; geprüft wurden alle deutschen Anbieter, nur Betano (32) und Bet365 (8) 
   ist **seit 02.11.2026 wieder da** (Davids Wunsch), unverändert aus Commit `3c7c35f`: Tabelle,
   Heatmap, Filtermenü, Quickpicker-Fenster, Wettschein, Kelly-Dialog mit der Kelly-Auswahl
   (`selectKelly` in `apps/analyzer/src/kelly.ts`), Marktprofil- und Live-Ansicht, dazu wieder der
-  Endpunkt `/api/combos/markdown`. `npm run app` (Port 5173), `app:build`, `app:preview`. Nicht
+  Endpunkt `/api/combos/markdown`. `npm run app` (Port 5173), `app:build`, `app:preview`. Der Kopierknopf der Kombis legt seit 10.11.2026 reinen
+  Text für die KI im Wettschein von Betano in die Zwischenablage (Davids Wunsch: „Erstelle mir folgende Kombiwette:
+  Heim - Gast: Tipp, …“, je Kombi ein Absatz, ohne Quote und Warnung, höchstens 399 Zeichen - mehr nimmt die KI nicht;
+  darüber erst kurze Tipps ohne „Tore“, dann Teamnamen ohne Füllwörter, dann auf 3/2/1 Wort gekürzt, „W“/„U21“/„II“
+  bleiben; passt es auch so nicht, sagt die Meldung „für Betano teilen“; `comboPromptText` in
+  `apps/analyzer/src/betCart.ts`); die Tabelle mit Quoten und Warnung geht weiter nach `data/tmp/kombis.md`. Tipps
+  ohne Quote kommen seit demselben Tag in Kombis (`isPlayable` prüft nur den Anpfiff; die Kombi zeigt „Quote offen“),
+  und im Tipp-Menü sind sie bei Spielen ganz ohne Quote frei - fehlt nur ein Markt, bleibt er gesperrt. Nicht
   zurückgeholt: `npm run edge-report -- --simulate`, `npm run kelly-tracker`, der UX-Agent
   `betting-ux-architect` und der Skill `betting-ux`. Die Beschreibung der Ansichten steht in
   `3c7c35f:AGENTS.md`. Die Messungen zu Kelly im Abschnitt „Kelly-Automatik“ gelten für den Dialog
@@ -683,8 +690,17 @@ Seit 19.10.2026 liegen die Oberflächen unter `apps/` (vorher `frontend/`). Die 
   `QuickpickUI.tsx`; das Fenster wird dafür breiter): Torphasen (`GoalPhasesPanel`, dieselbe Tafel wie in der
   Detailansicht, aus den Detailkennzahlen - rund vier Aufrufe beim ersten Öffnen eines Spiels), direkte Duelle aus
   der Analyse (`H2hSnapshot.tsx`, dieselbe Liste wie in der Detailansicht) und Tabellen- und Tordifferenz-Verlauf (alle 0 Aufrufe).
-  **Live seit 03.11.2026** (Davids Freigabe des Entwurfs https://claude.ai/artifact/D6XFu5HeV2ZZK5NrjrrDqH, im Stil der
-  alten App): Die Liste trägt **„Dein Tipp · jetzt“** - die zwei stärksten Empfehlungen von vor dem Anpfiff (★ vor ✓,
+  **Seit 10.11.2026 zeigt die Live-Liste „Noch möglich · laut Modell“** (Davids Entwurf
+  https://claude.ai/artifact/V4sGm67j7SnnQWhK2rKm5D: „nicht sehen, was erreicht ist, sondern was noch möglich ist - kurz
+  als Chips mit % laut Modell“): je offenem Ausgang ein Chip mit Live-Chance, je Markt eine Seite (die wahrscheinlichere,
+  außer die andere war dein Tipp; ★/✓ bleiben), stärkste zuerst, höchstens 4 (`openChances`, `OPEN_CHIPS_MAX` in
+  `apps/analyzer/src/liveQuestions.ts`). Märkte nur, wo das Live-Modell rechnet: Sieger, Über/Unter 1,5/2,5/3,5, Noch ein
+  Tor (entfällt, wenn eine offene Linie dasselbe fragt) - **BTTS und 1. Halbzeit haben keine Live-Chance und deshalb keinen
+  Chip**. Weggefallen: die oben gewählte Frage („Sieger nach 90 Min.“ usw.) mit ihrer Spalte, „Dein Tipp · jetzt“ in der
+  Zeile (die Tabelle der Tipps steht weiter im Fenster) und die Spieluhr unter der Minute. „Chance ab“ im Filtermenü und
+  die Sortierung „Chance“ lesen den stärksten offenen Ausgang; „Chance ab“ blendet kleinere Chips aus.
+  **Bis 10.11.2026, Live seit 03.11.2026** (Davids Freigabe des Entwurfs https://claude.ai/artifact/D6XFu5HeV2ZZK5NrjrrDqH, im Stil der
+  alten App): Die Liste trug **„Dein Tipp · jetzt“** - die zwei stärksten Empfehlungen von vor dem Anpfiff (★ vor ✓,
   dann nach Chance, nie bei `probabilityReliable: false`) mit Stand („noch 2 Tore“, „erreicht“, „führt“) und Live-Chance
   (`prematchTips` in `apps/analyzer/src/liveQuestions.ts`; Stand aus `marketStands`, 1. Halbzeit aus Stand bzw.
   Pausenstand, 1X2/Remis aus dem Spielstand) -, eine Spieluhr unter der Minute (`matchClock`) und eine Zeile mit Toren

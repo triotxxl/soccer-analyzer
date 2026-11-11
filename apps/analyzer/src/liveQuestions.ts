@@ -1,9 +1,8 @@
 /**
- * Die Live-Ansicht beantwortet je Zeile eine Frage, die oben gewählt wird: noch ein Tor, eine
- * Torlinie, das nächste Tor, den Sieger nach 90 Minuten oder die Karten. Hier steht nur, welche
- * Zahl oder Tatsache die Zeile dafür zeigt und wie Filter und Sortierung sie lesen - gerechnet
- * wird allein im Backend (`src/live-model.ts`, `marketStandNow`). Die App rechnet keine
- * Wahrscheinlichkeit selbst.
+ * Was die Live-Ansicht je Zeile zeigt: seit 10.11.2026 die noch offenen Ausgänge als Chips (`openChances`,
+ * Davids Entwurf; vorher eine oben gewählte Frage je Spalte), dazu die Tipps von vor dem Anpfiff im Fenster,
+ * und wie Filter und Sortierung das lesen - gerechnet wird allein im Backend (`src/live-model.ts`,
+ * `marketStandNow`). Die App rechnet keine Wahrscheinlichkeit selbst.
  *
  * Kein Vorteil, keine Quote in der Zeile: Die Quote stammt von vor dem Anpfiff und ist im Spiel
  * veraltet (Davids Entscheidung vom 28.09.2026).
@@ -19,53 +18,6 @@ export type LiveQuestion =
   | "nextGoal" | "result"
   | "cards";
 
-export const LIVE_QUESTION_GROUPS: ReadonlyArray<{ group: string | null; options: ReadonlyArray<{ key: LiveQuestion; label: string }> }> = [
-  { group: null, options: [{ key: "overview", label: "Überblick" }] },
-  {
-    group: "Tore",
-    options: [
-      { key: "anotherGoal", label: "Noch ein Tor" },
-      { key: "over15", label: "Über 1,5" }, { key: "under15", label: "Unter 1,5" },
-      { key: "over25", label: "Über 2,5" }, { key: "under25", label: "Unter 2,5" },
-      { key: "over35", label: "Über 3,5" }, { key: "under35", label: "Unter 3,5" },
-      { key: "btts", label: "BTTS Ja (beide treffen)" }, { key: "bttsNo", label: "BTTS Nein" }
-    ]
-  },
-  {
-    group: "Ergebnis",
-    options: [{ key: "nextGoal", label: "Nächstes Tor" }, { key: "result", label: "Sieger nach 90 Min." }]
-  },
-  { group: "Karten", options: [{ key: "cards", label: "Karten" }] }
-];
-
-const QUESTIONS = LIVE_QUESTION_GROUPS.flatMap((group) => group.options);
-
-export function liveQuestionLabel(question: LiveQuestion): string {
-  return QUESTIONS.find((option) => option.key === question)?.label ?? "Überblick";
-}
-
-const QUESTION_STORAGE_KEY = "football-analyzer:live-question";
-
-/** Die Frage blendet nichts aus und wird deshalb gemerkt - anders als die Filter. */
-export function loadLiveQuestion(): LiveQuestion {
-  if (typeof window === "undefined") return "overview";
-  try {
-    const stored = window.localStorage.getItem(QUESTION_STORAGE_KEY);
-    return QUESTIONS.find((option) => option.key === stored)?.key ?? "overview";
-  } catch {
-    return "overview";
-  }
-}
-
-export function saveLiveQuestion(question: LiveQuestion): void {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(QUESTION_STORAGE_KEY, question);
-  } catch {
-    // Ohne Speicher gilt die Wahl nur für diese Sitzung.
-  }
-}
-
 type LineKey = "over15" | "under15" | "over25" | "under25" | "over35" | "under35";
 const LINE_OF: Record<LineKey, { over: "over15" | "over25" | "over35"; under: boolean }> = {
   over15: { over: "over15", under: false }, under15: { over: "over15", under: true },
@@ -74,15 +26,8 @@ const LINE_OF: Record<LineKey, { over: "over15" | "over25" | "over35"; under: bo
 };
 const isLine = (question: LiveQuestion): question is LineKey => question in LINE_OF;
 
-/** Der Pre-Match-Markt, der zur Frage gehört - für „vor Anpfiff x %“ und das Detailfenster. */
-export function marketKeyOf(question: LiveQuestion): DashboardMarketKey | null {
-  if (isLine(question) || question === "btts" || question === "bttsNo") return question;
-  if (question === "result") return "1x2";
-  return null;
-}
-
-/** Hat die Frage eine Live-Chance? Nur dann greifen „Chance ab“ und die Sortierung nach Chance. */
-export function questionHasChance(question: LiveQuestion): boolean {
+/** Hat die Frage eine Live-Chance? BTTS hat keine (das Live-Modell rechnet sie nicht). */
+function questionHasChance(question: LiveQuestion): boolean {
   return question !== "btts" && question !== "bttsNo" && question !== "cards";
 }
 
@@ -148,12 +93,6 @@ export function standText(match: LiveBoardMatch, question: LiveQuestion, names: 
       }
       return `noch ${goals(stand.goalsNeeded)} nötig`;
   }
-}
-
-/** Ist die Torlinie oder BTTS schon entschieden? Dann zeigt die Zeile die Tatsache statt 100 %. */
-export function isDecided(match: LiveBoardMatch, question: LiveQuestion): boolean {
-  const stand = (isLine(question) || question === "btts" || question === "bttsNo") ? match.marketStands[question] : undefined;
-  return stand?.status === "won" || stand?.status === "lost";
 }
 
 // ===== Tipps vor dem Anpfiff und ihr Stand jetzt (seit 03.11.2026) ==========================
@@ -258,6 +197,82 @@ export function prematchTips(match: LiveBoardMatch, names: NameSource): LiveTip[
     });
 }
 
+// ===== Was noch möglich ist (seit 10.11.2026) ==================================================
+
+/**
+ * Davids Entwurf vom 10.11.2026 („nicht sehen, was erreicht ist, sondern was noch möglich ist - kurz als Chips
+ * mit % laut Modell“, https://claude.ai/artifact/V4sGm67j7SnnQWhK2rKm5D). Ein Ausgang, der weder erreicht noch
+ * vorbei ist, mit seiner Live-Chance aus dem Backend (`live.result`, `live.lines`, `live.anotherGoal`) - die App
+ * rechnet keine Wahrscheinlichkeit selbst. BTTS und die 1. Halbzeit fehlen, weil das Live-Modell für sie nichts
+ * rechnet.
+ */
+export interface OpenChance {
+  key: string;
+  label: string;
+  chance: number;
+  /** War dieser Ausgang vor dem Anpfiff eine Empfehlung (★ / ✓)? */
+  level: "strong" | "recommended" | null;
+}
+
+/** Höchstens so viele Chips je Zeile, der Rest als „+ n weitere“. */
+export const OPEN_CHIPS_MAX = 4;
+
+const LINES: ReadonlyArray<{ over: "over15" | "over25" | "over35"; under: "under15" | "under25" | "under35"; line: number; label: string }> = [
+  { over: "over15", under: "under15", line: 1.5, label: "1,5" },
+  { over: "over25", under: "under25", line: 2.5, label: "2,5" },
+  { over: "over35", under: "under35", line: 3.5, label: "3,5" }
+];
+
+/** Je Markt eine Seite: die wahrscheinlichere - außer die andere war vor dem Anpfiff dein Tipp. */
+function oneSide(options: OpenChance[]): OpenChance {
+  const tipped = options.filter((option) => option.level !== null).sort((left, right) => right.chance - left.chance)[0];
+  return tipped ?? [...options].sort((left, right) => right.chance - left.chance)[0]!;
+}
+
+/**
+ * Die offenen Ausgänge eines laufenden Spiels, stärkste Chance zuerst. Leer ohne Live-Chance (Verlängerung,
+ * Länderspiel …) oder wenn alles entschieden ist. „Noch ein Tor“ fällt weg, wenn eine offene Torlinie genau
+ * dasselbe fragt (bei 1:0 ist „Über 1,5“ dasselbe wie „noch ein Tor“).
+ */
+export function openChances(match: LiveBoardMatch, names: NameSource): OpenChance[] {
+  const live = match.live;
+  if (live.state !== "ok") return [];
+  const levelOf = (key: DashboardMarketKey, pick?: string): OpenChance["level"] => {
+    const market = match.prematch.markets.find((entry) => entry.key === key && (pick === undefined || entry.pick === pick));
+    if (!market || market.probabilityReliable === false || market.recommendation.level === "none") return null;
+    return market.recommendation.level === "strong" ? "strong" : "recommended";
+  };
+  const chances: OpenChance[] = [];
+  if (live.result) {
+    chances.push(oneSide([
+      { key: "home", label: `Sieg ${teamName(match, "home", names)}`, chance: live.result.home, level: levelOf("1x2", "1") },
+      { key: "draw", label: "Remis", chance: live.result.draw, level: levelOf("draw") },
+      { key: "away", label: `Sieg ${teamName(match, "away", names)}`, chance: live.result.away, level: levelOf("1x2", "2") }
+    ]));
+  }
+  const goals = (match.goals.home ?? 0) + (match.goals.away ?? 0);
+  let anotherGoalCovered = false;
+  for (const { over, under, line, label } of LINES) {
+    const value = live.lines?.[over];
+    const status = match.marketStands[over]?.status;
+    if (value === undefined || status === "won" || status === "lost") continue;
+    if (line === goals + 0.5) anotherGoalCovered = true;
+    chances.push(oneSide([
+      { key: over, label: `Über ${label}`, chance: value, level: levelOf(over) },
+      { key: under, label: `Unter ${label}`, chance: 1 - value, level: levelOf(under) }
+    ]));
+  }
+  if (live.anotherGoal !== null && !anotherGoalCovered) {
+    chances.push({ key: "anotherGoal", label: "Noch ein Tor", chance: live.anotherGoal, level: null });
+  }
+  return chances.sort((left, right) => right.chance - left.chance);
+}
+
+/** Die stärkste offene Chance - für „Chance ab“ und die Sortierung. */
+export function topOpenChance(match: LiveBoardMatch, names: NameSource): number | null {
+  return openChances(match, names)[0]?.chance ?? null;
+}
+
 /** Wie weit das Spiel ist, 0-1, für die Spieluhr unter der Minute. null bei unklarem Stand. */
 export function matchClock(match: LiveBoardMatch): number | null {
   const status = match.status.short;
@@ -318,44 +333,43 @@ export function inPhase(match: LiveBoardMatch, phase: LivePhase): boolean {
 }
 
 export interface LiveDisplayFilters {
-  question: LiveQuestion;
   chanceMin: LiveChanceMin;
   redOnly: boolean;
   phase: LivePhase;
   sort: LiveSort;
+  names: NameSource;
 }
 
-/** Sortierbar ist nur, was zu sehen ist; sonst gilt der Anstoß. */
-export function effectiveLiveSort(sort: LiveSort, question: LiveQuestion): LiveSort {
-  if (sort === "chance" && !questionHasChance(question)) return "kickoff";
-  if (sort === "cards" && question !== "cards") return "kickoff";
-  return sort;
+/** „Chance ab“ als Anteil, null bei „Alle“. */
+export function chanceThreshold(chanceMin: LiveChanceMin): number | null {
+  return chanceMin === "all" ? null : Number(chanceMin) / 100;
 }
 
 /**
  * Wendet die Anzeige-Filter an und sortiert. Die Filter kosten nichts: Sie wirken auf die
  * geladene Tafel, nicht auf den Umfang der Abfrage (der hängt an Wettbewerben und „Nur Spiele
- * mit Empfehlung vor Anpfiff“).
+ * mit Empfehlung vor Anpfiff“). „Chance ab“ und „Chance“ lesen seit 10.11.2026 die Chips: Ein Spiel
+ * bleibt, wenn ein noch offener Ausgang die Schwelle erreicht.
  */
 export function visibleLiveMatches(matches: LiveBoardMatch[], filters: LiveDisplayFilters): LiveBoardMatch[] {
-  const threshold = filters.chanceMin === "all" || !questionHasChance(filters.question) ? null : Number(filters.chanceMin) / 100;
+  const threshold = chanceThreshold(filters.chanceMin);
+  const top = new Map(matches.map((match) => [match.fixtureId, topOpenChance(match, filters.names)]));
   const shown = matches.filter((match) => {
     if (filters.redOnly && !hasRedCard(match)) return false;
     if (!inPhase(match, filters.phase)) return false;
     if (threshold !== null) {
-      const chance = chanceOf(match, filters.question);
+      const chance = top.get(match.fixtureId) ?? null;
       if (chance === null || chance < threshold) return false;
     }
     return true;
   });
-  const sort = effectiveLiveSort(filters.sort, filters.question);
   const minuteOf = (match: LiveBoardMatch) => match.status.short === "HT" ? 45.5 : (match.elapsed ?? 0) + (match.extra ?? 0) / 100;
   const byKickoff = (left: LiveBoardMatch, right: LiveBoardMatch) =>
     left.kickoff.localeCompare(right.kickoff) || left.fixtureId - right.fixtureId;
   return [...shown].sort((left, right) => {
-    switch (sort) {
+    switch (filters.sort) {
       case "minute": return minuteOf(right) - minuteOf(left) || byKickoff(left, right);
-      case "chance": return (chanceOf(right, filters.question) ?? -1) - (chanceOf(left, filters.question) ?? -1) || byKickoff(left, right);
+      case "chance": return (top.get(right.fixtureId) ?? -1) - (top.get(left.fixtureId) ?? -1) || byKickoff(left, right);
       case "cards": return (totalCards(right) ?? -1) - (totalCards(left) ?? -1) || byKickoff(left, right);
       default: return byKickoff(left, right);
     }

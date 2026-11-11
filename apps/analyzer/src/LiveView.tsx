@@ -5,25 +5,21 @@ import type { LiveLoadState } from "../../shared/src/liveData";
 import { countryName, leagueName, teamName, useNames, type NameSource } from "../../shared/src/names";
 import {
   blockedText,
-  chanceOf,
+  chanceThreshold,
   eventSummary,
   eventText,
-  isDecided,
   isGoalEvent,
   isRedCardEvent,
-  liveQuestionLabel,
-  marketKeyOf,
   matchClock,
+  OPEN_CHIPS_MAX,
+  openChances,
   prematchTips,
-  questionHasChance,
   SIDE_UNRELIABLE_TEXT,
-  standText,
-  totalCards,
-  type LiveQuestion,
-  type LiveTip
+  type LiveChanceMin,
+  type OpenChance
 } from "./liveQuestions";
 import { duelsOf, duelStats, H2H_FEW, type Duel } from "../../shared/src/duels";
-import type { DashboardFixture, DashboardMarket, FormResult, LiveBoardEvent, LiveBoardMatch, LiveTeamSnapshot } from "../../shared/src/types";
+import type { DashboardFixture, FormResult, LiveBoardEvent, LiveBoardMatch, LiveTeamSnapshot } from "../../shared/src/types";
 
 /** Seit 03.11.2026 breiter (vorher 440): Kacheln der Chancen und die Tipp-Tabelle brauchen den Platz. */
 const PANEL_WIDTH = 540;
@@ -89,11 +85,6 @@ function statisticsMissingText(match: LiveBoardMatch): string {
     : "Für dieses Spiel liefert API-Football gerade keine Live-Statistik.";
 }
 
-function Provisional({ match }: { match: LiveBoardMatch }) {
-  if (!match.live.provisional) return null;
-  return <span className="live-provisional" title={PROVISIONAL_TITLE}>vorläufig</span>;
-}
-
 /** Drei Anteile nebeneinander - Heim, Mitte (Remis bzw. kein Tor), Gast. Keine neue Farbe. */
 function ThreeWayBar({ home, middle, away }: { home: number; middle: number; away: number }) {
   return <span className="live-metric-bar" aria-hidden>
@@ -103,89 +94,12 @@ function ThreeWayBar({ home, middle, away }: { home: number; middle: number; awa
   </span>;
 }
 
-function prematchMarket(match: LiveBoardMatch, question: LiveQuestion): DashboardMarket | null {
-  const key = marketKeyOf(question);
-  return key ? match.prematch.markets.find((market) => market.key === key) ?? null : null;
-}
-
-/** „vor Anpfiff 60 %“ grau - ohne Stufe, ohne Quote. Nie bei `probabilityReliable: false`. */
-function PrematchHint({ market }: { market: DashboardMarket | null }) {
-  if (!market || market.probabilityReliable === false) return null;
-  return <small className="live-prematch-hint" title="Wahrscheinlichkeit vor dem Anpfiff - im Spiel veraltet">vor Anpfiff {pct(market.probability)}</small>;
-}
-
 function nextGoalText(next: NonNullable<LiveBoardMatch["live"]["nextGoal"]>): string {
   return `Heim ${Math.round(next.home * 100)} · keins ${Math.round(next.none * 100)} · Gast ${Math.round(next.away * 100)}`;
 }
 
 function resultText(result: NonNullable<LiveBoardMatch["live"]["result"]>): string {
   return `1 ${Math.round(result.home * 100)} · X ${Math.round(result.draw * 100)} · 2 ${Math.round(result.away * 100)}`;
-}
-
-/** Die Zelle mit der Antwort auf die gewählte Frage und die Zelle daneben. */
-function questionCells(match: LiveBoardMatch, question: LiveQuestion, names: NameSource): [ReactNode, ReactNode] {
-  const live = match.live;
-  const blocked = blockedText(match);
-  const market = prematchMarket(match, question);
-
-  if (question === "cards") {
-    const total = totalCards(match);
-    if (total === null || !match.cards) return [<span className="live-fact">keine Kartendaten</span>, null];
-    return [
-      <strong className="live-chance">{total}</strong>,
-      <small>Gelb {match.cards.home.yellow} : {match.cards.away.yellow} · Rot {match.cards.home.red} : {match.cards.away.red}</small>
-    ];
-  }
-
-  if (question === "btts" || question === "bttsNo") {
-    return [<span className="live-fact">{standText(match, question, names) ?? "–"}</span>, <PrematchHint market={market} />];
-  }
-
-  const stand = standText(match, question, names);
-  if (isDecided(match, question)) {
-    return [<span className="live-fact">{stand}</span>, <PrematchHint market={market} />];
-  }
-  if (blocked) {
-    return [<span className="live-fact muted">{blocked}</span>, <PrematchHint market={market} />];
-  }
-
-  if (question === "nextGoal") {
-    if (!live.nextGoal) return [<span className="live-fact muted">{SIDE_UNRELIABLE_TEXT}</span>, null];
-    const side = live.nextGoal.home >= live.nextGoal.away ? "Heim" : "Gast";
-    return [
-      <span className="live-value-line"><strong className="live-chance">{side} {pct(chanceOf(match, question)!)}</strong><Provisional match={match} /></span>,
-      <><ThreeWayBar home={live.nextGoal.home} middle={live.nextGoal.none} away={live.nextGoal.away} /><small>{nextGoalText(live.nextGoal)}</small></>
-    ];
-  }
-
-  if (question === "result") {
-    if (!live.result) return [<span className="live-fact muted">{SIDE_UNRELIABLE_TEXT}</span>, null];
-    const { home, draw, away } = live.result;
-    const outcome = home >= draw && home >= away ? "1" : draw >= away ? "X" : "2";
-    return [
-      <span className="live-value-line" title={match.prematch.crossLeague ? CUP_NOTE : "Gilt nach 90 Minuten."}>
-        <strong className="live-chance">{outcome} · {pct(chanceOf(match, question)!)}</strong><Provisional match={match} />
-      </span>,
-      <><ThreeWayBar home={home} middle={draw} away={away} /><small>{resultText(live.result)}</small></>
-    ];
-  }
-
-  const chance = chanceOf(match, question);
-  const main = <span className="live-value-line">
-    <strong className="live-chance">{chance === null ? "–" : pct(chance)}</strong><Provisional match={match} />
-  </span>;
-  if (question === "overview") {
-    return [main, <>
-      {live.nextGoal
-        ? <><ThreeWayBar home={live.nextGoal.home} middle={live.nextGoal.none} away={live.nextGoal.away} /><small>Nächstes Tor: {nextGoalText(live.nextGoal)}</small></>
-        : <small>Nächstes Tor: {SIDE_UNRELIABLE_TEXT}</small>}
-      {live.remainingGoals !== null && <small>Erwartete Resttore {decimal(live.remainingGoals)}</small>}
-    </>];
-  }
-  if (question === "anotherGoal") {
-    return [main, live.remainingGoals !== null ? <small>Erwartete Resttore {decimal(live.remainingGoals)}</small> : null];
-  }
-  return [main, <>{stand && <small>{stand}</small>}<PrematchHint market={market} /></>];
 }
 
 function RedChip({ count }: { count: number }) {
@@ -210,34 +124,43 @@ function PressureCell({ match, title }: { match: LiveBoardMatch; title?: string 
   </span>;
 }
 
-function tipTitle(tip: LiveTip): string {
-  return `${tip.label} · ${tip.level === "strong" ? "stark empfohlen" : "empfohlen"} · vor dem Anpfiff ${pct(tip.before)}`
-    + `${tip.odds ? ` · Quote ${formatOdd(tip.odds)}` : ""} · jetzt: ${tip.stand}${tip.now !== null ? ` · Live-Chance ${pct(tip.now)}` : ""}`;
+const chanceTier = (chance: number) => chance >= 0.7 ? "high" : chance >= 0.4 ? "mid" : "low";
+
+function chipTitle(chip: OpenChance): string {
+  const tip = chip.level === "strong" ? " · dein starker Tipp vor dem Anpfiff" : chip.level === "recommended" ? " · dein Tipp vor dem Anpfiff" : "";
+  return `${chip.label}: ${pct(chip.chance)} laut Modell bis Abpfiff (90 Min.)${tip}`;
 }
 
 /**
- * „Dein Tipp · jetzt“: die zwei stärksten Empfehlungen von vor dem Anpfiff mit ihrem Stand (seit
- * 03.11.2026, Davids Wunsch). Gold-Rand ★, Grün-Rand ✓ - dieselben Zeichen wie in der Tabelle.
+ * „Noch möglich · laut Modell“ (seit 10.11.2026, Davids Entwurf): nur Ausgänge, die weder erreicht noch vorbei
+ * sind, je Markt eine Seite, stärkste zuerst. Ab 70 % grün, unter 40 % zurückgenommen; der Strich unten ist die
+ * Chance als Länge. ★/✓ = war vor dem Anpfiff eine Empfehlung. „Chance ab“ blendet kleinere Chips aus.
  */
-function TipChips({ tips }: { tips: LiveTip[] }) {
-  if (tips.length === 0) return <span className="live-tips"><small>keine Empfehlung vor dem Anpfiff</small></span>;
-  const rest = tips.length - 2;
-  return <span className="live-tips">
-    {tips.slice(0, 2).map((tip) => <span key={tip.key} className={`live-tip ${tip.level}`} title={tipTitle(tip)}>
-      <span className="level-glyph" aria-hidden>{tip.level === "strong" ? "★" : "✓"}</span>
-      <span className="live-tip-label">{tip.label}</span>
-      <span className={`live-tip-stand ${tip.tone}`}>{tip.stand}{tip.now !== null && ` · ${pct(tip.now)}`}</span>
+function OpenChips({ match, chanceMin }: { match: LiveBoardMatch; chanceMin: LiveChanceMin }) {
+  const names = useNames();
+  const blocked = blockedText(match);
+  if (blocked) return <span className="live-open"><small className="live-open-note">{blocked}</small></span>;
+  const threshold = chanceThreshold(chanceMin) ?? 0;
+  const all = openChances(match, names);
+  const open = all.filter((chip) => chip.chance >= threshold);
+  if (all.length === 0) return <span className="live-open"><small className="live-open-note">Alles entschieden</small></span>;
+  const rest = open.length - OPEN_CHIPS_MAX;
+  return <span className="live-open">
+    {open.slice(0, OPEN_CHIPS_MAX).map((chip) => <span key={chip.key} className={`live-open-chip ${chanceTier(chip.chance)}`} title={chipTitle(chip)}>
+      {chip.level && <span className={`level-glyph ${chip.level}`} aria-hidden>{chip.level === "strong" ? "★" : "✓"}</span>}
+      <span className="live-open-label">{chip.label}</span>
+      <strong className="live-open-pct">{pct(chip.chance)}</strong>
+      <i className="live-open-meter" aria-hidden style={{ width: `${Math.round(chip.chance * 1000) / 10}%` }} />
     </span>)}
-    {rest > 0 && <small>+ {rest} {rest === 1 ? "weiterer" : "weitere"}</small>}
+    {rest > 0 && <small className="live-open-note">+ {rest} weitere</small>}
+    {!match.live.result && <small className="live-open-note" title="Ohne Ligastärke-Vergleich keine belastbare Chance auf den Sieger.">{SIDE_UNRELIABLE_TEXT}: kein Sieger</small>}
   </span>;
 }
 
-/** Die Minute, darunter ein schmaler Balken: wie weit das Spiel ist (Strich bei der Pause). */
+/** Die Minute. Der Balken darunter ist seit 10.11.2026 weg - er zeigte nur noch einmal die Minute (Davids Entwurf). */
 function MinuteCell({ match }: { match: LiveBoardMatch }) {
-  const clock = matchClock(match);
   return <span className="live-minute-cell">
     <span className="live-minute live">{minuteLabel(match)}</span>
-    {clock !== null && <span className="live-clock" aria-hidden><i style={{ width: `${Math.round(clock * 1000) / 10}%` }} /></span>}
   </span>;
 }
 
@@ -265,14 +188,13 @@ function CardsCell({ match }: { match: LiveBoardMatch }) {
   </span>;
 }
 
-/** Die Kopfzeile der Liste: Die Frage steht hier einmal statt in jeder Zeile. */
-function LiveHead({ question }: { question: LiveQuestion }) {
+/** Die Kopfzeile der Liste. */
+function LiveHead() {
   return <div className="live-row live-head" aria-hidden>
     <span>Min.</span>
     <span>Spiel</span>
     <span>Stand</span>
-    <span>{liveQuestionLabel(question === "overview" ? "anotherGoal" : question)}</span>
-    <span title="Die Empfehlungen von vor dem Anpfiff (★ stark, ✓ empfohlen) und wie sie jetzt stehen">Dein Tipp · jetzt</span>
+    <span title="Was noch offen ist – weder erreicht noch vorbei. Chance laut Modell bis Abpfiff (90 Min.). ★/✓ = dein Tipp vor dem Anpfiff.">Noch möglich · laut Modell</span>
     <span title="Schüsse aufs Tor, darunter der Ballbesitz">Aufs Tor</span>
     <span>Karten</span>
   </div>;
@@ -281,16 +203,15 @@ function LiveHead({ question }: { question: LiveQuestion }) {
 /** Wo das Fenster aufgeht: an der Maus, oder bei der Tastatur neben der Zeile. */
 export interface PanelAnchor { x: number; y: number }
 
-function LiveRow({ match, question, open, onToggle }: {
+function LiveRow({ match, chanceMin, open, onToggle }: {
   match: LiveBoardMatch;
-  question: LiveQuestion;
+  chanceMin: LiveChanceMin;
   open: boolean;
   onToggle(fixtureId: number, anchor: PanelAnchor): void;
 }) {
   const names = useNames();
   const homeName = teamName(match, "home", names);
   const awayName = teamName(match, "away", names);
-  const [main, secondary] = questionCells(match, question, names);
   const missing = match.metricsAvailable ? undefined : statisticsMissingText(match);
   const summary = eventSummary(match, names);
   // Seit 29.09.2026 per Klick statt beim Überfahren (Davids Wunsch): Das Fenster ging sonst
@@ -323,8 +244,7 @@ function LiveRow({ match, question, open, onToggle }: {
       <strong>{match.goals.home ?? 0}</strong>
       <strong>{match.goals.away ?? 0}</strong>
     </span>
-    <span className="live-value">{main}{secondary && <span className="live-second">{secondary}</span>}</span>
-    <TipChips tips={prematchTips(match, names)} />
+    <OpenChips match={match} chanceMin={chanceMin} />
     {/* Heim oben und Gast unten - auf Höhe der Teamnamen. */}
     <PressureCell match={match} title={missing} />
     <CardsCell match={match} />
@@ -583,8 +503,6 @@ export function LiveMetricsPanel({ match, fixture, anchor, panelRef }: {
   match: LiveBoardMatch;
   /** Das Spiel im Snapshot - für H2H und Form. Fehlt es, sagt der Reiter das. */
   fixture?: DashboardFixture;
-  /** Bis 03.11.2026 für „Vor dem Anpfiff“; die Tipps stehen jetzt in eigener Tabelle. */
-  question?: LiveQuestion;
   anchor: PanelAnchor;
   panelRef: RefObject<HTMLDivElement | null>;
 }) {
@@ -648,7 +566,7 @@ export function LiveMetricsPanel({ match, fixture, anchor, panelRef }: {
   </div>;
 }
 
-export function LiveView({ state, matches, fixtures, runningCount, question, onResetFilters }: {
+export function LiveView({ state, matches, fixtures, runningCount, chanceMin, onResetFilters }: {
   state: LiveLoadState;
   /** Die Spiele des Snapshots nach ID - für H2H und Form im Fenster. */
   fixtures?: ReadonlyMap<number, DashboardFixture>;
@@ -656,7 +574,8 @@ export function LiveView({ state, matches, fixtures, runningCount, question, onR
   matches: LiveBoardMatch[];
   /** Laufende Spiele vor den Anzeige-Filtern - trennt „läuft keins“ von „Filter blenden alles aus“. */
   runningCount: number;
-  question: LiveQuestion;
+  /** „Chance ab“ aus dem Filtermenü: blendet kleinere Chips aus. */
+  chanceMin: LiveChanceMin;
   onResetFilters(): void;
 }) {
   const [opened, setOpened] = useState<{ fixtureId: number; anchor: PanelAnchor } | null>(null);
@@ -692,8 +611,7 @@ export function LiveView({ state, matches, fixtures, runningCount, question, onR
     return <div className="live-status error"><WarningCircle size={20} weight="duotone" aria-hidden /> {state.message}</div>;
   }
 
-  const showsChance = questionHasChance(question)
-    && matches.some((match) => match.live.state === "ok" && match.live.provisional);
+  const showsChance = matches.some((match) => match.live.state === "ok" && match.live.provisional);
 
   return <>
     {state.message && <div className="live-notice" role="status">
@@ -703,11 +621,11 @@ export function LiveView({ state, matches, fixtures, runningCount, question, onR
     {/* Das Fenster steht fest an der Klickstelle; scrollt die Liste darunter weg, gehört es zu
         keiner sichtbaren Zeile mehr und geht zu. */}
     <div className="live-list" onScroll={() => setOpened(null)}>
-      {matches.length > 0 && <LiveHead question={question} />}
+      {matches.length > 0 && <LiveHead />}
       {matches.map((match) => <LiveRow
         key={match.fixtureId}
         match={match}
-        question={question}
+        chanceMin={chanceMin}
         open={opened?.fixtureId === match.fixtureId}
         onToggle={toggle}
       />)}

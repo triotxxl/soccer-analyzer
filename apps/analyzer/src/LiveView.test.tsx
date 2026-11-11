@@ -161,21 +161,19 @@ describe("Live-Ansicht", () => {
     expect(row).toHaveTextContent("63'");
     expect(row.querySelector(".live-score")).toHaveTextContent("10");
     expect(row).toHaveTextContent("Bundesliga");
-    // Überblick: die Live-Chance „noch ein Tor“, als vorläufig markiert.
-    // Die Frage steht einmal in der Kopfzeile, nicht in jeder Zeile.
-    expect(globalThis.document.querySelector(".live-head")).toHaveTextContent("Noch ein Tor");
-    expect(row).toHaveTextContent("67 %");
-    expect(within(row).getByText("vorläufig")).toBeInTheDocument();
-    expect(row).toHaveTextContent("Erwartete Resttore 1,10");
-    // Die Quote von vor dem Anpfiff steht nicht in der Zeile - sie ist im Spiel veraltet. Seit
-    // 03.11.2026 steht dort aber die Empfehlung mit ihrem Stand jetzt (Davids Freigabe des Entwurfs).
+    // Seit 10.11.2026 (Davids Entwurf): was noch möglich ist, als Chips mit Chance laut Modell, stärkste zuerst,
+    // je Markt eine Seite. Bei 1:0 ist „Über 1,5“ dasselbe wie „noch ein Tor“ - das steht nur einmal da.
+    expect(globalThis.document.querySelector(".live-head")).toHaveTextContent("Noch möglich · laut Modell");
+    const chips = [...row.querySelectorAll(".live-open-chip")].map((chip) => chip.textContent);
+    // Über 2,5 bleibt trotz 30 %: Es war vor dem Anpfiff dein Tipp (✓), sonst stünde Unter 2,5.
+    expect(chips).toEqual(["Unter 3,590 %", "Sieg Alpha FC70 %", "Über 1,553 %", "✓Über 2,530 %"]);
+    expect(row).not.toHaveTextContent("Noch ein Tor");
+    // Die Quote von vor dem Anpfiff steht nicht in der Zeile - sie ist im Spiel veraltet.
     expect(row).not.toHaveTextContent("1,85");
-    const tip = row.querySelector(".live-tip");
-    expect(tip).toHaveTextContent("✓Über 2,5noch 2 Tore · 30 %");
-    expect(tip).toHaveAttribute("title", expect.stringContaining("vor dem Anpfiff 64 % · Quote 1,85"));
-    // Tore und Rote Karten stehen in der Kleinzeile unter den Teams, die Spieluhr unter der Minute.
+    expect(row.querySelector(".live-open-chip.high")).toHaveTextContent("Unter 3,5");
+    // Tore und Rote Karten stehen in der Kleinzeile unter den Teams; der Balken unter der Minute ist weg.
     expect(row.querySelector(".live-event-line")).toHaveTextContent("Tor 40′ Spieler A");
-    expect((row.querySelector(".live-clock i") as HTMLElement).style.width).toBe("70%");
+    expect(row.querySelector(".live-clock")).toBeNull();
     const status = globalThis.document.querySelector(".live-status");
     expect(status).toHaveTextContent("1 laufendes Spiel");
     // Die Technik steht im Tooltip.
@@ -213,7 +211,8 @@ describe("Live-Ansicht", () => {
     render(<App />);
     await screen.findByRole("article");
 
-    expect(screen.getByLabelText("Markt")).toHaveValue("overview");
+    // Seit 10.11.2026 keine Frage mehr: Jede Zeile zeigt, was noch möglich ist.
+    expect(screen.queryByLabelText("Markt")).not.toBeInTheDocument();
     expect(screen.getByLabelText("Sortierung")).toHaveValue("kickoff");
     const menu = await openFilters(user);
     expect(within(menu).getByRole("button", { name: "Wettbewerbe auswählen" })).toBeInTheDocument();
@@ -356,20 +355,22 @@ describe("Live-Fragen und Anzeige-Filter", () => {
     window.localStorage.clear();
   });
 
-  it("zeigt bei einer Torlinie die Tatsache aus dem Stand und den Wert vor dem Anpfiff grau", async () => {
-    stubFetch(() => new Response(JSON.stringify(board()), { status: 200 }));
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+  it("zeigt nur Offenes: Erreichtes und Vorbeies fehlen, „noch ein Tor“ nur wenn keine Linie es schon fragt", async () => {
+    const match = liveMatch();
+    // 2:1 in der 80.: Über 1,5 und 2,5 erreicht (weg), Über 3,5 offen = „noch ein Tor“.
+    match.goals = { home: 2, away: 1 };
+    match.elapsed = 80;
+    match.marketStands = { ...match.marketStands, over15: { status: "won" }, under15: { status: "lost" }, over25: { status: "won" }, under25: { status: "lost" } };
+    match.live = { ...match.live, anotherGoal: 0.35, result: { home: 0.8, draw: 0.15, away: 0.05 }, lines: { over15: 1, over25: 1, over35: 0.35 } };
+    stubFetch(() => new Response(JSON.stringify(board([match])), { status: 200 }));
     render(<App />);
-    await screen.findByRole("article");
-
-    await user.selectOptions(screen.getByLabelText("Markt"), "over25");
-    const row = screen.getByRole("article");
-    expect(row).toHaveTextContent("30 %");
-    expect(row).toHaveTextContent("noch 2 Tore nötig");
-    expect(row).toHaveTextContent("vor Anpfiff 64 %");
-    expect(row).not.toHaveTextContent("1,85");
-    // Die Frage blendet nichts aus und wird gemerkt; der Markt der Tabelle bleibt unberührt.
-    expect(window.localStorage.getItem("football-analyzer:live-question")).toBe("over25");
+    const row = await screen.findByRole("article");
+    const chips = [...row.querySelectorAll(".live-open-chip")].map((chip) => chip.textContent);
+    expect(chips).toEqual(["Sieg Alpha FC80 %", "Unter 3,565 %"]);
+    expect(row).not.toHaveTextContent("Über 1,5");
+    expect(row).not.toHaveTextContent("erreicht");
+    // BTTS hat keine Live-Chance im Modell - dafür gibt es keinen Chip.
+    expect(row).not.toHaveTextContent("BTTS");
   });
 
   /**
@@ -386,7 +387,7 @@ describe("Live-Fragen und Anzeige-Filter", () => {
     const row = await screen.findByRole("article");
 
     const head = globalThis.document.querySelector(".live-head");
-    for (const label of ["Dein Tipp · jetzt", "Aufs Tor", "Karten"]) expect(head).toHaveTextContent(label);
+    for (const label of ["Noch möglich · laut Modell", "Aufs Tor", "Karten"]) expect(head).toHaveTextContent(label);
     expect(head).not.toHaveTextContent("Pässe");
     const [shots, cards] = [...row.querySelectorAll(".live-stat")];
     // Fehlt eine Zahl, bleibt ein Strich statt einer Null.
@@ -413,10 +414,9 @@ describe("Live-Fragen und Anzeige-Filter", () => {
     render(<App />);
     const row = await screen.findByRole("article");
 
-    // In der Zeile die zwei stärksten (★ vor ✓, dann nach Chance), der Rest als Zahl.
-    const chips = [...row.querySelectorAll(".live-tip")];
-    expect(chips.map((chip) => chip.textContent)).toEqual(["★Unter 3,52 Tore Luft · 90 %", "★Sieg Alpha FCführt · 70 %"]);
-    expect(row.querySelector(".live-tips")).toHaveTextContent("+ 2 weitere");
+    // In der Zeile nur Offenes: Über 1,5 ist erreicht und fehlt, die Tipps tragen ihr ★.
+    const chips = [...row.querySelectorAll(".live-open-chip")].map((chip) => chip.textContent);
+    expect(chips).toEqual(["★Unter 3,590 %", "★Sieg Alpha FC70 %", "Unter 2,570 %", "Noch ein Tor67 %"]);
 
     await user.click(row);
     const panel = await screen.findByRole("dialog", { name: /Live-Kennzahlen/ });
@@ -427,37 +427,22 @@ describe("Live-Fragen und Anzeige-Filter", () => {
     expect(rows.find((tipRow) => tipRow.textContent!.includes("1. HZ Über 0,5"))).toHaveTextContent("erreicht");
   });
 
-  it("zeigt bei BTTS nur den Stand, weil es dafür keine gemessene Live-Chance gibt", async () => {
-    stubFetch(() => new Response(JSON.stringify(board()), { status: 200 }));
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-    render(<App />);
-    await screen.findByRole("article");
-
-    await user.selectOptions(screen.getByLabelText("Markt"), "btts");
-    const row = screen.getByRole("article");
-    expect(row).toHaveTextContent("Gast FC fehlt noch");
-    expect(row).not.toHaveTextContent("vorläufig");
-    // Ohne Live-Chance greift „Chance ab“ nicht, und die Warnzeile entfällt.
-    expect(screen.queryByText(/rechne nicht mit Gewinn/)).not.toBeInTheDocument();
-    const menu = await openFilters(user);
-    expect(within(menu).getByRole("group", { name: "Chance ab" })).toBeDisabled();
-  });
-
   it("zeigt keine Live-Chance in der Verlängerung und keinen Sieger ohne Ligastärke", async () => {
     const extraTime = { ...liveMatch(), status: { short: "ET", long: "Extra Time" }, elapsed: 104 };
     extraTime.live = { ...extraTime.live, state: "extraTime", remainingGoals: null, anotherGoal: null, nextGoal: null, result: null, lines: null };
     const unreliable = { ...liveMatch(), fixtureId: 2, homeTeam: "Zulu FC" };
     unreliable.live = { ...unreliable.live, nextGoal: null, result: null };
     stubFetch(() => new Response(JSON.stringify(board([extraTime, unreliable])), { status: 200 }));
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     render(<App />);
     const [first, second] = await screen.findAllByRole("article");
     expect(first).toHaveTextContent("Verlängerung – keine Live-Chance");
     expect(first).toHaveTextContent("104' Verl.");
+    expect(first.querySelector(".live-open-chip")).toBeNull();
 
-    await user.selectOptions(screen.getByLabelText("Markt"), "result");
-    expect(second).toHaveTextContent("Ligastärke unbekannt");
-    expect(second.querySelector(".live-value")).not.toHaveTextContent("%");
+    // Ohne Ligastärke kein Sieger-Chip, die Torlinien bleiben.
+    expect(second).toHaveTextContent("Ligastärke unbekannt: kein Sieger");
+    expect([...second.querySelectorAll(".live-open-chip")].some((chip) => chip.textContent!.includes("Sieg"))).toBe(false);
+    expect(second.querySelector(".live-open")).toHaveTextContent("Unter 3,5");
   });
 
   it("zählt Rote Karten aus der Tafel, auch wenn die Statistik fehlt", async () => {
@@ -489,8 +474,7 @@ describe("Live-Fragen und Anzeige-Filter", () => {
     render(<App />);
     await screen.findByRole("article");
 
-    await user.selectOptions(screen.getByLabelText("Markt"), "cards");
-    expect(screen.getByRole("article")).toHaveTextContent("keine Kartendaten");
+    expect(within(screen.getByRole("article")).getByTitle("Keine Kartendaten – in dieser Liga fehlen Karten in den Ereignissen.")).toBeInTheDocument();
     await user.click(screen.getByRole("article"));
     const panel = await screen.findByRole("dialog", { name: /Live-Kennzahlen/ });
     expect(panel).toHaveTextContent("Keine Kartendaten – in dieser Liga fehlen Karten in den Ereignissen.");
@@ -510,9 +494,10 @@ describe("Live-Fragen und Anzeige-Filter", () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     render(<App />);
 
-    // Ohne belastbare Wahrscheinlichkeit ist ein Markt nie eine Empfehlung (AGENTS.md Punkt 5).
+    // Ohne belastbare Wahrscheinlichkeit ist ein Markt nie eine Empfehlung (AGENTS.md Punkt 5): kein ✓ am Chip.
     const row = await screen.findByRole("article");
-    expect(row.querySelector(".live-tips")).not.toHaveTextContent("Sieg Alpha FC");
+    const winChip = [...row.querySelectorAll(".live-open-chip")].find((chip) => chip.textContent!.includes("Sieg Alpha FC"));
+    expect(winChip?.querySelector(".level-glyph")).toBeNull();
     await user.click(row);
     const panel = await screen.findByRole("dialog", { name: /Live-Kennzahlen/ });
     expect(panel.querySelector(".live-tip-table")).not.toHaveTextContent("Sieg Alpha FC");
@@ -567,7 +552,8 @@ describe("Live-Fragen und Anzeige-Filter", () => {
 
   it("filtert nach Chance und Roter Karte, zeigt Schildchen und setzt beides zurück", async () => {
     const calm = { ...liveMatch(), fixtureId: 2, homeTeam: "Zulu FC" };
-    calm.live = { ...calm.live, anotherGoal: 0.4 };
+    // Stärkster offener Ausgang 62 % (Unter 3,5) - unter „Chance ab 65 %“.
+    calm.live = { ...calm.live, result: { home: 0.4, draw: 0.3, away: 0.3 }, lines: { over15: 0.55, over25: 0.4, over35: 0.38 } };
     calm.cards = { home: { yellow: 0, red: 1 }, away: { yellow: 0, red: 0 } };
     const calls = stubFetch(() => new Response(JSON.stringify(board([liveMatch(), calm])), { status: 200 }));
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
@@ -576,9 +562,12 @@ describe("Live-Fragen und Anzeige-Filter", () => {
     const before = liveCalls(calls).length;
 
     const menu = await openFilters(user);
-    await user.click(within(menu).getByRole("radio", { name: "Chance ab 50 %" }));
+    await user.click(within(menu).getByRole("radio", { name: "Chance ab 65 %" }));
     expect(screen.getAllByRole("article")).toHaveLength(1);
     expect(screen.getByRole("article")).toHaveTextContent("Alpha FC");
+    // Kleinere Chips fallen aus der Zeile.
+    expect([...screen.getByRole("article").querySelectorAll(".live-open-chip")].map((chip) => chip.textContent))
+      .toEqual(["Unter 3,590 %", "Sieg Alpha FC70 %"]);
 
     await user.click(within(menu).getByRole("switch", { name: "Rote Karte im Spiel" }));
     expect(screen.queryByRole("article")).not.toBeInTheDocument();
@@ -591,9 +580,9 @@ describe("Live-Fragen und Anzeige-Filter", () => {
     expect(screen.getAllByRole("article")).toHaveLength(2);
   });
 
-  it("sortiert nach Chance, wenn die Frage eine hat", async () => {
+  it("sortiert nach der stärksten offenen Chance und bietet Karten immer an", async () => {
     const low = { ...liveMatch(), fixtureId: 2, homeTeam: "Zulu FC", kickoff: "2026-08-20T17:00:00.000Z" };
-    low.live = { ...low.live, anotherGoal: 0.2 };
+    low.live = { ...low.live, result: { home: 0.4, draw: 0.3, away: 0.3 }, lines: { over15: 0.55, over25: 0.4, over35: 0.38 } };
     stubFetch(() => new Response(JSON.stringify(board([low, liveMatch()])), { status: 200 }));
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     render(<App />);
@@ -603,8 +592,8 @@ describe("Live-Fragen und Anzeige-Filter", () => {
     await user.selectOptions(screen.getByLabelText("Sortierung"), "chance");
     rows = screen.getAllByRole("article");
     expect(rows[0]).toHaveTextContent("Alpha FC");
-    // Karten stehen erst zur Wahl, wenn die Frage Karten ist.
-    expect(within(screen.getByLabelText("Sortierung")).queryByRole("option", { name: "Karten" })).not.toBeInTheDocument();
+    // Die Karten-Spalte steht immer da - also auch die Sortierung danach.
+    expect(within(screen.getByLabelText("Sortierung")).getByRole("option", { name: "Karten" })).toBeInTheDocument();
   });
 });
 

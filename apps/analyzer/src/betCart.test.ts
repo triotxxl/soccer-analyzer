@@ -295,10 +295,11 @@ describe("putEntriesInto", () => {
 describe("isPlayable und selectionLabel", () => {
   const now = Date.parse("2026-08-17T12:00:00.000Z");
 
-  it("mischbar nur vor dem Anpfiff und mit Quote", () => {
+  it("mischbar vor dem Anpfiff, seit 10.11.2026 auch ohne Quote (die Kombi-Quote ist dann offen)", () => {
     expect(isPlayable(entry("1"), now)).toBe(true);
     expect(isPlayable({ ...entry("1"), kickoff: "2026-08-17T11:00:00.000Z" }, now)).toBe(false);
-    expect(isPlayable(entry("1", null), now)).toBe(false);
+    expect(isPlayable(entry("1", null), now)).toBe(true);
+    expect(combinedOdds([entry("1"), entry("2", null)])).toBeNull();
   });
 
   it("nennt beim 1X2 die Mannschaft, sonst Markt und Auswahl", () => {
@@ -406,5 +407,62 @@ describe("comboCopyText", () => {
   it("nennt weder Wahrscheinlichkeit noch Stufe oder Einsatz", () => {
     const text = comboCopyText([{ combo, number: 1 }], "api", "Europe/Berlin").replace(COMBO_WARNING, "");
     expect(text).not.toMatch(/%|✓|★|Einsatz|Gewinn|übertragen/);
+  });
+});
+
+describe("Auftrag für die KI bei Betano", () => {
+  it("nennt je Spiel den Tipp in Worten, mehrere Kombis als eigene Absätze", async () => {
+    const { comboPromptText } = await import("./betCart");
+    const base = { combinedOdds: 3, transferred: false };
+    const goals = { fixtureId: 2, homeTeam: "Celtic", awayTeam: "Rangers", kickoff: "2026-11-14T15:00:00.000Z", marketKey: "over25", marketLabel: "Über 2,5", selection: "Mindestens 3 Tore", pick: null, odds: 1.7 };
+    const win = { fixtureId: 1, homeTeam: "Bayern", awayTeam: "Dortmund", kickoff: "2026-11-14T14:30:00.000Z", marketKey: "1x2", marketLabel: "1X2", selection: "Auswärtssieg", pick: "2", odds: 4.2 };
+    const text = comboPromptText([
+      { combo: { ...base, id: "a", entries: [goals, win] as never }, number: 1 },
+      { combo: { ...base, id: "b", entries: [{ ...goals, marketKey: "bttsNo" }] as never }, number: 2 }
+    ], "api");
+    expect(text).toBe([
+      "Erstelle mir folgende Kombiwette: Bayern - Dortmund: Sieg Dortmund, Celtic - Rangers: Über 2,5 Tore",
+      "",
+      "Erstelle mir folgende Kombiwette: Celtic - Rangers: Beide Teams treffen: Nein"
+    ].join("\n"));
+  });
+});
+
+describe("Auftrag für die KI bei Betano: höchstens 399 Zeichen", () => {
+  const tipOf = (fixtureId: number, homeTeam: string, awayTeam: string, marketKey: string, minute: number) => ({
+    fixtureId, homeTeam, awayTeam, kickoff: new Date(Date.UTC(2026, 10, 12, 12, minute)).toISOString(),
+    marketKey, marketLabel: marketKey, selection: marketKey, pick: null, odds: 1.5
+  });
+  // Davids Kombi vom 10.11.2026: 400+ Zeichen, die Betano-KI schnitt nach „San Marino - Belarus:“ ab.
+  const davids = [
+    tipOf(1, "Internacional de Bogota", "America de Cali", "under35", 1), tipOf(2, "Artis", "FK Jablonec", "over15", 2),
+    tipOf(3, "La Luz", "Fenix", "under35", 3), tipOf(4, "Tacuarembo", "Miramar", "under35", 4),
+    tipOf(5, "Real Cundinamarca", "Real Cartagena", "under35", 5), tipOf(6, "Madagascar", "Guinea-Bissau", "under35", 6),
+    tipOf(7, "Barcelona W", "Arsenal W", "firstHalfOver05", 7), tipOf(8, "Italy", "France", "over15", 8),
+    tipOf(9, "San Marino", "Belarus", "under35", 9)
+  ];
+
+  it("kürzt erst die Tipps, dann die Namen, bis es passt; W bleibt", async () => {
+    const { comboPromptText, BETANO_PROMPT_LIMIT } = await import("./betCart");
+    const text = comboPromptText([{ combo: { id: "a", entries: davids as never, combinedOdds: null, transferred: false }, number: 1 }], "api");
+    expect([...text].length).toBeLessThanOrEqual(BETANO_PROMPT_LIMIT);
+    expect(text).toMatch(/^Erstelle mir folgende Kombiwette: /);
+    expect(text).toContain("San Marino - Belarus: Unter 3,5");
+    expect(text).toContain("Barcelona W - Arsenal W: 1. HZ über 0,5");
+    expect(text).not.toContain("Tore");
+  });
+
+  it("lässt einen kurzen Auftrag unverändert", async () => {
+    const { comboPromptText } = await import("./betCart");
+    const text = comboPromptText([{ combo: { id: "b", entries: davids.slice(0, 2) as never, combinedOdds: null, transferred: false }, number: 1 }], "api");
+    expect(text).toBe("Erstelle mir folgende Kombiwette: Internacional de Bogota - America de Cali: Unter 3,5 Tore, Artis - FK Jablonec: Über 1,5 Tore");
+  });
+
+  it("kürzt lange Namen bis aufs erste Wort, wenn es sonst nicht passt", async () => {
+    const { comboPromptText, BETANO_PROMPT_LIMIT } = await import("./betCart");
+    const many = Array.from({ length: 10 }, (_, i) => tipOf(20 + i, `Deportivo Independiente Medellin ${i}`, `Atletico Nacional Medellin ${i}`, "over15", i));
+    const text = comboPromptText([{ combo: { id: "c", entries: many as never, combinedOdds: null, transferred: false }, number: 1 }], "api");
+    expect([...text].length).toBeLessThanOrEqual(BETANO_PROMPT_LIMIT);
+    expect(text).toContain("Deportivo - Atletico: Über 1,5");
   });
 });
