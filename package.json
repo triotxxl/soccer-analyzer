@@ -23,7 +23,7 @@
     "neo": "vite --config apps/neo/vite.config.ts",
     "neo:build": "vite build --config apps/neo/vite.config.ts",
     "neo:preview": "vite preview --config apps/neo/vite.config.ts",
-    "app:test": "vitest run",
+    "app:test": "node tools/app-test.ts",
     "test": "node --test --test-concurrency=1 \"test/**/*.test.ts\" && npm run app:test",
     "typecheck": "tsc --noEmit && tsc --project apps/analyzer/tsconfig.json --noEmit && tsc --project apps/neo/tsconfig.json --noEmit",
     "smoke": "node --env-file-if-exists=.env src/cli.ts smoke",

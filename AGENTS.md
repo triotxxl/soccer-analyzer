@@ -810,7 +810,10 @@ Seit 19.10.2026 liegen die Oberflächen unter `apps/` (vorher `frontend/`). Die 
   `TeamCrest.tsx`, `countryFlags.ts`, `perf.ts`/`PerfChart.tsx` Tabellen- und Tordifferenz-Verlauf, `duels.ts` direkte Duelle - je für
   beide Apps), `styles/base.css` (Farb-Tokens, Schrift, Reset, Wappen) und
   `vitest.setup.ts`.
-- `npm run app:test` läuft über `vitest.config.ts` in der Wurzel: alte App, Neo, `apps/shared` und die
+- `npm run app:test` startet Vitest über `tools/app-test.ts` mit großem Laufwerksbuchstaben (seit 12.11.2026:
+  Öffnet der Editor das Projekt als `c:\…`, lädt Vitest seine Module doppelt, und keine Testdatei lief -
+  „Vitest failed to find the current suite“; direkt mit `npx vitest` tritt das weiter auf) und läuft über
+  `vitest.config.ts` in der Wurzel: alte App, Neo, `apps/shared` und die
   Quickpick-Regeln (`test/rules/*.spec.ts`; die Quickpick-Tests der alten App liegen seit 26.10.2026
   dort). `npm run typecheck` prüft Wurzel, alte App und Neo (`apps/tsconfig.base.json`). Ein neues npm-Script gehört in `.claude/hooks/pruefer-waechter.ts`
   eingeordnet, sonst schlägt `test/pruefer-waechter.test.ts` fehl.
