@@ -56,7 +56,11 @@ export const KNOWN_SHARED_IDS: Array<{ teamId: number; note: string }> = [
   { teamId: 9064, note: "Wichita: zwei Teams in der USL League Two 2022/23" },
   { teamId: 4057, note: "Kaw Valley: zwei Teams in der USL League Two 2022" },
   { teamId: 8431, note: "BX Brussels: zwei Pokalspiele je Tag 2023, doppelt geführt" },
-  { teamId: 2056, note: "Aserri FC: Liga de Ascenso 2026 mit zwei Spielen je Tag, Copa Costa Rica 2025 ebenso" }
+  { teamId: 2056, note: "Aserri FC: Liga de Ascenso 2026 mit zwei Spielen je Tag, Copa Costa Rica 2025 ebenso" },
+  // Seit dem Nachladen der Jugend-Vereine (12.11.2026) im Bestand: Die U19 von Jindřichův Hradec läuft in der
+  // 1. Liga U19 (668) ohne Altersangabe unter der ID der Männer. Diese Spiele zählen nicht ins Elo (Wettbewerb
+  // fällt über ELO_EXCLUDE_PATTERN heraus) - eine Trennung änderte nichts.
+  { teamId: 7303, note: "Jindřichův Hradec: U19-Spiele der 1. Liga U19 unter der ID der Männer, nicht im Elo" }
 ];
 /** So lange darf das letzte Spiel eines Teams der Analyse zurückliegen, ohne aufzufallen. */
 const STALE_AFTER_MS = 365 * DAY_MS;
@@ -84,7 +88,9 @@ export const KNOWN_SHORT_SEASONS: Array<{ leagueId: number; season: number; note
  */
 export const KNOWN_SWAPPED_GOALS: Array<{ fixtureId: number; note: string }> = [
   { fixtureId: 1373026, note: "Coppa-Italia-Finale Milan - Bologna 0:1 (14.05.2025): Ndoyes Tor für Bologna steht unter Milan" },
-  { fixtureId: 1375502, note: "Mauritanien - Zentralafrika 2:1 (06.06.2025): Ereignisse 1:2, Heim und Gast in den Ereignissen vertauscht" }
+  { fixtureId: 1375502, note: "Mauritanien - Zentralafrika 2:1 (06.06.2025): Ereignisse 1:2, Heim und Gast in den Ereignissen vertauscht" },
+  { fixtureId: 1210230, note: "Tychy 71 - Rekord Bielsko-Biała 2:1 (Testspiel 27.06.2024): Ereignisse 1:2, Heim und Gast vertauscht (11.11.2026)" },
+  { fixtureId: 1588866, note: "Oxford United - Cheltenham 4:0 (EFL Trophy 10.11.2026): alle vier Tore unter Cheltenham, Schützen O'Donkor und Jeon sind Oxford-Spieler (11.11.2026)" }
 ];
 
 export const isFriendly = (match: Pick<EloMatch, "leagueName">) => /friendlies/i.test(match.leagueName);
