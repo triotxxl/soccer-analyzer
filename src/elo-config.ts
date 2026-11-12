@@ -22,12 +22,19 @@ export const NATIONAL_CATEGORIES: NationalCategory[] = ["u23", "u21", "u20", "u1
  * `club-women` (seit 29.09.2026): Frauen-Vereine, eigene Skala wie die Frauen-Nationalteams - sie
  * spielen nie gegen Männer-Vereine. Nur Anzeige, wie das Vereins-Elo überhaupt.
  */
-export type EloSystem = "club" | "club-women" | "national" | `national-${NationalCategory}`;
-export const ELO_SYSTEMS: EloSystem[] = ["club", "club-women", "national", ...NATIONAL_CATEGORIES.map((category) => `national-${category}` as const)];
+/**
+ * `club-youth` (seit 1.5.0, 11.11.2026, Davids Auftrag): Jugend-Vereinsteams („Sunderland U21",
+ * „Bayern U19") in ihren eigenen Wettbewerben (Premier League 2, U19 Bundesliga, Primavera, UEFA
+ * Youth League, Premier League International Cup …). Eine Skala über alle Altersklassen, weil die
+ * Vereine U19 bis U23 je Land verschieden führen und die Wettbewerbe sie mischen. Nur Anzeige wie
+ * die Frauen-Vereine; ob sie den Klassenfaktor tragen darf, misst erst der Prüfer-Agent.
+ */
+export type EloSystem = "club" | "club-women" | "club-youth" | "national" | `national-${NationalCategory}`;
+export const ELO_SYSTEMS: EloSystem[] = ["club", "club-women", "club-youth", "national", ...NATIONAL_CATEGORIES.map((category) => `national-${category}` as const)];
 
 /** Vereine oder Nationalteams - danach richten sich Parameter, Mitnahme und Vertrauen. */
 export function eloFamily(system: EloSystem): "club" | "national" {
-  return system === "club" || system === "club-women" ? "club" : "national";
+  return system === "club" || system === "club-women" || system === "club-youth" ? "club" : "national";
 }
 
 export function systemConfigOf(config: EloConfig, system: EloSystem): EloSystemConfig {
@@ -38,6 +45,7 @@ export function systemConfigOf(config: EloConfig, system: EloSystem): EloSystemC
 export function eloSystemLabel(system: EloSystem): string {
   if (system === "club") return "Vereine";
   if (system === "club-women") return "Frauen-Vereine";
+  if (system === "club-youth") return "Jugend-Vereine";
   if (system === "national") return "Nationalteams";
   const category = system.slice("national-".length);
   return category === "women" ? "Frauen-Nationalteams" : `${category.toUpperCase()}-Nationalteams`;
@@ -184,7 +192,11 @@ export const ELO_CONFIG: EloConfig = {
   // test/elo-version.test.ts die Erhöhung. 1.3.0 (28.10.2026): gespiegelte und
   // wettbewerbsübergreifende Dubletten fallen heraus, nachträgliche Korrekturen kommen an.
   // 1.4.0 (28.10.2026): Heimvorteil Vereine 50 statt 60, Liga-Niveau je Liga (`leagueLevel`).
-  version: "1.4.0",
+  // 1.5.0 (11.11.2026): Skala `club-youth` für Jugend-Vereinsteams, Wests APIA mit APIA Leichhardt
+  // zusammengeführt, und das Lesen folgt `ELO_TEAM_MERGES` (`src/elo-store.ts`).
+  // 1.5.1 (12.11.2026): keine Ligaebenen bei `club-youth` (`deriveTiers` in src/elo.ts). Die Regel
+  // steht im Code, nicht in den Listen - die Prüfsumme bleibt deshalb die von 1.5.0.
+  version: "1.5.1",
   club: {
     startRating: 1500,
     k: 30,
@@ -348,6 +360,44 @@ export const ELO_WOMEN_CLUB_COMPETITIONS: Record<number, EloCompetitionKind> = {
 export const ELO_YOUTH_PATTERN =
   /\b(u-?1\d|u-?2\d|youth|junior|juvenil|reserves?|primavera|development|academy|olympics?)\b/i;
 
+/**
+ * Internationale Wettbewerbe der Jugend-Vereine (Skala `club-youth`, seit 1.5.0), aus `elo_matches`
+ * vom 11.11.2026: UEFA Youth League (14, bei API-Football vom Typ „League“) und Premier League
+ * International Cup (1039). Nationale Jugendligen und -pokale (Premier League 2, U19 Bundesliga,
+ * Primavera, DFB-Junioren-Pokal, Diski Challenge …) brauchen keinen Eintrag - sie stehen nicht unter
+ * `World`. Jugend-Nationalteams unter `World` (U20 Elite League, Maurice Revello, Asian Games)
+ * stehen bewusst nicht hier: Was dort nicht gelistet ist, bleibt draußen.
+ */
+export const ELO_YOUTH_CLUB_COMPETITIONS: Record<number, EloCompetitionKind> = {
+  14: "championsLeague", 1039: "continentalTop", 667: "clubFriendly"
+};
+
+/** Jugend-Vereinsteam am Namen: „Sunderland U21", „Bayern U19". Frauen-Jugend („… U19 W") nicht. */
+export function isYouthClubName(name: string): boolean {
+  return /\sU-?(1[5-9]|2[0-3])$/i.test(name);
+}
+
+/**
+ * Ein Wettbewerb der Jugend-Vereine - für Nachladen und Wochenrunde, die nur den Wettbewerb kennen,
+ * nicht die Teamnamen: gelistet, oder eine nationale Liga bzw. ein nationaler Pokal mit Jugendmuster
+ * im Namen, der kein Wettbewerb der Jugend-Nationalteams und kein Frauenwettbewerb ist.
+ */
+/**
+ * Nationale Jugendwettbewerbe ohne Jugendwort im Namen, die das Muster nicht findet (Test vom
+ * 12.11.2026): Premier League 2 Division One (702), Premier League Cup (871), Diski Challenge (734),
+ * DFB Junioren Pokal (715, „Junioren" trifft `junior\b` nicht). Nur für Nachladen und Wochenrunde; die
+ * Einordnung der Spiele geht über die Teamnamen.
+ */
+export const ELO_YOUTH_CLUB_NAMED_COMPETITIONS: ReadonlySet<number> = new Set([702, 715, 734, 871]);
+
+export function isYouthClubCompetition(league: { leagueId: number; leagueName: string; country: string }): boolean {
+  if (ELO_YOUTH_CLUB_COMPETITIONS[league.leagueId] !== undefined) return league.leagueId !== 667;
+  if (ELO_YOUTH_CLUB_NAMED_COMPETITIONS.has(league.leagueId)) return true;
+  if (ELO_NATIONAL_CATEGORY_COMPETITIONS[league.leagueId] !== undefined || league.country === "World") return false;
+  return ELO_YOUTH_PATTERN.test(league.leagueName)
+    && !/\b(women|woman|femenin[oa]?|feminine|frauen|dames|w[- ]league)\b/i.test(league.leagueName);
+}
+
 /** Die Skala zweier Teams aus ihren Namen, oder null, wenn sie nicht zusammenpassen. */
 export function nationalCategoryOf(homeName: string, awayName: string): NationalCategory | null {
   const of = (name: string): NationalCategory | "senior" => {
@@ -427,6 +477,15 @@ export const ELO_TEAM_MERGES: EloTeamMerge[] = [
     // Division, FAI Cup, Vereins-Testspiele 2023-2026).
     from: 11328, to: 28562, countries: ["Ireland", "World"],
     note: "Kerry FC (Irland): First Division und FAI Cup 2023-2026, seit Oktober 2026 unter 28562 (23.10.2026)"
+  },
+  {
+    // Zwei gleichzeitig benutzte IDs desselben Vereins aus Sydney: 3764 „APIA Leichhardt Tigers" in
+    // der New South Wales NPL und im Australia Cup (160 Spiele bis 13.09.2026), 26874 „Wests APIA" nur
+    // in der Australian Championship (Oktober/November 2025 und 2026, dieselben Gegner wie in der NPL,
+    // etwa Sydney United, nahtlos nach dem NPL-Saisonende). Die Spiele hängen an der ID mit der
+    // Geschichte; Ansetzungen unter 26874 bekommen ihr Elo über die Umleitung in `src/elo-store.ts`.
+    from: 26874, to: 3764,
+    note: "Wests APIA (Australian Championship 2025-2026) ist APIA Leichhardt Tigers (11.11.2026)"
   },
   {
     // Trennung: 687 ist Flora Tallinn (Meistriliiga, Europapokal, Testspiele). API-Football legte

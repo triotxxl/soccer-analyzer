@@ -507,7 +507,15 @@ function deriveTiers(
 ): Map<string, 1 | 2 | 3> {
   const countryOf = new Map<string, string>();
   // Je Skala: Frauenligen eines Landes stehen auf einer anderen Skala als die Männerligen.
-  for (const match of prepared) if (match.cls.isLeague) countryOf.set(`${match.leagueId}|${match.season}`, `${match.cls.system}|${match.country}|${match.season}`);
+  // Jugend-Vereine (seit 1.5.1, Davids Entscheidung vom 12.11.2026) bekommen keine Ebenen: Die
+  // Jugendligen eines Landes sind Altersklassen (U23, U19, U17), die nie gegeneinander spielen. Ihr
+  // Mittelwertvergleich sagte nichts und drosselte ganze Ligen um 10-20 % (Liga Revelação U23,
+  // Brasileiro U17, U18 Premier League - Prüfung vom 12.11.2026). Ohne Eintrag gilt Ebene 1.
+  for (const match of prepared) {
+    if (match.cls.isLeague && match.cls.system !== "club-youth") {
+      countryOf.set(`${match.leagueId}|${match.season}`, `${match.cls.system}|${match.country}|${match.season}`);
+    }
+  }
   const groups = new Map<string, Array<{ bucket: string; mean: number }>>();
   const tiers = new Map<string, 1 | 2 | 3>();
   for (const [bucket, entry] of firstRatings) {

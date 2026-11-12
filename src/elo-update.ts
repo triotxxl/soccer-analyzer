@@ -7,7 +7,8 @@ import type { AnalyzerDatabase } from "./database.ts";
 import { classifyMatch, CONFEDERATION_OF_COMPETITION, type EloMatch } from "./elo-competitions.ts";
 import {
   ELO_COMPETITIONS, ELO_CONFIG, ELO_EXCLUDE_PATTERN, ELO_EXCLUDE_TEAM_PATTERN, ELO_NATIONAL_CATEGORY_COMPETITIONS,
-  ELO_SENIOR_RESERVE_TEAMS, ELO_TEAM_MERGES, ELO_WOMEN_CLUB_COMPETITIONS, ELO_YOUTH_PATTERN
+  ELO_SENIOR_RESERVE_TEAMS, ELO_TEAM_MERGES, ELO_WOMEN_CLUB_COMPETITIONS, ELO_YOUTH_CLUB_COMPETITIONS, ELO_YOUTH_PATTERN,
+  isYouthClubCompetition
 } from "./elo-config.ts";
 import { calculateHistoricalElo, leagueLevels, summarizeElo } from "./elo.ts";
 import type { ApiFixture, ApiLeague } from "./types.ts";
@@ -198,8 +199,9 @@ export async function topUpRunningSeasons(
     // Jugend- und Frauen-Nationalteams erkennt `classifyMatch` erst an den Teamnamen - ihre
     // Wettbewerbe stehen deshalb ausdrücklich in der Liste.
     const category = ELO_NATIONAL_CATEGORY_COMPETITIONS[league.league.id] !== undefined;
+    const youthClub = isYouthClubCompetition({ leagueId: league.league.id, leagueName: league.league.name, country: league.country.name });
     const cls = classifyMatch({ leagueId: league.league.id, leagueName: league.league.name, leagueType: league.league.type, country: league.country.name });
-    if (cls.excluded && !category) continue;
+    if (cls.excluded && !category && !youthClub) continue;
     const running = runningSeason(league, options.now);
     if (!running) continue;
     if (options.done?.has(league.league.id)) {
@@ -266,7 +268,8 @@ export function eloRulesFingerprint(): string {
   const { version: _version, ...config } = ELO_CONFIG;
   const rules = {
     config, competitions: ELO_COMPETITIONS, nationalCategories: ELO_NATIONAL_CATEGORY_COMPETITIONS,
-    womenClubs: ELO_WOMEN_CLUB_COMPETITIONS, merges: ELO_TEAM_MERGES, seniorReserves: [...ELO_SENIOR_RESERVE_TEAMS].sort((a, b) => a - b),
+    womenClubs: ELO_WOMEN_CLUB_COMPETITIONS, youthClubs: ELO_YOUTH_CLUB_COMPETITIONS, merges: ELO_TEAM_MERGES,
+    seniorReserves: [...ELO_SENIOR_RESERVE_TEAMS].sort((a, b) => a - b),
     youth: ELO_YOUTH_PATTERN, excludeTeam: ELO_EXCLUDE_TEAM_PATTERN, exclude: ELO_EXCLUDE_PATTERN,
     confederations: CONFEDERATION_OF_COMPETITION
   };

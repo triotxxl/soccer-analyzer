@@ -1,7 +1,7 @@
 # Team-Elo
 
 Zentrale Beschreibung des Team-Elo (Davids Auftrag vom 28.10.2026, Abschnitt 9). Stand: Elo-Regeln
-**1.4.0**, Modell `goalLineModelVersion` **3.7.0**, Snapshot `schemaVersion` **12**. Messstände und
+**1.5.1**, Modell `goalLineModelVersion` **3.8.0**, Snapshot `schemaVersion` **16**. Messstände und
 Entscheidungen stehen zusätzlich in `AGENTS.md`, Abschnitt „Team-Elo“; der Code ist maßgeblich
 (`src/elo.ts`, `src/elo-config.ts`).
 
@@ -77,9 +77,39 @@ Elo allein ergibt kein 1X2. Wo es ins Modell eingeht, verschiebt es nur die erwa
 
 ## 4. Skalen
 
-Vereine (Männer, eine globale Skala), Frauen-Vereine, A-Nationalteams, U23, U21, U20, U19, U17,
-Frauen-Nationalteams - getrennt (`EloSystem`). Werte verschiedener Skalen sind **nicht** vergleichbar; Neo
+Vereine (Männer, eine globale Skala), Frauen-Vereine, Jugend-Vereine, A-Nationalteams, U23, U21, U20, U19,
+U17, Frauen-Nationalteams - getrennt (`EloSystem`). Werte verschiedener Skalen sind **nicht** vergleichbar; Neo
 vergleicht nur innerhalb einer Skala und sagt sonst „nicht vergleichbar“.
+
+**Jugend-Vereine (`club-youth`, seit 1.5.0, 11.11.2026, Davids Auftrag):** beide Teams mit Altersangabe
+U15 bis U23 („Sunderland U21“, „Bayern U19“), in nationalen Jugendligen und -pokalen (Premier League 2,
+U19 Bundesliga, Primavera, DFB-Junioren-Pokal, Diski Challenge …) und den gelisteten internationalen
+Wettbewerben `ELO_YOUTH_CLUB_COMPETITIONS` (UEFA Youth League 14, Premier League International Cup 1039,
+Vereins-Testspiele 667). **Eine Skala über alle Altersklassen**, weil die Vereine U19 bis U23 je Land
+verschieden führen und die Wettbewerbe sie mischen. Parameter wie Vereine (Mitnahme, Ligaebenen je
+Skala). Draußen bleiben: Jugend gegen Männer (EFL Trophy, National League Cup), die zweiten Mannschaften
+aus `ELO_SENIOR_RESERVE_TEAMS` (Männerskala), Jugend-Nationalteams unter `World` ohne Listeneintrag (U20
+Elite League, Maurice Revello) und Frauen-Jugend. **Nur Anzeige:** `eloLevelOf` im Analyzer liest nur die
+Männerskala, `teamEloSystems` nennt sie nicht - ob sie den Klassenfaktor tragen darf, misst erst der
+Prüfer-Agent. Nachladen: `npm run elo -- backfill --youth-clubs`; die Wochenrunde nimmt laufende
+Jugendwettbewerbe aus dem Bestand mit (`isYouthClubCompetition`, Wettbewerbe ohne Jugendwort im Namen
+in `ELO_YOUTH_CLUB_NAMED_COMPETITIONS`).
+
+**Prüfung vom 12.11.2026 und Davids Entscheidungen:** Die Skala zerfällt in 14 unverbundene Inseln
+(Brasilien, Europa/UEFA Youth League, England mit Belgien …); Werte sind nur innerhalb einer Insel
+vergleichbar. Innerhalb einer Liga trennt sie etwa wie die Männer-Vereine (Log-Loss gegen Heimvorteil
+2025 −0,058 ± 0,005, 2026 −0,069 ± 0,006), schätzt den Favoriten aber zu hoch (53 statt 57 von 100). Als
+Klassenfaktor ohne Gewinn (Teiler 1400 gepoolt −0,006 ± 0,006, im Premier League International Cup
++0,051 ± 0,024). Entschieden: **bleibt Anzeige**; **keine Ligaebenen** (1.5.1, `deriveTiers`); **Neo urteilt bei
+Jugend-Vereinen nur, wenn beide Werte mindestens 30 % Vertrauen haben**, sonst „zu wenige Spiele für ein
+Urteil“ (`strengthOf` in `apps/neo/src/neoData.ts`). Das Liga-Niveau der Jugendligen nach der Copinha
+(Januar 2027) kostenlos nachmessen; der heutige Hinweis hängt an 59 italienischen Pokalspielen.
+
+**Lesen folgt den Zusammenführungen (seit 1.5.0):** `getTeamElo` und `getEloByTeam` (`src/elo-store.ts`)
+folgen `ELO_TEAM_MERGES` (positives `to`), wenn die gefragte ID keinen eigenen Eintrag hat. Anlass Wests
+APIA (26874, nur Australian Championship) = APIA Leichhardt Tigers (3764, NSW NPL): zwei gleichzeitig
+benutzte IDs, die Zusammenführung allein hätte der Ansetzung unter 26874 das Elo genommen. Ein eigener
+Eintrag geht vor (geteilte IDs wie Kenya Police 8560).
 
 ## 5. Startwerte, neue Teams, Auf- und Abstieg
 
@@ -151,6 +181,8 @@ international ~80), Startwert neuer Teams, Pokalgewicht 1,0, neutraler Platz in 
 | 1.2.1 | 26.09.2026 | `ELO_TEAM_MERGES`; danach ohne Versionserhöhung: eigene Skalen, Reserve-Teams, Trennungen |
 | 1.3.0 | 28.10.2026 | gespiegelte und wettbewerbsübergreifende Dubletten, Korrekturen, Zukunftsdatum, Stempel |
 | 1.4.0 | 28.10.2026 | Heimvorteil Vereine 50, Liga-Niveau, `league_id` je Verein, Historie 731 Tage |
+| 1.5.0 | 11.11.2026 | Skala `club-youth` (Jugend-Vereine), Wests APIA → APIA Leichhardt, Lesen folgt `ELO_TEAM_MERGES` |
+| 1.5.1 | 12.11.2026 | keine Ligaebenen bei `club-youth` (Altersklassen spielen nie gegeneinander); Jugend-Backtest gepaart 2025 +0,0004, 2026 −0,0002 (je ± 0,0002) |
 
 ## 10. Quellen
 

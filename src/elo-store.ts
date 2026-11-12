@@ -1,5 +1,5 @@
 import type { AnalyzerDatabase } from "./database.ts";
-import type { EloSystem } from "./elo-config.ts";
+import { ELO_TEAM_MERGES, type EloSystem } from "./elo-config.ts";
 
 /**
  * Leseschnittstelle des Team-Elo. Sie liest nur, was `npm run elo -- build` zuletzt
@@ -52,9 +52,31 @@ function toStored(row: Record<string, unknown>): StoredElo {
   };
 }
 
-export function getTeamElo(database: AnalyzerDatabase, teamId: number, system: EloSystem = "club"): StoredElo | null {
-  const row = database.eloRatings({ system, teamId })[0];
-  return row ? toStored(row) : null;
+/**
+ * Zusammengeführte IDs (`ELO_TEAM_MERGES`, positives `to`): Die Spiele der `from`-ID hängen beim
+ * Rechnen an der `to`-ID, ein eigener Eintrag für `from` entsteht nur, wo die Zusammenführung
+ * eingeschränkt ist (`countries`, `leagues`) und ein Rest bleibt. Seit 1.5.0 folgt das Lesen dieser
+ * Kette, wenn die gefragte ID keinen eigenen Eintrag hat - vorher stand Wests APIA (26874, nur
+ * Australian Championship) ohne Elo da, obwohl seine Geschichte unter 3764 lag. Ein eigener Eintrag
+ * geht vor: Bei geteilten IDs (Kenya Police 8560 trägt auch Police aus Burkina Faso) bleibt er.
+ */
+const MERGE_TARGET = new Map<number, number>(ELO_TEAM_MERGES.filter((merge) => merge.to > 0).map((merge) => [merge.from, merge.to]));
+
+/** Die IDs, unter denen das Elo von `teamId` stehen kann: zuerst die eigene, dann die Kette aus `ELO_TEAM_MERGES`. */
+export function mergedTeamIds(teamId: number): number[] {
+  const ids = [teamId];
+  for (let next = MERGE_TARGET.get(teamId); next !== undefined && !ids.includes(next) && ids.length < 10; next = MERGE_TARGET.get(next)) {
+    ids.push(next);
+  }
+  return ids;
+}
+
+export function getTeamElo(database: Pick<AnalyzerDatabase, "eloRatings">, teamId: number, system: EloSystem = "club"): StoredElo | null {
+  for (const id of mergedTeamIds(teamId)) {
+    const row = database.eloRatings({ system, teamId: id })[0];
+    if (row) return toStored(row);
+  }
+  return null;
 }
 
 export function getEloRanking(
@@ -75,6 +97,12 @@ export function getEloByTeam(database: Pick<AnalyzerDatabase, "eloRatings">): Ma
   for (const row of database.eloRatings().map(toStored)) {
     const existing = byTeam.get(row.teamId);
     if (!existing || row.games > existing.games) byTeam.set(row.teamId, row);
+  }
+  // Zusammengeführte IDs ohne eigenen Eintrag zeigen den Eintrag ihrer Ziel-ID (siehe `getTeamElo`).
+  for (const from of MERGE_TARGET.keys()) {
+    if (byTeam.has(from)) continue;
+    const target = mergedTeamIds(from).slice(1).map((id) => byTeam.get(id)).find((row) => row !== undefined);
+    if (target) byTeam.set(from, target);
   }
   return byTeam;
 }

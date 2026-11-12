@@ -12,7 +12,10 @@ import { eloRulesFingerprint } from "../src/elo-update.ts";
  */
 const FINGERPRINTS: Record<string, string> = {
   "1.3.0": "ebd51b9145b6",
-  "1.4.0": "6f136bfc3357"
+  "1.4.0": "6f136bfc3357",
+  "1.5.0": "226fa494c2fa",
+  // 1.5.1 ändert nur Code (keine Ligaebenen bei Jugend-Vereinen), nicht die Listen - gleiche Prüfsumme.
+  "1.5.1": "226fa494c2fa"
 };
 
 test("die Elo-Version passt zu den Regeln", () => {

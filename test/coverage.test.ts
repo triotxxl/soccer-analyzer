@@ -60,6 +60,14 @@ test("Frauen-Vereine gelten nicht als Nationalteams, obwohl beide „… W“ he
   assert.match(report.missingStrength[0]!.action, /--competition 1191/);
 });
 
+test("Jugend-Vereine: das Elo ist für den Klassenfaktor nicht freigegeben, so vorgesehen", () => {
+  const report = findCoverageGaps(doc([
+    fixture({ league: "Premier League International Cup", homeTeam: "Sunderland U21", awayTeam: "Paris Saint-Germain U21", homeElo: elo("club-youth"), awayElo: elo("club-youth") })
+  ]), { eloMatches: () => [], storedElo: () => null, apiLeagueId: () => 1039 });
+  assert.equal(report.missingStrength[0]?.intended, true);
+  assert.match(report.missingStrength[0]!.cause, /Jugend-Vereine/);
+});
+
 test("ältere Analysen ohne Team-ID: die ID kommt aus dem Wappen-Link", () => {
   assert.equal(teamIdOf(fixture({ homeCrest: "https://media.api-sports.io/football/teams/2384.png" }), "home"), 2384);
   assert.equal(teamIdOf(fixture({ homeTeamId: 7, homeCrest: "https://media.api-sports.io/football/teams/2384.png" }), "home"), 7);

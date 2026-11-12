@@ -116,6 +116,15 @@ function strengthGap(fixture: DashboardFixture, lookup: CoverageLookup): Omit<St
     }
     return { cause: "Nationalteams, Grund unklar", action: "Analyse neu laufen lassen und erneut prüfen", intended: false };
   }
+  // Jugend-Vereine (Skala `club-youth`, seit Elo 1.5.0) sind wie die Frauen-Vereine nur Anzeige: Ihr Elo
+  // trägt weder den Klassenfaktor noch ein Liga-Niveau, bis der Prüfer-Agent es gemessen hat.
+  if (eloSystems.includes("club-youth")) {
+    return {
+      cause: "Jugend-Vereine: Elo ist für den Klassenfaktor nicht freigegeben",
+      action: "erst vom Prüfer-Agenten messen lassen, dann mit David entscheiden (Davids Entscheidung)",
+      intended: true
+    };
+  }
   if (fixture.warnings.some((warning) => /Keine eigene Ligabasis/.test(warning))) {
     return {
       cause: "Heimatliga eines Teams nicht gefunden",

@@ -59,8 +59,8 @@ function groupOf(match: EloMatch): BacktestGroup | null {
   const cls = classifyMatch(match);
   if (cls.excluded) return null;
   if (eloFamily(cls.system) === "national") return "national";
-  // Frauen-Vereine sind nur Anzeige und ungemessen - nicht in die Gruppen der Männer mischen.
-  if (cls.system === "club-women") return null;
+  // Frauen- und Jugend-Vereine sind nur Anzeige und ungemessen - nicht in die Gruppen der Männer mischen.
+  if (cls.system === "club-women" || cls.system === "club-youth") return null;
   if (cls.isLeague) return "liga";
   if (cls.kind === "clubFriendly") return "testspiel";
   if (cls.international) return "international";

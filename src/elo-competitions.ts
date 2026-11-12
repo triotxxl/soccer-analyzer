@@ -1,6 +1,6 @@
 import {
   ELO_COMPETITIONS, ELO_EXCLUDE_PATTERN, ELO_EXCLUDE_TEAM_PATTERN, ELO_NATIONAL_CATEGORY_COMPETITIONS, ELO_WOMEN_CLUB_COMPETITIONS,
-  ELO_SENIOR_RESERVE_TEAMS, ELO_YOUTH_PATTERN, nationalCategoryOf,
+  ELO_SENIOR_RESERVE_TEAMS, ELO_YOUTH_CLUB_COMPETITIONS, ELO_YOUTH_PATTERN, isYouthClubName, nationalCategoryOf,
   type EloCompetitionKind, type EloSystem
 } from "./elo-config.ts";
 
@@ -104,6 +104,26 @@ export function classifyMatch(
       if (type === "league") return { ...base, kind: "leagueTier1", isLeague: true, international: false };
       if (type === "cup") return { ...base, kind: SUPER_CUP_PATTERN.test(match.leagueName) ? "superCup" : "domesticCup", isLeague: false, international: false };
     }
+  }
+  // Jugend-Vereine (seit 1.5.0): beide Teams mit Altersangabe („… U21"), kein Wettbewerb der
+  // Jugend-Nationalteams, keine zweite Mannschaft aus `ELO_SENIOR_RESERVE_TEAMS` (die rechnet auf der
+  // Männerskala). Eigene Skala `club-youth`, sonst wie Vereine; unter `World` nur gelistete Wettbewerbe.
+  if (
+    match.homeName && match.awayName && isYouthClubName(match.homeName) && isYouthClubName(match.awayName)
+    && !ELO_NATIONAL_CATEGORY_COMPETITIONS[match.leagueId]
+    && !(match.homeId !== undefined && ELO_SENIOR_RESERVE_TEAMS.has(match.homeId))
+    && !(match.awayId !== undefined && ELO_SENIOR_RESERVE_TEAMS.has(match.awayId))
+  ) {
+    const international = ELO_YOUTH_CLUB_COMPETITIONS[match.leagueId];
+    const base = { excluded: false as const, system: "club-youth" as const, neutral: NEUTRAL.has(match.leagueId) };
+    if (international) return { ...base, kind: international, isLeague: false, international: international !== "clubFriendly" };
+    if (match.country !== "World") {
+      if (FRIENDLY_PATTERN.test(match.leagueName)) return { ...base, kind: "clubFriendly", isLeague: false, international: false };
+      const type = match.leagueType?.toLocaleLowerCase();
+      if (type === "league") return { ...base, kind: "leagueTier1", isLeague: true, international: false };
+      if (type === "cup") return { ...base, kind: SUPER_CUP_PATTERN.test(match.leagueName) ? "superCup" : "domesticCup", isLeague: false, international: false };
+    }
+    return { excluded: true, reason: "unbekannt" };
   }
   if (ELO_EXCLUDE_PATTERN.test(match.leagueName)) return { excluded: true, reason: "jugendFrauen" };
   if (isExcludedTeam(match, "home") || isExcludedTeam(match, "away")) {

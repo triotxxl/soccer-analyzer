@@ -7,8 +7,9 @@
  *   npm run elo -- update [--top-up|--no-top-up]  wie im Dashboard-Lauf: Import seit zuletzt,
  *                                              Wochenrunde falls fällig, neu rechnen
  *   npm run elo -- backfill --budget 1800      fehlende, beendete Liga-Saisons nachladen
- *                  [--from 2021] [--dry-run] [--national-categories]
- *                  (nur Jugend- und Frauen-Nationalwettbewerbe samt Testspielen)
+ *                  [--from 2021] [--dry-run] [--national-categories] [--youth-clubs]
+ *                  (nur Jugend- und Frauen-Nationalwettbewerbe samt Testspielen bzw.
+ *                  nur Wettbewerbe der Jugend-Vereine, Skala club-youth)
  *   npm run elo -- build                       beide Systeme rechnen und speichern (0 API)
  *   npm run elo -- ranking [--system club|national] [--country X] [--top 50] [--min-confidence 50]
  *   npm run elo -- team <ID oder Name> [--system national] [--games 20]
@@ -19,7 +20,10 @@ import { ApiFootballClient } from "../src/api.ts";
 import { config } from "../src/config.ts";
 import { AnalyzerDatabase } from "../src/database.ts";
 import { classifyMatch, type EloMatch } from "../src/elo-competitions.ts";
-import { ELO_COMPETITIONS, ELO_CONFIG, ELO_EXCLUDE_PATTERN, ELO_NATIONAL_CATEGORY_COMPETITIONS, ELO_SYSTEMS, eloSystemLabel, type EloSystem } from "../src/elo-config.ts";
+import {
+  ELO_COMPETITIONS, ELO_CONFIG, ELO_EXCLUDE_PATTERN, ELO_NATIONAL_CATEGORY_COMPETITIONS, ELO_SYSTEMS, eloSystemLabel, isYouthClubCompetition,
+  type EloSystem
+} from "../src/elo-config.ts";
 import { getEloHistory, getEloRanking, getTeamElo } from "../src/elo-store.ts";
 import { autoUpdateElo, importFromCache, leagueTypeMap, rebuildElo, toEloMatch } from "../src/elo-update.ts";
 import { seasonHasOpenFixtures } from "../src/strength-builder.ts";
@@ -71,6 +75,7 @@ async function backfill(database: AnalyzerDatabase): Promise<void> {
   const from = Number(option("from") ?? 2021);
   const dryRun = args.includes("--dry-run");
   const onlyCategories = args.includes("--national-categories");
+  const onlyYouthClubs = args.includes("--youth-clubs");
   if (!dryRun && (!Number.isInteger(budget) || budget < 1)) throw new Error("--budget <n> ist Pflicht, etwa --budget 1800.");
   const client = new ApiFootballClient();
   const { leagues, types } = await leagueTypes(client);
@@ -93,9 +98,12 @@ async function backfill(database: AnalyzerDatabase): Promise<void> {
     // ergibt sich erst aus den Teamnamen der einzelnen Spiele (`classifyMatch`).
     const category = ELO_NATIONAL_CATEGORY_COMPETITIONS[league.league.id] !== undefined;
     if (onlyCategories && !category) continue;
+    // Jugend-Vereine (Skala club-youth): ihre Wettbewerbe tragen ebenfalls die Ausschlussmuster.
+    const youthClub = isYouthClubCompetition({ leagueId: league.league.id, leagueName: league.league.name, country: league.country.name });
+    if (onlyYouthClubs && !youthClub) continue;
     const listed = ELO_COMPETITIONS.national[league.league.id] || ELO_COMPETITIONS.club[league.league.id] || category;
     if (!listed && !known.has(league.league.id)) continue;
-    if (!category) {
+    if (!category && !youthClub) {
       if (ELO_EXCLUDE_PATTERN.test(league.league.name)) continue;
       if (classifyMatch({ leagueId: league.league.id, leagueName: league.league.name, leagueType: league.league.type, country: league.country.name }).excluded) continue;
     }

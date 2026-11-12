@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { backtestElo, backtestMetrics } from "../src/elo-backtest.ts";
 import { classifyMatch, type EloMatch } from "../src/elo-competitions.ts";
-import { ELO_CONFIG, type EloConfig } from "../src/elo-config.ts";
+import { ELO_CONFIG, isYouthClubCompetition, isYouthClubName, type EloConfig } from "../src/elo-config.ts";
 import { calculateHistoricalElo, decayFactor, expectedHome, mergeTeams, movFactor, summarizeElo, teamKey } from "../src/elo.ts";
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -140,6 +140,51 @@ test("die Ligaebene wird aus den Daten abgeleitet, nicht vorgegeben", () => {
   const second = state.history.find((row) => row.leagueId === 200 && row.kickoff === NOW - 20 * DAY)!;
   assert.equal(second.competition, "leagueTier2");
   assert.equal(second.competitionMultiplier, 0.9);
+});
+
+test("Jugend-Vereine bekommen keine Ligaebenen - ihre Ligen sind Altersklassen (1.5.1)", () => {
+  // Derselbe Aufbau wie oben, nur mit Jugendteams: Bei Männern wäre Liga 200 Ebene 2.
+  const youth = (partial: Parameters<typeof match>[0]) =>
+    match({ ...partial, homeName: `Team ${partial.homeId} U19`, awayName: `Team ${partial.awayId} U19` });
+  const matches: EloMatch[] = [];
+  let day = 400;
+  for (let round = 0; round < 3; round += 1) {
+    for (let i = 0; i < 6; i += 2) {
+      matches.push(youth({ homeId: 1 + i, awayId: 2 + i, homeGoals: 1, awayGoals: 1, leagueId: 100, leagueName: "U19 Liga", season: 2025, kickoff: NOW - day-- * DAY }));
+      matches.push(youth({ homeId: 11 + i, awayId: 12 + i, homeGoals: 1, awayGoals: 1, leagueId: 200, leagueName: "U17 Liga", season: 2025, kickoff: NOW - day-- * DAY }));
+    }
+    for (let i = 0; i < 6; i += 1) {
+      matches.push(youth({ homeId: 1 + i, awayId: 11 + i, homeGoals: 3, awayGoals: 0, leagueId: 300, leagueName: "Jugendpokal", leagueType: "Cup", season: 2025, kickoff: NOW - day-- * DAY }));
+    }
+  }
+  for (let i = 0; i < 6; i += 2) {
+    matches.push(youth({ homeId: 11 + i, awayId: 12 + i, homeGoals: 1, awayGoals: 0, leagueId: 200, leagueName: "U17 Liga", season: 2026, kickoff: NOW - 20 * DAY }));
+  }
+  const state = calculateHistoricalElo(matches, { ...PLAIN, tiers: { minTeams: 6, gap: 30 } }, { asOf: NOW });
+  assert.equal(state.tiers.get("200|2026"), undefined);
+  const row = state.history.find((entry) => entry.leagueId === 200 && entry.kickoff === NOW - 20 * DAY)!;
+  assert.equal(row.system, "club-youth");
+  assert.equal(row.competition, "leagueTier1");
+});
+
+test("Jugend-Vereine am Namen und am Wettbewerb erkennen", () => {
+  assert.equal(isYouthClubName("Sunderland U21"), true);
+  assert.equal(isYouthClubName("Bayern Munich U19"), true);
+  assert.equal(isYouthClubName("Palmeiras U20"), true);
+  // Frauen-Jugend, Nationalteam-Muster ohne Leerzeichen und Männer-Teams nicht.
+  assert.equal(isYouthClubName("Bayern U19 W"), false);
+  assert.equal(isYouthClubName("Borussia Dortmund II"), false);
+  assert.equal(isYouthClubName("Sunderland"), false);
+  assert.equal(isYouthClubCompetition({ leagueId: 702, leagueName: "Premier League 2 Division One", country: "England" }), true);
+  assert.equal(isYouthClubCompetition({ leagueId: 14, leagueName: "UEFA Youth League", country: "World" }), true);
+  assert.equal(isYouthClubCompetition({ leagueId: 1039, leagueName: "Premier League International Cup", country: "World" }), true);
+  // Vereins-Testspiele gehören zu mehreren Skalen und sind kein reiner Jugendwettbewerb.
+  assert.equal(isYouthClubCompetition({ leagueId: 667, leagueName: "Friendlies Clubs", country: "World" }), false);
+  // Jugend-Nationalteams, unbekannte World-Wettbewerbe, Frauen und Männerligen nicht.
+  assert.equal(isYouthClubCompetition({ leagueId: 850, leagueName: "UEFA U21 Championship - Qualification", country: "World" }), false);
+  assert.equal(isYouthClubCompetition({ leagueId: 890, leagueName: "U20 Elite League", country: "World" }), false);
+  assert.equal(isYouthClubCompetition({ leagueId: 1, leagueName: "U19 Frauen-Bundesliga", country: "Germany" }), false);
+  assert.equal(isYouthClubCompetition({ leagueId: 78, leagueName: "Bundesliga", country: "Germany" }), false);
 });
 
 test("ein neues Team startet beim Mittel seiner Liga, nicht bei 1500", () => {
@@ -470,8 +515,9 @@ test("gemischte Altersklassen und Vereins-Jugend bleiben ausgeschlossen", () => 
   const world = { leagueType: "Cup", country: "World" } as const;
   // U21 gegen U19 passt auf keine Skala.
   assert.equal(classifyMatch({ ...world, leagueId: 10, leagueName: "Friendlies", homeName: "Spain U21", awayName: "France U19" }).excluded, true);
-  // Vereins-Jugend steht nie unter einem Wettbewerb der Liste.
-  assert.equal(classifyMatch({ leagueId: 702, leagueName: "Premier League 2 Division One", leagueType: "League", country: "England", homeName: "Arsenal U21", awayName: "Chelsea U21" }).excluded, true);
+  // Vereins-Jugend steht nie auf einer Nationalteam-Skala - seit 1.5.0 auf der eigenen `club-youth`.
+  const youth = classifyMatch({ leagueId: 702, leagueName: "Premier League 2 Division One", leagueType: "League", country: "England", homeName: "Arsenal U21", awayName: "Chelsea U21" });
+  assert.equal(youth.excluded ? null : youth.system, "club-youth");
   // Ein U18-Team hat keine Skala und fällt weiter heraus.
   assert.equal(classifyMatch({ ...world, leagueId: 10, leagueName: "Friendlies", homeName: "Spain U18", awayName: "France U18" }).excluded, true);
   // Ein Jugendwettbewerb ohne Namenszusatz der Teams wird nicht geraten.
@@ -516,6 +562,30 @@ test("Frauen-Vereine bekommen eine eigene Skala, getrennt von Männer-Vereinen u
   assert.ok(state.teams.has(teamKey("national-women", 70)));
   assert.ok(state.teams.has(teamKey("club", 1)));
   assert.ok(!state.teams.has(teamKey("club", 90)));
+  // Frauen-Jugend bleibt draußen.
+  assert.equal(classifyMatch({ leagueId: 1, leagueName: "U19 Frauen-Bundesliga", leagueType: "League", country: "Germany", homeName: "Bayern U19 W", awayName: "Wolfsburg U19 W" }).excluded, true);
+});
+
+test("Jugend-Vereine bekommen eine eigene Skala, getrennt von Männer-Vereinen und Jugend-Nationalteams", () => {
+  const state = calculateHistoricalElo([
+    match({ homeId: 100, awayId: 101, homeGoals: 2, awayGoals: 1, leagueId: 702, leagueName: "Premier League 2 Division One", country: "England", homeName: "Sunderland U21", awayName: "Everton U21" }),
+    match({ homeId: 100, awayId: 102, homeGoals: 1, awayGoals: 1, leagueId: 1039, leagueName: "Premier League International Cup", leagueType: "Cup", country: "World", homeName: "Sunderland U21", awayName: "Paris Saint-Germain U21" }),
+    match({ homeId: 103, awayId: 104, homeGoals: 3, awayGoals: 0, leagueId: 14, leagueName: "UEFA Youth League", leagueType: "League", country: "World", homeName: "Bayern Munich U19", awayName: "Chelsea U19" }),
+    match({ homeId: 80, awayId: 81, homeGoals: 1, awayGoals: 0, leagueId: 850, leagueName: "UEFA U21 Championship - Qualification", leagueType: "Cup", country: "World", homeName: "Albania U21", awayName: "Malta U21" }),
+    match({ homeId: 1, awayId: 2, homeGoals: 2, awayGoals: 1, leagueName: "Premier League", country: "England" })
+  ], PLAIN, { asOf: NOW });
+  for (const id of [100, 101, 102, 103, 104]) assert.ok(state.teams.has(teamKey("club-youth", id)), `Team ${id}`);
+  assert.ok(state.teams.has(teamKey("national-u21", 80)));
+  assert.ok(state.teams.has(teamKey("club", 1)));
+  assert.ok(!state.teams.has(teamKey("club", 100)));
+  assert.ok(!state.teams.has(teamKey("club-youth", 80)));
+  const pl2 = classifyMatch({ leagueId: 702, leagueName: "Premier League 2 Division One", leagueType: "League", country: "England", homeName: "Sunderland U21", awayName: "Everton U21" });
+  assert.deepEqual(pl2.excluded ? null : [pl2.system, pl2.kind, pl2.isLeague, pl2.international], ["club-youth", "leagueTier1", true, false]);
+  // Jugend gegen Männer bleibt draußen (EFL Trophy), ebenso Jugend-Nationalteams unter World ohne Listeneintrag.
+  assert.equal(classifyMatch({ leagueId: 46, leagueName: "EFL Trophy", leagueType: "Cup", country: "England", homeName: "Reading", awayName: "Chelsea U21" }).excluded, true);
+  assert.equal(classifyMatch({ leagueId: 890, leagueName: "U20 Elite League", leagueType: "Cup", country: "World", homeName: "England U20", awayName: "Germany U20" }).excluded, true);
+  // Eine zweite Mannschaft aus ELO_SENIOR_RESERVE_TEAMS rechnet auf der Männerskala, nicht bei der Jugend.
+  assert.equal(classifyMatch({ leagueId: 999, leagueName: "Reserve League", leagueType: "League", country: "Scotland", homeId: 6779, homeName: "Rangers U21", awayId: 7, awayName: "Celtic U21" }).excluded, true);
   // Frauen-Jugend bleibt draußen.
   assert.equal(classifyMatch({ leagueId: 1, leagueName: "U19 Frauen-Bundesliga", leagueType: "League", country: "Germany", homeName: "Bayern U19 W", awayName: "Wolfsburg U19 W" }).excluded, true);
 });

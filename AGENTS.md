@@ -1296,6 +1296,26 @@ nachgezogen, nicht gesammelt am Ende.
   Teams aus dem vorhandenen Bestand, 0 Aufrufe. **Nur Anzeige** wie das Vereins-Elo überhaupt,
   im Elo-Backtest nicht mitgezählt. Männer-Vereine und A-Nationalteams blieben nachgewiesen
   unverändert.
+- **Jugend-Vereine haben seit 11.11.2026 eine eigene Skala `club-youth`** (Davids Auftrag, Elo 1.5.0):
+  beide Teams mit Altersangabe U15-U23 in nationalen Jugendwettbewerben (Premier League 2, U19 Bundesliga,
+  Primavera, Diski Challenge …) und den gelisteten internationalen (`ELO_YOUTH_CLUB_COMPETITIONS`: UEFA
+  Youth League 14, Premier League International Cup 1039, Vereins-Testspiele 667). Eine Skala über alle
+  Altersklassen; Prüfung vom 12.11.2026: 14 unverbundene Inseln (Brasilien, Europa/UYL, England …), Werte nur
+  innerhalb einer Insel vergleichbar, als Klassenfaktor gemessen ohne Gewinn (Teiler 1400 −0,006 ± 0,006,
+  im Premier League International Cup schlechter) - bleibt Anzeige (Davids Entscheidung vom 12.11.2026,
+  ebenso: keine Ligaebenen bei `club-youth`, Elo 1.5.1; Neo urteilt bei Jugend-Vereinen nur ab 30 % Vertrauen
+  beider Teams, sonst „zu wenige Spiele für ein Urteil“). Jugend
+  gegen Männer, `ELO_SENIOR_RESERVE_TEAMS`, Jugend-Nationalteams unter `World` ohne Listeneintrag und
+  Frauen-Jugend bleiben draußen. **Nur Anzeige** wie die Frauen-Vereine (`eloLevelOf` liest nur `club`,
+  `teamEloSystems` nennt sie nicht); `npm run coverage` führt solche Spiele unter „so vorgesehen“. Ob die
+  Skala den Klassenfaktor tragen darf, misst der Prüfer-Agent, dann entscheidet David. Nachladen
+  `npm run elo -- backfill --youth-clubs`, Wochenrunde über `isYouthClubCompetition`. Beschreibung in
+  `docs/team-elo.md`, Abschnitt 4.
+- **Das Lesen folgt den Zusammenführungen (seit 11.11.2026, Elo 1.5.0):** `getTeamElo` und
+  `getEloByTeam` folgen `ELO_TEAM_MERGES`, wenn die gefragte ID keinen eigenen Eintrag hat - vorher stand
+  Wests APIA (26874, nur Australian Championship) ohne Elo, obwohl seine Geschichte als APIA Leichhardt
+  Tigers (3764, NSW NPL) vorlag; beide IDs sind gleichzeitig in Gebrauch, die Zusammenführung allein
+  hätte der Ansetzung unter 26874 nichts gebracht. Ein eigener Eintrag geht vor (geteilte IDs).
 - **Jugend- und Frauen-Nationalteams haben seit 29.09.2026 eigene Skalen** (Davids Auftrag):
   `national-u23`, `-u21`, `-u20`, `-u19`, `-u17`, `-women` (`EloSystem`, `ELO_SYSTEMS` in
   `src/elo-config.ts`), mit denselben Parametern wie die A-Nationalteams (`systemConfigOf`). Die
