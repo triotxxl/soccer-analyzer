@@ -18,9 +18,10 @@ und ihr Neuaufbau kostet Tausende API-Aufrufe. Schritte für David:
 3. `npm run restore` - lädt die neueste Sicherung von MEGA, prüft sie und legt sie als
    `data/analyzer.sqlite` ab. Ohne MEGA: `npm run restore -- --file <pfad zur .sqlite.gz>`.
    Eine vorhandene Datenbank ersetzt erst `--force`, und sie wird dabei beiseitegelegt.
-4. Nicht in der Sicherung: der API-Cache (`data/cache/`, füllt sich mit den Analysen, die erste
-   ist teurer), die Snapshots in `output/` (Marktprofil und Kelly-Automatik beginnen mit dem
-   übertragenen Stand der Datenbank, aber ohne alte Snapshots), `data.json` (nur für `--source tipico`) und Claudes Notizen
+4. Die Analyse-Stände in `output/` holt `npm run restore` seit 13.11.2026 mit (MEGA-Ordner
+   `<MEGA_FOLDER>/snapshots`, Abschnitt „Pflege“, Sicherung): die letzte Analyse und alle datierten Stände.
+   Nicht in der Sicherung: der API-Cache (`data/cache/`, füllt sich mit den Analysen, die erste
+   ist teurer), `data.json` (nur für `--source tipico`) und Claudes Notizen
    (`C:\Users\<Name>\.claude\projects\…\memory\` - von Hand kopieren, sonst fehlen die
    Daueraufträge).
 
@@ -684,7 +685,14 @@ Spiele; geprüft wurden alle deutschen Anbieter, nur Betano (32) und Bet365 (8) 
   über die Online-Sicherung von SQLite (eine Dateikopie verlöre, was noch im WAL steht), geprüft
   mit `quick_check`, erst dann gepackt und umbenannt - scheitert etwas, bleibt die bisherige
   Sicherung. Rund 190 MB und 15 s je Analyse, kein API-Budget. Von Hand `npm run backup`,
-  abschalten mit `BACKUP_AFTER_ANALYSIS=0`. Cache und Snapshots sind nicht dabei.
+  abschalten mit `BACKUP_AFTER_ANALYSIS=0`. Der Cache ist nicht dabei.
+  **Analyse-Stände bei MEGA (seit 13.11.2026, Davids Wunsch** „die letzte Analyse immer in der Datenbank oder
+  im Code“; Datenbank und git schieden aus, je Analyse bis 50 MB): `src/snapshot-sync.ts` lädt nach der
+  Datenbank `output/dashboard-latest.json` und die datierten Stände gepackt nach `<MEGA_FOLDER>/snapshots` -
+  den letzten Stand jedes Mal neu (erst hoch, dann die alte Fassung weg), datierte nur, wenn sie dort fehlen,
+  neueste zuerst, höchstens 20 je Analyse (`npm run backup` lädt alle fehlenden). Sie bleiben dort (20 GB).
+  `npm run restore` holt danach `dashboard-latest.json` immer und die datierten, die lokal fehlen; mit
+  `--file` nicht.
   **Seit 21.10.2026 zusätzlich bei MEGA** (Davids Wahl, 20 GB kostenlos), wenn `MEGA_EMAIL` und
   `MEGA_PASSWORD` in `.env` stehen: `src/mega-store.ts` über das Paket `megajs` (nicht von MEGA
   selbst), Regeln in `src/remote-backup.ts` - erst hochladen, dann die ältere Fassung des Tages

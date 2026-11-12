@@ -4,7 +4,8 @@
  *   npm run backup
  *
  * Ziel `data/backups/` oder `BACKUP_DIR`, eine Datei je Tag, die neuesten `BACKUP_KEEP` (6)
- * bleiben; mit MEGA-Zugang in `.env` zusätzlich dort. Kostet kein API-Budget. Zurückspielen:
+ * bleiben; mit MEGA-Zugang in `.env` zusätzlich dort, dazu alle Analyse-Stände aus `output/`, die
+ * dort noch fehlen (die Analyse lädt je Lauf höchstens 20). Kostet kein API-Budget. Zurückspielen:
  * `npm run restore` (`tools/restore.ts`).
  */
 import { runBackup } from "../src/backup-run.ts";

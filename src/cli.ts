@@ -835,7 +835,9 @@ async function dashboard(args: ParsedArgs): Promise<void> {
     // Zuletzt, damit Abrechnung und Elo des Laufs mit drin sind. Scheitert sie, bleibt die
     // Analyse gültig und die bisherige Sicherung des Tages stehen.
     if (config.backupAfterAnalysis) {
-      const backup = await runBackup();
+      // Je Analyse höchstens 20 ältere Analyse-Stände neu zu MEGA, damit die erste auf einem
+      // PC mit vielen alten Ständen nicht lange hängt (der Rest: npm run backup).
+      const backup = await runBackup({ snapshotLimit: 20 });
       for (const line of backup.lines) console.log(line);
       for (const line of backup.errors) console.error(line);
     }

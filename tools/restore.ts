@@ -11,9 +11,10 @@
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { BACKUP_FILE } from "../src/backup.ts";
-import { config, DB_FILE } from "../src/config.ts";
+import { config, DB_FILE, ROOT_DIR } from "../src/config.ts";
 import { newestRemoteBackup } from "../src/remote-backup.ts";
 import { restoreDatabase } from "../src/restore.ts";
+import { downloadSnapshots, SNAPSHOT_SUBFOLDER } from "../src/snapshot-sync.ts";
 
 const args = process.argv.slice(2);
 const fileArg = args.includes("--file") ? args[args.indexOf("--file") + 1] : undefined;
@@ -50,6 +51,20 @@ try {
   const result = await restoreDatabase(data, DB_FILE, { force });
   console.log(`Eingespielt: ${label} -> ${result.target} (${(result.bytes / 1e6).toFixed(0)} MB)`);
   if (result.setAside) console.log(`Die bisherige Datenbank liegt unter ${result.setAside}.`);
+  // Nur zusammen mit der Datenbank von MEGA - zu einer Datei aus --file passt der Stand dort nicht.
+  if (config.mega && !fileArg) {
+    const folder = `${config.mega.folder}/${SNAPSHOT_SUBFOLDER}`;
+    console.log(`Lade Analyse-Stände von MEGA/${folder} …`);
+    const { openMegaStore } = await import("../src/mega-store.ts");
+    const store = await openMegaStore({ ...config.mega, folder });
+    try {
+      const snapshots = await downloadSnapshots(store, path.join(ROOT_DIR, "output"));
+      console.log(`Analyse-Stände: ${snapshots.latest ? "letzte Analyse eingespielt" : "keine letzte Analyse bei MEGA"}`
+        + ` · ${snapshots.downloaded} ältere neu nach output/`);
+    } finally {
+      await store.close();
+    }
+  }
   console.log("Der API-Cache (data/cache/) ist nicht in der Sicherung; er füllt sich mit den nächsten Analysen.");
 } catch (error) {
   console.error(error instanceof Error ? error.message : String(error));

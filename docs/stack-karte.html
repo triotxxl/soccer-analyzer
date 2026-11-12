@@ -265,7 +265,7 @@ details.honesty p { margin-top: 6px; }
 
 <div class="page">
   <header class="head">
-    <span class="eyebrow">api-football-analyzer · Stand 12.11.2026</span>
+    <span class="eyebrow">api-football-analyzer · Stand 13.11.2026</span>
     <h1>Wie der Analyzer zusammenhängt</h1>
     <p>Von den Quoten bei API-Football bis zur Anzeige in Neo: welche Teile Daten holen, rechnen, speichern und zeigen, und wer von Claudes Seite daran arbeitet. Klick auf einen Baustein, dann siehst du, woher er seine Daten bekommt und wohin er sie gibt.</p>
     <div class="legend" aria-label="Farben">
@@ -349,7 +349,7 @@ details.honesty p { margin-top: 6px; }
       <li class="step in-run"><span class="s-num">Lauf</span><h3>Rechnen</h3><p>Torlinien (vorher fehlende Ligastärke nachladen), Remis-Punkte, Favoriten. Die Modelle bekommen Daten und geben Wahrscheinlichkeiten zurück.</p><span><span class="chip cost">Ligastärke bis 300</span></span></li>
       <li class="step in-run"><span class="s-num">Lauf</span><h3>Snapshot schreiben</h3><p><code>output/dashboard-latest.json</code> und eine datierte Kopie. Prognosen gehen zusätzlich in die Datenbank.</p><span><span class="chip free">0 Aufrufe</span></span></li>
       <li class="step in-run"><span class="s-num">Lauf</span><h3>Abrechnen</h3><p>Beendete Spiele abrechnen, danach die Kurzfassung, wie gut das Modell zuletzt lag.</p><span><span class="chip cost">bis 200</span></span></li>
-      <li class="step in-run"><span class="s-num">Lauf</span><h3>Sichern</h3><p>Datenbank geprüft und gepackt nach <code>data/backups/</code>, dann zu MEGA. Rund 15 Sekunden.</p><span><span class="chip free">0 Aufrufe</span></span></li>
+      <li class="step in-run"><span class="s-num">Lauf</span><h3>Sichern</h3><p>Datenbank geprüft und gepackt nach <code>data/backups/</code>, dann zu MEGA. Danach der letzte Snapshot und bis zu 20 noch fehlende ältere nach MEGA (Ordner <code>snapshots</code>).</p><span><span class="chip free">0 Aufrufe</span></span></li>
       <li class="step"><span class="s-num">Danach</span><h3>Lücken prüfen</h3><p><code>npm run coverage</code> und <code>npm run data-check</code> listen fehlendes Elo, fehlende Ligastärke und Datenfehler.</p><span><span class="chip free">0 Aufrufe</span></span></li>
       <li class="step"><span class="s-num">Danach</span><h3>Ansehen</h3><p><code>npm run neo</code> startet Neo auf Port 5174, <code>npm run app</code> die alte App auf Port 5173. Beide lesen den neuesten Snapshot.</p><span><span class="chip free">0 Aufrufe</span></span></li>
     </ol>
@@ -396,8 +396,8 @@ details.honesty p { margin-top: 6px; }
           <tr><td><code>add-tipico-names</code></td><td>Tipico-Namen in einen vorhandenen Snapshot schreiben</td><td><span class="chip free">0</span></td></tr>
           <tr><td><code>insights-probe</code></td><td>Detailkennzahlen eines Spiels prüfen</td><td><span class="chip cost">rund 4</span></td></tr>
           <tr><td><code>smoke</code></td><td>Verbindung zu API-Football testen</td><td><span class="chip cost">1</span></td></tr>
-          <tr><td><code>backup</code></td><td>Datenbank sichern, auch zu MEGA</td><td><span class="chip free">0</span></td></tr>
-          <tr><td><code>restore</code></td><td>Neueste Sicherung von MEGA zurückspielen (<code>--force</code> ersetzt)</td><td><span class="chip free">0</span></td></tr>
+          <tr><td><code>backup</code></td><td>Datenbank sichern, auch zu MEGA, dazu alle fehlenden Snapshots</td><td><span class="chip free">0</span></td></tr>
+          <tr><td><code>restore</code></td><td>Neueste Sicherung und die Snapshots von MEGA zurückspielen (<code>--force</code> ersetzt)</td><td><span class="chip free">0</span></td></tr>
           <tr><td class="grp" colspan="3">App und Entwicklung</td></tr>
           <tr><td><code>app</code></td><td>Alte App starten, Port 5173</td><td><span class="chip free">0</span></td></tr>
           <tr><td><code>app:build</code></td><td>Alte App für <code>dist/analyzer</code> bauen</td><td><span class="chip free">0</span></td></tr>
@@ -452,7 +452,7 @@ details.honesty p { margin-top: 6px; }
             <tr><td><code>data/analyzer.sqlite</code><br><span class="hint">Prognosen, Ergebnisse, Elo, Ligastärke</span></td><td class="yes">ja, lokal und MEGA</td></tr>
             <tr><td><code>.env</code><br><span class="hint">API-Schlüssel (API-Football, OddsPapi), MEGA-Zugang</span></td><td class="no">nein, von Hand</td></tr>
             <tr><td><code>data/cache/</code><br><span class="hint">füllt sich mit der nächsten Analyse</span></td><td class="no">nein</td></tr>
-            <tr><td><code>output/</code><br><span class="hint">Snapshots für Neo und Rückrechnungen</span></td><td class="no">nein</td></tr>
+            <tr><td><code>output/</code><br><span class="hint">Snapshots für Neo und Rückrechnungen</span></td><td class="yes">ja, bei MEGA (seit 13.11.2026)</td></tr>
             <tr><td><code>data.json</code><br><span class="hint">dein Tipico-Export, nur für <code>--source tipico</code></span></td><td class="no">nein</td></tr>
             <tr><td>Claudes Notizen<br><span class="hint">Daueraufträge, Vorlieben</span></td><td class="no">nein, von Hand kopieren</td></tr>
           </tbody>
@@ -477,8 +477,8 @@ const NODES = {
   q_oddspapi: { band: "main", col: 0, t: "src", kind: "Quelle", name: "OddsPapi", line: "Welche Spiele es bei Betano und Tipico gibt", path: "src/oddspapi.ts · src/offer-filter.ts", chips: [["cost", "250 im Monat"]],
     text: "Seit 10.11.2026 die Angebotsliste: welche Spiele betano.de und Tipico DE führen, je Seite eine eigene Liste. Analysiert wird, was mindestens eine Seite anbietet – auch ohne Quote bei API-Football (dann „Ohne Quote“ in den Apps); beide Apps schalten zwischen Betano und Tipico um. Nur die Spielliste, keine Quoten – die kommen weiter von API-Football. Die Spiele werden über Anstoß und Teamnamen zugeordnet (src/offer-matching.ts); ein Spiel ohne eigenen Treffer zählt, wenn seine Liga dabei ist. Führt API-Football ein Spiel auf einem Platzhaltertermin, gilt der Anstoß von Betano bzw. Tipico. Angebotene Spiele, die API-Football gar nicht kennt, werden nicht analysiert – die alte App listet sie zugeklappt im Filtermenü unter „Angebot“.",
     facts: [["Kosten", "Gratis-Konto: 250 Aufrufe im Monat. Feste Zwei-Tage-Blöcke, 3 Stunden im Cache <code>data/oddspapi-cache/</code>: eine Analyse je Seite 0 bis 3 Aufrufe, beide zusammen bis 6. 10 bleiben als Reserve."], ["Rückfall", "Ohne Schlüssel, bei leerem Kontingent oder Fehler: Ligen, die Tipico je angeboten hat – mit Warnung."], ["Platzhaltertermine", "Anstoß vom Anbieter; liegt das Spiel bei API-Football außerhalb des Zeitraums, lädt die Analyse die Tagesliste ±2 Tage daneben (ein Aufruf je Tag)."], ["Schlüssel", "<code>ODDSPAPI_KEY</code> in <code>.env</code>, Seiten in <code>ODDSPAPI_BOOKMAKERS</code> (Vorgabe betano.de,tipico)"], ["Umschalter", "Neo in der Kopfleiste, alte App im Filtermenü unter „Umfang“; ab Werk Betano, gemerkt. Baustein <code>apps/shared/src/offer.ts</code>"], ["Quoten von hier", "Gemessen 10.11.2026: 25 $ im Monat für betano.de, 35 $ mit Tipico – nicht gebucht."]] },
-  q_mega: { band: "main", col: 0, t: "src", kind: "Quelle und Ablage", name: "MEGA", line: "Sicherungen in der Cloud", path: "src/mega-store.ts · src/remote-backup.ts", chips: [["plain", "6 Sicherungen"]],
-    text: "Cloud-Ablage für die Datenbank-Sicherungen über das Paket megajs. Von hier holt npm run restore die Datenbank auf einen anderen PC.",
+  q_mega: { band: "main", col: 0, t: "src", kind: "Quelle und Ablage", name: "MEGA", line: "Sicherungen und Snapshots in der Cloud", path: "src/mega-store.ts · src/remote-backup.ts · src/snapshot-sync.ts", chips: [["plain", "6 Sicherungen"]],
+    text: "Cloud-Ablage für die Datenbank-Sicherungen über das Paket megajs, seit 13.11.2026 auch für die Snapshots (Unterordner snapshots, gepackt, der letzte jedes Mal neu, ältere einmal, alle bleiben). Von hier holt npm run restore Datenbank und Snapshots auf einen anderen PC, damit die Apps dort sofort die letzte Analyse zeigen.",
     facts: [["Zugang", "<code>MEGA_EMAIL</code>, <code>MEGA_PASSWORD</code>, <code>MEGA_FOLDER</code> in <code>.env</code>"], ["Regel", "Immer nur ein PC zur Zeit. Vor dem Wechsel <code>npm run restore -- --force</code>."]] },
 
   // Kommandozeile
@@ -584,6 +584,8 @@ const EDGES = [
   ["a_settle", "s_db", "Ergebnisse und Abrechnung"],
   ["a_dashboard", "s_backup", "Sicherung nach jeder Analyse"],
   ["s_backup", "q_mega", "hochladen, 6 behalten"],
+  ["s_output", "q_mega", "Snapshots hochladen"],
+  ["q_mega", "s_output", "npm run restore holt die Snapshots"],
   ["q_mega", "s_db", "npm run restore"],
   ["a_care", "s_db", "Elo und Ligastärke nachladen"],
   ["s_db", "a_reports", "nur lesen"],
