@@ -492,7 +492,12 @@ export function strengthOf(fixture: DashboardFixture, source: NameSource = "api"
   const home = fixture.homeElo ?? null, away = fixture.awayElo ?? null;
   const comparable = home !== null && away !== null && home.system === away.system;
   let stronger: StrengthView["stronger"] = null, verdict: string | null = null;
-  if (comparable) {
+  // Jugend-Vereine (Skala `club-youth`) nur mit Urteil, wenn beide Werte belastbar sind (Davids
+  // Entscheidung vom 12.11.2026): Die Skala zerfällt in unverbundene Inseln, und im Premier League
+  // International Cup gewann die laut Elo klar stärkere Seite nur 48 von 100 Spielen. Die Zahlen bleiben.
+  if (comparable && home.system === "club-youth" && (eloThin(home) || eloThin(away))) {
+    verdict = "zu wenige Spiele für ein Urteil";
+  } else if (comparable) {
     const diff = home.elo - away.elo, size = Math.abs(diff), name = diff > 0 ? homeName : awayName;
     if (size >= ELO_TEAM_STEPS.slight) stronger = diff > 0 ? "home" : "away";
     verdict = size < ELO_TEAM_STEPS.slight ? "etwa gleich stark"

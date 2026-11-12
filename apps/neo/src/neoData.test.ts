@@ -190,6 +190,20 @@ describe("Elo (Spielstärke)", () => {
     expect(s.league?.verdict).toBe("deutlicher Klassenunterschied zugunsten von Heim FC");
     expect(s.league?.stronger).toBe("away");
   });
+  it("urteilt bei Jugend-Vereinen nur, wenn beide Werte belastbar sind", () => {
+    const youth = (homeConfidence: number) => ({
+      ...league, crossLeague: false,
+      homeElo: { ...league.homeElo!, system: "club-youth" as const, elo: 1700, confidence: homeConfidence },
+      awayElo: { ...league.awayElo!, system: "club-youth" as const, elo: 1500, confidence: 60 },
+    });
+    const thin = strengthOf(youth(20));
+    expect(thin.comparable).toBe(true);
+    expect(thin.stronger).toBeNull();
+    expect(thin.verdict).toBe("zu wenige Spiele für ein Urteil");
+    const solid = strengthOf(youth(40));
+    expect(solid.stronger).toBe("home");
+    expect(solid.verdict).toMatch(/klar stärker$/);
+  });
   it("vergleicht keine verschiedenen Skalen und nennt fehlendes Elo", () => {
     const mixed = { ...cup, awayElo: { ...cup.awayElo!, system: "national" as const } };
     expect(strengthOf(mixed).comparable).toBe(false);
