@@ -707,8 +707,16 @@ Seit 19.10.2026 liegen die Oberflächen unter `apps/` (vorher `frontend/`). Die 
 `apps/analyzer/` war vom 26.10. bis 02.11.2026 entfernt (Abschnitt „Pflege“):
 
 - `apps/analyzer/` - die **alte App** (`npm run app`, Port 5173, `app:build`, `app:preview`), seit
-  02.11.2026 wieder da, Stand vom 26.10.2026. Sie hat als einzige eine Live-Ansicht. Eigene Stildatei
-  `apps/analyzer/src/base.css` (alter Stand; die gemeinsame trägt seit 26.10. die Tokens von Neo). Neu seit
+  02.11.2026 wieder da, Stand vom 26.10.2026. Sie hat als einzige eine Live-Ansicht.
+  **Redesign seit 13.11.2026** (Davids Freigabe der Leinwand https://claude.ai/artifact/3gYfrzR5UEXjwp1QenPged,
+  Umbau in Wellen, Inhalte und Regeln unverändert): Welle 1 Grundgerüst - zwei Themen über `data-theme` auf `<html>`
+  (`src/theme.ts`, gemerkt in `localStorage` `analyzer:theme`, `?theme=light|dark` in der Adresse geht vor), alle Farben
+  als Tokens in `apps/analyzer/src/base.css` (styles.css trägt keine festen Grautöne mehr; neue Farben nur als Token,
+  sonst stimmt eins der Themen nicht), Schrift Inter (`@fontsource/inter`), randlose Hülle, Leiste 72 px, Kopfzeile
+  `AppHeader` (`NavRail.tsx`) mit Hell/Dunkel. Offen: Tabelle mit Filter und Detailansicht (Detail in Reitern),
+  Quickpicker und Wettschein, Live, Heatmap/Marktprofil/Kelly/Einstellungen/Zustände; die farbigen Sondertöne in
+  styles.css (Gold, Grün, Orange) sind noch auf dunkel abgestimmt. Eigene Stildatei
+  `apps/analyzer/src/base.css` (nicht die gemeinsame, die seit 26.10. die Tokens von Neo trägt). Neu seit
   02.11.2026 (Davids Wunsch): **Tabellenverlauf** direkt unter „Direkte Begegnungen“ (`LeaguePerf.tsx`) - dasselbe
   Diagramm und dieselbe Rechnung wie im H2H-Reiter von Neo, dafür nach `apps/shared/src/PerfChart.tsx` und
   `apps/shared/src/perf.ts` (`tableEntryOf`, `perfWindow`, `perfTrend`) verschoben; 0 Aufrufe. Im **Quickpicker**

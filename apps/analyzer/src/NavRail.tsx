@@ -1,6 +1,7 @@
-import { Broadcast, ChartBar, ClockCounterClockwise, GridFour, SoccerBall, Table, type Icon } from "@phosphor-icons/react";
+import { Broadcast, ChartBar, ClockCounterClockwise, GridFour, Moon, SoccerBall, Sun, Table, type Icon } from "@phosphor-icons/react";
 import type { ReactNode } from "react";
 import { dateFormat } from "./dateFormat";
+import type { Theme } from "./theme";
 
 /**
  * Die vier Ansichten der linken Leiste. Tabelle und Heatmap sind intern dieselbe Ansicht
@@ -68,4 +69,33 @@ export function NavRail({ active, onSelect, createdAt, timezone, settings }: {
       <span>{time}</span>
     </p>
   </div>;
+}
+
+/**
+ * Kopfzeile über jeder Ansicht (seit 13.11.2026, Redesign): Name und Datenstand links, rechts der
+ * Umschalter Hell/Dunkel. Weitere Knöpfe (Wettschein) kommen mit den nächsten Umbau-Wellen.
+ */
+export function AppHeader({ createdAt, timezone, theme, onThemeChange, children }: {
+  createdAt: string;
+  timezone: string;
+  theme: Theme;
+  onThemeChange: (theme: Theme) => void;
+  children?: ReactNode;
+}) {
+  const [day, time] = dataTimestampParts(createdAt, timezone);
+  return <header className="app-header">
+    <div className="app-header-title">
+      <strong>Football Analyzer</strong>
+      <span>Stand {day} · {time}</span>
+    </div>
+    {children}
+    <div className="theme-switch" role="group" aria-label="Darstellung">
+      <button type="button" aria-pressed={theme === "light"} onClick={() => onThemeChange("light")}>
+        <Sun size={15} weight="bold" aria-hidden />Hell
+      </button>
+      <button type="button" aria-pressed={theme === "dark"} onClick={() => onThemeChange("dark")}>
+        <Moon size={15} weight="bold" aria-hidden />Dunkel
+      </button>
+    </div>
+  </header>;
 }

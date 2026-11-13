@@ -374,7 +374,8 @@ describe("React-Dashboard", () => {
     expect(await display()).toEqual({ view: "outcome", line: undefined, direction: undefined });
     await user.selectOptions(markets, "draw");
     expect(await display()).toMatchObject({ view: "outcome" });
-  });
+    // Viele Marktwechsel über die ganze Tabelle: im vollen Testlauf knapp über 5 s, einzeln weit darunter.
+  }, 15_000);
 
   it("zeigt Vorteil und Kelly ab Werk nicht, auch wenn der alte Schlüssel an war", async () => {
     // Bis 27.09.2026 schrieb die App "1" schon beim ersten Laden - das darf nicht mehr gelten.

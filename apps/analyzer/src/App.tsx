@@ -29,7 +29,8 @@ import { edgeOf, loadKellyAuto, loadKellySettings, loadKellyVisible, saveKellyAu
 import { KellyButton, KellyDialog, formatEuro, kellyProfileNote } from "./KellyUI";
 import { FilterButton, FilterChip, FilterMenu, FilterSegment, type ClassGapFilter, type FilterMenuActions, type FilterMenuValues, type LeagueEntry, type LevelFilter, type SegmentOption } from "./FilterMenu";
 import { MarketProfileView } from "./MarketProfileUI";
-import { BrandMark, NavRail, type NavKey } from "./NavRail";
+import { AppHeader, BrandMark, NavRail, type NavKey } from "./NavRail";
+import { useTheme } from "./theme";
 import { QuickpickButton, QuickpickChip, QuickpickDialog, QuickpickTableTip, type QuickpickCartFeedback } from "./QuickpickUI";
 import { applyQuickpick, loadQuickpickStore, saveQuickpickStore, settingsOf, withSettings, QUICKPICK_PRESETS, REJECTION_LABELS, presetOf, type QuickpickEvaluation, type QuickpickFilterReport, type QuickpickPresetId, type QuickpickRejection, type QuickpickStore } from "./quickpick";
 import { TeamCrest } from "../../shared/src/TeamCrest";
@@ -1412,6 +1413,7 @@ const FixtureRow = memo(function FixtureRow({ fixture, view, actions, open, cart
 function Dashboard({ document }: { document: DashboardDocument }) {
   const [view, setView] = useState<AppView>(loadView);
   const [layout, setLayout] = useState<TableLayout>(loadLayout);
+  const [theme, setTheme] = useTheme();
   const navKey: NavKey = view === "prematch" ? layout : view;
   // Zeigt die H2H- und Form-Spalte auf das Ausbleiben statt auf das Eintreten.
   const [counterDirection, setCounterDirection] = useState(false);
@@ -2410,6 +2412,7 @@ function Dashboard({ document }: { document: DashboardDocument }) {
       settings={settingsControl} />
 
     <main className="content">
+      <AppHeader createdAt={document.meta.createdAt} timezone={document.meta.timezone} theme={theme} onThemeChange={setTheme} />
       {banner && <div className="banner"><span><RocketLaunch size={20} weight="duotone" /></span><p><strong className="gold">Gold ★</strong> heißt sehr empfehlenswert, <strong>Grün ✓</strong> empfehlenswert. Sortiere über die Spaltenköpfe; Zeitraum, Wettbewerbe und Stufe stellst du über „Filter“ ein.</p><button onClick={() => { setBanner(false); saveBannerDismissed(); }} aria-label="Hinweis schließen"><X /></button></div>}
       {view === "prematch" ? <>
       <div className="view-toolbar prematch-toolbar">

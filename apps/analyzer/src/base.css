@@ -1,39 +1,86 @@
-/* Grundlage der alten App: Farben, Schrift, Reset. Bis 26.10.2026 war das apps/shared/styles/base.css;
-   seitdem trägt die gemeinsame Datei die Tokens von Neo (andere Namen und Werte). Seit der Rückkehr der
-   alten App am 02.11.2026 behält sie hier ihren alten Stand, damit sie aussieht wie vorher. */
+/* Grundlage der alten App: Farben, Schrift, Reset.
+   Seit 13.11.2026 (Davids Freigabe des Redesigns, Leinwand „Analyzer Tabelle – Hell & Dunkel“,
+   https://claude.ai/artifact/3gYfrzR5UEXjwp1QenPged) mit zwei Themen: dunkel ab Werk,
+   hell über `data-theme="light"` auf <html> (gesetzt von `src/theme.ts`, gemerkt im Browser).
+   styles.css trägt keine festen Grautöne mehr, nur diese Tokens - wer eine Farbe braucht, nimmt
+   eine von hier, sonst stimmt sie in einem der beiden Themen nicht.
+   Schrift Inter wie im Entwurf (@fontsource/inter). */
 :root {
   color-scheme: dark;
-  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
-  background: #181818;
-  color: #d4d4d4;
+  font-family: var(--sans);
+  font-feature-settings: "calt" 0;
+  font-variant-numeric: tabular-nums;
+  background: var(--bg);
+  color: var(--text);
   font-synthesis: none;
-  --bg: #181818;
-  --shell: #1e1e1e;
-  --surface: #252526;
-  --surface-2: #2d2d30;
-  --line: #3c3c3c;
-  --line-soft: #2b2b2b;
-  --text: #d4d4d4;
-  --muted: #a0a0a0;
-  --dim: #868686;
-  --accent: #3794ff;
-  --accent-soft: #1f3a4d;
-  --green: #89d185;
-  --gold: #cca700;
-  --red: #f14c4c;
-  --home: #75beff;
-  --away: #ce9178;
-  --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --sans: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  /* Früher JetBrains Mono; die Stellen, die sie nutzten, sind Zahlen und kurze Kennungen. */
+  --mono: var(--sans);
+
+  --bg: #121314;
+  --shell: #17181a;
+  --surface: #1e1f22;
+  --surface-2: #27282c;
+  --hover: #24262a;
+  /* „gewählt“: Segmente, offene Knöpfe, Wahl im Filtermenü */
+  --selected: #24335e;
+  --line: #2f3136;
+  --line-soft: #26272b;
+  --line-strong: #3d4047;
+  --text: #e6e8eb;
+  --text-2: #c3c7cd;
+  --text-strong: #f8f9fb;
+  --muted: #9ba1ab;
+  --dim: #858b95;
+  --accent: #3b6cf6;
+  --accent-ink: #8fb0ff;
+  --accent-soft: #1f2a4a;
+  --green: #5fd18c;
+  --gold: #f0b04a;
+  --red: #ff5a5f;
+  --home: #7aa2ff;
+  --away: #f0a35a;
+  /* Für rgba(var(--tint), a): helle Schleier im dunklen, dunkle im hellen Thema. */
+  --tint: 255, 255, 255;
+  --shade: 0, 0, 0;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #f3f5f9;
+  --shell: #eef1f6;
+  --surface: #ffffff;
+  --surface-2: #f4f6fa;
+  --hover: #eef1f6;
+  --selected: #e3e9fc;
+  --line: #e1e5ec;
+  --line-soft: #eceff4;
+  --line-strong: #cbd2dd;
+  --text: #1d2233;
+  --text-2: #3b4252;
+  --text-strong: #0f1320;
+  --muted: #5f6673;
+  --dim: #6b7280;
+  --accent: #1f3fd1;
+  --accent-ink: #1f3fd1;
+  --accent-soft: #e8edfd;
+  --green: #11703a;
+  --gold: #8a5a00;
+  --red: #c42b2b;
+  --home: #1f3fd1;
+  --away: #b4500a;
+  --tint: 20, 30, 70;
+  --shade: 20, 30, 70;
 }
 
 * { box-sizing: border-box; }
 html, body, #root { min-height: 100%; margin: 0; }
-body { min-width: 320px; background: radial-gradient(900px 520px at 6% -6%, rgba(255,255,255,.035), transparent 60%), var(--bg); }
+body { min-width: 320px; background: var(--bg); }
 button, input, select { font: inherit; }
 button { color: inherit; cursor: pointer; }
 button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 ::-webkit-scrollbar { width: 10px; height: 10px; }
-::-webkit-scrollbar-thumb { background: #424242; border-radius: 8px; }
+::-webkit-scrollbar-thumb { background: var(--line-strong); border-radius: 8px; }
 ::-webkit-scrollbar-track { background: transparent; }
 
 .visually-hidden { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
@@ -41,4 +88,4 @@ button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px s
 /* Wappen (shared/src/TeamCrest.tsx); im Analyzer halten Übersicht und Torphasen-Zeilen dafür
    eine 16px-Spalte. Größen je Ort stehen in der App. */
 .team-crest { width: 16px; height: 16px; flex: 0 0 auto; object-fit: contain; }
-.team-crest.fallback { display: grid; place-items: center; border-radius: 4px; background: rgba(255,255,255,.07); color: #8a8a8a; font-size: 7px; font-weight: 700; }
+.team-crest.fallback { display: grid; place-items: center; border-radius: 4px; background: rgba(var(--tint), .07); color: var(--muted); font-size: 7px; font-weight: 700; }
