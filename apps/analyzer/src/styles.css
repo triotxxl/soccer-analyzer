@@ -1484,3 +1484,40 @@ fieldset.filter-field { min-width: 0; margin-inline: 0; padding: 0; border: 0; }
 .filter-tile.checked::after, .quick-range.active::after { display: none; }
 .filter-tile.checked { box-shadow: inset 0 0 0 2px var(--accent); }
 .quick-range.active { background: var(--accent); color: #fff; }
+
+/* ===== Redesign Welle 3 (13.11.2026): Quickpicker und Wettschein ===== */
+.filter-menu.quickpick-menu, .filter-menu.cart-window { border-radius: 18px; }
+/* Filter- und Stufenwahl: gewählt blau ausgefüllt wie im Entwurf, sonst ruhig auf der Karte. */
+.quickpick-option { min-height: 40px; border-radius: 10px; font-size: 13px; }
+.quickpick-option:hover:not(.checked) { background: var(--surface); }
+.quickpick-option.checked { background: var(--accent); color: #fff; }
+.quickpick-option.checked .quickpick-option-value, .quickpick-option.checked .quickpick-level-value { color: #fff; }
+.quickpick-option.checked::before { display: none; }
+.quickpick-levels .quickpick-option.checked { background: var(--surface); color: var(--text-strong); box-shadow: inset 0 0 0 2px var(--accent); }
+.quickpick-levels .quickpick-option.checked .quickpick-level-value { color: var(--text-strong); }
+/* Treffer */
+.quickpick-entry.open { background: var(--accent-soft); }
+.quickpick-pick { padding: 3px 9px; border-radius: 8px; background: var(--accent-soft); color: var(--accent-ink); font-size: 12px; }
+.quickpick-odds { display: inline-grid; place-items: center; min-width: 52px; height: 28px; padding: 0 8px; border-radius: 8px; background: var(--surface-2); font-size: 13px; }
+.cart-add { width: 32px; height: 32px; border-radius: 10px; background: var(--surface); }
+.cart-add:hover { border-color: var(--accent); color: var(--accent-ink); }
+.quickpick-add { --hub-size: 32px; }
+/* Fuß: Warnung als gelber Kasten, Hauptknopf blau */
+.quickpick-warning { display: flex; align-items: flex-start; gap: 8px; padding: 10px 12px; border-radius: 12px; background: color-mix(in srgb, var(--gold) 16%, var(--surface)); color: var(--text); font-size: 12px; line-height: 1.45; }
+.quickpick-cart { height: 40px; padding: 0 16px; border-color: var(--accent); border-radius: 12px; background: var(--accent); color: #fff; font-size: 13px; }
+.quickpick-cart:hover:not(:disabled) { border-color: var(--accent); background: var(--accent); filter: brightness(1.08); color: #fff; }
+.quickpick-footer .filter-reset, .quickpick-show-table { height: 40px; border-radius: 12px; font-size: 13px; font-weight: 600; }
+/* Wettschein */
+.cart-size { padding: 4px 6px 4px 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+.cart-size.active { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-ink); }
+.cart-size.active::before { display: none; }
+.cart-step { width: 28px; height: 28px; border: 0; border-radius: 8px; background: var(--surface-2); font-weight: 700; }
+.cart-step:hover:not(:disabled) { background: var(--accent-soft); color: var(--accent-ink); }
+.cart-size input { height: 28px; background: var(--surface); }
+.cart-game { padding: 8px 10px; border-radius: 10px; background: var(--surface); }
+.cart-game + .cart-game { padding-top: 8px; border-top: 0; }
+.cart-games { gap: 8px; }
+.cart-combo { border-radius: 12px; background: var(--surface); }
+.cart-combo-odds { padding: 3px 8px; border-radius: 8px; background: var(--surface-2); font-weight: 700; }
+.cart-window .quickpick-cart, .cart-window .quickpick-footer .filter-reset:last-child { height: 40px; }
+.quickpick-cart:disabled { border-color: var(--line); background: transparent; color: var(--dim); filter: none; }

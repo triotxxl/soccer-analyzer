@@ -187,7 +187,8 @@ describe("React-Dashboard", () => {
     expect(screen.getAllByText(/Testbegründung/)).toHaveLength(5);
     await user.click(screen.getByRole("tab", { name: "H2H & Form" }));
     expect(await within(screen.getByLabelText("Details")).findByText("Direkte Begegnungen")).toBeInTheDocument();
-  });
+    // Filter, drei Marktwechsel und zwei Reiter: im vollen Testlauf knapp über 5 s.
+  }, 15_000);
 
   it("schreibt bei Pokal- und Länderspielen Alle statt Heim und Ausw. über die Form", async () => {
     const current = document();
