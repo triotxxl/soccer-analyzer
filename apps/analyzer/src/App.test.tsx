@@ -182,8 +182,11 @@ describe("React-Dashboard", () => {
       "match kickoff form h2h expected shots market data");
 
     await user.click(screen.getByRole("button", { name: /Alpha FCGast FC/i }));
-    expect(await within(screen.getByLabelText("Details")).findByText("Direkte Begegnungen")).toBeInTheDocument();
+    // Die Detailansicht öffnet mit dem Reiter „Märkte“; die Duelle stehen unter „H2H & Form“.
+    expect(await within(screen.getByLabelText("Details")).findByText("Bewertung je Markt")).toBeInTheDocument();
     expect(screen.getAllByText(/Testbegründung/)).toHaveLength(5);
+    await user.click(screen.getByRole("tab", { name: "H2H & Form" }));
+    expect(await within(screen.getByLabelText("Details")).findByText("Direkte Begegnungen")).toBeInTheDocument();
   });
 
   it("schreibt bei Pokal- und Länderspielen Alle statt Heim und Ausw. über die Form", async () => {
@@ -1275,6 +1278,7 @@ describe("React-Dashboard", () => {
     expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /Alpha FCGast FC/i }));
+    await user.click(await screen.findByRole("tab", { name: "Saison" }));
     expect(await screen.findByText("Ligatabelle")).toBeInTheDocument();
     const standings = screen.getByRole("table", { name: "Ligatabelle" });
     expect(within(standings).getByText("Spitzenreiter FC")).toBeInTheDocument();
@@ -1292,8 +1296,10 @@ describe("React-Dashboard", () => {
 
     await user.click(screen.getByRole("button", { name: /Alpha FCGast FC/i }));
     const details = within(await screen.findByLabelText("Details"));
+    await user.click(details.getByRole("tab", { name: "Saison" }));
     expect(await details.findByRole("region", { name: "Torphasen" })).toBeInTheDocument();
-    expect(details.getByRole("region", { name: "Trends" })).toBeInTheDocument();
+    await user.click(details.getByRole("tab", { name: "H2H & Form" }));
+    expect(await details.findByRole("region", { name: "Trends" })).toBeInTheDocument();
     expect(details.getByRole("region", { name: "Direkte Begegnungen" })).toBeInTheDocument();
     cleanup();
 
@@ -1305,13 +1311,15 @@ describe("React-Dashboard", () => {
     render(<App />);
     expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: /Alpha FCGast FC/i }));
+    await user.click(await screen.findByRole("tab", { name: "H2H & Form" }));
     expect(await screen.findByRole("status")).toHaveTextContent("API-Football ist gerade nicht erreichbar.");
     expect(await screen.findByText("Direkte Begegnungen")).toBeInTheDocument();
     expect(globalThis.document.querySelectorAll(".h2h-match-row")).toHaveLength(1);
+    await user.click(screen.getByRole("tab", { name: "Saison" }));
     expect(screen.queryByRole("region", { name: "Torphasen" })).not.toBeInTheDocument();
   });
 
-  it("öffnet das Detail-Panel direkt mit dem Spinner und blendet alles andere aus", async () => {
+  it("zeigt die Märkte sofort und in H2H und Saison den Spinner, solange die Kennzahlen laden", async () => {
     const current = document();
     current.fixtures[0]!.table = [
       { position: 1, teamName: "Alpha FC", played: 10, wins: 8, draws: 1, losses: 1, points: 25, goalsFor: 24, goalsAgainst: 10 },
@@ -1327,9 +1335,14 @@ describe("React-Dashboard", () => {
 
     await user.click(screen.getByRole("button", { name: /Alpha FCGast FC/i }));
     const details = within(screen.getByLabelText("Details"));
+    // Die Märkte stammen aus dem Lauf und brauchen keine Detailkennzahlen.
+    expect(details.getByText("Bewertung je Markt")).toBeInTheDocument();
+    await user.click(details.getByRole("tab", { name: "H2H & Form" }));
     expect(details.getByRole("status")).toHaveTextContent("Torphasen und Trends werden geladen");
     expect(globalThis.document.querySelector(".insight-loading")).toBeInTheDocument();
     expect(details.queryByText("Direkte Begegnungen")).not.toBeInTheDocument();
+    await user.click(details.getByRole("tab", { name: "Saison" }));
+    expect(details.getByRole("status")).toHaveTextContent("Torphasen und Trends werden geladen");
     expect(details.queryByText("Ligatabelle")).not.toBeInTheDocument();
     expect(details.queryByText("Bewertung je Markt")).not.toBeInTheDocument();
   });
@@ -1347,12 +1360,14 @@ describe("React-Dashboard", () => {
     expect(await screen.findByText("Alpha FC")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /Alpha FCGast FC/i }));
-    expect(await screen.findByText("Direkte Begegnungen")).toBeInTheDocument();
+    await user.click(await screen.findByRole("tab", { name: "Saison" }));
+    expect(await screen.findByRole("region", { name: "Torphasen" })).toBeInTheDocument();
     expect(screen.queryByText("Ligatabelle")).not.toBeInTheDocument();
 
+    // Der gewählte Reiter bleibt beim Wechsel auf ein anderes Spiel.
     await user.click(screen.getByRole("button", { name: /Alpha FCGast FC/i }));
     await user.click(screen.getByRole("button", { name: /Zulu FCGast FC/i }));
-    expect(await screen.findByText("Direkte Begegnungen")).toBeInTheDocument();
+    expect(await screen.findByRole("region", { name: "Torphasen" })).toBeInTheDocument();
     expect(screen.queryByText("Ligatabelle")).not.toBeInTheDocument();
   });
 });
@@ -1821,6 +1836,7 @@ describe("Schüsse und Ecken", () => {
 
     // Die Ecken sind in die Detailansicht gewandert.
     await user.click(screen.getByRole("button", { name: /Mit ZahlenGast FC/ }));
+    await user.click(screen.getByRole("tab", { name: "H2H & Form" }));
     expect(screen.getByRole("status")).toHaveTextContent("werden geladen");
     expect(globalThis.document.querySelector(".detail-recent")).toHaveTextContent("Schüsse aufs Tor 5,2 : 3,0 · Ecken 6,4 : 2,0");
   });

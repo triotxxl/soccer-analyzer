@@ -713,8 +713,12 @@ Seit 19.10.2026 liegen die Oberflächen unter `apps/` (vorher `frontend/`). Die 
   (`src/theme.ts`, gemerkt in `localStorage` `analyzer:theme`, `?theme=light|dark` in der Adresse geht vor), alle Farben
   als Tokens in `apps/analyzer/src/base.css` (styles.css trägt keine festen Grautöne mehr; neue Farben nur als Token,
   sonst stimmt eins der Themen nicht), Schrift Inter (`@fontsource/inter`), randlose Hülle, Leiste 72 px, Kopfzeile
-  `AppHeader` (`NavRail.tsx`) mit Hell/Dunkel. Offen: Tabelle mit Filter und Detailansicht (Detail in Reitern),
-  Quickpicker und Wettschein, Live, Heatmap/Marktprofil/Kelly/Einstellungen/Zustände; die farbigen Sondertöne in
+  `AppHeader` (`NavRail.tsx`) mit Hell/Dunkel. Welle 2: Werkzeugleiste, Tabelle als Karte, Filtermenü (Wahl blau
+  statt grüner Balken; Grün heißt nur noch „Empfehlenswert“), Chips ★ blau / ✓ grün getönt, Detailansicht in drei
+  Reitern Märkte / H2H & Form / Saison (`DETAIL_TABS` in `App.tsx`, `part` in `FixtureInsightPanels`; die Märkte
+  stehen sofort, H2H und Saison warten auf die Detailkennzahlen). Die Regeln stehen als Block am Ende von
+  `styles.css` und überschreiben die älteren. Offen: Quickpicker und Wettschein, Live,
+  Heatmap/Marktprofil/Kelly/Einstellungen/Zustände; die farbigen Sondertöne in
   styles.css (Gold, Grün, Orange) sind noch auf dunkel abgestimmt. Eigene Stildatei
   `apps/analyzer/src/base.css` (nicht die gemeinsame, die seit 26.10. die Tokens von Neo trägt). Neu seit
   02.11.2026 (Davids Wunsch): **Tabellenverlauf** direkt unter „Direkte Begegnungen“ (`LeaguePerf.tsx`) - dasselbe

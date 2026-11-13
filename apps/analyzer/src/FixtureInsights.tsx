@@ -690,9 +690,14 @@ function TrendsPanel({ insights, scope }: { insights: FixtureInsightsData; scope
  * keinen weiteren Aufruf aus. Bis die Daten stehen - und wenn sie ausbleiben - zeigt die
  * App weiter die direkten Duelle aus dem Dashboard-Lauf.
  */
-export function FixtureInsightPanels({ insights: loaded, timezone, homeName, awayName, leagueName, afterH2h }: {
+export function FixtureInsightPanels({ insights: loaded, timezone, homeName, awayName, leagueName, afterH2h, part = "all" }: {
   insights: FixtureInsightsData;
   timezone: string;
+  /**
+   * Welche Tafeln: alle (Quickpicker), oder getrennt für die Reiter der Detailansicht (seit
+   * 13.11.2026, Redesign) - „h2h“ = direkte Duelle, Spielstatistik, Trends; „season“ = Torphasen.
+   */
+  part?: "all" | "h2h" | "season";
   /** Steht direkt unter den direkten Duellen (seit 02.11.2026 der Tabellenverlauf). */
   afterH2h?: ReactNode;
   /**
@@ -713,8 +718,9 @@ export function FixtureInsightPanels({ insights: loaded, timezone, homeName, awa
     () => ({ id: insights.league.id, season: insights.league.season }),
     [insights.league.id, insights.league.season]
   );
+  if (part === "season") return <ScoringPeriodsPanel insights={insights} />;
   return <>
-    <ScoringPeriodsPanel insights={insights} />
+    {part === "all" && <ScoringPeriodsPanel insights={insights} />}
     <H2hPanel insights={insights} scope={scope} timezone={timezone} />
     {afterH2h}
     <MatchStatsPanel insights={insights} scope={scope} />

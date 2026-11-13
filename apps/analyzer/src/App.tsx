@@ -147,7 +147,15 @@ const TABLE_MODE_OPTIONS: ReadonlyArray<SegmentOption<DisplayMode>> = [
 ];
 
 /** Der Satz, der im Modus "Vorteil & Kelly" immer unter der Leiste steht. Nicht wegklickbar. */
-export const KELLY_WARNING = "Ein großer Vorteil ist meist ein Fehler des Modells. Auch die Kelly-Auswahl lag,"
+/** Reiter der Detailansicht (seit 13.11.2026, Redesign). Gemerkt nur, solange die Seite offen ist. */
+type DetailTab = "markets" | "h2h" | "season";
+const DETAIL_TABS: ReadonlyArray<readonly [DetailTab, string]> = [
+  ["markets", "Märkte"],
+  ["h2h", "H2H & Form"],
+  ["season", "Saison"]
+];
+
+export const KELLY_WARNING ="Ein großer Vorteil ist meist ein Fehler des Modells. Auch die Kelly-Auswahl lag,"
   + " an alten Spielen geprüft, im Minus – rechne nicht mit Gewinn.";
 type SortKey = "kickoff" | "league" | "team" | "form" | "h2h" | "expected" | "score" | "market" | "shots" | "corners" | "confidence";
 
@@ -1470,6 +1478,7 @@ function Dashboard({ document }: { document: DashboardDocument }) {
   const [h2hSortMode, setH2hSortMode] = useState(0);
   const [secondarySortKey, setSecondarySortKey] = useState<"form" | "h2h" | null>(null);
   const [openFixture, setOpenFixture] = useState<number | null>(null);
+  const [detailTab, setDetailTab] = useState<DetailTab>("markets");
   // Der Abruf hängt allein an der aufgeklappten Partie: zugeklappt kostet die Ansicht nichts.
   const insights = useFixtureInsights(openFixture);
   const [cartMenuFixtureId, setCartMenuFixtureId] = useState<number | null>(null);
@@ -2528,15 +2537,29 @@ function Dashboard({ document }: { document: DashboardDocument }) {
                 </span>
                 <button className="fixture-detail-close" aria-label="Details schließen" onClick={() => setOpenFixture(null)}><X /></button>
               </header>
-              {loading
+              {/* Seit 13.11.2026 (Redesign) in drei Reitern statt untereinander. Die Märkte kommen aus
+                  dem Lauf und stehen sofort; nur H2H und Saison warten auf die Detailkennzahlen. */}
+              <div className="detail-tabs" role="tablist" aria-label="Bereiche">
+                {DETAIL_TABS.map(([key, label]) => <button key={key} type="button" role="tab" id={`detail-tab-${key}`}
+                  aria-selected={detailTab === key} aria-controls="detail-tab-panel" onClick={() => setDetailTab(key)}>{label}</button>)}
+              </div>
+              <div className="detail-tab-panel" id="detail-tab-panel" role="tabpanel" aria-labelledby={`detail-tab-${detailTab}`}>
+              {detailTab === "markets"
+                ? <section className="insight-panel"><h3>Bewertung je Markt</h3><div className="market-details">{fixture.markets.map((item) => <div key={item.key} className={item.recommendation.level}><i /><span><strong>{item.label} · {item.recommendation.label}</strong>{item.details.join(" · ")}</span></div>)}</div></section>
+                : loading
                 ? <div className="insight-loading" role="status"><i aria-hidden /><span>Torphasen und Trends werden geladen …</span></div>
+                : detailTab === "h2h"
+                ? (detailed
+                  ? <FixtureInsightPanels part="h2h" insights={insights.insights} timezone={document.meta.timezone}
+                    homeName={home} awayName={away} leagueName={leagueName(fixture, nameSource)} />
+                  : <H2hSnapshotPanel fixture={fixture} home={home} away={away} timezone={document.meta.timezone}
+                    notice={<InsightsNotice state={insights} />} />)
                 : <>
               {detailed
-                ? <FixtureInsightPanels insights={insights.insights} timezone={document.meta.timezone}
-                  homeName={home} awayName={away} leagueName={leagueName(fixture, nameSource)} afterH2h={leaguePerf} />
-                : <H2hSnapshotPanel fixture={fixture} home={home} away={away} timezone={document.meta.timezone}
-                  notice={<InsightsNotice state={insights} />} />}
-              {!detailed && leaguePerf}
+                ? <FixtureInsightPanels part="season" insights={insights.insights} timezone={document.meta.timezone}
+                  homeName={home} awayName={away} leagueName={leagueName(fixture, nameSource)} />
+                : <InsightsNotice state={insights} />}
+              {leaguePerf}
               {showTable && <section className="insight-panel"><h3>Ligatabelle</h3>
                 <table className="standings-table" aria-label="Ligatabelle">
                   <thead><tr><th>Pl.</th><th>Team</th><th>Sp</th><th>+/-</th><th>Pkt</th></tr></thead>
@@ -2551,8 +2574,8 @@ function Dashboard({ document }: { document: DashboardDocument }) {
                       </tr>)}</tbody>
                 </table>
               </section>}
-              <section className="insight-panel"><h3>Bewertung je Markt</h3><div className="market-details">{fixture.markets.map((item) => <div key={item.key} className={item.recommendation.level}><i /><span><strong>{item.label} · {item.recommendation.label}</strong>{item.details.join(" · ")}</span></div>)}</div></section>
               </>}
+              </div>
             </aside>;
       })()}
       </div>

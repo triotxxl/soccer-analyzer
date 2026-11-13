@@ -1409,3 +1409,78 @@ fieldset.filter-field { min-width: 0; margin-inline: 0; padding: 0; border: 0; }
 .filter-menu.quickpick-menu:has(.quickpick-body.with-detail) { width: min(1340px, calc(100vw - 140px)); }
 .quickpick-body.with-detail { grid-template-columns: minmax(280px, 320px) minmax(0, 1fr) minmax(320px, 380px); }
 .quickpick-detail { display: grid; gap: 12px; align-content: start; min-width: 0; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+
+/* ===== Redesign Welle 2 (13.11.2026): Werkzeugleiste, Tabelle, Filtermenü, Detailansicht =====
+   Nach der freigegebenen Leinwand. Steht bewusst am Ende und überschreibt die älteren Regeln
+   oben, statt sie einzeln umzuschreiben - Abstände und Rechnungen der Spalten bleiben unberührt. */
+.view-toolbar { color: var(--muted); }
+.filter-trigger, .kelly-trigger { height: 40px; padding: 0 14px; border-color: var(--line); border-radius: 12px; background: var(--surface); color: var(--text); font-size: 13px; }
+.filter-trigger:hover, .kelly-trigger:hover { border-color: var(--line-strong); background: var(--surface-2); }
+.filter-trigger.open, .quickpick-trigger.open, .quickpick-trigger.active { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-ink); }
+.quickpick-trigger.active::after { background: var(--accent); }
+.cart-trigger { border-color: var(--accent); background: var(--accent); color: #fff; }
+.cart-trigger:hover { border-color: var(--accent); background: var(--accent); filter: brightness(1.08); color: #fff; }
+.filter-count { min-width: 20px; height: 20px; border-radius: 999px; background: var(--accent-soft); color: var(--accent-ink); font-family: var(--sans); font-size: 11px; }
+.cart-trigger .filter-count { background: rgba(255, 255, 255, .22); color: #fff; }
+.toolbar-search { max-width: 300px; }
+.toolbar-search input { height: 40px; border-radius: 12px; background: var(--surface-2); font-size: 13px; }
+.toolbar-search input:not(:placeholder-shown) { background: var(--surface); }
+.view-toolbar select { height: 40px; padding: 0 12px; border-radius: 12px; background: var(--surface); font-size: 13px; font-weight: 600; }
+.view-toolbar select:hover:not(:disabled) { background: var(--surface-2); }
+.view-toolbar .sort-control select { border-radius: 12px 0 0 12px; }
+.sort-direction { height: 40px; border-radius: 0 12px 12px 0; }
+.segmented { padding: 3px; border: 0; border-radius: 10px; background: var(--surface-2); }
+.segmented button { padding: 0 12px; height: 34px; border-radius: 8px; font-size: 12px; font-weight: 600; }
+.segmented button.active { background: var(--surface); color: var(--text-strong); box-shadow: 0 1px 3px rgba(var(--shade), .18); }
+.filter-status strong { font-family: var(--sans); }
+.banner { border-radius: 14px; background: var(--surface); }
+
+/* Tabelle als Karte */
+.table-scroll { border-radius: 16px; background: var(--surface); box-shadow: 0 8px 28px rgba(var(--shade), .06); }
+.table-head { background: var(--surface); }
+.table-head button, .table-head .head-label { font-size: 11px; letter-spacing: .04em; }
+.table-head button.sorted { color: var(--accent-ink); }
+.fixture-row-wrap + .fixture-row-wrap { border-top: 1px solid var(--line); }
+.fixture-row:hover { background: var(--surface-2); }
+.day-divider { padding-top: 16px; background: var(--surface); }
+.day-divider h3 { color: var(--text-2); }
+/* Empfohlene Märkte als Chips: ★ blau, ✓ grün getönt wie „Empfehlenswert“ in der Detailansicht. */
+.rec-chip { height: 28px; padding: 0 9px; border: 0; border-radius: 8px; background: var(--surface-2); font-size: 12px; }
+.rec-chip.strong { background: var(--accent-soft); color: var(--accent-ink); }
+.rec-chip.recommended { background: color-mix(in srgb, var(--green) 14%, var(--surface)); }
+
+/* Filtermenü */
+.filter-menu { border-color: var(--line); border-radius: 16px; background: var(--surface); box-shadow: 0 20px 56px rgba(var(--shade), .28); }
+.filter-menu-head { padding: 14px 18px; }
+.filter-menu-head h2 { font-size: 16px; font-weight: 700; }
+.filter-menu-close { width: 32px; height: 32px; border-radius: 9px; background: var(--surface); }
+.filter-card { gap: 10px; border: 0; border-radius: 12px; background: var(--surface-2); }
+.filter-card-head h4 { font-size: 13px; font-weight: 700; }
+.segmented.filter-seg { padding: 3px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+.segmented.filter-seg label { height: 28px; border-radius: 7px; font-weight: 600; }
+.segmented.filter-seg label:has(input:checked) { background: var(--accent); color: #fff; }
+.segmented.filter-seg label:has(input:checked)::after { display: none; }
+.filter-menu input[type="checkbox"] { accent-color: var(--accent); }
+
+/* Detailansicht mit Reitern */
+.fixture-detail-panel { background: var(--surface); }
+.fixture-detail-teams strong { font-size: 15px; }
+.fixture-detail-teams small { font-size: 11px; }
+.fixture-detail-close { width: 36px; height: 36px; border-radius: 10px; }
+.detail-tabs { display: flex; gap: 2px; margin: 0 -28px 0 -20px; padding: 0 16px; border-bottom: 1px solid var(--line); }
+.detail-tabs button { height: 44px; padding: 0 12px; border: 0; border-bottom: 2px solid transparent; margin-bottom: -1px; background: transparent; color: var(--muted); font-size: 13px; font-weight: 600; }
+.detail-tabs button:hover { color: var(--text); }
+.detail-tabs button[aria-selected="true"] { border-bottom-color: var(--accent); color: var(--accent-ink); }
+.detail-tab-panel { display: grid; gap: 12px; align-content: start; min-width: 0; }
+.insight-panel { border: 0; border-radius: 12px; background: var(--surface-2); }
+/* Wahl im Menü: blau statt des grünen Balkens (Grün heißt in der Tabelle „Empfehlenswert“). */
+.calendar-day.edge::after, .quickpick-trigger.active::after, .cart-size.active::before,
+.quickpick-option.checked::before, .cart-menu-item[aria-checked="true"]::before, .cart-add.has-entries::after { background: var(--accent); }
+.filter-switch:has(input:checked) .filter-switch-track { background: var(--accent); }
+/* Bewertung je Markt: lesbar statt 8 px, ohne festen Deckel - der Reiter gehört ihr allein. */
+.market-details { max-height: none; overflow: visible; gap: 10px; }
+.market-details > div { padding: 8px 10px; border-radius: 10px; background: var(--surface); font-size: 12px; line-height: 1.5; }
+.market-details strong { margin-bottom: 2px; color: var(--text-strong); font-size: 13px; }
+.filter-tile.checked::after, .quick-range.active::after { display: none; }
+.filter-tile.checked { box-shadow: inset 0 0 0 2px var(--accent); }
+.quick-range.active { background: var(--accent); color: #fff; }
