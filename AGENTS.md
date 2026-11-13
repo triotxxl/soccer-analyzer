@@ -720,8 +720,11 @@ Seit 19.10.2026 liegen die Oberflächen unter `apps/` (vorher `frontend/`). Die 
   `styles.css` und überschreiben die älteren. Welle 3: Quickpicker und Wettschein (Filter- und Stufenwahl blau,
   Warnung als gelber Kasten im Fuß, Hauptknopf blau, Kombi-Größen als Kästen, Tipps und Kombis als Karten; nur
   Stil). Welle 4: Live (Liste als Karte, Minute mit rotem Punkt statt rotem Kästchen, Chips ohne Rand, Live-Fenster
-  im neuen Stil; nur Stil). Offen: Heatmap/Marktprofil/Kelly/Einstellungen/Zustände; die farbigen Sondertöne in
-  styles.css (Gold, Grün, Orange) sind noch auf dunkel abgestimmt. Eigene Stildatei
+  im neuen Stil; nur Stil). Welle 5: Heatmap (Zellen per `color-mix` aus `--home`/`--away`/`--green`, Schrift immer
+  `--text-strong` - vorher helle Schrift auf heller Fläche im hellen Thema), Marktprofil, Kelly-Dialog, Einstellungen,
+  Leer- und Ladezustände, dazu die letzten fest auf dunkel abgestimmten Sondertöne (Klassen-Marke, Kelly-Hinweise,
+  Verbindungswarnung, Live-Tipps). Damit ist der Umbau abgeschlossen; die alten Regeln oben in styles.css tragen teils
+  noch feste Farben, die Blöcke „Redesign Welle …“ am Ende überschreiben sie. Eigene Stildatei
   `apps/analyzer/src/base.css` (nicht die gemeinsame, die seit 26.10. die Tokens von Neo trägt). Neu seit
   02.11.2026 (Davids Wunsch): **Tabellenverlauf** direkt unter „Direkte Begegnungen“ (`LeaguePerf.tsx`) - dasselbe
   Diagramm und dieselbe Rechnung wie im H2H-Reiter von Neo, dafür nach `apps/shared/src/PerfChart.tsx` und
