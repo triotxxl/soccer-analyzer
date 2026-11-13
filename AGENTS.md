@@ -719,7 +719,8 @@ Seit 19.10.2026 liegen die Oberflächen unter `apps/` (vorher `frontend/`). Die 
   stehen sofort, H2H und Saison warten auf die Detailkennzahlen). Die Regeln stehen als Block am Ende von
   `styles.css` und überschreiben die älteren. Welle 3: Quickpicker und Wettschein (Filter- und Stufenwahl blau,
   Warnung als gelber Kasten im Fuß, Hauptknopf blau, Kombi-Größen als Kästen, Tipps und Kombis als Karten; nur
-  Stil). Offen: Live, Heatmap/Marktprofil/Kelly/Einstellungen/Zustände; die farbigen Sondertöne in
+  Stil). Welle 4: Live (Liste als Karte, Minute mit rotem Punkt statt rotem Kästchen, Chips ohne Rand, Live-Fenster
+  im neuen Stil; nur Stil). Offen: Heatmap/Marktprofil/Kelly/Einstellungen/Zustände; die farbigen Sondertöne in
   styles.css (Gold, Grün, Orange) sind noch auf dunkel abgestimmt. Eigene Stildatei
   `apps/analyzer/src/base.css` (nicht die gemeinsame, die seit 26.10. die Tokens von Neo trägt). Neu seit
   02.11.2026 (Davids Wunsch): **Tabellenverlauf** direkt unter „Direkte Begegnungen“ (`LeaguePerf.tsx`) - dasselbe

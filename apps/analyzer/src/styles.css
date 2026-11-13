@@ -1521,3 +1521,34 @@ fieldset.filter-field { min-width: 0; margin-inline: 0; padding: 0; border: 0; }
 .cart-combo-odds { padding: 3px 8px; border-radius: 8px; background: var(--surface-2); font-weight: 700; }
 .cart-window .quickpick-cart, .cart-window .quickpick-footer .filter-reset:last-child { height: 40px; }
 .quickpick-cart:disabled { border-color: var(--line); background: transparent; color: var(--dim); filter: none; }
+
+/* ===== Redesign Welle 4 (13.11.2026): Live ===== */
+.live-status.error, .live-status.error svg { color: var(--gold); }
+.live-notice { border-color: color-mix(in srgb, var(--gold) 40%, var(--line)); background: color-mix(in srgb, var(--gold) 14%, var(--surface)); color: var(--text); font-size: 12px; }
+/* Liste als Karte wie die Tabelle */
+.live-list { margin: 0 0 16px; padding: 0 20px 12px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); box-shadow: 0 8px 28px rgba(var(--shade), .06); }
+.live-head, .live-head:hover { top: 0; background: var(--surface); font-size: 11px; }
+.live-row { border-radius: 0; }
+.live-row + .live-row { border-top: 1px solid var(--line); }
+.live-row:hover, .live-row:focus-visible { background: var(--surface-2); }
+.live-row.open { background: var(--accent-soft); }
+/* Minute: roter Punkt und kräftige Zahl statt rotem Kästchen */
+.live-minute { justify-items: start; padding: 0; border: 0; background: transparent; color: var(--text-strong); font-size: 16px; }
+.live-minute.live::before { width: 7px; height: 7px; }
+.live-score strong { font-size: 17px; }
+/* „Noch möglich“-Chips */
+.live-open-chip { height: 30px; padding: 0 10px; border: 0; border-radius: 8px; background: var(--surface-2); font-size: 12px; }
+.live-open-chip.high { border: 0; background: color-mix(in srgb, var(--green) 14%, var(--surface)); }
+.live-open-chip.low { background: transparent; box-shadow: inset 0 0 0 1px var(--line); }
+.live-open-meter { height: 3px; }
+.live-card i { background: #f2c230; }
+/* Live-Fenster */
+.live-panel { padding: 16px 18px; border-color: var(--line); border-radius: 18px; box-shadow: 0 20px 56px rgba(var(--shade), .28); }
+.live-panel-head strong { font-size: 15px; }
+.live-panel-head small { font-size: 11px; }
+.live-section { padding: 12px 0; border-top-color: var(--line); }
+.live-section h4 { font-size: 11px; }
+.live-panel-empty, .live-panel-note { font-size: 12px; }
+.live-chance-tile { border-radius: 12px; }
+.live-minute { display: inline-flex; align-items: center; gap: 6px; }
+.live-minute.live::before { margin: 0; }
