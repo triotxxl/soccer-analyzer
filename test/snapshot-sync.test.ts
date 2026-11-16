@@ -5,7 +5,7 @@ import path from "node:path";
 import test from "node:test";
 import { gunzipSync, gzipSync } from "node:zlib";
 import type { RemoteBackupFile, RemoteBackupStore } from "../src/remote-backup.ts";
-import { downloadSnapshots, uploadSnapshots } from "../src/snapshot-sync.ts";
+import { downloadSnapshots, pullSnapshots, snapshotTime, uploadSnapshots } from "../src/snapshot-sync.ts";
 
 function memoryStore() {
   const files = new Map<string, RemoteBackupFile & { data: Buffer }>();
@@ -98,4 +98,43 @@ test("holt den letzten Stand immer und datierte nur, wenn sie lokal fehlen", wit
   assert.equal(readFileSync(path.join(output, dated(1)), "utf8"), "lokal");
   assert.equal(readFileSync(path.join(output, dated(2)), "utf8"), '{"m":2}');
   assert.deepEqual(readdirSync(output).sort(), ["dashboard-latest.json", dated(1), dated(2)].sort());
+}));
+
+test("der Zeitpunkt im Namen ist der der Analyse", () => {
+  assert.equal(snapshotTime("dashboard-2026-11-12T23-58-15-359Z.json"), "2026-11-12T23:58:15.359Z");
+  assert.equal(snapshotTime("dashboard-2026-11-12T23-58-15-359Z.json.gz"), "2026-11-12T23:58:15.359Z");
+  assert.equal(snapshotTime("dashboard-latest.json.gz"), null);
+  assert.equal(snapshotTime("analyzer-2026-11-13.sqlite.gz"), null);
+});
+
+test("vor der Analyse: fehlende Stände holen, wenn die lokale Datenbank auf dem neuesten Stand ist", withDirectory(async (directory) => {
+  writeFileSync(path.join(directory, dated(1)), "lokal");
+  writeFileSync(path.join(directory, "dashboard-latest.json"), "lokal");
+  const { store } = memoryStore();
+  await store.upload(`${dated(1)}.gz`, gzipSync("von MEGA"));
+  await store.upload(`${dated(2)}.gz`, gzipSync('{"m":2}'));
+  await store.upload("dashboard-latest.json.gz", gzipSync("von MEGA"));
+
+  // Die lokale Datenbank kennt die Analyse von 18:02 (gleich alt zählt als aktuell), anders geschrieben.
+  const result = await pullSnapshots(store, directory, "2026-11-12T19:02:00+01:00");
+
+  assert.deepEqual(result, { downloaded: 1, newerRemote: null });
+  assert.equal(readFileSync(path.join(directory, dated(1)), "utf8"), "lokal");
+  assert.equal(readFileSync(path.join(directory, dated(2)), "utf8"), '{"m":2}');
+  assert.equal(readFileSync(path.join(directory, "dashboard-latest.json"), "utf8"), "lokal");
+}));
+
+test("vor der Analyse: ein jüngerer Stand bei MEGA hält an und holt nichts", withDirectory(async (directory) => {
+  const { store } = memoryStore();
+  await store.upload(`${dated(1)}.gz`, gzipSync('{"m":1}'));
+  await store.upload(`${dated(5)}.gz`, gzipSync('{"m":5}'));
+
+  const result = await pullSnapshots(store, directory, "2026-11-12T18:01:00.000Z");
+  assert.deepEqual(result, { downloaded: 0, newerRemote: "2026-11-12T18:05:00.000Z" });
+  assert.deepEqual(readdirSync(directory), []);
+
+  const empty = await pullSnapshots(store, directory, null);
+  assert.equal(empty.newerRemote, "2026-11-12T18:05:00.000Z");
+  const nothingRemote = await pullSnapshots(memoryStore().store, directory, null);
+  assert.deepEqual(nothingRemote, { downloaded: 0, newerRemote: null });
 }));

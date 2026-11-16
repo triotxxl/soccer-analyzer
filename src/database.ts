@@ -2744,6 +2744,18 @@ export class AnalyzerDatabase {
       ORDER BY h.kickoff DESC LIMIT ?`).all(system, teamId, teamId, limit) as Array<Record<string, unknown>>;
   }
 
+  /**
+   * Zeitpunkt der jüngsten Analyse in dieser Datenbank - bei einer Dashboard-Analyse derselbe wie im
+   * Namen ihres Snapshots. Für den Abgleich mit MEGA (`pullBeforeAnalysis`). Über `julianday`, weil
+   * ältere Zeilen in anderer Schreibweise stehen könnten.
+   */
+  lastAnalysisAt(): string | null {
+    const row = this.db.prepare(
+      "SELECT created_at FROM goal_line_analysis_runs ORDER BY julianday(created_at) DESC LIMIT 1"
+    ).get() as { created_at?: string } | undefined;
+    return row?.created_at ?? null;
+  }
+
   close(): void {
     this.db.close();
   }

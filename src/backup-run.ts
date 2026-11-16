@@ -10,7 +10,7 @@ import path from "node:path";
 import { backupDatabase, backupLine } from "./backup.ts";
 import { config, DB_FILE, ROOT_DIR } from "./config.ts";
 import { remoteUploadLine, uploadBackup } from "./remote-backup.ts";
-import { SNAPSHOT_SUBFOLDER, snapshotUploadLine, uploadSnapshots } from "./snapshot-sync.ts";
+import { pullSnapshots, SNAPSHOT_SUBFOLDER, snapshotUploadLine, uploadSnapshots } from "./snapshot-sync.ts";
 
 export interface BackupRunReport {
   lines: string[];
@@ -23,6 +23,49 @@ export interface BackupRunOptions {
 }
 
 const messageOf = (error: unknown): string => (error instanceof Error ? error.message : String(error));
+
+/** Der andere PC hat zuletzt analysiert; die Analyse startet nicht (`pullBeforeAnalysis`). */
+export class NewerRemoteAnalysisError extends Error {}
+
+const berlinTime = (iso: string): string =>
+  new Date(iso).toLocaleString("de-DE", { timeZone: config.timezone, dateStyle: "short", timeStyle: "short" });
+
+/**
+ * Vor jeder Dashboard-Analyse (seit 16.11.2026, Davids Entscheidung): fehlende Analyse-Stände von
+ * MEGA holen - und abbrechen, wenn dort eine Analyse liegt, die jünger ist als die lokale Datenbank
+ * (`pullSnapshots`). Das kostet keinen Aufruf bei API-Football und läuft vor dem ersten.
+ * Ist MEGA nicht erreichbar, läuft die Analyse mit Warnung weiter: Ein Ausfall dort soll keine
+ * Analyse verhindern, die Prüfung fehlt dann aber.
+ */
+export async function pullBeforeAnalysis(lastLocalAnalysis: string | null): Promise<BackupRunReport> {
+  const report: BackupRunReport = { lines: [], errors: [] };
+  if (!config.mega) return report;
+  const folder = `${config.mega.folder}/${SNAPSHOT_SUBFOLDER}`;
+  let result: Awaited<ReturnType<typeof pullSnapshots>>;
+  try {
+    const { openMegaStore } = await import("./mega-store.ts");
+    const store = await openMegaStore({ ...config.mega, folder });
+    try {
+      result = await pullSnapshots(store, path.join(ROOT_DIR, "output"), lastLocalAnalysis);
+    } finally {
+      await store.close();
+    }
+  } catch (error) {
+    report.errors.push(`Abgleich mit MEGA nicht möglich, die Analyse läuft ohne Prüfung auf einen neueren Stand: ${messageOf(error)}`);
+    return report;
+  }
+  if (result.newerRemote) {
+    throw new NewerRemoteAnalysisError([
+      `Analyse nicht gestartet: Bei MEGA liegt eine Analyse vom ${berlinTime(result.newerRemote)},`
+        + ` die lokale Datenbank endet ${lastLocalAnalysis ? `mit der vom ${berlinTime(lastLocalAnalysis)}` : "ohne Analyse"}.`,
+      "Zuletzt hat also der andere PC gearbeitet. Erst dessen Stand einspielen:",
+      "  npm run restore -- --force",
+      "Danach die Analyse neu starten. Ganz bewusst ohne Abgleich: --ohne-abgleich."
+    ].join("\n"));
+  }
+  report.lines.push(`Abgleich mit MEGA/${folder}: ${result.downloaded > 0 ? `${result.downloaded} Analyse-Stände geholt` : "nichts Neues"}`);
+  return report;
+}
 
 export async function runBackup(options: BackupRunOptions = {}): Promise<BackupRunReport> {
   const report: BackupRunReport = { lines: [], errors: [] };

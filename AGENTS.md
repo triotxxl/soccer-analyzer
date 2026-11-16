@@ -27,7 +27,10 @@ und ihr Neuaufbau kostet Tausende API-Aufrufe. Schritte für David:
 
 **Immer nur ein PC zur Zeit:** Jede Analyse sichert am Ende. Wer danach am anderen PC weitermacht,
 spielt dort vorher mit `npm run restore -- --force` den neuesten Stand ein - sonst laufen zwei
-Datenbanken auseinander, und SQLite-Dateien lassen sich nicht zusammenführen.
+Datenbanken auseinander, und SQLite-Dateien lassen sich nicht zusammenführen. **Seit 16.11.2026 prüft das
+`npm run dashboard` selbst** (Davids Entscheidung, nach einer Panne am selben Tag): Liegt bei MEGA eine Analyse,
+die jünger ist als die lokale Datenbank, startet die Analyse nicht und nennt `npm run restore -- --force`
+(Abschnitt „Pflege“, Sicherung).
 
 Ohne Datenbank verweigert `AnalyzerDatabase` den Start mit genau diesem Hinweis
 (`MISSING_DATABASE_MESSAGE` in `src/database.ts`), statt still eine leere anzulegen. Neu beginnen
@@ -690,9 +693,20 @@ Spiele; geprüft wurden alle deutschen Anbieter, nur Betano (32) und Bet365 (8) 
   im Code“; Datenbank und git schieden aus, je Analyse bis 50 MB): `src/snapshot-sync.ts` lädt nach der
   Datenbank `output/dashboard-latest.json` und die datierten Stände gepackt nach `<MEGA_FOLDER>/snapshots` -
   den letzten Stand jedes Mal neu (erst hoch, dann die alte Fassung weg), datierte nur, wenn sie dort fehlen,
-  neueste zuerst, höchstens 20 je Analyse (`npm run backup` lädt alle fehlenden). Sie bleiben dort (20 GB).
+  neueste zuerst (bis 16.11.2026 höchstens 20 je Analyse). Sie bleiben dort (20 GB).
   `npm run restore` holt danach `dashboard-latest.json` immer und die datierten, die lokal fehlen; mit
   `--file` nicht.
+  **Laufender Abgleich seit 16.11.2026** (Davids Wunsch „laufender Abgleich für jede Analyse“): Jede
+  Dashboard-Analyse holt **vor** dem ersten API-Aufruf die datierten Stände, die lokal fehlen (`pullSnapshots`,
+  `pullBeforeAnalysis` in `src/backup-run.ts`; `dashboard-latest.json` bleibt, die Analyse schreibt sie neu), und
+  lädt am Ende alle fehlenden hoch. **Ist bei MEGA ein Stand jünger als die letzte Analyse der lokalen Datenbank**
+  (Name des Snapshots gegen `goal_line_analysis_runs.created_at`, `lastAnalysisAt`; beides ist derselbe Zeitpunkt),
+  hat der andere PC zuletzt gearbeitet: Die Analyse bricht ab und nennt `npm run restore -- --force` - Davids
+  Entscheidung statt automatisch einspielen. Grund: Am 16.11.2026 lag dieser PC auf dem 12.11., der andere hatte am
+  13.11. analysiert; die Sicherung vom älteren PC trug den jüngeren Tagesnamen, und `restore` hätte den älteren
+  Stand eingespielt. Ist MEGA nicht erreichbar, läuft die Analyse mit Warnung ohne Prüfung. Bewusst ohne Abgleich:
+  `npm run dashboard -- --ohne-abgleich`; mit `BACKUP_AFTER_ANALYSIS=0` entfällt er ebenfalls. Kostet keinen
+  API-Aufruf, rund 10-20 s für die Anmeldung bei MEGA.
   **Seit 21.10.2026 zusätzlich bei MEGA** (Davids Wahl, 20 GB kostenlos), wenn `MEGA_EMAIL` und
   `MEGA_PASSWORD` in `.env` stehen: `src/mega-store.ts` über das Paket `megajs` (nicht von MEGA
   selbst), Regeln in `src/remote-backup.ts` - erst hochladen, dann die ältere Fassung des Tages

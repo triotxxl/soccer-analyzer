@@ -3,7 +3,7 @@ import path from "node:path";
 import { ApiFootballClient } from "./api.ts";
 import { config, ROOT_DIR } from "./config.ts";
 import { AnalysisSnapshotCache } from "./analysis-cache.ts";
-import { runBackup } from "./backup-run.ts";
+import { pullBeforeAnalysis, runBackup } from "./backup-run.ts";
 import {
   runAnalysis,
   runDrawCriteriaAnalysis,
@@ -717,6 +717,13 @@ async function dashboard(args: ParsedArgs): Promise<void> {
   }
   const database = new AnalyzerDatabase();
   try {
+    // Laufender Abgleich mit MEGA (seit 16.11.2026, Davids Entscheidung): vor dem ersten Aufruf
+    // fehlende Analyse-Stände holen und abbrechen, wenn der andere PC zuletzt analysiert hat.
+    if (config.backupAfterAnalysis && !args.options.has("ohne-abgleich")) {
+      const pulled = await pullBeforeAnalysis(database.lastAnalysisAt());
+      for (const line of pulled.lines) console.log(line);
+      for (const line of pulled.errors) console.error(line);
+    }
     const source = oddsSource === "api"
       ? await apiDashboardSource(dates, database, args.options.has("alle-ligen"))
       : await tipicoDashboardSource(args, dates, database);
@@ -835,9 +842,9 @@ async function dashboard(args: ParsedArgs): Promise<void> {
     // Zuletzt, damit Abrechnung und Elo des Laufs mit drin sind. Scheitert sie, bleibt die
     // Analyse gültig und die bisherige Sicherung des Tages stehen.
     if (config.backupAfterAnalysis) {
-      // Je Analyse höchstens 20 ältere Analyse-Stände neu zu MEGA, damit die erste auf einem
-      // PC mit vielen alten Ständen nicht lange hängt (der Rest: npm run backup).
-      const backup = await runBackup({ snapshotLimit: 20 });
+      // Seit 16.11.2026 alle fehlenden Analyse-Stände (vorher höchstens 20 je Analyse): Der
+      // Bestand bei MEGA ist vollständig, es fehlt je Analyse meist nur ihr eigener.
+      const backup = await runBackup();
       for (const line of backup.lines) console.log(line);
       for (const line of backup.errors) console.error(line);
     }

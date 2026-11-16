@@ -265,7 +265,7 @@ details.honesty p { margin-top: 6px; }
 
 <div class="page">
   <header class="head">
-    <span class="eyebrow">api-football-analyzer · Stand 13.11.2026</span>
+    <span class="eyebrow">api-football-analyzer · Stand 16.11.2026</span>
     <h1>Wie der Analyzer zusammenhängt</h1>
     <p>Von den Quoten bei API-Football bis zur Anzeige in Neo: welche Teile Daten holen, rechnen, speichern und zeigen, und wer von Claudes Seite daran arbeitet. Klick auf einen Baustein, dann siehst du, woher er seine Daten bekommt und wohin er sie gibt.</p>
     <div class="legend" aria-label="Farben">
@@ -338,18 +338,19 @@ details.honesty p { margin-top: 6px; }
   <section class="section" aria-labelledby="flow-h">
     <header>
       <h2 id="flow-h">Ablauf einer Analyse</h2>
-      <p>Die Reihenfolge ist deine Vorgabe vom 05.10.2026: erst zuordnen, dann Daten nachziehen, erst am Ende analysieren. Die Schritte 3 bis 8 erledigt <code>npm run dashboard</code> in einem Lauf.</p>
+      <p>Die Reihenfolge ist deine Vorgabe vom 05.10.2026: erst zuordnen, dann Daten nachziehen, erst am Ende analysieren. Die Schritte 3 bis 9 erledigt <code>npm run dashboard</code> in einem Lauf.</p>
       <p class="run-note"><i></i>blauer Rand = Teil von <code>npm run dashboard</code></p>
     </header>
     <ol class="flow" style="list-style:none;margin:0;padding:0">
       <li class="step"><span class="s-num">Vorher</span><h3>Vorbereiten</h3><p><code>npm run prepare-analysis</code> zählt Spiele ohne Ansetzung und zeigt Teams ohne Elo. Zuordnen (Aliase) nur noch beim Tipico-Weg.</p><span><span class="chip free">praktisch 0 Aufrufe</span></span></li>
       <li class="step"><span class="s-num">Vorher</span><h3>Daten nachziehen</h3><p>Teams ohne Elo: Saisons nachladen, Listen in <code>src/elo-config.ts</code> ergänzen, <code>npm run elo -- build</code>.</p><span><span class="chip cost">kleine Nachladungen</span></span></li>
+      <li class="step in-run"><span class="s-num">Lauf</span><h3>Abgleich mit MEGA</h3><p>Fehlende Snapshots holen. Liegt dort eine Analyse, die jünger ist als die lokale Datenbank (der andere PC war zuletzt dran), startet die Analyse nicht: erst <code>npm run restore -- --force</code>. Bewusst ohne: <code>--ohne-abgleich</code>.</p><span><span class="chip free">0 Aufrufe</span></span></li>
       <li class="step in-run"><span class="s-num">Lauf</span><h3>Quoten holen</h3><p>Jedes Spiel, für das Betano bei API-Football Quoten führt und das es laut Angebotsliste von OddsPapi bei betano.de oder Tipico gibt (jedes Spiel merkt sich, wo) (ohne OddsPapi: Ligen des früheren Tipico-Angebots; Korrekturen in <code>data/angebot-ligen.json</code>), mit Fixture- und Liga-ID (<code>/odds</code>, Seiten nacheinander, 60 Minuten im Cache). Ohne Spiel bricht der Lauf ab und schreibt nichts.</p><span><span class="chip cost">20 bis 230</span> <span class="chip plain">OddsPapi 0 bis 6</span></span></li>
       <li class="step in-run"><span class="s-num">Lauf</span><h3>Elo nachziehen</h3><p>Neue Ergebnisse aus dem Cache. Einmal pro Woche zusätzlich die laufenden Saisons aller Ligen.</p><span><span class="chip cost">Wochenrunde bis 600</span></span></li>
       <li class="step in-run"><span class="s-num">Lauf</span><h3>Rechnen</h3><p>Torlinien (vorher fehlende Ligastärke nachladen), Remis-Punkte, Favoriten. Die Modelle bekommen Daten und geben Wahrscheinlichkeiten zurück.</p><span><span class="chip cost">Ligastärke bis 300</span></span></li>
       <li class="step in-run"><span class="s-num">Lauf</span><h3>Snapshot schreiben</h3><p><code>output/dashboard-latest.json</code> und eine datierte Kopie. Prognosen gehen zusätzlich in die Datenbank.</p><span><span class="chip free">0 Aufrufe</span></span></li>
       <li class="step in-run"><span class="s-num">Lauf</span><h3>Abrechnen</h3><p>Beendete Spiele abrechnen, danach die Kurzfassung, wie gut das Modell zuletzt lag.</p><span><span class="chip cost">bis 200</span></span></li>
-      <li class="step in-run"><span class="s-num">Lauf</span><h3>Sichern</h3><p>Datenbank geprüft und gepackt nach <code>data/backups/</code>, dann zu MEGA. Danach der letzte Snapshot und bis zu 20 noch fehlende ältere nach MEGA (Ordner <code>snapshots</code>).</p><span><span class="chip free">0 Aufrufe</span></span></li>
+      <li class="step in-run"><span class="s-num">Lauf</span><h3>Sichern</h3><p>Datenbank geprüft und gepackt nach <code>data/backups/</code>, dann zu MEGA. Danach der letzte Snapshot und alle noch fehlenden älteren nach MEGA (Ordner <code>snapshots</code>).</p><span><span class="chip free">0 Aufrufe</span></span></li>
       <li class="step"><span class="s-num">Danach</span><h3>Lücken prüfen</h3><p><code>npm run coverage</code> und <code>npm run data-check</code> listen fehlendes Elo, fehlende Ligastärke und Datenfehler.</p><span><span class="chip free">0 Aufrufe</span></span></li>
       <li class="step"><span class="s-num">Danach</span><h3>Ansehen</h3><p><code>npm run neo</code> startet Neo auf Port 5174, <code>npm run app</code> die alte App auf Port 5173. Beide lesen den neuesten Snapshot.</p><span><span class="chip free">0 Aufrufe</span></span></li>
     </ol>
@@ -366,7 +367,7 @@ details.honesty p { margin-top: 6px; }
         <tbody>
           <tr><td class="grp" colspan="3">Analysieren</td></tr>
           <tr><td><code>prepare-analysis</code></td><td>Vor jeder Analyse: offene Ligen, Spiele ohne Gegenstück, Teams ohne Elo</td><td><span class="chip free">praktisch 0</span></td></tr>
-          <tr><td><code>dashboard</code></td><td>Der Hauptlauf: Import, Elo, Rechnen, Snapshot, Abrechnung, Sicherung</td><td><span class="chip cost">kostet</span></td></tr>
+          <tr><td><code>dashboard</code></td><td>Der Hauptlauf: Abgleich mit MEGA, Import, Elo, Rechnen, Snapshot, Abrechnung, Sicherung</td><td><span class="chip cost">kostet</span></td></tr>
           <tr><td><code>analyze</code></td><td>Einzelne Ligen oder Spiele für Screenshot-Aufträge (<code>--select</code>, <code>--match</code>)</td><td><span class="chip cost">kostet</span></td></tr>
           <tr><td><code>draw</code></td><td>Reine Remis-Analyse mit dem 100-Punkte-System</td><td><span class="chip cost">kostet</span></td></tr>
           <tr><td><code>favorites</code></td><td>Reine 1X2-Favoritenanalyse</td><td><span class="chip cost">kostet</span></td></tr>
@@ -479,8 +480,8 @@ const NODES = {
     text: "Seit 10.11.2026 die Angebotsliste: welche Spiele betano.de und Tipico DE führen, je Seite eine eigene Liste. Analysiert wird, was mindestens eine Seite anbietet – auch ohne Quote bei API-Football (dann „Ohne Quote“ in den Apps); beide Apps schalten zwischen Betano und Tipico um. Nur die Spielliste, keine Quoten – die kommen weiter von API-Football. Die Spiele werden über Anstoß und Teamnamen zugeordnet (src/offer-matching.ts); ein Spiel ohne eigenen Treffer zählt, wenn seine Liga dabei ist. Führt API-Football ein Spiel auf einem Platzhaltertermin, gilt der Anstoß von Betano bzw. Tipico. Angebotene Spiele, die API-Football gar nicht kennt, werden nicht analysiert – die alte App listet sie zugeklappt im Filtermenü unter „Angebot“.",
     facts: [["Kosten", "Gratis-Konto: 250 Aufrufe im Monat. Feste Zwei-Tage-Blöcke, 3 Stunden im Cache <code>data/oddspapi-cache/</code>: eine Analyse je Seite 0 bis 3 Aufrufe, beide zusammen bis 6. 10 bleiben als Reserve."], ["Rückfall", "Ohne Schlüssel, bei leerem Kontingent oder Fehler: Ligen, die Tipico je angeboten hat – mit Warnung."], ["Platzhaltertermine", "Anstoß vom Anbieter; liegt das Spiel bei API-Football außerhalb des Zeitraums, lädt die Analyse die Tagesliste ±2 Tage daneben (ein Aufruf je Tag)."], ["Schlüssel", "<code>ODDSPAPI_KEY</code> in <code>.env</code>, Seiten in <code>ODDSPAPI_BOOKMAKERS</code> (Vorgabe betano.de,tipico)"], ["Umschalter", "Neo in der Kopfleiste, alte App im Filtermenü unter „Umfang“; ab Werk Betano, gemerkt. Baustein <code>apps/shared/src/offer.ts</code>"], ["Quoten von hier", "Gemessen 10.11.2026: 25 $ im Monat für betano.de, 35 $ mit Tipico – nicht gebucht."]] },
   q_mega: { band: "main", col: 0, t: "src", kind: "Quelle und Ablage", name: "MEGA", line: "Sicherungen und Snapshots in der Cloud", path: "src/mega-store.ts · src/remote-backup.ts · src/snapshot-sync.ts", chips: [["plain", "6 Sicherungen"]],
-    text: "Cloud-Ablage für die Datenbank-Sicherungen über das Paket megajs, seit 13.11.2026 auch für die Snapshots (Unterordner snapshots, gepackt, der letzte jedes Mal neu, ältere einmal, alle bleiben). Von hier holt npm run restore Datenbank und Snapshots auf einen anderen PC, damit die Apps dort sofort die letzte Analyse zeigen.",
-    facts: [["Zugang", "<code>MEGA_EMAIL</code>, <code>MEGA_PASSWORD</code>, <code>MEGA_FOLDER</code> in <code>.env</code>"], ["Regel", "Immer nur ein PC zur Zeit. Vor dem Wechsel <code>npm run restore -- --force</code>."]] },
+    text: "Cloud-Ablage für die Datenbank-Sicherungen über das Paket megajs, seit 13.11.2026 auch für die Snapshots (Unterordner snapshots, gepackt, der letzte jedes Mal neu, ältere einmal, alle bleiben). Von hier holt npm run restore Datenbank und Snapshots auf einen anderen PC, damit die Apps dort sofort die letzte Analyse zeigen. Seit 16.11.2026 gleicht jede Analyse in beide Richtungen ab und startet nicht, wenn hier eine jüngere Analyse liegt als in der lokalen Datenbank.",
+    facts: [["Zugang", "<code>MEGA_EMAIL</code>, <code>MEGA_PASSWORD</code>, <code>MEGA_FOLDER</code> in <code>.env</code>"], ["Regel", "Immer nur ein PC zur Zeit. Vor dem Wechsel <code>npm run restore -- --force</code>; die Analyse prüft das seit 16.11.2026 selbst."]] },
 
   // Kommandozeile
   a_prepare: { band: "main", col: 1, t: "cli", kind: "Befehl", name: "Vorbereiten", line: "Spiele prüfen, Elo-Lücken zeigen", path: "npm run prepare-analysis", chips: [["free", "praktisch 0"]],
