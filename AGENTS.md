@@ -747,6 +747,10 @@ Seit 19.10.2026 liegen die Oberflächen unter `apps/` (vorher `frontend/`). Die 
   `QuickpickUI.tsx`; das Fenster wird dafür breiter): Torphasen (`GoalPhasesPanel`, dieselbe Tafel wie in der
   Detailansicht, aus den Detailkennzahlen - rund vier Aufrufe beim ersten Öffnen eines Spiels), direkte Duelle aus
   der Analyse (`H2hSnapshot.tsx`, dieselbe Liste wie in der Detailansicht) und Tabellen- und Tordifferenz-Verlauf (alle 0 Aufrufe).
+  **Seit 19.11.2026** (Davids Wunsch: „die gleichen Stats wie im H2H, wenn ich aus der Tabelle reinklicke“) steht dort,
+  sobald die Detailkennzahlen da sind, derselbe Block wie im Reiter „H2H & Form“ (`FixtureInsightPanels part="h2h"`:
+  direkte Duelle mit Filter, Spielstatistik, Trends); die Liste aus der Analyse nur, solange sie laden oder fehlen.
+  Kein zusätzlicher Aufruf - die Torphasen laden die Detailkennzahlen ohnehin.
   **Seit 10.11.2026 zeigt die Live-Liste „Noch möglich · laut Modell“** (Davids Entwurf
   https://claude.ai/artifact/V4sGm67j7SnnQWhK2rKm5D: „nicht sehen, was erreicht ist, sondern was noch möglich ist - kurz
   als Chips mit % laut Modell“): je offenem Ausgang ein Chip mit Live-Chance, je Markt eine Seite (die wahrscheinlichere,
@@ -2125,3 +2129,4 @@ nachgezogen wird erst ab rund 100 Tipps der Vorgabestufe.
   die Schwellen an diesen Daten nachzustellen. In Neo steht er noch nicht unter „Autoren".
 - In der alten App mit Reglern (Plätze in 5/10, Spieltage, Quote) und Schalter „Auch konstant gut gegen
   abrutschend"; Spalten „Im Hoch"/„Im Tief" („6. · +4 in 5 · +7 in 10"), Stärke „Trend ±n".
+
