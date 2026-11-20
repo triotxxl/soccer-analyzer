@@ -231,8 +231,33 @@ const DAVES_TABLE: QuickpickParam[] = [
   }
 ];
 
+const DAVES_HOME_AWAY: QuickpickParam[] = [
+  {
+    id: "duels", label: "Direkte Duelle", min: 3, max: 10, step: 1,
+    title: "So viele der letzten direkten Duelle (H2H) werden angeschaut. Daves Regel: 5."
+  },
+  {
+    id: "minWins", label: "Davon gewonnen", min: 2, max: 10, step: 1,
+    title: "So viele davon muss jeweils die Heimmannschaft (bzw. jeweils der Gast) gewonnen haben. Daves Regel:"
+      + " alle."
+  },
+  {
+    id: "maxAgeYears", label: "Ältestes Duell höchstens (Jahre)", min: 1, max: 99, step: 1, sliderMax: 15,
+    title: "Wie lange das älteste der gezählten Duelle her sein darf. 99 heißt: egal."
+  },
+  {
+    id: "minOdds", label: "Quote ab", min: 1, max: 3, step: 0.05,
+    title: "Mindestquote auf den Tipp – Daves Vorgabe 1,30."
+  },
+  {
+    id: "maxOdds", label: "Quote bis", min: 1.2, max: 99, step: 0.05, sliderMax: 6,
+    title: "Höchstquote. 99 heißt: keine Grenze."
+  }
+];
+
 export const QUICKPICK_PARAMS: Record<QuickpickPresetId, QuickpickParam[]> = {
   davesTable: DAVES_TABLE,
+  davesHomeAway: DAVES_HOME_AWAY,
   daves1x2: DAVES,
   dominanz: DOMINANZ,
   hz15: HZ15,
@@ -272,7 +297,18 @@ export const QUICKPICK_TOGGLES: Record<QuickpickPresetId, QuickpickToggle[]> = {
   remis: [],
   remisScore: [],
   modell1x2: [],
-  kombi: []
+  kombi: [],
+  davesHomeAway: [
+    {
+      id: "allowOppositeWin", label: "Rest-Duell darf die andere Seite gewinnen",
+      title: "Nur wenn weniger Siege als Duelle verlangt sind: Darf das übrige Duell auch die andere Seite"
+        + " gewonnen haben? Aus heißt: nur ein Unentschieden ist erlaubt."
+    },
+    {
+      id: "excludeFriendlies", label: "Testspiele nicht mitzählen",
+      title: "Testspiele finden oft auf neutralem Platz oder mit B-Elf statt – dort sagt der Spielort nichts."
+    }
+  ]
 };
 
 /** Anzeigewert eines Reglers: Wahrscheinlichkeiten stehen im Modell als 0 bis 1. */

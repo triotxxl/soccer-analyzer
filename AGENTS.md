@@ -2130,3 +2130,27 @@ nachgezogen wird erst ab rund 100 Tipps der Vorgabestufe.
 - In der alten App mit Reglern (Plätze in 5/10, Spieltage, Quote) und Schalter „Auch konstant gut gegen
   abrutschend"; Spalten „Im Hoch"/„Im Tief" („6. · +4 in 5 · +7 in 10"), Stärke „Trend ±n".
 
+### „Daves Home/Away-Filter": der Spielort gewinnt jedes Duell (seit 20.11.2026)
+
+- Davids Auftrag vom 20.11.2026 (`davesHomeAway`, `src/quickpick-daveshomeaway.ts`, Gruppe Daves Filter): Spiele, in
+  denen in den letzten 5 direkten Duellen **jedes Mal die Mannschaft gewann, die in jenem Duell zu Hause spielte** -
+  egal welcher Verein (Davids Antwort auf die Rückfrage: „Spielort gewinnt“, nicht „das heutige Heimteam gewann alle“).
+  Dann Tipp 1; gewann jedes Mal der Gast, Tipp 2. Quote ab 1,30 (Davids Wahl, Identität). Testspiele zählen nicht,
+  ein Remis bricht die Serie, unter 5 Pflichtspiel-Duellen nicht prüfbar (`keineDuelle`). Duelle aus `h2h.history`,
+  sonst `h2h.matches`. Duelle auf neutralem Platz (Finale, Supercup) erkennt der Snapshot nicht (29 von 141 Tipps
+  haben eins unter den fünf). Stufen vorab festgelegt: Streng zusätzlich ältestes Duell höchstens 4 Jahre und Quote bis
+  3,00, Locker 4 Siege + 1 Remis, Weit 4 von 5 beliebig. Abweisungsgründe `h2hSpielort`, `h2hAlt`.
+- **Vorabmessung des Prüfers (20.11.2026, Duelle aus dem Cache nachgebaut, 0 Aufrufe):** Vorgabe 141 Tipps, 1,5 je
+  Tag, 48,9 % Treffer bei fair 40,3 %, Ø-Quote 2,68; Treffer − fair +8,7 ± 4,0, Ertrag +11,5 ± 11,1 %. **Kein Beleg:**
+  1. Hälfte +14,7 ± 5,8, 2. Hälfte +2,8 ± 5,6 (je Monat: Aug −0,2, Sep +19,9, Okt +8,4, Nov −0,9), Regression
+  b(Muster) 0,38 ± 0,18, 2. Hälfte 0,12 ± 0,25. Das Muster kommt nicht öfter vor als durch Zufall (133 beobachtet,
+  147-163 erwartet). Locker/Weit +3,0/+1,1 gegen fair, Ertrag −5,0/−10,5 %. Fast nur Ligaspiele; Überschneidung mit
+  Daves 1x2 nur 4 von 141. Ein 4er geht in rund 6 von 100 Fällen auf.
+- Knöpfe aus `npm run quickpick-report -- --preset davesHomeAway` (136 statt 141 Tipps, weil alte Snapshots nur fünf
+  Duelle samt Testspielen tragen). **Offen** (Vorschlag des Prüfers): Duelle in `tools/snapshot-history.ts` aus dem
+  Cache nachbauen wie die Tabellen. Nicht `--write` mit `--preset` - das überschriebe den Kalibrierstand der übrigen.
+- **Nachmessung vorab festgelegt:** nur neue Tipps der Vorgabe ab 20.11.2026; bei 150 Tipps (rund 3-5 Monate)
+  bestanden, wenn Treffer − fair, je Anstoßtag gebündelt, über 2 Standardfehlern liegt, sonst „kein Vorteil“ in die
+  Texte. Schwellen bis dahin nicht an diesen Daten nachstellen. In Neo steht er noch nicht unter „Autoren“.
+- In der alten App Regler (Duelle, davon gewonnen, ältestes Duell, Quote), Schalter „Rest-Duell darf die andere Seite
+  gewinnen“ und „Testspiele nicht mitzählen“; Spalten „Direkte Duelle“ („2:0 H · 1:0 H …“) und „Ältestes Duell“.

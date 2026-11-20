@@ -24,6 +24,7 @@ import { REMIS_SCORE_PRESET, evaluateRemisScore, type RemisScoreQuickpickSetting
 import { MODELL1X2_PRESET, evaluateModell1x2, type Modell1x2QuickpickSettings } from "./quickpick-modell1x2.ts";
 import { KOMBI_PRESET, evaluateKombi, type KombiQuickpickSettings } from "./quickpick-kombi.ts";
 import { DAVES_TABLE_PRESET, evaluateDavesTable, type DavesTableQuickpickSettings } from "./quickpick-davestable.ts";
+import { DAVES_HOME_AWAY_PRESET, evaluateDavesHomeAway, type DavesHomeAwayQuickpickSettings } from "./quickpick-daveshomeaway.ts";
 
 export * from "./quickpick-core.ts";
 export * from "./quickpick-daves.ts";
@@ -34,6 +35,7 @@ export * from "./quickpick-remisscore.ts";
 export * from "./quickpick-modell1x2.ts";
 export * from "./quickpick-kombi.ts";
 export * from "./quickpick-davestable.ts";
+export * from "./quickpick-daveshomeaway.ts";
 
 /**
  * Die Einstellungen der **gerade gewählten** Voreinstellung. Eine diskriminierte Union über
@@ -47,7 +49,8 @@ export type QuickpickSettings =
   | RemisScoreQuickpickSettings
   | Modell1x2QuickpickSettings
   | KombiQuickpickSettings
-  | DavesTableQuickpickSettings;
+  | DavesTableQuickpickSettings
+  | DavesHomeAwayQuickpickSettings;
 
 /** Die Einstellungen zu einer bestimmten Voreinstellung. */
 export type SettingsOf<I extends QuickpickPresetId> = Extract<QuickpickSettings, { preset: I }>;
@@ -63,7 +66,8 @@ export const QUICKPICK_PRESETS: Record<QuickpickPresetId, AnyQuickpickPreset> = 
   remisScore: REMIS_SCORE_PRESET as unknown as AnyQuickpickPreset,
   modell1x2: MODELL1X2_PRESET as unknown as AnyQuickpickPreset,
   kombi: KOMBI_PRESET as unknown as AnyQuickpickPreset,
-  davesTable: DAVES_TABLE_PRESET as unknown as AnyQuickpickPreset
+  davesTable: DAVES_TABLE_PRESET as unknown as AnyQuickpickPreset,
+  davesHomeAway: DAVES_HOME_AWAY_PRESET as unknown as AnyQuickpickPreset
 };
 
 /** Stabile Reihenfolge für die Auswahl in der Oberfläche. */
@@ -72,6 +76,7 @@ export const QUICKPICK_PRESET_LIST: AnyQuickpickPreset[] = [
   QUICKPICK_PRESETS.dominanz,
   QUICKPICK_PRESETS.remisScore,
   QUICKPICK_PRESETS.davesTable,
+  QUICKPICK_PRESETS.davesHomeAway,
   QUICKPICK_PRESETS.modell1x2,
   QUICKPICK_PRESETS.hz15,
   QUICKPICK_PRESETS.remis,
@@ -118,6 +123,7 @@ export function evaluateFixture(
     : settings.preset === "modell1x2" ? evaluateModell1x2(fixture, settings)
     : settings.preset === "kombi" ? evaluateKombi(fixture, settings)
     : settings.preset === "davesTable" ? evaluateDavesTable(fixture, settings)
+    : settings.preset === "davesHomeAway" ? evaluateDavesHomeAway(fixture, settings)
     : evaluateDaves(fixture, settings);
 }
 

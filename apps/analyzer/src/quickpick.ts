@@ -14,6 +14,7 @@ import {
   DEFAULT_MODELL1X2_SETTINGS,
   DEFAULT_KOMBI_SETTINGS,
   DEFAULT_DAVES_TABLE_SETTINGS,
+  DEFAULT_DAVES_HOME_AWAY_SETTINGS,
   QUICKPICK_PRESETS,
   type DavesQuickpickSettings,
   type QuickpickPresetId,
@@ -24,7 +25,8 @@ import {
   type RemisScoreQuickpickSettings,
   type Modell1x2QuickpickSettings,
   type KombiQuickpickSettings,
-  type DavesTableQuickpickSettings
+  type DavesTableQuickpickSettings,
+  type DavesHomeAwayQuickpickSettings
 } from "../../../src/quickpick.ts";
 
 const STORAGE_KEY = "football-analyzer:quickpick-settings";
@@ -44,6 +46,7 @@ export interface QuickpickStore {
   modell1x2: Modell1x2QuickpickSettings;
   kombi: KombiQuickpickSettings;
   davesTable: DavesTableQuickpickSettings;
+  davesHomeAway: DavesHomeAwayQuickpickSettings;
 }
 
 export const DEFAULT_QUICKPICK_STORE: QuickpickStore = {
@@ -55,7 +58,8 @@ export const DEFAULT_QUICKPICK_STORE: QuickpickStore = {
   remisScore: DEFAULT_REMIS_SCORE_SETTINGS,
   modell1x2: DEFAULT_MODELL1X2_SETTINGS,
   kombi: DEFAULT_KOMBI_SETTINGS,
-  davesTable: DEFAULT_DAVES_TABLE_SETTINGS
+  davesTable: DEFAULT_DAVES_TABLE_SETTINGS,
+  davesHomeAway: DEFAULT_DAVES_HOME_AWAY_SETTINGS
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -98,7 +102,8 @@ export function loadQuickpickStore(): QuickpickStore {
     if (parsed.daves1x2 === undefined && parsed.dominanz === undefined
       && parsed.underdog === undefined && parsed.hz15 === undefined
       && parsed.remis === undefined && parsed.remisScore === undefined
-      && parsed.modell1x2 === undefined && parsed.kombi === undefined && parsed.davesTable === undefined) {
+      && parsed.modell1x2 === undefined && parsed.kombi === undefined && parsed.davesTable === undefined
+      && parsed.davesHomeAway === undefined) {
       return { ...DEFAULT_QUICKPICK_STORE, daves1x2: mergeBranch(DEFAULT_QUICKPICK_SETTINGS, parsed) };
     }
 
@@ -119,7 +124,8 @@ export function loadQuickpickStore(): QuickpickStore {
       remisScore: mergeBranch(DEFAULT_REMIS_SCORE_SETTINGS, parsed.remisScore),
       modell1x2: mergeBranch(DEFAULT_MODELL1X2_SETTINGS, parsed.modell1x2),
       kombi: mergeBranch(DEFAULT_KOMBI_SETTINGS, parsed.kombi),
-      davesTable: mergeBranch(DEFAULT_DAVES_TABLE_SETTINGS, parsed.davesTable)
+      davesTable: mergeBranch(DEFAULT_DAVES_TABLE_SETTINGS, parsed.davesTable),
+      davesHomeAway: mergeBranch(DEFAULT_DAVES_HOME_AWAY_SETTINGS, parsed.davesHomeAway)
     };
   } catch {
     return DEFAULT_QUICKPICK_STORE;
@@ -144,6 +150,7 @@ export function settingsOf(store: QuickpickStore): QuickpickSettings {
     : store.aktiv === "modell1x2" ? store.modell1x2
     : store.aktiv === "kombi" ? store.kombi
     : store.aktiv === "davesTable" ? store.davesTable
+    : store.aktiv === "davesHomeAway" ? store.davesHomeAway
     : store.daves1x2;
 }
 
@@ -156,6 +163,7 @@ export function withSettings(store: QuickpickStore, settings: QuickpickSettings)
     : settings.preset === "modell1x2" ? { ...store, modell1x2: settings }
     : settings.preset === "kombi" ? { ...store, kombi: settings }
     : settings.preset === "davesTable" ? { ...store, davesTable: settings }
+    : settings.preset === "davesHomeAway" ? { ...store, davesHomeAway: settings }
     : { ...store, daves1x2: settings };
 }
 

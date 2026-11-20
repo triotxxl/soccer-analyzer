@@ -475,7 +475,7 @@ describe("Vier Voreinstellungen", () => {
     render(<Harness fixtures={[fixture(1, "Alpha", "Beta", 75)]} />);
     const werte = (gruppe: string) => within(screen.getByRole("group", { name: gruppe }))
       .getAllByRole("radio").map((radio) => radio.getAttribute("value"));
-    expect(werte("Daves Filter")).toEqual(["daves1x2", "dominanz", "remisScore", "davesTable"]);
+    expect(werte("Daves Filter")).toEqual(["daves1x2", "dominanz", "remisScore", "davesTable", "davesHomeAway"]);
     expect(werte("Modell-Filter")).toEqual(["modell1x2", "hz15", "remis"]);
     expect(werte("Quoten-Filter")).toEqual(["kombi"]);
   });

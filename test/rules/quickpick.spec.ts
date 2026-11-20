@@ -1136,3 +1136,70 @@ describe("Daves Table-Filter", () => {
     expect((D as { minOdds?: number }).minOdds).toBe(1.6);
   });
 });
+
+describe("Daves Home/Away-Filter", () => {
+  const D = QUICKPICK_PRESETS.davesHomeAway.defaults;
+  /** Ein Duell als [Heimtore, Gasttore]; `friendly` für ein Testspiel. Neueste zuerst, je ein Jahr zurück. */
+  const duels = (scores: Array<[number, number] | [number, number, "test"]>) => scores.map(([home, away, test], index) => ({
+    fixtureId: 100 + index,
+    teamWasHome: index % 2 === 0,
+    date: `${2025 - index}-09-01T18:00:00+00:00`,
+    homeTeam: index % 2 === 0 ? "Alpha" : "Beta",
+    awayTeam: index % 2 === 0 ? "Beta" : "Alpha",
+    homeGoals: home,
+    awayGoals: away,
+    friendly: test === "test"
+  }));
+  const game = (scores: Parameters<typeof duels>[0], oddsHome = 1.9, oddsAway = 4.2) => fixture({
+    kickoff: "2026-11-21T15:00:00Z",
+    h2h: { outcomes: [], btts: [], draws: 0, consecutiveDraws: 0, matches: [], history: duels(scores) },
+    markets: market({ pick: "1", odds: oddsHome, oddsHome, oddsAway })
+  });
+
+  it("tippt 1, wenn in allen 5 Duellen der Spielort gewann – egal welcher Verein", () => {
+    const result = evaluateFixture(game([[2, 0], [1, 0], [3, 1], [2, 1], [1, 0]]), D);
+    expect(result.passes).toBe(true);
+    expect(result.side).toBe("1");
+    expect(result.odds).toBe(1.9);
+    expect(result.davesHomeAway?.pattern).toBe("heim");
+    expect(result.davesHomeAway?.wins).toBe(5);
+  });
+
+  it("tippt 2, wenn in allen 5 Duellen der Gast gewann", () => {
+    const result = evaluateFixture(game([[0, 1], [1, 2], [0, 3], [1, 2], [0, 1]]), D);
+    expect(result.passes).toBe(true);
+    expect(result.side).toBe("2");
+    expect(result.odds).toBe(4.2);
+    expect(result.davesHomeAway?.pattern).toBe("gast");
+  });
+
+  it("ein Unentschieden oder ein Sieg der anderen Seite bricht die Serie", () => {
+    expect(evaluateFixture(game([[2, 0], [1, 1], [3, 1], [2, 1], [1, 0]]), D).rejectedBy).toBe("h2hSpielort");
+    expect(evaluateFixture(game([[2, 0], [0, 1], [3, 1], [2, 1], [1, 0]]), D).rejectedBy).toBe("h2hSpielort");
+    // „Locker“: 4 von 5 mit Unentschieden ja, mit Sieg der anderen Seite nein; „Weit“ lässt beides zu.
+    expect(evaluateFixture(game([[2, 0], [1, 1], [3, 1], [2, 1], [1, 0]]), applyLevel({ ...D }, "locker")).passes).toBe(true);
+    expect(evaluateFixture(game([[2, 0], [0, 1], [3, 1], [2, 1], [1, 0]]), applyLevel({ ...D }, "locker")).passes).toBe(false);
+    expect(evaluateFixture(game([[2, 0], [0, 1], [3, 1], [2, 1], [1, 0]]), applyLevel({ ...D }, "weit")).passes).toBe(true);
+  });
+
+  it("zählt Testspiele nicht und verlangt 5 Pflichtspiel-Duelle", () => {
+    // Das Testspiel (0:3) fällt heraus, dahinter rückt ein Heimsieg nach.
+    expect(evaluateFixture(game([[2, 0], [0, 3, "test"], [1, 0], [3, 1], [2, 1], [1, 0]]), D).passes).toBe(true);
+    expect(evaluateFixture(game([[2, 0], [0, 3, "test"], [1, 0], [3, 1], [2, 1]]), D).rejectedBy).toBe("keineDuelle");
+    expect(evaluateFixture(game([[2, 0], [1, 0], [3, 1]]), D).rejectedBy).toBe("keineDuelle");
+  });
+
+  it("verlangt Quote ab 1,30 und bei „Streng“ Duelle der letzten 4 Jahre", () => {
+    const serie: Parameters<typeof duels>[0] = [[2, 0], [1, 0], [3, 1], [2, 1], [1, 0]];
+    expect(evaluateFixture(game(serie, 1.22), D).rejectedBy).toBe("quote");
+    // Das älteste Duell liegt gut 5 Jahre zurück.
+    expect(evaluateFixture(game(serie), applyLevel({ ...D }, "streng")).rejectedBy).toBe("h2hAlt");
+  });
+
+  it("steht bei den Daves Filtern, Vorgabe „Ausgewogen“ = 5 von 5, ab 1,30", () => {
+    expect(QUICKPICK_PRESETS.davesHomeAway.group).toBe("daves");
+    expect(QUICKPICK_PRESETS.davesHomeAway.levels.map((l) => l.id)).toEqual(["streng", "ausgewogen", "locker", "weit"]);
+    expect(levelOf(D)).toBe("ausgewogen");
+    expect(D).toMatchObject({ minOdds: 1.3, duels: 5, minWins: 5, excludeFriendlies: true });
+  });
+});

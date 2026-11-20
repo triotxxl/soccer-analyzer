@@ -624,8 +624,57 @@ const DAVES_TABLE_COLUMNS: QuickpickColumn[] = [
   MODELL1X2_COLUMNS.find((column) => column.key === "quote")!
 ];
 
+/** Ein Duell kurz: „2:0 H“ (Heimsieg), „0:1 G“ (Gast), „1:1 =“. */
+function duelText(duel: { homeGoals: number; awayGoals: number }): string {
+  const mark = duel.homeGoals > duel.awayGoals ? "H" : duel.homeGoals < duel.awayGoals ? "G" : "=";
+  return `${duel.homeGoals}:${duel.awayGoals} ${mark}`;
+}
+
+/** Die Spalten von „Daves Home/Away-Filter“: Muster der Duelle und wann das älteste war. */
+const DAVES_HOME_AWAY_COLUMNS: QuickpickColumn[] = [
+  partie,
+  {
+    key: "tipp", label: "Tipp", sortable: false, className: "quickpick-side",
+    cell: (row) => ({
+      main: teamOf(row),
+      note: row.evaluation.davesHomeAway?.pattern === "gast" ? "Gast gewinnt" : "Heim gewinnt"
+    })
+  },
+  {
+    key: "duelle", label: "Direkte Duelle", ariaLabel: "Die gezählten direkten Duelle, neueste zuerst", sortable: true,
+    value: (row) => row.evaluation.davesHomeAway?.wins ?? -1,
+    cell: (row) => {
+      const detail = row.evaluation.davesHomeAway;
+      if (!detail) return { main: "–" };
+      const sieger = detail.pattern === "heim" ? "Heimmannschaft" : "Gast";
+      return {
+        main: detail.duels.map(duelText).join(" · "),
+        mainTitle: detail.duels.map((duel) => `${duel.date.slice(0, 10)}: ${duel.homeTeam} – ${duel.awayTeam}`
+          + ` ${duel.homeGoals}:${duel.awayGoals}`).join("\n"),
+        note: `${detail.wins} von ${detail.duels.length} gewann die ${sieger}`
+      };
+    }
+  },
+  {
+    key: "aeltestes", label: "Ältestes Duell", ariaLabel: "Datum des ältesten gezählten Duells", sortable: true,
+    value: (row) => row.evaluation.davesHomeAway ? Date.parse(row.evaluation.davesHomeAway.oldest) : 0,
+    cell: (row) => {
+      const detail = row.evaluation.davesHomeAway;
+      if (!detail) return { main: "–" };
+      const years = (Date.parse(row.fixture.kickoff) - Date.parse(detail.oldest)) / (365.25 * 24 * 3600 * 1000);
+      return {
+        main: detail.oldest.slice(0, 10).split("-").reverse().join("."),
+        note: `vor ${years.toFixed(1).replace(".", ",")} Jahren`,
+        mainTitle: "Je älter die Duelle, desto weniger sagen sie über die Mannschaften von heute."
+      };
+    }
+  },
+  MODELL1X2_COLUMNS.find((column) => column.key === "quote")!
+];
+
 const QUICKPICK_COLUMNS: Record<QuickpickPresetId, QuickpickColumn[]> = {
   davesTable: DAVES_TABLE_COLUMNS,
+  davesHomeAway: DAVES_HOME_AWAY_COLUMNS,
   daves1x2: DAVES_COLUMNS,
   dominanz: DOMINANZ_COLUMNS,
   hz15: HZ15_COLUMNS,
@@ -738,6 +787,15 @@ export function strengthOf(preset: QuickpickPresetId, row: QuickpickRow): Quickp
       percent: Math.min(100, swing * 5), label: `Trend ±${swing}`, gut: 50, mittel: 25,
       title: "Wie weit die beiden in der Tabelle auseinanderlaufen: Plätze, die die eine gewonnen, plus Plätze,"
         + " die die andere verloren hat – in den letzten 5 oder 10 Spieltagen, je nachdem, wo es mehr ist."
+    };
+  }
+  if (preset === "davesHomeAway") {
+    const detail = evaluation.davesHomeAway;
+    if (detail === null || detail === undefined) return null;
+    const percent = Math.round(detail.wins / detail.duels.length * 100);
+    return {
+      percent, label: `${detail.wins} von ${detail.duels.length}`, gut: 100, mittel: 80,
+      title: `In so vielen der letzten direkten Duelle gewann jeweils ${detail.pattern === "heim" ? "die Heimmannschaft" : "der Gast"}.`
     };
   }
   if (preset === "remisScore") {

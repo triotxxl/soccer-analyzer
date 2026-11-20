@@ -2,6 +2,7 @@ import type { DashboardFixture, DashboardMarket, DashboardMarketKey, FormResult 
 import type { DrawSignalResult } from "./draw-signals.ts";
 import type { KombiFlag, KombiTip } from "./kombi-tipps.ts";
 import type { DavesTableDetail } from "./quickpick-davestable.ts";
+import type { DavesHomeAwayDetail } from "./quickpick-daveshomeaway.ts";
 import type { RecentMatchSummary } from "./types.ts";
 
 /**
@@ -12,7 +13,8 @@ import type { RecentMatchSummary } from "./types.ts";
  * Hier steht bewusst keine Regel - nur das, woraus Regeln gebaut werden.
  */
 
-export type QuickpickPresetId = "daves1x2" | "dominanz" | "hz15" | "remis" | "remisScore" | "modell1x2" | "kombi" | "davesTable";
+export type QuickpickPresetId = "daves1x2" | "dominanz" | "hz15" | "remis" | "remisScore" | "modell1x2" | "kombi" | "davesTable"
+  | "davesHomeAway";
 
 /**
  * Die Gruppe, unter der eine Voreinstellung im Dialog erscheint. `daves` wählt über Tabelle,
@@ -166,7 +168,11 @@ export type QuickpickRejection =
   | "auffaellig"
   | "nichtUnterDenBesten"
   // Grund der Voreinstellung „Daves Table-Filter“: keine Mannschaft im Hoch gegen eine im Tief.
-  | "tabellenTrend";
+  | "tabellenTrend"
+  // Gründe der Voreinstellung „Daves Home/Away-Filter“. `h2hSpielort` heißt „gemessen, Serie gebrochen“,
+  // `h2hAlt` „Duelle zu alt“; zu wenige Duelle bleiben `keineDuelle`.
+  | "h2hSpielort"
+  | "h2hAlt";
 
 export const REJECTION_LABELS: Record<QuickpickRejection, string> = {
   keinTipp: "für dieses Spiel gibt es keinen Sieger-Tipp",
@@ -195,7 +201,9 @@ export const REJECTION_LABELS: Record<QuickpickRejection, string> = {
   keinKombiTipp: "kein Tipp ab der Mindestquote, bei dem der Buchmacher auch die Gegenseite anbietet",
   auffaellig: "auffällige Quoten, oder Modell und Quote liegen weit auseinander – lieber weglassen",
   nichtUnterDenBesten: "zählt nicht zu den besten – Feld „Nur die besten“",
-  tabellenTrend: "keine Mannschaft klettert in der Tabelle, während die andere abrutscht"
+  tabellenTrend: "keine Mannschaft klettert in der Tabelle, während die andere abrutscht",
+  h2hSpielort: "in den direkten Duellen gewann nicht jedes Mal die Heimmannschaft bzw. jedes Mal der Gast",
+  h2hAlt: "die direkten Duelle liegen zu lange zurück"
 };
 
 export interface QuickpickDominance {
@@ -358,6 +366,8 @@ export interface QuickpickEvaluation {
   modell1x2?: Modell1x2Detail | null;
   /** Nur bei „davesTable“ gesetzt: Tabellentrend beider Seiten. */
   davesTable?: DavesTableDetail | null;
+  /** Nur bei „davesHomeAway“ gesetzt: die gezählten Duelle und das Muster. */
+  davesHomeAway?: DavesHomeAwayDetail | null;
   /** Nur bei „kombi" gesetzt. */
   kombi?: KombiDetail | null;
   passes: boolean;
@@ -379,7 +389,7 @@ export function emptyRejections(): Record<QuickpickRejection, number> {
     remisChance: 0, remisScore: 0, remisDaten: 0,
     siegChance: 0, nichtBelastbar: 0,
     keinKombiTipp: 0, auffaellig: 0, nichtUnterDenBesten: 0,
-    tabellenTrend: 0
+    tabellenTrend: 0, h2hSpielort: 0, h2hAlt: 0
   };
 }
 
@@ -563,5 +573,6 @@ export function firstHalfRateOf(
 export function oddsEstimated(evaluation: QuickpickEvaluation): boolean {
   return evaluation.dominanz?.oddsSource === "geschätzt"
     || evaluation.modell1x2?.oddsSource === "geschätzt"
-    || evaluation.davesTable?.oddsSource === "geschätzt";
+    || evaluation.davesTable?.oddsSource === "geschätzt"
+    || evaluation.davesHomeAway?.oddsSource === "geschätzt";
 }
